@@ -59,7 +59,7 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // Bind to Railway/Heroku-style dynamic PORT, fallback to 5000 (Replit)
+  // Bind to platform-provided PORT (e.g., Railway/Heroku), fallback to 5000
   const port = Number(process.env.PORT) || 5000;
   server.listen({
     port,
