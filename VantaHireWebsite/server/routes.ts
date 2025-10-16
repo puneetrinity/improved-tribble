@@ -17,11 +17,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
+        // Allow strictly required third-party domains
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          // Apollo (optional tracker)
+          "https://assets.apollo.io",
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          // Google Fonts stylesheet (optional)
+          "https://fonts.googleapis.com",
+        ],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: ["'self'", "ws:", "wss:"],
-        fontSrc: ["'self'"],
+        connectSrc: [
+          "'self'",
+          "ws:",
+          "wss:",
+          // Apollo (optional tracker)
+          "https://assets.apollo.io",
+        ],
+        fontSrc: [
+          "'self'",
+          "data:",
+          // Google Fonts font files (optional)
+          "https://fonts.gstatic.com",
+        ],
         objectSrc: ["'none'"],
         mediaSrc: ["'self'"],
         frameSrc: ["'none'"],

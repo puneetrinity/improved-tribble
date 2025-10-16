@@ -31,8 +31,8 @@ const Hero = () => {
       <div className={`flex flex-col md:flex-row items-center transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         <div className="md:w-1/2 mb-10 md:mb-0 relative">
           {/* Background decoration */}
-          <div className="absolute -z-10 w-64 h-64 rounded-full bg-purple-500/10 blur-3xl -left-10 -top-10 animate-pulse-slow"></div>
-          <div className="absolute -z-10 w-48 h-48 rounded-full bg-blue-500/10 blur-3xl left-40 top-40 animate-pulse-slow" 
+          <div className="absolute -z-10 w-64 h-64 rounded-full bg-purple-500/10 blur-2xl -left-10 -top-10 animate-pulse-slow"></div>
+          <div className="absolute -z-10 w-48 h-48 rounded-full bg-blue-500/10 blur-2xl left-40 top-40 animate-pulse-slow" 
               style={{animationDelay: '1.2s'}}></div>
           
           {/* Premium line accent */}
@@ -70,8 +70,8 @@ const Hero = () => {
         
         <div className="md:w-1/2 flex justify-center relative">
           {/* Background glows */}
-          <div className="absolute w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-pulse-slow"></div>
-          <div className="absolute w-48 h-48 bg-pink-500/10 rounded-full blur-3xl translate-x-20 -translate-y-10 animate-pulse-slow" 
+          <div className="absolute w-72 h-72 bg-blue-500/10 rounded-full blur-2xl animate-pulse-slow"></div>
+          <div className="absolute w-48 h-48 bg-pink-500/10 rounded-full blur-2xl translate-x-20 -translate-y-10 animate-pulse-slow" 
                style={{animationDelay: '1s'}}></div>
           <div className="absolute w-36 h-36 bg-purple-500/10 rounded-full blur-xl translate-x-40 -translate-y-20 animate-pulse-slow"
                style={{animationDelay: '1.5s'}}></div>

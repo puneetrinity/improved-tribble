@@ -22,6 +22,7 @@ import ApplicationManagementPage from "@/pages/application-management-page";
 import CandidateDashboard from "@/pages/candidate-dashboard";
 import JobAnalyticsDashboard from "@/pages/job-analytics-dashboard";
 import RecruiterDashboard from "@/pages/recruiter-dashboard";
+import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
 
 function Router() {
   return (
@@ -53,6 +54,9 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
+          {/* Inject analytics only after consent */}
+          <AnalyticsOnConsent />
+          <CookieConsent />
           <Router />
         </TooltipProvider>
       </AuthProvider>

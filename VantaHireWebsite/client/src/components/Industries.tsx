@@ -244,9 +244,9 @@ const Industries = () => {
     >
       {/* Premium background decorations */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-      <div className="absolute top-0 right-0 w-96 h-96 bg-[#7B38FB]/15 rounded-full blur-[100px] animate-pulse-slow"></div>
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#2D81FF]/15 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
-      <div className="absolute top-1/3 left-1/4 w-72 h-72 bg-[#FF5BA8]/10 rounded-full blur-[80px] animate-pulse-slow" style={{ animationDelay: '0.8s' }}></div>
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#7B38FB]/15 rounded-full blur-[50px] animate-pulse-slow"></div>
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#2D81FF]/15 rounded-full blur-[50px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
+      <div className="absolute top-1/3 left-1/4 w-72 h-72 bg-[#FF5BA8]/10 rounded-full blur-[40px] animate-pulse-slow" style={{ animationDelay: '0.8s' }}></div>
       
       {/* Animated particles */}
       <div className="absolute w-2 h-2 bg-blue-300/40 rounded-full top-1/4 right-1/3 animate-float-path" 

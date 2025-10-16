@@ -88,9 +88,9 @@ const Header = () => {
         {/* Enhanced desktop menu */}
         <div className="hidden md:flex items-center space-x-8">
           {/* Navigation links with premium hover effects */}
-          <a 
-            href="/#about" 
-            className="relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group text-white/70"
+          <a
+            href="/#about"
+            className={`relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group ${activeSection === 'about' ? 'text-white' : 'text-white/70'}`}
             onClick={(e) => {
               e.preventDefault();
               if (window.location.pathname === '/') {
@@ -101,13 +101,13 @@ const Header = () => {
             }}
           >
             <span className="relative z-10">About</span>
-            <span className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 scale-x-0 group-hover:scale-x-100"></span>
+            <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 ${activeSection === 'about' ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}></span>
             <span className="absolute inset-0 -z-10 bg-white/0 group-hover:bg-white/5 transition-colors duration-300 rounded-md"></span>
           </a>
           
-          <a 
-            href="/#services" 
-            className="relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group text-white/70"
+          <a
+            href="/#services"
+            className={`relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group ${activeSection === 'services' ? 'text-white' : 'text-white/70'}`}
             onClick={(e) => {
               e.preventDefault();
               if (window.location.pathname === '/') {
@@ -118,13 +118,13 @@ const Header = () => {
             }}
           >
             <span className="relative z-10">Services</span>
-            <span className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 scale-x-0 group-hover:scale-x-100"></span>
+            <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 ${activeSection === 'services' ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}></span>
             <span className="absolute inset-0 -z-10 bg-white/0 group-hover:bg-white/5 transition-colors duration-300 rounded-md"></span>
           </a>
           
-          <a 
-            href="/#industries" 
-            className="relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group text-white/70"
+          <a
+            href="/#industries"
+            className={`relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group ${activeSection === 'industries' ? 'text-white' : 'text-white/70'}`}
             onClick={(e) => {
               e.preventDefault();
               if (window.location.pathname === '/') {
@@ -135,13 +135,13 @@ const Header = () => {
             }}
           >
             <span className="relative z-10">Industries</span>
-            <span className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 scale-x-0 group-hover:scale-x-100"></span>
+            <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 ${activeSection === 'industries' ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}></span>
             <span className="absolute inset-0 -z-10 bg-white/0 group-hover:bg-white/5 transition-colors duration-300 rounded-md"></span>
           </a>
           
-          <a 
-            href="/#contact" 
-            className="relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group text-white/70"
+          <a
+            href="/#contact"
+            className={`relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group ${activeSection === 'contact' ? 'text-white' : 'text-white/70'}`}
             onClick={(e) => {
               e.preventDefault();
               if (window.location.pathname === '/') {
@@ -152,7 +152,7 @@ const Header = () => {
             }}
           >
             <span className="relative z-10">Contact</span>
-            <span className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 scale-x-0 group-hover:scale-x-100"></span>
+            <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 ${activeSection === 'contact' ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'}`}></span>
             <span className="absolute inset-0 -z-10 bg-white/0 group-hover:bg-white/5 transition-colors duration-300 rounded-md"></span>
           </a>
 
@@ -295,9 +295,9 @@ const Header = () => {
           </button>
         </div>
         <div className="flex flex-col space-y-6">
-          <a 
-            href="/#about" 
-            className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"
+          <a
+            href="/#about"
+            className={`text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 ${activeSection === 'about' ? 'border-[#7B38FB]' : 'border-transparent hover:border-[#7B38FB]'}`}
             onClick={(e) => {
               e.preventDefault();
               setIsMenuOpen(false);
@@ -310,9 +310,9 @@ const Header = () => {
           >
             About
           </a>
-          <a 
-            href="/#services" 
-            className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"
+          <a
+            href="/#services"
+            className={`text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 ${activeSection === 'services' ? 'border-[#7B38FB]' : 'border-transparent hover:border-[#7B38FB]'}`}
             onClick={(e) => {
               e.preventDefault();
               setIsMenuOpen(false);
@@ -325,9 +325,9 @@ const Header = () => {
           >
             Services
           </a>
-          <a 
-            href="/#industries" 
-            className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"
+          <a
+            href="/#industries"
+            className={`text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 ${activeSection === 'industries' ? 'border-[#7B38FB]' : 'border-transparent hover:border-[#7B38FB]'}`}
             onClick={(e) => {
               e.preventDefault();
               setIsMenuOpen(false);
@@ -340,9 +340,9 @@ const Header = () => {
           >
             Industries
           </a>
-          <a 
-            href="/#contact" 
-            className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"
+          <a
+            href="/#contact"
+            className={`text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 ${activeSection === 'contact' ? 'border-[#7B38FB]' : 'border-transparent hover:border-[#7B38FB]'}`}
             onClick={(e) => {
               e.preventDefault();
               setIsMenuOpen(false);

@@ -115,17 +115,22 @@ const ContactForm = () => {
     <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))] to-[hsl(var(--vanta-dark))]/80 backdrop-blur-lg p-8 rounded-xl shadow-lg premium-card border border-white/5">
       {!submitted ? (
         <form onSubmit={handleSubmit} className="space-y-5">
-          <h3 className="text-xl font-bold mb-4 animate-gradient-text">Get in Touch</h3>
+          <div className="mb-6">
+            <h3 className="text-xl font-bold mb-2 animate-gradient-text">Send Us a Message</h3>
+            <p className="text-sm text-white/60">
+              Fields marked with <span className="text-[#FF5BA8]">*</span> are required
+            </p>
+          </div>
           
           <div className="space-y-5">
             <div className="relative">
-              <label 
-                htmlFor="name" 
+              <label
+                htmlFor="name"
                 className={`block text-sm font-medium mb-1 transition-all duration-300 ${
                   focusedField === 'name' ? 'text-[#7B38FB]' : 'text-white/80'
                 }`}
               >
-                Your Name
+                Your Name <span className="text-[#FF5BA8]">*</span>
               </label>
               <input
                 type="text"
@@ -147,13 +152,13 @@ const ContactForm = () => {
             </div>
             
             <div className="relative">
-              <label 
-                htmlFor="email" 
+              <label
+                htmlFor="email"
                 className={`block text-sm font-medium mb-1 transition-all duration-300 ${
                   focusedField === 'email' ? 'text-[#7B38FB]' : 'text-white/80'
                 }`}
               >
-                Email Address
+                Email Address <span className="text-[#FF5BA8]">*</span>
               </label>
               <input
                 type="email"
@@ -175,13 +180,13 @@ const ContactForm = () => {
             </div>
             
             <div className="relative">
-              <label 
-                htmlFor="phone" 
+              <label
+                htmlFor="phone"
                 className={`block text-sm font-medium mb-1 transition-all duration-300 ${
                   focusedField === 'phone' ? 'text-[#7B38FB]' : 'text-white/80'
                 }`}
               >
-                Phone Number
+                Phone Number <span className="text-white/40 text-xs">(Optional)</span>
               </label>
               <input
                 type="tel"
@@ -202,13 +207,13 @@ const ContactForm = () => {
             </div>
             
             <div className="relative">
-              <label 
-                htmlFor="company" 
+              <label
+                htmlFor="company"
                 className={`block text-sm font-medium mb-1 transition-all duration-300 ${
                   focusedField === 'company' ? 'text-[#7B38FB]' : 'text-white/80'
                 }`}
               >
-                Company
+                Company <span className="text-white/40 text-xs">(Optional)</span>
               </label>
               <input
                 type="text"
@@ -229,13 +234,13 @@ const ContactForm = () => {
             </div>
             
             <div className="relative">
-              <label 
-                htmlFor="location" 
+              <label
+                htmlFor="location"
                 className={`block text-sm font-medium mb-1 transition-all duration-300 ${
                   focusedField === 'location' ? 'text-[#7B38FB]' : 'text-white/80'
                 }`}
               >
-                Location / City
+                Location / City <span className="text-white/40 text-xs">(Optional)</span>
               </label>
               <input
                 type="text"
@@ -256,13 +261,13 @@ const ContactForm = () => {
             </div>
             
             <div className="relative">
-              <label 
-                htmlFor="message" 
+              <label
+                htmlFor="message"
                 className={`block text-sm font-medium mb-1 transition-all duration-300 ${
                   focusedField === 'message' ? 'text-[#7B38FB]' : 'text-white/80'
                 }`}
               >
-                Message
+                Message <span className="text-[#FF5BA8]">*</span>
               </label>
               <textarea
                 id="message"
@@ -349,9 +354,9 @@ const Contact = () => {
     <section id="contact" className="bg-gradient-to-b from-[#2D1B69] to-[#1E0B40] relative overflow-hidden" ref={sectionRef}>
       {/* Premium background decorations */}
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-      <div className="absolute top-20 right-10 w-80 h-80 bg-blue-500/10 rounded-full blur-[80px] animate-pulse-slow"></div>
-      <div className="absolute bottom-10 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-[80px] animate-pulse-slow" style={{ animationDelay: '1.5s' }}></div>
-      <div className="absolute top-40 left-1/4 w-60 h-60 bg-pink-500/10 rounded-full blur-[60px] animate-pulse-slow" style={{ animationDelay: '0.8s' }}></div>
+      <div className="absolute top-20 right-10 w-80 h-80 bg-blue-500/10 rounded-full blur-[40px] animate-pulse-slow"></div>
+      <div className="absolute bottom-10 left-10 w-72 h-72 bg-purple-500/10 rounded-full blur-[40px] animate-pulse-slow" style={{ animationDelay: '1.5s' }}></div>
+      <div className="absolute top-40 left-1/4 w-60 h-60 bg-pink-500/10 rounded-full blur-[40px] animate-pulse-slow" style={{ animationDelay: '0.8s' }}></div>
       
       {/* Animated particles */}
       <div className="absolute w-2 h-2 bg-blue-300/40 rounded-full top-1/4 right-1/4 animate-float-path" 
@@ -374,12 +379,32 @@ const Contact = () => {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
             <div className={`transition-all duration-700 ${isInView ? 'animate-slide-left' : 'opacity-0 -translate-x-10'}`} style={{ animationDelay: '0.4s' }}>
               <div className="space-y-8">
+                {/* Calendly CTA - Primary */}
+                <div className="text-center md:text-left">
+                  <h3 className="text-2xl font-bold mb-4 animate-gradient-text inline-block">
+                    Ready to Transform Your Hiring?
+                  </h3>
+                  <p className="text-white/80 mb-6">
+                    Schedule a free 30-minute consultation to discuss your recruitment needs.
+                  </p>
+                  <Button
+                    variant="gradient"
+                    size="xl"
+                    className="rounded-full premium-card hover:scale-105 transform transition-all duration-300 group w-full"
+                    onClick={() => window.open('https://calendly.com/vantahire/30min', '_blank')}
+                  >
+                    <Calendar className="w-5 h-5 mr-2 group-hover:animate-pulse" />
+                    <span className="group-hover:tracking-wide transition-all duration-300">Schedule a Free Consultation</span>
+                  </Button>
+                </div>
+
+                {/* Contact Information */}
                 <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))] to-[hsl(var(--vanta-dark))]/80 backdrop-blur-lg p-8 rounded-xl shadow-lg premium-card border border-white/5">
-                  <h3 className="text-xl font-bold mb-6 animate-gradient-text inline-block">
-                    Contact Information
+                  <h3 className="text-xl font-bold mb-6 text-white/90">
+                    Or Reach Us Directly
                   </h3>
                   <div className="space-y-6">
                     <div className="flex items-center group transition-all duration-300 hover:translate-x-2">
@@ -411,23 +436,6 @@ const Contact = () => {
                       <span className="font-medium text-white/90 transition-all duration-300 group-hover:tracking-wide">Bangalore, India</span>
                     </div>
                   </div>
-                </div>
-                
-                <div className="relative flex justify-center">
-                  <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-3xl animate-pulse-slow"></div>
-                  <Planet className="w-40 h-40 animate-float-path" />
-                </div>
-                
-                <div className="mt-8 text-center md:text-left">
-                  <Button 
-                    variant="gradient" 
-                    size="xl" 
-                    className="rounded-full premium-card hover:scale-105 transform transition-all duration-300 group"
-                    onClick={() => window.open('https://calendly.com/vantahire/30min', '_blank')}
-                  >
-                    <Calendar className="w-5 h-5 mr-2 group-hover:animate-pulse" />
-                    <span className="group-hover:tracking-wide transition-all duration-300">Schedule a Free Consultation</span>
-                  </Button>
                 </div>
               </div>
             </div>

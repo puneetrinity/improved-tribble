@@ -187,9 +187,9 @@ const Services = () => {
       <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
       
       {/* Premium background glow effects */}
-      <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#7B38FB]/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-[#2D81FF]/10 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.5s' }}></div>
-      <div className="absolute top-1/3 right-1/3 w-72 h-72 bg-[#FF5BA8]/10 rounded-full blur-[80px] animate-pulse-slow" style={{ animationDelay: '0.8s' }}></div>
+      <div className="absolute top-0 right-1/4 w-96 h-96 bg-[#7B38FB]/10 rounded-full blur-[50px] animate-pulse-slow"></div>
+      <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-[#2D81FF]/10 rounded-full blur-[50px] animate-pulse-slow" style={{ animationDelay: '1.5s' }}></div>
+      <div className="absolute top-1/3 right-1/3 w-72 h-72 bg-[#FF5BA8]/10 rounded-full blur-[40px] animate-pulse-slow" style={{ animationDelay: '0.8s' }}></div>
       
       {/* Animated floating particles */}
       <div className="absolute w-3 h-3 bg-blue-300/40 rounded-full top-1/4 right-1/3 animate-float-path" 
@@ -221,17 +221,13 @@ const Services = () => {
             <ServiceCard
               title="For Individuals"
               items={[
-                "SWOT Analysis & Career Planning", 
-                "Resume & LinkedIn Optimization", 
-                "Skill Gap Assessment"
-              ]}
-              detailItems={[
                 "SWOT Analysis & Career Planning",
                 "Resume & LinkedIn Optimization",
-                "Skill Gap Assessment & Upskilling Pathway", 
+                "Skill Gap Assessment & Upskilling Pathway",
                 "Interview Preparation Bootcamps",
                 "Personal Branding & Networking Mastery"
               ]}
+              detailItems={[]}
               icon={<User className="w-full h-full text-white" />}
               accentColor="text-[#2D81FF]"
               bgColor="rgba(30, 11, 64, 0.8)"
@@ -243,17 +239,13 @@ const Services = () => {
             <ServiceCard
               title="For Organizations"
               items={[
-                "Recruitment Consulting", 
-                "DEI Hiring", 
-                "Freelancer Recruiter Marketplace"
-              ]}
-              detailItems={[
                 "Recruitment Consulting (AI-driven + Traditional)",
                 "DEI Hiring and Leadership Search",
                 "Freelancer Recruiter Marketplace",
                 "Employer Branding Strategy",
                 "Recruiter Upskilling Programs"
               ]}
+              detailItems={[]}
               icon={<Building className="w-full h-full text-white" />}
               accentColor="text-[#FF9D4A]"
               bgColor="rgba(30, 11, 64, 0.8)"
@@ -265,17 +257,13 @@ const Services = () => {
             <ServiceCard
               title="For Colleges & Universities"
               items={[
-                "Corporate Readiness Bootcamps", 
-                "Resume Writing & LinkedIn Workshops", 
-                "Mock Interviews"
-              ]}
-              detailItems={[
                 "Corporate Readiness Bootcamps",
                 "Resume Writing & LinkedIn Workshops",
                 "Mock Interviews & Group Discussions",
                 "Guest Lectures & Panel Discussions",
                 "Entrepreneurship Cell Setup"
               ]}
+              detailItems={[]}
               icon={<GraduationCap className="w-full h-full text-white" />}
               accentColor="text-[#FF5BA8]"
               bgColor="rgba(30, 11, 64, 0.8)"
