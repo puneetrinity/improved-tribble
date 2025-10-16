@@ -28,7 +28,15 @@ from companies.views import upload_vacancy_file, delete_vacancy_file
 admin.autodiscover()
 handler500 = 'TRM.views.handler500'
 
+# Health check endpoint for Railway/monitoring
+def health_check(request):
+    """Simple health check endpoint that returns 200 OK"""
+    return HttpResponse("OK", content_type="text/plain", status=200)
+
 urlpatterns = [
+    # Health check
+    path('health', health_check, name='health_check'),
+
     # Admin:
     path('admin/doc/', include('django.contrib.admindocs.urls')),
     path('admin/', admin.site.urls),

@@ -244,9 +244,13 @@ DATABASES = {
 MEDIA_ROOT = os.getenv('media_root', os.path.join(PROJECT_PATH, 'media'))
 MEDIA_URL = os.getenv('media_url', 'http://spotaxis.com/media/')
 STATIC_ROOT = os.getenv('static_root', os.path.join(PROJECT_PATH, '..', 'staticfiles'))
-STATICFILES_DIRS = [
-    os.getenv('static_dir') or os.path.join(PROJECT_PATH, 'static')
-]
+
+# Only include STATICFILES_DIRS if the directory exists and is not the same as STATIC_ROOT
+_static_dir = os.getenv('static_dir') or os.path.join(PROJECT_PATH, 'static')
+if os.path.isdir(_static_dir) and os.path.abspath(_static_dir) != os.path.abspath(STATIC_ROOT):
+    STATICFILES_DIRS = [_static_dir]
+else:
+    STATICFILES_DIRS = []
 
 # Site URL
 PROTOCOL = 'https' if ENVIRONMENT == 'productive' else 'http'
