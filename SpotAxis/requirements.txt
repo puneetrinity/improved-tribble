@@ -100,3 +100,4 @@ dicttoxml==1.7.16
 email-reply-parser==0.5.12
 simplejson==3.19.2
 striprtf==0.0.26
+validate-email==1.3
