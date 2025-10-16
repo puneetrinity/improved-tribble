@@ -84,7 +84,7 @@ export function serveStatic(app: Express) {
   app.use(express.static(distPath, {
     setHeaders: (res, filePath) => {
       if (filePath.endsWith('index.html')) {
-        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Cache-Control', 'no-store, must-revalidate');
       } else if (filePath.includes('/assets/')) {
         // hashed assets
         res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
