@@ -91,3 +91,4 @@ django-crontab==0.7.1
 django-extensions==4.1.0
 markdownify==1.1.0
 django-bootstrap-form==3.4
+gunicorn==21.2.0
