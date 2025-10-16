@@ -5,6 +5,7 @@ from django.shortcuts import render
 # from social.exceptions import AuthCanceled
 from django.utils.cache import patch_vary_headers
 from django.conf import settings
+import os
 
 from TRM.settings import SUBDOMAIN_URLCONF, ROOT_DOMAIN, SITE_SUFFIX, SUPPORT_URLCONF, BLOG_URLCONF
 from django.db.models import Q
@@ -26,6 +27,10 @@ class SubdomainMiddleware:
 
     def __call__(self, request):
         # Migrate process_request logic here
+        # Allow health check endpoint to bypass subdomain checks
+        if request.path in ['/health', '/health/']:
+            return self.get_response(request)
+
         fqdn = request.get_host().split(':')[0]
         domain_parts = fqdn.split('.')
 
@@ -59,7 +64,12 @@ class SubdomainMiddleware:
             set_urlconf(SUBDOMAIN_URLCONF)
             request.urlconf = SUBDOMAIN_URLCONF
         elif fqdn != SITE_SUFFIX.strip('.').strip('/'):
-            raise Http404()
+            # In platform environments (e.g., Railway) or when wildcard hosts are allowed,
+            # don't enforce subdomain suffix strictly to avoid 404 on service subdomains.
+            allow_any = '*' in getattr(settings, 'ALLOWED_HOSTS', [])
+            disable_enforcement = os.getenv('DISABLE_SUBDOMAIN_ENFORCEMENT') == '1'
+            if not (allow_any or disable_enforcement):
+                raise Http404()
 
         response = self.get_response(request)
 
