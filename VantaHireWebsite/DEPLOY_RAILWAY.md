@@ -13,7 +13,10 @@ Set these in Railway → Variables:
 Required
 - `NODE_ENV=production`
 - `PORT` (Railway injects this automatically; app reads it)
-- `DATABASE_URL` (e.g. `postgresql://...` with `sslmode=require` when needed)
+- `DATABASE_URL` (Required)
+  - If using Railway Postgres: copy the full connection string from the Railway Postgres plugin.
+    - Optionally set `DATABASE_SSL=true` if your instance requires SSL.
+  - If using Neon: use the Neon connection string (often ends with `.neon.tech`), keep `sslmode=require`.
 - `SESSION_SECRET` (random string)
 
 Optional
@@ -52,7 +55,8 @@ If you deploy SpotAxis separately on Railway, use its public URL as `SPOTAXIS_BA
 
 ## 7) Troubleshooting
 - Port binding: ensure the app logs show it’s listening on the PORT Railway provided.
-- Database: verify `DATABASE_URL` and SSL options; Neon commonly needs `?sslmode=require`.
+- Database: verify `DATABASE_URL` and SSL options.
+  - Railway Postgres: set `DATABASE_URL` and (if needed) `DATABASE_SSL=true`.
+  - Neon: ensure `DATABASE_URL` points to `.neon.tech` and includes `sslmode=require`.
 - Cloudinary: if unset, file upload falls back to placeholders (info logged).
 - Emails: current implementation uses Nodemailer Ethereal for testing; replace with a real provider for production.
-

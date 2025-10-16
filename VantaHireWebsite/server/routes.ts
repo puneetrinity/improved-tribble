@@ -7,7 +7,7 @@ import { getEmailService } from "./simpleEmailService";
 import { setupAuth, requireAuth, requireRole } from "./auth";
 import { upload, uploadToCloudinary } from "./cloudinary";
 import rateLimit from "express-rate-limit";
-import { analyzeJobDescription, generateJobScore, calculateOptimizationSuggestions } from "./aiJobAnalyzer";
+import { analyzeJobDescription, generateJobScore, calculateOptimizationSuggestions, isAIEnabled } from "./aiJobAnalyzer";
 import helmet from "helmet";
 import * as spotaxis from "./integrations/spotaxis";
 
@@ -70,6 +70,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       enabled: spotaxis.isEnabled(),
       baseUrl: process.env.SPOTAXIS_BASE_URL || null,
       careersUrl: process.env.SPOTAXIS_CAREERS_URL || null,
+    });
+  });
+
+  // AI features status
+  app.get("/api/features/ai", (req: Request, res: Response) => {
+    res.json({
+      enabled: isAIEnabled(),
+      features: {
+        jobAnalysis: isAIEnabled(),
+        jobScoring: isAIEnabled(),
+      },
+      message: isAIEnabled()
+        ? 'AI features are available'
+        : 'AI features require OPENAI_API_KEY to be configured'
     });
   });
 
@@ -855,8 +869,16 @@ New job application received:
   // AI-powered job description analysis
   app.post("/api/ai/analyze-job-description", aiAnalysisRateLimit, requireRole(['recruiter', 'admin']), async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Check if AI features are enabled
+      if (!isAIEnabled()) {
+        return res.status(503).json({
+          error: 'AI features are not configured',
+          message: 'OpenAI API key is not set. AI-powered analysis is currently unavailable.'
+        });
+      }
+
       const { title, description } = req.body;
-      
+
       if (!title || !description) {
         return res.status(400).json({ error: 'Title and description are required' });
       }
@@ -887,8 +909,16 @@ New job application received:
   // AI-powered job scoring
   app.post("/api/ai/score-job", aiAnalysisRateLimit, requireRole(['recruiter', 'admin']), async (req: Request, res: Response, next: NextFunction) => {
     try {
+      // Check if AI features are enabled
+      if (!isAIEnabled()) {
+        return res.status(503).json({
+          error: 'AI features are not configured',
+          message: 'OpenAI API key is not set. AI-powered scoring is currently unavailable.'
+        });
+      }
+
       const { title, description, jobId } = req.body;
-      
+
       if (!title || !description) {
         return res.status(400).json({ error: 'Title and description are required' });
       }

@@ -1,7 +1,23 @@
 import OpenAI from "openai";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let openai: OpenAI | null = null;
+
+// Lazy initialization of OpenAI client
+function getOpenAIClient(): OpenAI {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OpenAI API key not configured. AI features are disabled.');
+  }
+  if (!openai) {
+    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  }
+  return openai;
+}
+
+// Check if AI features are available
+export function isAIEnabled(): boolean {
+  return !!process.env.OPENAI_API_KEY;
+}
 
 export interface JobAnalysisResult {
   clarity_score: number;
@@ -16,6 +32,7 @@ export interface JobAnalysisResult {
 
 export async function analyzeJobDescription(title: string, description: string): Promise<JobAnalysisResult> {
   try {
+    const client = getOpenAIClient();
     const prompt = `Evaluate the following job description for clarity, inclusion, and SEO optimization. Provide specific, actionable feedback.
 
 Job Title: ${title}
@@ -37,7 +54,7 @@ Focus on:
 
 Return only valid JSON without any additional text.`;
 
-    const response = await openai.chat.completions.create({
+    const response = await client.chat.completions.create({
       model: "gpt-4o",
       messages: [
         {
