@@ -243,7 +243,7 @@ DATABASES = {
 # Media & Static Files
 MEDIA_ROOT = os.getenv('media_root', os.path.join(PROJECT_PATH, 'media'))
 MEDIA_URL = os.getenv('media_url', 'http://spotaxis.com/media/')
-STATIC_ROOT = os.getenv('static_root', '')
+STATIC_ROOT = os.getenv('static_root', os.path.join(PROJECT_PATH, '..', 'staticfiles'))
 STATICFILES_DIRS = [
     os.getenv('static_dir') or os.path.join(PROJECT_PATH, 'static')
 ]
