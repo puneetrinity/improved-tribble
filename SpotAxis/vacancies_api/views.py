@@ -17,8 +17,17 @@ from django.contrib.auth.models import AnonymousUser
 from django.middleware import csrf
 from rest_framework.pagination import PageNumberPagination
 from datetime import datetime, timedelta, date
-from weasyprint import HTML
 import tempfile
+
+# Lazy import WeasyPrint - gracefully handle missing system libraries
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except Exception as e:
+    HTML = None
+    WEASYPRINT_AVAILABLE = False
+    import logging
+    logging.warning(f"WeasyPrint not available: {e}. PDF generation will be disabled.")
 import random
 import traceback
 from hashids import Hashids
@@ -681,6 +690,12 @@ class VacancyToPDFAPIView(APIView):
     API endpoint to generate a PDF version of a vacancy using WeasyPrint.
     """
     def get(self, request, vacancy_id):
+        if not WEASYPRINT_AVAILABLE:
+            return Response(
+                {"error": "PDF generation is currently unavailable. WeasyPrint system libraries are not installed."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
+
         vacancy = get_object_or_404(Vacancy, pk=vacancy_id)
         user = request.user
         my_vacancy = user.is_authenticated and user == vacancy.user

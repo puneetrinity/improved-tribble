@@ -28,7 +28,17 @@ import datetime
 utc = datetime.timezone.utc
 from django.utils.translation import gettext as _
 from django.views.decorators.csrf import csrf_exempt
-from weasyprint import HTML
+
+# Lazy import WeasyPrint - gracefully handle missing system libraries
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except Exception as e:
+    HTML = None
+    WEASYPRINT_AVAILABLE = False
+    import logging
+    logging.warning(f"WeasyPrint not available: {e}. PDF generation will be disabled.")
+
 from hashids import Hashids
 from payments.models import *
 from TRM.context_processors import subdomain
@@ -1366,6 +1376,13 @@ def vacancy_to_pdf(request, vacancy_id):
     Returns:
         HttpResponse: A PDF file download response.
     """
+    if not WEASYPRINT_AVAILABLE:
+        return HttpResponse(
+            "PDF generation is currently unavailable. WeasyPrint system libraries are not installed.",
+            status=503,
+            content_type="text/plain"
+        )
+
     from TRM.settings import MEDIA_URL
     vacancy = get_object_or_404(Vacancy, pk=vacancy_id)
     logo_pdf = 'logos_TRM/logo_pdf.png'

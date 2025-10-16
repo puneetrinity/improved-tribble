@@ -16,7 +16,17 @@ from django.http import Http404, JsonResponse
 from django.http import Http404, JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template import RequestContext
-from weasyprint import HTML
+
+# Lazy import WeasyPrint - gracefully handle missing system libraries
+try:
+    from weasyprint import HTML
+    WEASYPRINT_AVAILABLE = True
+except Exception as e:
+    HTML = None
+    WEASYPRINT_AVAILABLE = False
+    import logging
+    logging.warning(f"WeasyPrint not available: {e}. PDF generation will be disabled.")
+
 from companies.models import Company_Industry
 from .forms import AcademicForm, CandidateForm, CvLanguageForm, ExpertiseForm, ObjectiveForm, \
     cv_FileForm, TrainingForm, CertificateForm, ProjectForm, InterestsForm, \
@@ -633,6 +643,13 @@ def curriculum_to_pdf(request, candidate_id, template=None):
     Returns:
         HttpResponse: PDF file response with the candidate's CV.
     """
+    if not WEASYPRINT_AVAILABLE:
+        return HttpResponse(
+            "PDF generation is currently unavailable. WeasyPrint system libraries are not installed.",
+            status=503,
+            content_type="text/plain"
+        )
+
     from django.template.loader import render_to_string
     from TRM.settings import MEDIA_URL
 
