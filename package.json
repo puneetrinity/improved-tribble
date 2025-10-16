@@ -1,0 +1,16 @@
+{
+  "name": "vantahire-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Monorepo wrapper for Railway to build VantaHireWebsite sub-app.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "postinstall": "npm --prefix VantaHireWebsite ci --no-audit --no-fund || npm --prefix VantaHireWebsite install",
+    "build": "npm --prefix VantaHireWebsite run build",
+    "start": "npm --prefix VantaHireWebsite run start",
+    "dev": "npm --prefix VantaHireWebsite run dev"
+  }
+}
+
