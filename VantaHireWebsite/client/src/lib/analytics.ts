@@ -5,7 +5,11 @@ declare global {
 }
 
 export function loadApolloTracker(appId: string) {
+  if (!appId) return;
   try {
+    // Avoid duplicate injection
+    const exists = Array.from(document.getElementsByTagName('script')).some(s => s.src.includes('assets.apollo.io/micro/website-tracker'));
+    if (exists) return;
     const script = document.createElement('script');
     const nocache = Math.random().toString(36).substring(7);
     script.src = `https://assets.apollo.io/micro/website-tracker/tracker.iife.js?nocache=${nocache}`;
@@ -23,4 +27,3 @@ export function loadApolloTracker(appId: string) {
     console.warn('Apollo tracker injection failed:', e);
   }
 }
-

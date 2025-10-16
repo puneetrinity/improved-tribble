@@ -93,6 +93,16 @@ const Footer = () => {
           {/* Legal links */}
           <div className="flex flex-wrap gap-6 justify-center">
             <button 
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent('cookie-consent:open', { detail: { reset: true } }));
+              }}
+              className="text-white/60 hover:text-white transition-all duration-300 relative group"
+            >
+              Cookie Preferences
+              <span className="absolute bottom-0 left-0 h-px w-0 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] group-hover:w-full transition-all duration-300"></span>
+            </button>
+
+            <button 
               onClick={(e) => e.preventDefault()}
               className="text-white/60 hover:text-white transition-all duration-300 relative group"
             >

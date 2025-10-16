@@ -87,6 +87,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ status: "ok" });
   });
 
+  // Public client configuration (non-sensitive)
+  app.get("/api/client-config", (_req: Request, res: Response) => {
+    res.json({
+      apolloAppId: process.env.APOLLO_APP_ID || null,
+    });
+  });
+
   // SpotAxis integration status and config
   app.get("/api/integrations/spotaxis", (req: Request, res: Response) => {
     res.json({

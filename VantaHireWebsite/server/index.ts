@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startJobScheduler } from "./jobScheduler";
@@ -6,8 +7,31 @@ import { createAdminUser, createTestRecruiter } from "./createAdminUser";
 import { createTestJobs } from "./createTestJobs";
 
 const app = express();
+
+// Enable GZIP compression for all responses
+app.use(compression({
+  level: 6, // Compression level (0-9, 6 is default and good balance)
+  threshold: 1024, // Only compress responses larger than 1KB
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// WWW to non-WWW redirect for SEO (301 permanent redirect)
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  if (host.startsWith('www.')) {
+    const protocol = req.headers['x-forwarded-proto'] || (req.secure ? 'https' : 'http');
+    return res.redirect(301, `${protocol}://${host.slice(4)}${req.url}`);
+  }
+  next();
+});
 
 app.use((req, res, next) => {
   const start = Date.now();

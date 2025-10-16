@@ -41,10 +41,10 @@ const Hero = () => {
           
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 relative">
             <div className="animate-fade-in" style={{animationDelay: '0.5s'}}>
-              <span className="animate-gradient-text font-extrabold">Your Trusted</span>
+              <span className="animate-gradient-text font-extrabold">AI-Powered Recruitment Partner</span>
             </div>
             <div className="animate-fade-in" style={{animationDelay: '0.8s'}}>
-              <span className="text-white leading-tight mt-2 block">AI-Powered Recruitment Partner</span>
+              <span className="text-white leading-tight mt-2 block">for Startups & Enterprise</span>
             </div>
           </h1>
           
