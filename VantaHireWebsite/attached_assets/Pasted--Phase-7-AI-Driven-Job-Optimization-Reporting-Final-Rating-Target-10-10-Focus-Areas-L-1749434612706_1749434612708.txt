@@ -1,0 +1,163 @@
+✅ Phase 7 – AI-Driven Job Optimization & Reporting
+Final Rating Target: ★★★★★ (10/10)
+Focus Areas: LLM-assisted job review, recruiter reports, scoring & compliance, platform intelligence
+
+🎯 Phase Objectives
+Goal	Description
+🧠 AI-Assist	Help recruiters write clearer, more inclusive, SEO-optimized job descriptions
+📊 Reporting	Provide exportable job performance data for recruiters and admins
+📈 Predictive Scoring	Use AI + platform data to predict job post success
+🔐 Compliance	Reduce bias, ensure privacy, and control AI costs
+
+🔧 Key Features (Updated & Reviewed)
+🔹 1. AI-Powered Job Description Review
+Feature Summary:
+
+Analyze job title + description
+
+Output scores: Clarity, Inclusion, SEO Optimization
+
+Highlight biased language and missing keywords
+
+Display suggestions in a structured UI panel
+
+Implementation:
+
+API: POST /api/ai/analyze-job-description
+
+Uses OpenAI with prompt injection + response parser
+
+Rate limit: 5 requests/hour per recruiter (express-rate-limit)
+
+Secrets managed via Replit Secrets
+
+Prompt Sample:
+
+txt
+Copy
+Edit
+Evaluate the following job description for clarity, bias, and SEO optimization. Suggest improvements in bullet points.
+
+Job Title: {{title}}
+Job Description: {{description}}
+
+Return a JSON object with:
+- clarity_score (0–100)
+- bias_flags (array of flagged terms)
+- seo_keywords (array of missing keywords)
+- suggestions (array of improvement tips)
+🛠 Schema Update: job_analytics
+ts
+Copy
+Edit
+ai_score_cache: integer,
+ai_model_version: text
+Migration:
+
+sql
+Copy
+Edit
+ALTER TABLE job_analytics ADD COLUMN IF NOT EXISTS ai_score_cache INTEGER;
+ALTER TABLE job_analytics ADD COLUMN IF NOT EXISTS ai_model_version TEXT;
+💡 UI Enhancement – Analysis Panel
+tsx
+Copy
+Edit
+<AnalysisPanel>
+  <ScoreRing value={clarity} label="Clarity" />
+  <InclusionMeter flags={biasFlags} />
+  <KeywordList keywords={seoKeywords} />
+  <SuggestionBox items={suggestions} />
+</AnalysisPanel>
+🔹 2. Job Score Prediction & Benchmarking
+Feature Summary:
+
+Predict performance (0–100) based on AI + analytics history
+
+Show “how it compares” to similar roles on VantaHire
+
+Use: Description length, keyword density, past conversion rate trends
+
+API:
+
+POST /api/ai/score-job
+
+Adds ai_score_cache in job_analytics
+
+✅ Cache on job submit/edit to avoid re-analysis
+✅ Add versioning for transparency (ai_model_version)
+
+🔹 3. CSV + Web Reporting for Analytics
+Feature Summary:
+
+Export recruiter’s or admin’s job analytics
+
+Format: .csv or web table
+
+Filters: date range, status, job title
+
+API:
+
+GET /api/analytics/export?format=csv&type=recruiter
+
+Anonymize candidate data (GDPR compliance):
+
+Replace emails, names with Candidate #1234
+
+Omit PII in exports
+
+🔹 4. Enhanced Recruiter Dashboard Filters
+Filter Criteria:
+
+Date range (e.g., last 7/30/90 days)
+
+Job status (active, expired)
+
+Performance score (slider 0–100)
+
+New UI Sections:
+
+Top 3 jobs by conversion rate
+
+Heatmap (views vs apply clicks over time)
+
+Archived jobs toggle
+
+🔒 Ethics, Privacy, Cost, and Performance
+Concern	Solution
+Abuse of OpenAI API	express-rate-limit (5 req/hour/user)
+Privacy in CSV exports	Anonymize applicant PII
+AI Cost Monitoring	Log usage + set max tokens/job
+Over-analysis (UI)	Use useSWR with revalidateOnFocus: false
+Error handling	Use OpenAI error class: OpenAI.APIError
+
+ts
+Copy
+Edit
+try {
+  const result = await analyzeJobWithAI(content);
+} catch (err) {
+  if (err instanceof OpenAI.APIError) {
+    logger.error('OpenAI API failed', err);
+    return res.status(502).json({ error: 'LLM unavailable' });
+  }
+}
+✅ Day-by-Day Implementation Plan
+Day	Task
+Day 1	Schema migration: job_analytics updated with AI fields
+Day 2	Build /api/ai/analyze-job-description route with OpenAI integration
+Day 3	Design AnalysisPanel UI with scores & suggestions
+Day 4	Integrate “Analyze with AI” into job posting page
+Day 5	Build CSV export functionality with PII redaction
+Day 6	Enhance recruiter dashboard: filters, score columns, highlights
+Day 7	End-to-end QA, documentation, logging of AI usage
+
+✅ Deliverables Checklist
+Feature	Status
+AI Job Analyzer (modal + scores + suggestions)	✅
+AI Score Cache + Model Versioning	✅
+CSV + Web Export with anonymized data	✅
+Job Benchmarking & Top Job Comparison	✅
+Role-Based Access (Admin + Recruiter)	✅
+Error Handling & Cost Control	✅
+AI Prompt Engineering + Logging	✅

@@ -1,0 +1,61 @@
+<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E0B40;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2D1B69;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Text gradients -->
+    <linearGradient id="main-text-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7B38FB;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2D81FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF5BA8;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="accent-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF5BA8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B38FB;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1080" height="1080" fill="url(#bg-gradient)"/>
+  
+  <!-- Subtle background pattern -->
+  <pattern id="simple-dots" patternUnits="userSpaceOnUse" width="60" height="60">
+    <circle cx="30" cy="30" r="1.5" fill="white" fill-opacity="0.05"/>
+  </pattern>
+  <rect width="1080" height="1080" fill="url(#simple-dots)"/>
+  
+  <!-- Main content centered -->
+  <g transform="translate(540, 540)">
+    <!-- "We are" text -->
+    <text x="0" y="-80" font-family="system-ui, -apple-system, sans-serif" font-size="48" font-weight="600" fill="white" fill-opacity="0.9" text-anchor="middle">
+      We are
+    </text>
+    
+    <!-- "HIRING" text (emphasized) -->
+    <text x="0" y="20" font-family="system-ui, -apple-system, sans-serif" font-size="92" font-weight="900" fill="url(#main-text-gradient)" text-anchor="middle">
+      HIRING
+    </text>
+    
+    <!-- "Freelancer Recruiter" text -->
+    <text x="0" y="100" font-family="system-ui, -apple-system, sans-serif" font-size="42" font-weight="700" fill="url(#accent-gradient)" text-anchor="middle">
+      Freelancer Recruiter
+    </text>
+    
+    <!-- Contact info -->
+    <text x="0" y="180" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="500" fill="white" fill-opacity="0.8" text-anchor="middle">
+      hello@vantahire.com
+    </text>
+    
+    <text x="0" y="220" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="600" fill="url(#accent-gradient)" text-anchor="middle">
+      www.vantahire.com
+    </text>
+  </g>
+  
+  <!-- Simple decorative elements -->
+  <rect x="0" y="0" width="1080" height="4" fill="url(#main-text-gradient)" opacity="0.6"/>
+  <rect x="0" y="1076" width="1080" height="4" fill="url(#accent-gradient)" opacity="0.6"/>
+</svg>

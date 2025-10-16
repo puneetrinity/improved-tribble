@@ -1,0 +1,140 @@
+name: VantaHire CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: vantahire_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Setup environment variables
+      run: |
+        echo "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/vantahire_test" >> $GITHUB_ENV
+        echo "NODE_ENV=test" >> $GITHUB_ENV
+        echo "SESSION_SECRET=test-secret" >> $GITHUB_ENV
+    
+    - name: Run database migrations
+      run: npm run db:push
+    
+    - name: Run unit tests
+      run: npm run test:unit
+    
+    - name: Run integration tests
+      run: npm run test:integration
+    
+    - name: Run security tests
+      run: npm run test:security
+    
+    - name: Generate coverage report
+      run: npm run test:coverage
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: Install Playwright browsers
+      run: npx playwright install --with-deps
+    
+    - name: Start application for E2E tests
+      run: |
+        npm run build
+        npm start &
+        sleep 30
+      env:
+        NODE_ENV: production
+    
+    - name: Run E2E tests
+      run: npm run test:e2e
+    
+    - name: Upload E2E test results
+      uses: actions/upload-artifact@v3
+      if: failure()
+      with:
+        name: playwright-report
+        path: playwright-report/
+        retention-days: 30
+
+  performance:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Start application
+      run: |
+        npm run build
+        npm start &
+        sleep 30
+      env:
+        NODE_ENV: production
+    
+    - name: Run performance tests
+      run: npm run test:performance
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-report
+        path: performance-results/
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Run security audit
+      run: npm audit --audit-level moderate
+    
+    - name: Run dependency check
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    
+    - name: Install and run security scanner
+      run: |
+        npm install -g retire
+        retire --js --node --exitwith 1

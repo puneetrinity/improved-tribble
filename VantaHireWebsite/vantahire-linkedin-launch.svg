@@ -1,0 +1,209 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2D1B69;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1E0B40;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2D1B69;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="text-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7B38FB;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2D81FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF5BA8;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="accent-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF5BA8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B38FB;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="button-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7B38FB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2D81FF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg-gradient)"/>
+  
+  <!-- Background pattern -->
+  <pattern id="dots" patternUnits="userSpaceOnUse" width="40" height="40">
+    <circle cx="20" cy="20" r="2" fill="white" fill-opacity="0.05"/>
+  </pattern>
+  <rect width="1200" height="630" fill="url(#dots)"/>
+  
+  <!-- Background glow effects -->
+  <circle cx="200" cy="150" r="120" fill="#7B38FB" fill-opacity="0.1" filter="blur(60px)"/>
+  <circle cx="1000" cy="480" r="100" fill="#2D81FF" fill-opacity="0.1" filter="blur(50px)"/>
+  <circle cx="600" cy="100" r="80" fill="#FF5BA8" fill-opacity="0.08" filter="blur(40px)"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="150" cy="200" r="3" fill="#7B38FB" fill-opacity="0.6"/>
+  <circle cx="1050" cy="180" r="4" fill="#2D81FF" fill-opacity="0.6"/>
+  <circle cx="300" cy="450" r="2" fill="#FF5BA8" fill-opacity="0.6"/>
+  <circle cx="900" cy="120" r="3" fill="#7B38FB" fill-opacity="0.4"/>
+  
+  <!-- Animated Rocket from website -->
+  <g transform="translate(40, 240) scale(0.75)">
+    <defs>
+      <!-- Advanced filters and gradients for 3D effect -->
+      <filter id="rocket-filter-3d" x="40" y="20" width="110" height="165" filterUnits="userSpaceOnUse" colorInterpolationFilters="sRGB">
+        <feFlood floodOpacity="0" result="BackgroundImageFix"/>
+        <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0"/>
+        <feOffset dy="4"/>
+        <feGaussianBlur stdDeviation="10"/>
+        <feColorMatrix type="matrix" values="0 0 0 0 0.176471 0 0 0 0 0.505882 0 0 0 0 1 0 0 0 0.25 0"/>
+        <feBlend mode="normal" in2="BackgroundImageFix" result="effect1_dropShadow"/>
+        <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow" result="shape"/>
+      </filter>
+      
+      <filter id="flame-glow" x="-20" y="-20" width="240" height="240">
+        <feGaussianBlur stdDeviation="2" result="blur"/>
+        <feFlood floodColor="#FF5BA8" floodOpacity="0.5" result="color"/>
+        <feComposite operator="in" in="color" in2="blur" result="glow"/>
+        <feComposite operator="over" in="SourceGraphic" in2="glow"/>
+      </filter>
+      
+      <filter id="flame-glow-orange" x="-20" y="-20" width="240" height="240">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feFlood floodColor="#FF9D4A" floodOpacity="0.5" result="color"/>
+        <feComposite operator="in" in="color" in2="blur" result="glow"/>
+        <feComposite operator="over" in="SourceGraphic" in2="glow"/>
+      </filter>
+      
+      <filter id="bubble-glow" x="-50%" y="-50%" width="200%" height="200%">
+        <feGaussianBlur stdDeviation="2" result="blur"/>
+        <feFlood floodOpacity="0.5" result="color"/>
+        <feComposite operator="in" in="color" in2="blur" result="glow"/>
+        <feComposite operator="over" in="SourceGraphic" in2="glow"/>
+      </filter>
+      
+      <linearGradient id="window-gradient" x1="85" y1="85" x2="106" y2="120" gradientUnits="userSpaceOnUse">
+        <stop stopColor="#E0F7FF"/>
+        <stop offset="0.5" stopColor="#C7EEFF"/>
+        <stop offset="1" stopColor="#A8DFFF"/>
+      </linearGradient>
+    </defs>
+    
+    <!-- Glowing effect behind rocket -->
+    <circle cx="95" cy="120" r="60" fill="#3D93FF" fill-opacity="0.2" filter="blur(20px)"/>
+    
+    <!-- Main rocket body with 3D effect -->
+    <g filter="url(#rocket-filter-3d)">
+      <!-- Left side (darker for 3D effect) -->
+      <path d="M95.5 40C95.5 40 71 62.5 71 102.5C71 142.5 95.5 165 95.5 165Z" fill="#1A5BB9"/>
+      
+      <!-- Right side (brighter for 3D effect) -->
+      <path d="M95.5 40C95.5 40 120 62.5 120 102.5C120 142.5 95.5 165 95.5 165Z" fill="#3D93FF"/>
+      
+      <!-- Rocket window with 3D glass effect -->
+      <ellipse cx="95.5" cy="102.5" rx="12.5" ry="17.5" fill="url(#window-gradient)" filter="drop-shadow(0px 2px 3px rgba(0, 0, 0, 0.2))"/>
+      
+      <!-- Highlight on window for 3D effect -->
+      <ellipse cx="91.5" cy="98" rx="5" ry="7" fill="white" fill-opacity="0.3"/>
+    </g>
+    
+    <!-- 3D fins -->
+    <g>
+      <!-- Left fin -->
+      <path d="M71 90C71 90 60 95 60 102.5C60 110 71 115 71 115" fill="#FF5BA8" stroke="#FF5BA8" stroke-width="4" stroke-linecap="round"/>
+      
+      <!-- Right fin -->
+      <path d="M120 90C120 90 131 95 131 102.5C131 110 120 115 120 115" fill="#FF5BA8" stroke="#FF5BA8" stroke-width="4" stroke-linecap="round"/>
+    </g>
+    
+    <!-- Rocket nose with shine -->
+    <path d="M95.5 40C95.5 40 83 50 83 65C83 80 95.5 85 95.5 85C95.5 85 108 80 108 65C108 50 95.5 40 95.5 40Z" fill="#3D93FF"/>
+    <path d="M90 45C90 45 88 55 95.5 55C103 55 101 45 101 45L90 45Z" fill="white" fill-opacity="0.3"/>
+    
+    <!-- 3D Flames with layered effect -->
+    <g>
+      <path d="M83 145C83 145 77 167.5 95.5 167.5C114 167.5 108 145 108 145H83Z" fill="#FF5BA8" stroke="#FF5BA8" stroke-width="1" filter="url(#flame-glow)"/>
+      <path d="M77 155C77 155 72.5 175 95.5 175C118.5 175 114 155 114 155H77Z" fill="#FF9D4A" stroke="#FF9D4A" stroke-width="1" filter="url(#flame-glow-orange)"/>
+    </g>
+    
+    <!-- Rocket trails/bubbles with 3D floating effect -->
+    <g>
+      <circle cx="153.5" cy="122.5" r="7.5" fill="#FF5BA8" opacity="0.7" filter="url(#bubble-glow)"/>
+      <circle cx="143.5" cy="142.5" r="5.5" fill="#50E3C2" opacity="0.5" filter="url(#bubble-glow)"/>
+      <circle cx="163.5" cy="142.5" r="4.5" fill="#7B38FB" opacity="0.6" filter="url(#bubble-glow)"/>
+    </g>
+    
+    <!-- Additional detail elements -->
+    <path d="M87 132C87 132 89 135 95.5 135C102 135 104 132 104 132" stroke="#1A5BB9" stroke-width="2" stroke-linecap="round"/>
+    
+    <!-- Flame glow effect -->
+    <circle cx="95" cy="180" r="25" fill="#FF9D4A" fill-opacity="0.2" filter="blur(15px)"/>
+  </g>
+  
+  <!-- Main content area -->
+  <g transform="translate(250, 120)">
+    <!-- Top accent line -->
+    <rect x="0" y="0" width="100" height="4" rx="2" fill="url(#accent-gradient)"/>
+    
+    <!-- Main headline -->
+    <text x="0" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="58" font-weight="800" fill="url(#text-gradient)">
+      VantaHire is Live!
+    </text>
+    
+    <!-- Tagline -->
+    <text x="0" y="120" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="600" fill="white" fill-opacity="0.95">
+      Revolutionizing Recruitment with AI
+    </text>
+    
+    <!-- Description -->
+    <text x="0" y="170" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="400" fill="white" fill-opacity="0.8">
+      Connecting top talent with leading companies through
+    </text>
+    <text x="0" y="200" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="400" fill="white" fill-opacity="0.8">
+      intelligent matching and personalized recruitment solutions.
+    </text>
+    
+    <!-- Key features -->
+    <g transform="translate(0, 250)">
+      <g>
+        <circle cx="10" cy="10" r="6" fill="url(#button-gradient)"/>
+        <text x="25" y="16" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="white" fill-opacity="0.9">
+          AI-Powered Talent Matching
+        </text>
+      </g>
+      <g transform="translate(0, 35)">
+        <circle cx="10" cy="10" r="6" fill="url(#accent-gradient)"/>
+        <text x="25" y="16" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="white" fill-opacity="0.9">
+          Expert Recruitment Consultation
+        </text>
+      </g>
+      <g transform="translate(0, 70)">
+        <circle cx="10" cy="10" r="6" fill="#2D81FF"/>
+        <text x="25" y="16" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="white" fill-opacity="0.9">
+          Seamless Hiring Experience
+        </text>
+      </g>
+    </g>
+    
+    <!-- Call to action -->
+    <g transform="translate(0, 380)">
+      <rect x="0" y="0" width="200" height="50" rx="25" fill="url(#button-gradient)" filter="drop-shadow(0 4px 20px rgba(123, 56, 251, 0.3))"/>
+      <text x="100" y="32" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="600" fill="white" text-anchor="middle">
+        Visit VantaHire.com
+      </text>
+    </g>
+  </g>
+  
+  <!-- Website URL -->
+  <text x="600" y="580" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="white" fill-opacity="0.7" text-anchor="middle">
+    www.vantahire.com
+  </text>
+  
+  <!-- Contact info -->
+  <text x="950" y="550" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="white" fill-opacity="0.6">
+    hello@vantahire.com
+  </text>
+  <text x="950" y="575" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="white" fill-opacity="0.6">
+    +91-9742944825
+  </text>
+  <text x="950" y="600" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="white" fill-opacity="0.6">
+    Bangalore, India
+  </text>
+</svg>

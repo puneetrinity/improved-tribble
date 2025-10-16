@@ -1,0 +1,189 @@
+enhanced_path = "/mnt/data/vantahire_test_plan_v2.md"
+with open(enhanced_path, "w") as f:
+f.write(enhanced_test_plan_md)
+
+enhanced_path
+
+Always show details
+
+Copy
+
+Analyzed
+python
+Always show details
+
+Copy
+# Re-creating the enhanced test plan file after kernel reset
+enhanced_test_plan_md = """
+# ✅ VantaHire Automated Test Plan (Comprehensive QA Coverage v2)
+
+---
+
+## 🔍 1. Unit Tests (Vitest + React Testing Library)
+
+### 🧩 Components
+| Component         | Tests |
+|------------------|-------|
+| `Button.tsx`     | Renders, handles `onClick`, `variant`, `size` |
+| `Header.tsx`     | Nav highlight, mobile toggle |
+| `Footer.tsx`     | Link render test |
+| `JobCard.tsx`    | Title + CTA logic |
+| `ApplicationForm`| Form validation, disabled submit |
+
+### 🔁 Mocking Strategy
+```ts
+jest.mock('../api/jobs', () => ({
+  fetchJobs: jest.fn().mockResolvedValue(mockJobs)
+}));
+🧪 2. Integration/Module Tests
+Page	Tests
+/jobs	Lists, filters, pagination
+/job/:id	Detail fetch, apply logic
+/admin	Review flow, approve/decline
+/contact	Validation, POST request
+/ai/analyze	Prompt > OpenAI > Response structure check
+
+🤖 3. AI Feature Testing
+Case	Validation
+Valid input	Returns SEO + bias + clarity
+LLM down	Simulate API failure (502)
+Rate limit	429 after 5/hour
+Schema match	Zod or JSON Schema
+
+ts
+Always show details
+
+Copy
+expect(result).toMatchSchema(aiSchema)
+🔐 4. Security Tests
+Area	Goal
+Auth Routes	Block unauth users
+SQLi	Attempt payloads
+XSS	Escaped inputs
+Rate Limit	429 on spam
+
+🎯 5. Performance Tests (NEW)
+Tool: k6, Artillery, or Loadmill
+Scenario	Metric	Threshold
+Job Search	Response	<500ms
+Bulk Apply	Throughput	>50 req/min
+AI Analyzer	p95 latency	<2s
+
+🧪 6. E2E Tests (Playwright)
+Flow	Covered
+Recruiter → post → sees dashboard	
+Admin → approve → visible in public	
+Candidate → apply → confirmation	
+Application → shortlist → status reflected	
+
+ts
+Always show details
+
+Copy
+test('Submit form', async ({ page }) => {
+  await page.goto('/jobs');
+  await page.fill('#name', 'John');
+  await page.setInputFiles('input[type=file]', 'resume.pdf');
+  await expect(page.locator('form')).toPass({ timeout: 10_000 });
+});
+📦 7. API Contract Tests
+Endpoint	Checks
+POST jobs	Auth + shape
+PATCH application	Role-protected
+GET analytics	schema validation
+
+🧪 8. Accessibility (a11y)
+Tool	Use Case
+axe-playwright	Page tests
+storybook-a11y	Component
+
+🎭 9. Visual Regression
+Tool	Coverage
+Percy	Homepage, dashboards
+Playwright snapshots	Footer/CTA
+
+🧰 10. Test Data Management
+✅ Use:
+
+faker.js for random test values
+
+factories for job/application mock objects
+
+Seed scripts for demo mode
+
+🚀 11. CI Integration
+GitHub Actions
+yaml
+Always show details
+
+Copy
+- name: Run impacted tests
+  uses: microsoft/playwright-github-action@v1
+  with:
+    grep: ${{ needs.detect-changes.outputs.tests }}
+📈 Coverage & Tools
+Tool	Use
+vitest	Unit tests
+cypress/playwright	Flows
+supertest	API
+nyc	Coverage
+jest-html-reporter	HTML test report
+
+✅ Pyramid Summary
+java
+Always show details
+
+Copy
+     ▲
+   UI/E2E  - Playwright
+ Integration - Vitest
+Unit (95%) - CVA, hooks, components
+🔁 Final Recap Checklist
+ Unit + UI tests
+
+ AI-specific test flows
+
+ Security validation
+
+ Contract testing
+
+ Performance metrics
+
+ Data mocking + factories
+
+ GitHub Actions CI support
+
+ Visual regression ready
+"""
+
+Save the final enhanced plan
+enhanced_path = "/mnt/data/vantahire_test_plan_v2.md"
+with open(enhanced_path, "w") as f:
+f.write(enhanced_test_plan_md)
+
+enhanced_path
+
+Always show details
+
+Copy
+Result
+'/mnt/data/vantahire_test_plan_v2.md'
+✅ Your enhanced automated test plan is ready with all your recommendations included.
+
+📄 Download the updated test plan:
+Click to download vantahire_test_plan_v2.md
+
+🆕 What's Added:
+🚀 Performance Testing (Job Search, AI response latency, Bulk apply)
+
+🧪 Test Data Management (faker.js, factory functions)
+
+✅ Mocking Strategy (jest.mock(...))
+
+🔐 Flaky Test Prevention (await expect(...).toPass)
+
+📦 API Schema Validation (toMatchSchema)
+
+📊 CI Pipeline Optimizations (Impacted test detection)
+
+📈 Test Pyramid visualization

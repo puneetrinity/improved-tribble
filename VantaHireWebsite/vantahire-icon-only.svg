@@ -1,0 +1,44 @@
+<svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Icon gradient -->
+    <linearGradient id="icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7B38FB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2D81FF;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Accent gradient -->
+    <linearGradient id="accent-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF5BA8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B38FB;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Drop shadow filter -->
+    <filter id="drop-shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#7B38FB" floodOpacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="40" cy="40" r="38" fill="url(#icon-gradient)" opacity="0.1" filter="blur(8px)"/>
+  
+  <!-- Main "V" shape with 3D effect -->
+  <g filter="url(#drop-shadow)">
+    <!-- Left side of V (darker) -->
+    <path d="M20 25 L35 55 L40 55 L25 25 Z" fill="#1A5BB9"/>
+    
+    <!-- Right side of V (lighter) -->
+    <path d="M45 25 L60 25 L45 55 L40 55 Z" fill="#3D93FF"/>
+    
+    <!-- Center highlight -->
+    <path d="M35 45 L40 55 L45 45 Z" fill="url(#accent-gradient)" opacity="0.8"/>
+  </g>
+  
+  <!-- Rocket trail elements -->
+  <circle cx="28" cy="32" r="2" fill="#FF5BA8" opacity="0.7"/>
+  <circle cx="52" cy="32" r="2" fill="#50E3C2" opacity="0.6"/>
+  <circle cx="40" cy="22" r="1.5" fill="#FF9D4A" opacity="0.8"/>
+  
+  <!-- Additional accent dots around the icon -->
+  <circle cx="65" cy="25" r="1" fill="#FF5BA8" opacity="0.6"/>
+  <circle cx="15" cy="55" r="1" fill="#2D81FF" opacity="0.6"/>
+</svg>

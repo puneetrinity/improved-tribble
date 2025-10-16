@@ -1,0 +1,87 @@
+<svg width="400" height="120" viewBox="0 0 400 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Main brand gradient -->
+    <linearGradient id="brand-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7B38FB;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2D81FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF5BA8;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Icon gradient -->
+    <linearGradient id="icon-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7B38FB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2D81FF;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Accent gradient -->
+    <linearGradient id="accent-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF5BA8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B38FB;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Drop shadow filter -->
+    <filter id="drop-shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#7B38FB" floodOpacity="0.3"/>
+    </filter>
+    
+    <!-- Glow effect filter -->
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feFlood floodColor="#7B38FB" floodOpacity="0.4" result="color"/>
+      <feComposite operator="in" in="color" in2="blur" result="glow"/>
+      <feComposite operator="over" in="SourceGraphic" in2="glow"/>
+    </filter>
+  </defs>
+  
+  <!-- Icon Section - Stylized "V" with rocket elements -->
+  <g transform="translate(20, 20)">
+    <!-- Background glow -->
+    <circle cx="40" cy="40" r="35" fill="url(#icon-gradient)" opacity="0.1" filter="blur(8px)"/>
+    
+    <!-- Main "V" shape with 3D effect -->
+    <g filter="url(#drop-shadow)">
+      <!-- Left side of V (darker) -->
+      <path d="M15 25 L35 65 L40 65 L20 25 Z" fill="#1A5BB9"/>
+      
+      <!-- Right side of V (lighter) -->
+      <path d="M45 25 L65 25 L45 65 L40 65 Z" fill="#3D93FF"/>
+      
+      <!-- Center highlight -->
+      <path d="M35 45 L40 65 L45 45 Z" fill="url(#accent-gradient)" opacity="0.8"/>
+    </g>
+    
+    <!-- Rocket trail elements -->
+    <circle cx="25" cy="35" r="2" fill="#FF5BA8" opacity="0.7"/>
+    <circle cx="55" cy="35" r="2" fill="#50E3C2" opacity="0.6"/>
+    <circle cx="40" cy="25" r="1.5" fill="#FF9D4A" opacity="0.8"/>
+  </g>
+  
+  <!-- Company Name -->
+  <g transform="translate(100, 30)">
+    <!-- "Vanta" part -->
+    <text x="0" y="35" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="800" fill="url(#brand-gradient)" filter="url(#glow)">
+      Vanta
+    </text>
+    
+    <!-- "Hire" part with slight offset for visual hierarchy -->
+    <text x="120" y="35" font-family="system-ui, -apple-system, sans-serif" font-size="36" font-weight="700" fill="url(#brand-gradient)" filter="url(#glow)">
+      Hire
+    </text>
+    
+    <!-- Tagline -->
+    <text x="0" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" fill="#7B38FB" opacity="0.8">
+      AI-Powered Recruitment Solutions
+    </text>
+  </g>
+  
+  <!-- Decorative elements -->
+  <g opacity="0.6">
+    <!-- Small accent dots -->
+    <circle cx="350" cy="30" r="1.5" fill="#FF5BA8"/>
+    <circle cx="360" cy="45" r="1" fill="#2D81FF"/>
+    <circle cx="340" cy="50" r="1" fill="#50E3C2"/>
+    
+    <!-- Connecting line -->
+    <rect x="320" y="40" width="20" height="1" rx="0.5" fill="url(#accent-gradient)" opacity="0.5"/>
+  </g>
+</svg>

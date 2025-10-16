@@ -1,0 +1,144 @@
+<svg width="1584" height="396" viewBox="0 0 1584 396" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2D1B69;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#1E0B40;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#2D1B69;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E0B40;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="text-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7B38FB;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#2D81FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FF5BA8;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="accent-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#FF5BA8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7B38FB;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="rocket-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3D93FF;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1A5BB9;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feFlood floodColor="#7B38FB" floodOpacity="0.4" result="color"/>
+      <feComposite operator="in" in="color" in2="blur" result="glow"/>
+      <feComposite operator="over" in="SourceGraphic" in2="glow"/>
+    </filter>
+    
+    <filter id="rocket-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" floodColor="#7B38FB" floodOpacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1584" height="396" fill="url(#bg-gradient)"/>
+  
+  <!-- Background pattern -->
+  <pattern id="dots" patternUnits="userSpaceOnUse" width="60" height="60">
+    <circle cx="30" cy="30" r="1.5" fill="white" fill-opacity="0.04"/>
+  </pattern>
+  <rect width="1584" height="396" fill="url(#dots)"/>
+  
+  <!-- Background glow effects -->
+  <circle cx="300" cy="100" r="120" fill="#7B38FB" fill-opacity="0.08" filter="blur(60px)"/>
+  <circle cx="1300" cy="300" r="100" fill="#2D81FF" fill-opacity="0.08" filter="blur(50px)"/>
+  <circle cx="800" cy="80" r="80" fill="#FF5BA8" fill-opacity="0.06" filter="blur(40px)"/>
+  <circle cx="1400" cy="150" r="90" fill="#50E3C2" fill-opacity="0.05" filter="blur(45px)"/>
+  
+  <!-- Decorative particles -->
+  <circle cx="200" cy="150" r="3" fill="#7B38FB" fill-opacity="0.6"/>
+  <circle cx="1400" cy="100" r="2" fill="#2D81FF" fill-opacity="0.5"/>
+  <circle cx="400" cy="320" r="2.5" fill="#FF5BA8" fill-opacity="0.6"/>
+  <circle cx="1200" cy="250" r="2" fill="#50E3C2" fill-opacity="0.5"/>
+  <circle cx="600" cy="60" r="1.5" fill="#FF9D4A" fill-opacity="0.7"/>
+  <circle cx="1000" cy="340" r="2" fill="#7B38FB" fill-opacity="0.4"/>
+  
+  <!-- Rocket illustration -->
+  <g transform="translate(1350, 150) scale(0.6)" filter="url(#rocket-shadow)">
+    <!-- Background glow -->
+    <circle cx="95" cy="120" r="60" fill="#3D93FF" fill-opacity="0.15" filter="blur(20px)"/>
+    
+    <!-- Main rocket body -->
+    <path d="M95.5 40C95.5 40 71 62.5 71 102.5C71 142.5 95.5 165 95.5 165Z" fill="#1A5BB9"/>
+    <path d="M95.5 40C95.5 40 120 62.5 120 102.5C120 142.5 95.5 165 95.5 165Z" fill="#3D93FF"/>
+    
+    <!-- Rocket window -->
+    <ellipse cx="95.5" cy="102.5" rx="12.5" ry="17.5" fill="#E0F7FF"/>
+    <ellipse cx="91.5" cy="98" rx="5" ry="7" fill="white" fill-opacity="0.6"/>
+    
+    <!-- Fins -->
+    <path d="M71 90C71 90 60 95 60 102.5C60 110 71 115 71 115" fill="#FF5BA8" stroke="#FF5BA8" stroke-width="3"/>
+    <path d="M120 90C120 90 131 95 131 102.5C131 110 120 115 120 115" fill="#FF5BA8" stroke="#FF5BA8" stroke-width="3"/>
+    
+    <!-- Rocket nose -->
+    <path d="M95.5 40C95.5 40 83 50 83 65C83 80 95.5 85 95.5 85C95.5 85 108 80 108 65C108 50 95.5 40 95.5 40Z" fill="#3D93FF"/>
+    
+    <!-- Flames -->
+    <path d="M83 145C83 145 77 167.5 95.5 167.5C114 167.5 108 145 108 145H83Z" fill="#FF5BA8"/>
+    <path d="M77 155C77 155 72.5 175 95.5 175C118.5 175 114 155 114 155H77Z" fill="#FF9D4A"/>
+    
+    <!-- Trail bubbles -->
+    <circle cx="153.5" cy="122.5" r="6" fill="#FF5BA8" opacity="0.6"/>
+    <circle cx="143.5" cy="142.5" r="4" fill="#50E3C2" opacity="0.5"/>
+    <circle cx="163.5" cy="142.5" r="3" fill="#7B38FB" opacity="0.6"/>
+  </g>
+  
+  <!-- Main content -->
+  <g transform="translate(80, 80)">
+    <!-- Company name -->
+    <text x="0" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="52" font-weight="800" fill="url(#text-gradient)" filter="url(#glow)">
+      VantaHire
+    </text>
+    
+    <!-- Tagline -->
+    <text x="0" y="100" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="600" fill="white" fill-opacity="0.9">
+      AI-Powered Recruitment Solutions
+    </text>
+    
+    <!-- Key value propositions -->
+    <g transform="translate(0, 140)">
+      <g>
+        <circle cx="8" cy="8" r="4" fill="url(#accent-gradient)"/>
+        <text x="25" y="13" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="white" fill-opacity="0.85">
+          Intelligent Talent Matching
+        </text>
+      </g>
+      <g transform="translate(0, 30)">
+        <circle cx="8" cy="8" r="4" fill="#2D81FF"/>
+        <text x="25" y="13" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="white" fill-opacity="0.85">
+          Expert Recruitment Consulting
+        </text>
+      </g>
+      <g transform="translate(0, 60)">
+        <circle cx="8" cy="8" r="4" fill="#50E3C2"/>
+        <text x="25" y="13" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="500" fill="white" fill-opacity="0.85">
+          Seamless Hiring Experience
+        </text>
+      </g>
+    </g>
+  </g>
+  
+  <!-- Contact information -->
+  <g transform="translate(600, 280)">
+    <text x="0" y="20" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="600" fill="white" fill-opacity="0.9">
+      Contact Us
+    </text>
+    <text x="0" y="45" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="500" fill="white" fill-opacity="0.7">
+      hello@vantahire.com  •  +91-9742944825  •  Bangalore, India
+    </text>
+    <text x="0" y="70" font-family="system-ui, -apple-system, sans-serif" font-size="14" font-weight="600" fill="url(#text-gradient)">
+      www.vantahire.com
+    </text>
+  </g>
+  
+  <!-- Accent line at bottom -->
+  <rect x="0" y="390" width="1584" height="6" fill="url(#accent-gradient)" opacity="0.6"/>
+  
+  <!-- Top accent line -->
+  <rect x="0" y="0" width="1584" height="2" fill="url(#text-gradient)" opacity="0.4"/>
+</svg>
