@@ -16,7 +16,8 @@ WORKDIR /app
 
 # Copy SpotAxis directory
 COPY SpotAxis/requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir whitenoise==6.6.0
 
 # Copy entire SpotAxis project
 COPY SpotAxis /app

@@ -16,11 +16,11 @@ WORKDIR /app
 
 # Copy requirements and install
 COPY requirements.txt /app/
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir whitenoise==6.6.0
 
 # Copy project
 COPY . /app
 
 # Collect static (ignore errors if not configured), migrate, then start gunicorn
 CMD ["bash", "-lc", "python manage.py collectstatic --noinput || true && python manage.py migrate && gunicorn TRM.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3"]
-

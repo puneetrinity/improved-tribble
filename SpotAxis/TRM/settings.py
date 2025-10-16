@@ -129,6 +129,7 @@ INSTALLED_APPS = (
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Serve static files in production
     # 'TRM.middleware.CrossDomainSessionMiddleware',
     #'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -243,6 +244,7 @@ DATABASES = {
 # Media & Static Files
 MEDIA_ROOT = os.getenv('media_root', os.path.join(PROJECT_PATH, 'media'))
 MEDIA_URL = os.getenv('media_url', 'http://spotaxis.com/media/')
+STATIC_URL = os.getenv('static_url', '/static/')
 STATIC_ROOT = os.getenv('static_root', os.path.join(PROJECT_PATH, '..', 'staticfiles'))
 
 # Only include STATICFILES_DIRS if the directory exists and is not the same as STATIC_ROOT
@@ -251,6 +253,9 @@ if os.path.isdir(_static_dir) and os.path.abspath(_static_dir) != os.path.abspat
     STATICFILES_DIRS = [_static_dir]
 else:
     STATICFILES_DIRS = []
+
+# WhiteNoise: hashed, compressed static files
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Site URL
 PROTOCOL = 'https' if ENVIRONMENT == 'productive' else 'http'
