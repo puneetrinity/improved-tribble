@@ -85,3 +85,4 @@ wsproto==1.2.0
 xvfbwrapper==0.2.13
 zopfli==0.2.3.post1
 psycopg[binary]==3.2.3
+python-dotenv==1.0.1

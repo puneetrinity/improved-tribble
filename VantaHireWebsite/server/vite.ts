@@ -96,6 +96,8 @@ export function serveStatic(app: Express) {
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
+    // Ensure the SPA shell (index.html) is never cached, to avoid hash mismatches
+    res.setHeader('Cache-Control', 'no-store, must-revalidate');
     res.sendFile(path.resolve(distPath, "index.html"));
   });
 }

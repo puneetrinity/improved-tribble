@@ -17,6 +17,11 @@ export default function RecruiterDashboard() {
   const [selectedApplicationId, setSelectedApplicationId] = useState<number | null>(null);
   const [reviewNotes, setReviewNotes] = useState("");
   const [newStatus, setNewStatus] = useState("");
+  // SpotAxis integration flag (must be inside component for hooks correctness)
+  const { data: spotaxis } = useQuery<{ enabled: boolean }>(["spotaxis-config"], async () => {
+    const res = await fetch('/api/integrations/spotaxis');
+    return res.json();
+  });
 
   // Fetch recruiter's jobs
   const { data: jobs = [], isLoading: jobsLoading } = useQuery({
@@ -422,8 +427,3 @@ export default function RecruiterDashboard() {
     </div>
   );
 }
-  // SpotAxis integration flag
-  const { data: spotaxis } = useQuery<{ enabled: boolean }>(["spotaxis-config"], async () => {
-    const res = await fetch('/api/integrations/spotaxis');
-    return res.json();
-  });
