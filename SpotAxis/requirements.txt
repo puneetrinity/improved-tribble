@@ -86,3 +86,8 @@ xvfbwrapper==0.2.13
 zopfli==0.2.3.post1
 psycopg[binary]==3.2.3
 python-dotenv==1.0.1
+django-rosetta==0.10.2
+django-crontab==0.7.1
+django-extensions==4.1.0
+markdownify==1.1.0
+django-bootstrap-form==3.4
