@@ -22,5 +22,5 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 # Copy entire SpotAxis project
 COPY SpotAxis /app
 
-# Collect static (ignore errors if not configured), migrate, then start gunicorn
-CMD ["bash", "-lc", "python manage.py collectstatic --noinput || true && python manage.py migrate && gunicorn TRM.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3"]
+# Collect static (ignore errors if not configured), migrate, create admin, then start gunicorn
+CMD ["bash", "-lc", "python manage.py collectstatic --noinput || true && python manage.py migrate && python create_admin.py && gunicorn TRM.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3"]
