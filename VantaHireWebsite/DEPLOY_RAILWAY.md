@@ -41,6 +41,7 @@ Configure Railway’s health check path to `/api/health` (200 OK when healthy).
 ## 5) Deploy Steps
 - Connect the GitHub repo to Railway or push to a Railway Git repository.
 - Set variables in Railway as described above.
+- Optional: set `MIGRATE_ON_START=true` in your Web service to auto-apply schema (drizzle-kit push) on boot.
 - Deploy. Railway builds the client to `dist/public` and the server to `dist/index.js`.
 - On successful start, logs include the bound port and optional SpotAxis config.
 
@@ -58,5 +59,8 @@ If you deploy SpotAxis separately on Railway, use its public URL as `SPOTAXIS_BA
 - Database: verify `DATABASE_URL` and SSL options.
   - Railway Postgres: set `DATABASE_URL` and (if needed) `DATABASE_SSL=true`.
   - Neon: ensure `DATABASE_URL` points to `.neon.tech` and includes `sslmode=require`.
+- Missing tables (e.g., `relation "users" does not exist`):
+  - Run once in the service shell: `npm --prefix VantaHireWebsite run db:push`, or
+  - Set `MIGRATE_ON_START=true` and redeploy to run migrations automatically.
 - Cloudinary: if unset, file upload falls back to placeholders (info logged).
 - Emails: current implementation uses Nodemailer Ethereal for testing; replace with a real provider for production.
