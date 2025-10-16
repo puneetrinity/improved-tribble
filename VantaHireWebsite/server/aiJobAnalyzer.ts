@@ -1,22 +1,22 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-let openai: OpenAI | null = null;
+// Using Groq's llama-3.3-70b-versatile model for high-quality analysis
+let groq: Groq | null = null;
 
-// Lazy initialization of OpenAI client
-function getOpenAIClient(): OpenAI {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OpenAI API key not configured. AI features are disabled.');
+// Lazy initialization of Groq client
+function getGroqClient(): Groq {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('Groq API key not configured. AI features are disabled.');
   }
-  if (!openai) {
-    openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  if (!groq) {
+    groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   }
-  return openai;
+  return groq;
 }
 
 // Check if AI features are available
 export function isAIEnabled(): boolean {
-  return !!process.env.OPENAI_API_KEY;
+  return !!process.env.GROQ_API_KEY;
 }
 
 export interface JobAnalysisResult {
@@ -32,7 +32,7 @@ export interface JobAnalysisResult {
 
 export async function analyzeJobDescription(title: string, description: string): Promise<JobAnalysisResult> {
   try {
-    const client = getOpenAIClient();
+    const client = getGroqClient();
     const prompt = `Evaluate the following job description for clarity, inclusion, and SEO optimization. Provide specific, actionable feedback.
 
 Job Title: ${title}
@@ -55,7 +55,7 @@ Focus on:
 Return only valid JSON without any additional text.`;
 
     const response = await client.chat.completions.create({
-      model: "gpt-4o",
+      model: "llama-3.3-70b-versatile",
       messages: [
         {
           role: "system",
@@ -82,12 +82,12 @@ Return only valid JSON without any additional text.`;
       bias_flags: Array.isArray(result.bias_flags) ? result.bias_flags : [],
       seo_keywords: Array.isArray(result.seo_keywords) ? result.seo_keywords : [],
       suggestions: Array.isArray(result.suggestions) ? result.suggestions : [],
-      model_version: "gpt-4o"
+      model_version: "llama-3.3-70b-versatile"
     };
 
   } catch (error) {
-    console.error('OpenAI API error:', error);
-    if (error instanceof OpenAI.APIError) {
+    console.error('Groq API error:', error);
+    if (error instanceof Error) {
       throw new Error(`AI analysis unavailable: ${error.message}`);
     }
     throw new Error('AI analysis failed');

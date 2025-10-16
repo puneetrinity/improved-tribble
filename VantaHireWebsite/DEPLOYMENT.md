@@ -30,7 +30,7 @@
    CLOUDINARY_CLOUD_NAME=<your-value>
    CLOUDINARY_API_KEY=<your-value>
    CLOUDINARY_API_SECRET=<your-value>
-   OPENAI_API_KEY=<your-value>
+   GROQ_API_KEY=<your-value>
    SPOTAXIS_BASE_URL=<your-value>
    ```
 
@@ -62,7 +62,7 @@ If deploying SpotAxis alongside VantaHire:
 | `CLOUDINARY_CLOUD_NAME` | No | Cloudinary cloud name for file uploads |
 | `CLOUDINARY_API_KEY` | No | Cloudinary API key |
 | `CLOUDINARY_API_SECRET` | No | Cloudinary API secret |
-| `OPENAI_API_KEY` | No | OpenAI API key for AI job analysis |
+| `GROQ_API_KEY` | No | Groq API key for AI job analysis (get free at https://console.groq.com) |
 | `SPOTAXIS_BASE_URL` | No | Base URL for SpotAxis integration |
 | `SPOTAXIS_CAREERS_URL` | No | Careers page URL for SpotAxis |
 | `NOTIFICATION_EMAIL` | No | Email for system notifications |
