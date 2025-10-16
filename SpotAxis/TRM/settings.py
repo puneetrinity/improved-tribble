@@ -7,6 +7,9 @@ import paypalrestsdk
 
 load_dotenv()
 
+# Django compatibility shim for legacy packages (must run before Django imports)
+from . import django_compat
+
 PROJECT_NAME = 'SpotAxis'
 PROJECT_PATH = os.path.dirname(os.path.realpath(__file__))
 
