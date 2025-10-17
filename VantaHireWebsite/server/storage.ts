@@ -412,7 +412,7 @@ export class DatabaseStorage implements IStorage {
       .where(eq(applications.email, email))
       .orderBy(desc(applications.appliedAt));
 
-    return results.map(result => ({
+    return results.map((result: any) => ({
       ...result,
       job: result.job
     }));

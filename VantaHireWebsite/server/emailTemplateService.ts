@@ -187,7 +187,7 @@ export async function sendApplicationReceivedEmail(
  */
 export async function getAllTemplates(): Promise<EmailTemplate[]> {
   return db.query.emailTemplates.findMany({
-    orderBy: (templates, { asc }) => [asc(templates.templateType), asc(templates.name)],
+    orderBy: (templates: any, { asc }: any) => [asc(templates.templateType), asc(templates.name)],
   });
 }
 
