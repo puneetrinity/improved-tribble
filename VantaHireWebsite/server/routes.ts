@@ -8,7 +8,7 @@ import { setupAuth, requireAuth, requireRole } from "./auth";
 import { upload, uploadToCloudinary } from "./cloudinary";
 import rateLimit from "express-rate-limit";
 import { analyzeJobDescription, generateJobScore, calculateOptimizationSuggestions, isAIEnabled } from "./aiJobAnalyzer";
-import { sendTemplatedEmail } from "./emailTemplateService";
+import { sendTemplatedEmail, sendStatusUpdateEmail, sendInterviewInvitation, sendApplicationReceivedEmail } from "./emailTemplateService";
 import helmet from "helmet";
 import * as spotaxis from "./integrations/spotaxis";
 
@@ -362,6 +362,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         resumeUrl
       });
 
+      // Fire-and-forget: candidate confirmation (if enabled)
+      const autoEmails = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1';
+      if (autoEmails) {
+        sendApplicationReceivedEmail(application.id).catch(err => console.error('Application received email error:', err));
+      }
+
       // Send notification email to recruiter
       try {
         const emailService = await getEmailService();
@@ -518,6 +524,21 @@ New job application received:
       const { stageId, notes } = req.body;
       if (!stageId || isNaN(appId)) return res.status(400).json({ error: 'stageId required' });
       await storage.updateApplicationStage(appId, parseInt(stageId), req.user!.id, notes);
+      // Fire-and-forget: automated status email (if enabled)
+      const autoEmails = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1';
+      if (autoEmails) {
+        try {
+          // Determine stage name for status update
+          const stages = await storage.getPipelineStages();
+          const target = stages.find(s => s.id === parseInt(stageId));
+          if (target?.name) {
+            // Do not block response
+            sendStatusUpdateEmail(appId, target.name).catch(err => console.error('Status email error:', err));
+          }
+        } catch (e) {
+          console.warn('Automated email skipped (stage lookup failed):', e);
+        }
+      }
       res.json({ success: true });
     } catch (e) { next(e); }
   });
@@ -537,6 +558,11 @@ New job application received:
       const appId = parseInt(req.params.id);
       const { date, time, location, notes } = req.body;
       const updated = await storage.scheduleInterview(appId, { date: date ? new Date(date) : undefined, time, location, notes });
+      // Fire-and-forget: interview invite (if enabled and fields provided)
+      const autoEmails = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1';
+      if (autoEmails && date && time && location) {
+        sendInterviewInvitation(appId, { date, time, location }).catch(err => console.error('Interview email error:', err));
+      }
       res.json(updated);
     } catch (e) { next(e); }
   });

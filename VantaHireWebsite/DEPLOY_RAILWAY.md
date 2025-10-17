@@ -27,6 +27,8 @@ Optional
 - SpotAxis integration:
   - `SPOTAXIS_BASE_URL` (e.g. `https://your-spotaxis-app.railway.app`)
   - `SPOTAXIS_CAREERS_URL` (e.g. `https://org-subdomain.your-spotaxis.com/jobs/`)
+ - Email automation (ATS):
+   - `EMAIL_AUTOMATION_ENABLED` = `true` to auto-send emails on stage changes, scheduling, and application received
 
 ## 3) Build & Start Commands
 The repo already defines:
