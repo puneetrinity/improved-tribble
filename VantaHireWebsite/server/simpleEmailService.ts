@@ -4,6 +4,7 @@ import type { ContactSubmission } from '@shared/schema';
 // Simple interface for our email service
 export interface EmailService {
   sendContactNotification(submission: ContactSubmission): Promise<boolean>;
+  sendEmail?(opts: { to: string; subject: string; text: string }): Promise<boolean>;
 }
 
 // Implementation using Ethereal (a fake SMTP service for testing)
@@ -100,6 +101,27 @@ export class TestEmailService implements EmailService {
       return true;
     } catch (error) {
       console.error('Error sending email notification:', error);
+      return false;
+    }
+  }
+  
+  async sendEmail(opts: { to: string; subject: string; text: string}): Promise<boolean> {
+    if (!this.transporter) {
+      const initialized = await this.initialize();
+      if (!initialized) return false;
+    }
+    try {
+      if (!this.transporter) return false;
+      const info = await this.transporter.sendMail({
+        from: '"VantaHire" <no-reply@vantahire.com>',
+        to: opts.to,
+        subject: opts.subject,
+        text: opts.text,
+      });
+      console.log('Email sent:', nodemailer.getTestMessageUrl(info));
+      return true;
+    } catch (e) {
+      console.error('Email send error:', e);
       return false;
     }
   }

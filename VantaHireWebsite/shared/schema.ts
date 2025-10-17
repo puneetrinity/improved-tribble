@@ -66,6 +66,17 @@ export const applications = pgTable("applications", {
   downloadedAt: timestamp("downloaded_at"),
   appliedAt: timestamp("applied_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  // ATS enhancements
+  currentStage: integer("current_stage"),
+  interviewDate: timestamp("interview_date"),
+  interviewTime: text("interview_time"),
+  interviewLocation: text("interview_location"),
+  interviewNotes: text("interview_notes"),
+  recruiterNotes: text("recruiter_notes").array(),
+  rating: integer("rating"),
+  tags: text("tags").array(),
+  stageChangedAt: timestamp("stage_changed_at"),
+  stageChangedBy: integer("stage_changed_by").references(() => users.id),
 });
 
 export const jobAnalytics = pgTable("job_analytics", {
@@ -78,6 +89,40 @@ export const jobAnalytics = pgTable("job_analytics", {
   aiModelVersion: text("ai_model_version"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ATS: Pipeline stages
+export const pipelineStages = pgTable("pipeline_stages", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  order: integer("order").notNull(),
+  color: text("color").default("#3b82f6"),
+  isDefault: boolean("is_default").default(false),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ATS: Application stage history
+export const applicationStageHistory = pgTable("application_stage_history", {
+  id: serial("id").primaryKey(),
+  applicationId: integer("application_id").notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  fromStage: integer("from_stage").references(() => pipelineStages.id),
+  toStage: integer("to_stage").notNull().references(() => pipelineStages.id),
+  changedBy: integer("changed_by").notNull().references(() => users.id),
+  notes: text("notes"),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+});
+
+// ATS: Email templates
+export const emailTemplates = pgTable("email_templates", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  templateType: text("template_type").notNull(),
+  createdBy: integer("created_by").references(() => users.id),
+  isDefault: boolean("is_default").default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Relations
@@ -114,10 +159,53 @@ export const jobsRelations = relations(jobs, ({ one, many }) => ({
   }),
 }));
 
-export const applicationsRelations = relations(applications, ({ one }) => ({
+export const applicationsRelations = relations(applications, ({ one, many }) => ({
   job: one(jobs, {
     fields: [applications.jobId],
     references: [jobs.id],
+  }),
+  currentStageRel: one(pipelineStages, {
+    fields: [applications.currentStage],
+    references: [pipelineStages.id],
+  }),
+  stageChangedByUser: one(users, {
+    fields: [applications.stageChangedBy],
+    references: [users.id],
+  }),
+  stageHistory: many(applicationStageHistory),
+}));
+
+export const pipelineStagesRelations = relations(pipelineStages, ({ one, many }) => ({
+  createdBy: one(users, {
+    fields: [pipelineStages.createdBy],
+    references: [users.id],
+  }),
+  applications: many(applications),
+}));
+
+export const applicationStageHistoryRelations = relations(applicationStageHistory, ({ one }) => ({
+  application: one(applications, {
+    fields: [applicationStageHistory.applicationId],
+    references: [applications.id],
+  }),
+  fromStageRel: one(pipelineStages, {
+    fields: [applicationStageHistory.fromStage],
+    references: [pipelineStages.id],
+  }),
+  toStageRel: one(pipelineStages, {
+    fields: [applicationStageHistory.toStage],
+    references: [pipelineStages.id],
+  }),
+  changedByUser: one(users, {
+    fields: [applicationStageHistory.changedBy],
+    references: [users.id],
+  }),
+}));
+
+export const emailTemplatesRelations = relations(emailTemplates, ({ one }) => ({
+  createdBy: one(users, {
+    fields: [emailTemplates.createdBy],
+    references: [users.id],
   }),
 }));
 
@@ -127,6 +215,22 @@ export const jobAnalyticsRelations = relations(jobAnalytics, ({ one }) => ({
     references: [jobs.id],
   }),
 }));
+
+// Types and insert schemas for new tables
+export const insertPipelineStageSchema = createInsertSchema(pipelineStages).pick({
+  name: true,
+  order: true,
+  color: true,
+  isDefault: true,
+});
+
+export const insertEmailTemplateSchema = createInsertSchema(emailTemplates).pick({
+  name: true,
+  subject: true,
+  body: true,
+  templateType: true,
+  isDefault: true,
+});
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -220,3 +324,11 @@ export type UserProfile = typeof userProfiles.$inferSelect;
 
 export type InsertJobAnalytics = z.infer<typeof insertJobAnalyticsSchema>;
 export type JobAnalytics = typeof jobAnalytics.$inferSelect;
+
+export type PipelineStage = typeof pipelineStages.$inferSelect;
+export type InsertPipelineStage = z.infer<typeof insertPipelineStageSchema>;
+
+export type EmailTemplate = typeof emailTemplates.$inferSelect;
+export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
+
+export type ApplicationStageHistory = typeof applicationStageHistory.$inferSelect;

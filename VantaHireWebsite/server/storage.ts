@@ -5,6 +5,9 @@ import {
   applications,
   userProfiles,
   jobAnalytics,
+  pipelineStages,
+  applicationStageHistory,
+  emailTemplates,
   type User, 
   type InsertUser, 
   type ContactSubmission, 
@@ -16,7 +19,11 @@ import {
   type UserProfile,
   type InsertUserProfile,
   type JobAnalytics,
-  type InsertJobAnalytics
+  type InsertJobAnalytics,
+  type PipelineStage,
+  type InsertPipelineStage,
+  type EmailTemplate,
+  type InsertEmailTemplate
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, ilike, sql, or, inArray, count } from "drizzle-orm";
@@ -89,6 +96,19 @@ export interface IStorage {
   updateConversionRate(jobId: number): Promise<JobAnalytics | undefined>;
   updateJobAnalytics(jobId: number, updates: { aiScoreCache?: number; aiModelVersion?: string }): Promise<JobAnalytics | undefined>;
   getJobsWithAnalytics(userId?: number): Promise<any[]>;
+  
+  // ATS: pipeline & interview
+  getPipelineStages(): Promise<PipelineStage[]>;
+  createPipelineStage(stage: InsertPipelineStage & { createdBy?: number }): Promise<PipelineStage>;
+  updateApplicationStage(appId: number, newStageId: number, changedBy: number, notes?: string): Promise<void>;
+  getApplicationStageHistory(appId: number): Promise<any[]>;
+  scheduleInterview(appId: number, fields: { date?: Date; time?: string; location?: string; notes?: string }): Promise<Application | undefined>;
+  addRecruiterNote(appId: number, note: string): Promise<Application | undefined>;
+  setApplicationRating(appId: number, rating: number): Promise<Application | undefined>;
+  
+  // ATS: email templates
+  getEmailTemplates(): Promise<EmailTemplate[]>;
+  createEmailTemplate(template: InsertEmailTemplate & { createdBy?: number }): Promise<EmailTemplate>;
 }
 
 // Database storage implementation using Drizzle ORM
@@ -833,6 +853,74 @@ export class DatabaseStorage implements IStorage {
       ...row,
       analytics: row.analytics || { views: 0, applyClicks: 0, conversionRate: "0.00" }
     }));
+  }
+
+  // ===== ATS: Pipeline and Interviews =====
+  async getPipelineStages(): Promise<PipelineStage[]> {
+    return db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  }
+
+  async createPipelineStage(stage: InsertPipelineStage & { createdBy?: number }): Promise<PipelineStage> {
+    const [result] = await db.insert(pipelineStages).values(stage).returning();
+    return result;
+  }
+
+  async updateApplicationStage(appId: number, newStageId: number, changedBy: number, notes?: string): Promise<void> {
+    const app = await this.getApplication(appId);
+    await db.update(applications)
+      .set({ currentStage: newStageId, stageChangedAt: new Date(), stageChangedBy: changedBy, updatedAt: new Date() })
+      .where(eq(applications.id, appId));
+    await db.insert(applicationStageHistory).values({
+      applicationId: appId,
+      fromStage: app?.currentStage || null,
+      toStage: newStageId,
+      changedBy,
+      notes,
+    });
+  }
+
+  async getApplicationStageHistory(appId: number): Promise<any[]> {
+    return db.select().from(applicationStageHistory).where(eq(applicationStageHistory.applicationId, appId)).orderBy(desc(applicationStageHistory.changedAt));
+  }
+
+  async scheduleInterview(appId: number, fields: { date?: Date; time?: string; location?: string; notes?: string }): Promise<Application | undefined> {
+    const [result] = await db.update(applications)
+      .set({
+        interviewDate: fields.date || null,
+        interviewTime: fields.time || null,
+        interviewLocation: fields.location || null,
+        interviewNotes: fields.notes || null,
+        updatedAt: new Date(),
+      })
+      .where(eq(applications.id, appId))
+      .returning();
+    return result || undefined;
+  }
+
+  async addRecruiterNote(appId: number, note: string): Promise<Application | undefined> {
+    const [result] = await db.update(applications)
+      .set({ recruiterNotes: sql`${applications.recruiterNotes} || ${[note]}`, updatedAt: new Date() })
+      .where(eq(applications.id, appId))
+      .returning();
+    return result || undefined;
+  }
+
+  async setApplicationRating(appId: number, rating: number): Promise<Application | undefined> {
+    const [result] = await db.update(applications)
+      .set({ rating, updatedAt: new Date() })
+      .where(eq(applications.id, appId))
+      .returning();
+    return result || undefined;
+  }
+
+  // ===== ATS: Email templates =====
+  async getEmailTemplates(): Promise<EmailTemplate[]> {
+    return db.select().from(emailTemplates).orderBy(desc(emailTemplates.createdAt));
+  }
+
+  async createEmailTemplate(template: InsertEmailTemplate & { createdBy?: number }): Promise<EmailTemplate> {
+    const [result] = await db.insert(emailTemplates).values(template).returning();
+    return result;
   }
 }
 

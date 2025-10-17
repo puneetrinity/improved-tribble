@@ -1,13 +1,14 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertContactSchema, insertJobSchema, insertApplicationSchema } from "@shared/schema";
+import { insertContactSchema, insertJobSchema, insertApplicationSchema, insertPipelineStageSchema, insertEmailTemplateSchema, type InsertEmailTemplate } from "@shared/schema";
 import { z } from "zod";
 import { getEmailService } from "./simpleEmailService";
 import { setupAuth, requireAuth, requireRole } from "./auth";
 import { upload, uploadToCloudinary } from "./cloudinary";
 import rateLimit from "express-rate-limit";
 import { analyzeJobDescription, generateJobScore, calculateOptimizationSuggestions, isAIEnabled } from "./aiJobAnalyzer";
+import { sendTemplatedEmail } from "./emailTemplateService";
 import helmet from "helmet";
 import * as spotaxis from "./integrations/spotaxis";
 
@@ -486,6 +487,114 @@ New job application received:
     } catch (error) {
       next(error);
     }
+  });
+
+  // ============= ATS: PIPELINE & APPLICATION MANAGEMENT =============
+
+  // Get pipeline stages
+  app.get("/api/pipeline/stages", requireAuth, async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const stages = await storage.getPipelineStages();
+      res.json(stages);
+    } catch (e) { next(e); }
+  });
+
+  // Create pipeline stage (recruiters/admin)
+  app.post("/api/pipeline/stages", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = insertPipelineStageSchema.parse(req.body);
+      const stage = await storage.createPipelineStage({ ...body, createdBy: req.user!.id });
+      res.status(201).json(stage);
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ error: 'Validation error', details: e.errors });
+      next(e);
+    }
+  });
+
+  // Move application to a new stage
+  app.patch("/api/applications/:id/stage", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const appId = parseInt(req.params.id);
+      const { stageId, notes } = req.body;
+      if (!stageId || isNaN(appId)) return res.status(400).json({ error: 'stageId required' });
+      await storage.updateApplicationStage(appId, parseInt(stageId), req.user!.id, notes);
+      res.json({ success: true });
+    } catch (e) { next(e); }
+  });
+
+  // Get application stage history
+  app.get("/api/applications/:id/history", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const appId = parseInt(req.params.id);
+      const hist = await storage.getApplicationStageHistory(appId);
+      res.json(hist);
+    } catch (e) { next(e); }
+  });
+
+  // Schedule interview
+  app.patch("/api/applications/:id/interview", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const appId = parseInt(req.params.id);
+      const { date, time, location, notes } = req.body;
+      const updated = await storage.scheduleInterview(appId, { date: date ? new Date(date) : undefined, time, location, notes });
+      res.json(updated);
+    } catch (e) { next(e); }
+  });
+
+  // Add recruiter note
+  app.post("/api/applications/:id/notes", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const appId = parseInt(req.params.id);
+      const { note } = req.body;
+      if (!note) return res.status(400).json({ error: 'note required' });
+      const updated = await storage.addRecruiterNote(appId, note);
+      res.json(updated);
+    } catch (e) { next(e); }
+  });
+
+  // Set rating
+  app.patch("/api/applications/:id/rating", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const appId = parseInt(req.params.id);
+      const { rating } = req.body;
+      if (typeof rating !== 'number' || rating < 1 || rating > 5) return res.status(400).json({ error: 'rating 1-5' });
+      const updated = await storage.setApplicationRating(appId, rating);
+      res.json(updated);
+    } catch (e) { next(e); }
+  });
+
+  // Email templates
+  app.get("/api/email-templates", requireRole(['recruiter','admin']), async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const list = await storage.getEmailTemplates();
+      res.json(list);
+    } catch (e) { next(e); }
+  });
+
+  app.post("/api/email-templates", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const body = insertEmailTemplateSchema.parse(req.body as InsertEmailTemplate);
+      const tpl = await storage.createEmailTemplate({ ...body, createdBy: req.user!.id });
+      res.status(201).json(tpl);
+    } catch (e) {
+      if (e instanceof z.ZodError) return res.status(400).json({ error: 'Validation error', details: e.errors });
+      next(e);
+    }
+  });
+
+  // Send email using template
+  app.post("/api/applications/:id/send-email", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const appId = parseInt(req.params.id);
+      const { templateId, customizations } = req.body as { templateId: number; customizations?: Record<string,string> };
+      if (!templateId) return res.status(400).json({ error: 'templateId required' });
+      const appData = await storage.getApplication(appId);
+      if (!appData) return res.status(404).json({ error: 'application not found' });
+      const [tpl] = (await storage.getEmailTemplates()).filter(t => t.id === templateId);
+      if (!tpl) return res.status(404).json({ error: 'template not found' });
+      const ok = await sendTemplatedEmail(appData.email, tpl, customizations || {});
+      res.json({ success: !!ok });
+    } catch (e) { next(e); }
   });
 
   // Review a job (approve/decline)
