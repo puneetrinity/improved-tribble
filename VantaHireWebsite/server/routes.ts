@@ -12,6 +12,19 @@ import { sendTemplatedEmail, sendStatusUpdateEmail, sendInterviewInvitation, sen
 import helmet from "helmet";
 import * as spotaxis from "./integrations/spotaxis";
 
+// ATS Validation Schemas
+const updateStageSchema = z.object({
+  stageId: z.number().int().positive(),
+  notes: z.string().optional(),
+});
+
+const scheduleInterviewSchema = z.object({
+  date: z.string().datetime().optional(),
+  time: z.string().min(1).optional(),
+  location: z.string().min(1).optional(),
+  notes: z.string().optional(),
+});
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup security middleware with development-friendly CSP
   app.use(helmet({
@@ -521,24 +534,35 @@ New job application received:
   app.patch("/api/applications/:id/stage", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const appId = parseInt(req.params.id);
-      const { stageId, notes } = req.body;
-      if (!stageId || isNaN(appId)) return res.status(400).json({ error: 'stageId required' });
-      await storage.updateApplicationStage(appId, parseInt(stageId), req.user!.id, notes);
+      if (isNaN(appId)) return res.status(400).json({ error: 'Invalid application ID' });
+
+      // Validate input with Zod
+      const validation = updateStageSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: validation.error.errors
+        });
+      }
+
+      const { stageId, notes } = validation.data;
+
+      // Validate stage exists before updating
+      const stages = await storage.getPipelineStages();
+      const targetStage = stages.find(s => s.id === stageId);
+      if (!targetStage) {
+        return res.status(400).json({ error: `Invalid stage ID: ${stageId}` });
+      }
+
+      // Update stage (now in transaction)
+      await storage.updateApplicationStage(appId, stageId, req.user!.id, notes);
+
       // Fire-and-forget: automated status email (if enabled)
       const autoEmails = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1';
-      if (autoEmails) {
-        try {
-          // Determine stage name for status update
-          const stages = await storage.getPipelineStages();
-          const target = stages.find(s => s.id === parseInt(stageId));
-          if (target?.name) {
-            // Do not block response
-            sendStatusUpdateEmail(appId, target.name).catch(err => console.error('Status email error:', err));
-          }
-        } catch (e) {
-          console.warn('Automated email skipped (stage lookup failed):', e);
-        }
+      if (autoEmails && targetStage.name) {
+        sendStatusUpdateEmail(appId, targetStage.name).catch(err => console.error('Status email error:', err));
       }
+
       res.json({ success: true });
     } catch (e) { next(e); }
   });
@@ -556,13 +580,31 @@ New job application received:
   app.patch("/api/applications/:id/interview", requireRole(['recruiter','admin']), async (req: Request, res: Response, next: NextFunction) => {
     try {
       const appId = parseInt(req.params.id);
-      const { date, time, location, notes } = req.body;
-      const updated = await storage.scheduleInterview(appId, { date: date ? new Date(date) : undefined, time, location, notes });
+      if (isNaN(appId)) return res.status(400).json({ error: 'Invalid application ID' });
+
+      // Validate input with Zod
+      const validation = scheduleInterviewSchema.safeParse(req.body);
+      if (!validation.success) {
+        return res.status(400).json({
+          error: 'Validation error',
+          details: validation.error.errors
+        });
+      }
+
+      const { date, time, location, notes } = validation.data;
+      const updated = await storage.scheduleInterview(appId, {
+        date: date ? new Date(date) : undefined,
+        time,
+        location,
+        notes
+      });
+
       // Fire-and-forget: interview invite (if enabled and fields provided)
       const autoEmails = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1';
       if (autoEmails && date && time && location) {
         sendInterviewInvitation(appId, { date, time, location }).catch(err => console.error('Interview email error:', err));
       }
+
       res.json(updated);
     } catch (e) { next(e); }
   });

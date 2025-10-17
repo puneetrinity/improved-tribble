@@ -866,16 +866,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateApplicationStage(appId: number, newStageId: number, changedBy: number, notes?: string): Promise<void> {
-    const app = await this.getApplication(appId);
-    await db.update(applications)
-      .set({ currentStage: newStageId, stageChangedAt: new Date(), stageChangedBy: changedBy, updatedAt: new Date() })
-      .where(eq(applications.id, appId));
-    await db.insert(applicationStageHistory).values({
-      applicationId: appId,
-      fromStage: app?.currentStage || null,
-      toStage: newStageId,
-      changedBy,
-      notes,
+    // Use transaction to ensure atomicity of stage change + history insert
+    await db.transaction(async (tx) => {
+      // Get current application state
+      const app = await tx.query.applications.findFirst({
+        where: eq(applications.id, appId)
+      });
+
+      if (!app) {
+        throw new Error(`Application ${appId} not found`);
+      }
+
+      // Update application stage
+      await tx.update(applications)
+        .set({
+          currentStage: newStageId,
+          stageChangedAt: new Date(),
+          stageChangedBy: changedBy,
+          updatedAt: new Date()
+        })
+        .where(eq(applications.id, appId));
+
+      // Insert stage history
+      await tx.insert(applicationStageHistory).values({
+        applicationId: appId,
+        fromStage: app.currentStage || null,
+        toStage: newStageId,
+        changedBy,
+        notes,
+      });
     });
   }
 
