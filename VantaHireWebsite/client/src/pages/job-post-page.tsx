@@ -23,11 +23,12 @@ export default function JobPostPage() {
   const { toast } = useToast();
   
   // Check SpotAxis integration
-  const { data: spotaxis } = useQuery<{ enabled: boolean; baseUrl?: string | null }>([
-    "spotaxis-config",
-  ], async () => {
-    const res = await fetch('/api/integrations/spotaxis');
-    return res.json();
+  const { data: spotaxis } = useQuery<{ enabled: boolean; baseUrl?: string | null }>({
+    queryKey: ["spotaxis-config"],
+    queryFn: async () => {
+      const res = await fetch('/api/integrations/spotaxis');
+      return res.json();
+    }
   });
   
   const [formData, setFormData] = useState({
