@@ -85,17 +85,37 @@ All ATS features integrated into existing application management page:
 
 ---
 
-## ⏳ Pending (Phase 4 - Email Automation)
+## ✅ Completed (Phase 4 - Email Automation)
 
-### Automated Email Triggers:
-- [ ] **On Application Submitted** → Send "Application Received" email
-- [ ] **On Interview Scheduled** → Send "Interview Invitation" email
-- [ ] **On Stage Change (optional)** → Send "Status Update" email
+### Automated Email Triggers ✅
+**Gated by `EMAIL_AUTOMATION_ENABLED=true` environment variable**
 
-**Implementation:**
-- Add triggers in `server/routes.ts` after stage changes
-- Call `sendInterviewInvitation()` when interview scheduled
-- Call `sendApplicationReceivedEmail()` on new applications
+- [x] **On Application Submitted** → Send "Application Received" email
+  - Fires after successful application creation
+  - Uses `application_received` template
+  - Non-blocking, fire-and-forget
+
+- [x] **On Interview Scheduled** → Send "Interview Invitation" email
+  - Fires when date/time/location all provided
+  - Uses `interview_invite` template
+  - Includes interview details in email
+
+- [x] **On Stage Change** → Send "Status Update" email
+  - Fires on any pipeline stage change
+  - Uses `status_update` template
+  - Includes new stage name
+
+**Implementation Details:**
+- All triggers in `server/routes.ts`: lines 365-368, 527-540, 561-564
+- Fire-and-forget pattern with error logging
+- Uses Ethereal test transport (logs preview URLs)
+- Ready for SendGrid/Mailgun swap via env var
+
+**To Enable:**
+```bash
+# Set in Railway environment variables
+EMAIL_AUTOMATION_ENABLED=true
+```
 
 ---
 
@@ -133,24 +153,23 @@ npx tsx server/seedATSDefaults.ts
 | Recruiter Notes | ✅ | ✅ | ✅ Complete |
 | Candidate Rating | ✅ | ✅ | ✅ Complete |
 | Kanban Board | ✅ | ❌ | ❌ Opted for List View |
-| Email Automation | ✅ | ⏳ | ⏳ Optional (Phase 4) |
+| Email Automation | ✅ | ✅ | ✅ Complete (gated) |
 | Multi-tenant | ✅ | ❌ | ❌ Not Needed |
 | Billing | ✅ | ❌ | ❌ Not Needed |
 | Candidate Portal | ✅ | ⏳ | ⏳ Future |
 
 ---
 
-## 📈 Progress: 95% Complete
+## 📈 Progress: 100% Complete ✅
 
 - **Phase 1 (Schema)**: 100% ✅
 - **Phase 2 (Backend API)**: 100% ✅
 - **Phase 3 (Frontend UI)**: 100% ✅
-- **Phase 4 (Email Automation)**: 0% ⏳ (Optional)
+- **Phase 4 (Email Automation)**: 100% ✅
 
-**Estimated Remaining Time**: 1-2 hours (optional)
-- Email Automation: 1-2 hours (optional enhancement)
+**All Features Implemented!**
 
-**Current State**: Fully functional ATS is ready for deployment!
+**Current State**: Production-ready ATS with optional email automation! 🎉
 
 ---
 
@@ -197,33 +216,39 @@ The ATS is fully functional with all core features implemented. Next steps:
 ### 1. Deploy to Railway
 ```bash
 # Railway will auto-deploy from latest push
-# Once deployed, access Railway shell and run:
+# Once deployed, set environment variables:
+# - DATABASE_URL (auto-set by Railway)
+# - SESSION_SECRET (required)
+# - EMAIL_AUTOMATION_ENABLED=true (optional, enables Phase 4)
+
+# Then access Railway shell and run:
 npm run db:push  # Apply database schema
 npm run seed:ats # Seed pipeline stages and email templates
 ```
 
 ### 2. Test Full Workflow
 1. Login as recruiter at `/auth`
-2. Navigate to a job's applications page
+2. Navigate to a job's applications page (`/jobs/{id}/applications`)
 3. Test each ATS feature:
-   - Move candidate between stages
-   - Schedule an interview
-   - Send an email using template
-   - View stage history
-   - Rate candidate (stars)
-   - Add recruiter notes
+   - Move candidate between stages → Check logs for status email (if automation enabled)
+   - Schedule an interview → Check logs for interview invitation (if automation enabled)
+   - Send an email using template selector
+   - View stage history timeline
+   - Rate candidate (1-5 stars)
+   - View recruiter notes
 
-### 3. Optional: Add Email Automation (Phase 4)
-- Auto-send "Application Received" on new applications
-- Auto-send "Interview Invitation" when interview scheduled
-- Configurable status update emails
+4. Test email automation (if `EMAIL_AUTOMATION_ENABLED=true`):
+   - Submit new application → Check logs for "Application Received" preview URL
+   - Change stage → Check logs for "Status Update" preview URL
+   - Schedule interview → Check logs for "Interview Invitation" preview URL
 
-**Current Status**: Ready for production use! 🚀
+**Current Status**: Production-ready with full automation! 🚀
 
 ---
 
 **Last Updated**: Oct 17, 2025
 **Latest Commits**:
+- `1669fc5` - "Add Phase 4: Automated email triggers (gated by env var)" ✅
 - `16505e8` - "Add ATS frontend UI to application management page" ✅
 - `4110a0d` - "Fix critical ATS backend issues" ✅
 - `5b38a7e` - "Add ATS backend: schema, seed data, and email template service" ✅
