@@ -19,29 +19,17 @@ export default function RecruiterDashboard() {
   const [newStatus, setNewStatus] = useState("");
   // SpotAxis integration flag (must be inside component for hooks correctness)
   const { data: spotaxis } = useQuery<{ enabled: boolean }>({
-    queryKey: ["spotaxis-config"],
-    queryFn: async () => {
-      const res = await fetch('/api/integrations/spotaxis');
-      return res.json();
-    }
+    queryKey: ["/api/integrations/spotaxis"],
   });
 
   // Fetch recruiter's jobs
   const { data: jobs = [], isLoading: jobsLoading } = useQuery({
     queryKey: ["/api/my-jobs"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/my-jobs");
-      return await res.json();
-    },
   });
 
   // Fetch all applications for recruiter's jobs
   const { data: applications = [], isLoading: applicationsLoading } = useQuery({
     queryKey: ["/api/my-applications-received"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/my-applications-received");
-      return await res.json();
-    },
   });
 
   // Update application status mutation

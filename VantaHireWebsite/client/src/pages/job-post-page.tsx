@@ -24,11 +24,7 @@ export default function JobPostPage() {
   
   // Check SpotAxis integration
   const { data: spotaxis } = useQuery<{ enabled: boolean; baseUrl?: string | null }>({
-    queryKey: ["spotaxis-config"],
-    queryFn: async () => {
-      const res = await fetch('/api/integrations/spotaxis');
-      return res.json();
-    }
+    queryKey: ["/api/integrations/spotaxis"],
   });
   
   const [formData, setFormData] = useState({
