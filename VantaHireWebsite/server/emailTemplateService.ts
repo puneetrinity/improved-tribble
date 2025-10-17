@@ -183,6 +183,42 @@ export async function sendApplicationReceivedEmail(
 }
 
 /**
+ * Send job offer email
+ */
+export async function sendOfferEmail(
+  applicationId: number
+): Promise<void> {
+  const template = await db.query.emailTemplates.findFirst({
+    where: eq(emailTemplates.templateType, 'offer_extended'),
+  });
+
+  if (!template) {
+    console.warn('Offer template not found, skipping email');
+    return;
+  }
+
+  await sendTemplatedEmail(applicationId, template.id);
+}
+
+/**
+ * Send rejection email
+ */
+export async function sendRejectionEmail(
+  applicationId: number
+): Promise<void> {
+  const template = await db.query.emailTemplates.findFirst({
+    where: eq(emailTemplates.templateType, 'rejection'),
+  });
+
+  if (!template) {
+    console.warn('Rejection template not found, skipping email');
+    return;
+  }
+
+  await sendTemplatedEmail(applicationId, template.id);
+}
+
+/**
  * Get all available email templates
  */
 export async function getAllTemplates(): Promise<EmailTemplate[]> {

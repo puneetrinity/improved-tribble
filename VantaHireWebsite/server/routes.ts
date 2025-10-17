@@ -8,7 +8,7 @@ import { setupAuth, requireAuth, requireRole } from "./auth";
 import { upload, uploadToCloudinary } from "./cloudinary";
 import rateLimit from "express-rate-limit";
 import { analyzeJobDescription, generateJobScore, calculateOptimizationSuggestions, isAIEnabled } from "./aiJobAnalyzer";
-import { sendTemplatedEmail, sendStatusUpdateEmail, sendInterviewInvitation, sendApplicationReceivedEmail } from "./emailTemplateService";
+import { sendTemplatedEmail, sendStatusUpdateEmail, sendInterviewInvitation, sendApplicationReceivedEmail, sendOfferEmail, sendRejectionEmail } from "./emailTemplateService";
 import helmet from "helmet";
 import * as spotaxis from "./integrations/spotaxis";
 
@@ -560,7 +560,18 @@ New job application received:
       // Fire-and-forget: automated status email (if enabled)
       const autoEmails = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1';
       if (autoEmails && targetStage.name) {
-        sendStatusUpdateEmail(appId, targetStage.name).catch(err => console.error('Status email error:', err));
+        // Map stage names to specialized templates
+        const stageName = targetStage.name.toLowerCase();
+        if (stageName.includes('offer') || stageName.includes('hired')) {
+          // Send specialized offer email
+          sendOfferEmail(appId).catch(err => console.error('Offer email error:', err));
+        } else if (stageName.includes('reject')) {
+          // Send specialized rejection email
+          sendRejectionEmail(appId).catch(err => console.error('Rejection email error:', err));
+        } else {
+          // Generic status update for other stages
+          sendStatusUpdateEmail(appId, targetStage.name).catch(err => console.error('Status email error:', err));
+        }
       }
 
       res.json({ success: true });
