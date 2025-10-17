@@ -4,7 +4,7 @@
  */
 
 import { db } from './db';
-import { emailTemplates, applications } from '../shared/schema';
+import { emailTemplates, applications, emailAuditLog } from '../shared/schema';
 import { eq, asc } from 'drizzle-orm';
 import { getEmailService } from './simpleEmailService';
 import type { EmailTemplate } from '../shared/schema';
@@ -101,19 +101,51 @@ export async function sendTemplatedEmail(
   // Render template
   const { subject, body } = renderEmailTemplate(template, variables);
 
-  // Send email
-  const svc = await getEmailService();
-  if (!svc || typeof svc.sendEmail !== 'function') {
-    console.warn('Email service unavailable; skipping send.');
-    return;
-  }
-  await svc.sendEmail({
-    to: application.email,
-    subject,
-    text: body,
-  });
+  let previewUrl: string | null = null;
+  let status: 'success' | 'failed' = 'success';
+  let errorMessage: string | null = null;
 
-  console.log(`✉️  Sent ${template.name} to ${application.email}`);
+  try {
+    // Send email
+    const svc = await getEmailService();
+    if (!svc || typeof svc.sendEmail !== 'function') {
+      console.warn('Email service unavailable; skipping send.');
+      status = 'failed';
+      errorMessage = 'Email service unavailable';
+    } else {
+      const result = await svc.sendEmail({
+        to: application.email,
+        subject,
+        text: body,
+      });
+
+      // Extract preview URL if available (Ethereal)
+      if (result && typeof result === 'object' && 'messageId' in result) {
+        const nodemailerInfo = result as any;
+        if (nodemailerInfo.messageId && process.env.SMTP_HOST?.includes('ethereal')) {
+          previewUrl = `https://ethereal.email/message/${nodemailerInfo.messageId}`;
+        }
+      }
+
+      console.log(`✉️  Sent ${template.name} to ${application.email}`);
+    }
+  } catch (error: any) {
+    status = 'failed';
+    errorMessage = error?.message || 'Unknown error';
+    console.error(`Failed to send ${template.name} to ${application.email}:`, error);
+  }
+
+  // Log to audit table
+  await db.insert(emailAuditLog).values({
+    applicationId,
+    templateId,
+    templateType: template.templateType,
+    recipientEmail: application.email,
+    subject,
+    status,
+    errorMessage,
+    previewUrl,
+  });
 }
 
 /**

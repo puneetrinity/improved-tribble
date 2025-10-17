@@ -676,6 +676,29 @@ New job application received:
     } catch (e) { next(e); }
   });
 
+  // Automation settings - Get all settings
+  app.get("/api/admin/automation-settings", requireRole(['admin']), async (_req: Request, res: Response, next: NextFunction) => {
+    try {
+      const settings = await storage.getAutomationSettings();
+      res.json(settings);
+    } catch (e) { next(e); }
+  });
+
+  // Automation settings - Update a specific setting
+  app.patch("/api/admin/automation-settings/:key", requireRole(['admin']), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { key } = req.params;
+      const { value } = req.body;
+
+      if (typeof value !== 'boolean') {
+        return res.status(400).json({ error: 'value must be a boolean' });
+      }
+
+      const setting = await storage.updateAutomationSetting(key, value, req.user!.id);
+      res.json(setting);
+    } catch (e) { next(e); }
+  });
+
   // Review a job (approve/decline)
   app.patch("/api/admin/jobs/:id/review", requireRole(['admin']), async (req: Request, res: Response, next: NextFunction) => {
     try {

@@ -67,7 +67,7 @@ export const applications = pgTable("applications", {
   appliedAt: timestamp("applied_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   // ATS enhancements
-  currentStage: integer("current_stage"),
+  currentStage: integer("current_stage").references(() => pipelineStages.id),
   interviewDate: timestamp("interview_date"),
   interviewTime: text("interview_time"),
   interviewLocation: text("interview_location"),
@@ -77,7 +77,12 @@ export const applications = pgTable("applications", {
   tags: text("tags").array(),
   stageChangedAt: timestamp("stage_changed_at"),
   stageChangedBy: integer("stage_changed_by").references(() => users.id),
-});
+}, (table) => ({
+  // Indexes for ATS performance
+  currentStageIdx: index("applications_current_stage_idx").on(table.currentStage),
+  jobIdIdx: index("applications_job_id_idx").on(table.jobId),
+  emailIdx: index("applications_email_idx").on(table.email),
+}));
 
 export const jobAnalytics = pgTable("job_analytics", {
   id: serial("id").primaryKey(),
@@ -123,6 +128,31 @@ export const emailTemplates = pgTable("email_templates", {
   createdBy: integer("created_by").references(() => users.id),
   isDefault: boolean("is_default").default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// ATS: Email audit log
+export const emailAuditLog = pgTable("email_audit_log", {
+  id: serial("id").primaryKey(),
+  applicationId: integer("application_id").references(() => applications.id, { onDelete: 'cascade' }),
+  templateId: integer("template_id").references(() => emailTemplates.id),
+  templateType: text("template_type"),
+  recipientEmail: text("recipient_email").notNull(),
+  subject: text("subject").notNull(),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+  sentBy: integer("sent_by").references(() => users.id),
+  status: text("status").notNull().default("success"), // success, failed
+  errorMessage: text("error_message"),
+  previewUrl: text("preview_url"),
+});
+
+// ATS: Automation settings
+export const automationSettings = pgTable("automation_settings", {
+  id: serial("id").primaryKey(),
+  settingKey: text("setting_key").notNull().unique(),
+  settingValue: boolean("setting_value").notNull().default(true),
+  description: text("description"),
+  updatedBy: integer("updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // Relations
@@ -202,9 +232,32 @@ export const applicationStageHistoryRelations = relations(applicationStageHistor
   }),
 }));
 
-export const emailTemplatesRelations = relations(emailTemplates, ({ one }) => ({
+export const emailTemplatesRelations = relations(emailTemplates, ({ one, many }) => ({
   createdBy: one(users, {
     fields: [emailTemplates.createdBy],
+    references: [users.id],
+  }),
+  auditLogs: many(emailAuditLog),
+}));
+
+export const emailAuditLogRelations = relations(emailAuditLog, ({ one }) => ({
+  application: one(applications, {
+    fields: [emailAuditLog.applicationId],
+    references: [applications.id],
+  }),
+  template: one(emailTemplates, {
+    fields: [emailAuditLog.templateId],
+    references: [emailTemplates.id],
+  }),
+  sentByUser: one(users, {
+    fields: [emailAuditLog.sentBy],
+    references: [users.id],
+  }),
+}));
+
+export const automationSettingsRelations = relations(automationSettings, ({ one }) => ({
+  updatedByUser: one(users, {
+    fields: [automationSettings.updatedBy],
     references: [users.id],
   }),
 }));
@@ -332,3 +385,7 @@ export type EmailTemplate = typeof emailTemplates.$inferSelect;
 export type InsertEmailTemplate = z.infer<typeof insertEmailTemplateSchema>;
 
 export type ApplicationStageHistory = typeof applicationStageHistory.$inferSelect;
+
+export type EmailAuditLog = typeof emailAuditLog.$inferSelect;
+
+export type AutomationSetting = typeof automationSettings.$inferSelect;

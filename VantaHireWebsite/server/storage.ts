@@ -1,16 +1,17 @@
-import { 
-  users, 
-  contactSubmissions, 
-  jobs, 
+import {
+  users,
+  contactSubmissions,
+  jobs,
   applications,
   userProfiles,
   jobAnalytics,
   pipelineStages,
   applicationStageHistory,
   emailTemplates,
-  type User, 
-  type InsertUser, 
-  type ContactSubmission, 
+  automationSettings,
+  type User,
+  type InsertUser,
+  type ContactSubmission,
   type InsertContact,
   type Job,
   type InsertJob,
@@ -23,7 +24,8 @@ import {
   type PipelineStage,
   type InsertPipelineStage,
   type EmailTemplate,
-  type InsertEmailTemplate
+  type InsertEmailTemplate,
+  type AutomationSetting
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, ilike, sql, or, inArray, count } from "drizzle-orm";
@@ -944,6 +946,47 @@ export class DatabaseStorage implements IStorage {
   async createEmailTemplate(template: InsertEmailTemplate & { createdBy?: number }): Promise<EmailTemplate> {
     const [result] = await db.insert(emailTemplates).values(template).returning();
     return result;
+  }
+
+  // ===== ATS: Automation settings =====
+  async getAutomationSettings(): Promise<AutomationSetting[]> {
+    return db.select().from(automationSettings).orderBy(automationSettings.settingKey);
+  }
+
+  async getAutomationSetting(key: string): Promise<AutomationSetting | undefined> {
+    const [result] = await db.select().from(automationSettings).where(eq(automationSettings.settingKey, key));
+    return result;
+  }
+
+  async updateAutomationSetting(key: string, value: boolean, updatedBy: number): Promise<AutomationSetting> {
+    // Try to update existing setting
+    const existing = await this.getAutomationSetting(key);
+
+    if (existing) {
+      const [updated] = await db
+        .update(automationSettings)
+        .set({ settingValue: value, updatedBy, updatedAt: new Date() })
+        .where(eq(automationSettings.settingKey, key))
+        .returning();
+      return updated;
+    } else {
+      // Create new setting if it doesn't exist
+      const [created] = await db
+        .insert(automationSettings)
+        .values({ settingKey: key, settingValue: value, updatedBy })
+        .returning();
+      return created;
+    }
+  }
+
+  async isAutomationEnabled(key: string): Promise<boolean> {
+    // First check environment variable for global override
+    const globalEnabled = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1';
+    if (!globalEnabled) return false;
+
+    // Then check specific setting in database
+    const setting = await this.getAutomationSetting(key);
+    return setting?.settingValue ?? true; // Default to enabled if not set
   }
 }
 
