@@ -899,7 +899,11 @@ export class DatabaseStorage implements IStorage {
 
   async addRecruiterNote(appId: number, note: string): Promise<Application | undefined> {
     const [result] = await db.update(applications)
-      .set({ recruiterNotes: sql`${applications.recruiterNotes} || ${[note]}`, updatedAt: new Date() })
+      .set({
+        // Ensure NULL-safe append: COALESCE to empty text[] then concatenate ARRAY[note]
+        recruiterNotes: sql`COALESCE(${applications.recruiterNotes}, ARRAY[]::text[]) || ARRAY[${note}]`,
+        updatedAt: new Date(),
+      })
       .where(eq(applications.id, appId))
       .returning();
     return result || undefined;

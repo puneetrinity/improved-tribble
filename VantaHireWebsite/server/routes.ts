@@ -592,8 +592,8 @@ New job application received:
       if (!appData) return res.status(404).json({ error: 'application not found' });
       const [tpl] = (await storage.getEmailTemplates()).filter(t => t.id === templateId);
       if (!tpl) return res.status(404).json({ error: 'template not found' });
-      const ok = await sendTemplatedEmail(appData.email, tpl, customizations || {});
-      res.json({ success: !!ok });
+      await sendTemplatedEmail(appId, templateId, customizations || {});
+      res.json({ success: true });
     } catch (e) { next(e); }
   });
 

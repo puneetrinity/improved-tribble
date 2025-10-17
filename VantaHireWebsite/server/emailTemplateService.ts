@@ -5,8 +5,8 @@
 
 import { db } from './db';
 import { emailTemplates, applications } from '../shared/schema';
-import { eq } from 'drizzle-orm';
-import { emailService } from './emailService';
+import { eq, asc } from 'drizzle-orm';
+import { getEmailService } from './simpleEmailService';
 import type { EmailTemplate } from '../shared/schema';
 
 export interface TemplateVariables {
@@ -102,7 +102,12 @@ export async function sendTemplatedEmail(
   const { subject, body } = renderEmailTemplate(template, variables);
 
   // Send email
-  await emailService.sendEmail({
+  const svc = await getEmailService();
+  if (!svc || typeof svc.sendEmail !== 'function') {
+    console.warn('Email service unavailable; skipping send.');
+    return;
+  }
+  await svc.sendEmail({
     to: application.email,
     subject,
     text: body,
