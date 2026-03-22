@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import Layout from "@/components/Layout";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
 import { useOrganization } from "@/hooks/use-organization";
@@ -14,7 +13,6 @@ import {
 } from "@/hooks/use-subscription";
 import { initiateCashfreeCheckout } from "@/lib/cashfree";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -45,6 +43,27 @@ import {
   Mail,
   AlertCircle,
 } from "lucide-react";
+import HomepageNav from "@/components/HomepageNav";
+import HomepageFooter from "@/components/HomepageFooter";
+import "@/styles/homepage-redesign.css";
+
+// Grid Overlay (same as homepage)
+const GridOverlay = () => (
+  <div className="hr-page-grid-overlay">
+    <div className="hr-page-grid-overlay-inner">
+      <div className="grid-col line-both">
+        <span className="hr-grid-diamond" style={{ left: '-4px', top: '56px' }}></span>
+        <span className="hr-grid-diamond" style={{ right: '-4px', top: '56px' }}></span>
+      </div>
+      <div className="grid-col"></div>
+      <div className="grid-col"></div>
+      <div className="grid-col line-both">
+        <span className="hr-grid-diamond" style={{ left: '-4px', top: '56px' }}></span>
+        <span className="hr-grid-diamond" style={{ right: '-4px', top: '56px' }}></span>
+      </div>
+    </div>
+  </div>
+);
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -280,16 +299,16 @@ export default function PricingPage() {
   const renderFeatureValue = (value: boolean | string) => {
     if (typeof value === 'boolean') {
       return value ? (
-        <Check className="h-5 w-5 text-green-500 mx-auto" />
+        <span className="hr-comparison-check"><Check size={16} /></span>
       ) : (
-        <X className="h-5 w-5 text-white/20 mx-auto" />
+        <span className="hr-comparison-x"><X size={16} /></span>
       );
     }
-    return <span className="text-center text-white">{value}</span>;
+    return <span style={{ color: 'var(--hr-text)' }}>{value}</span>;
   };
 
   return (
-    <Layout>
+    <>
       <Helmet>
         <title>Pricing | VantaHire - Simple, Transparent Pricing</title>
         <meta name="description" content="Simple pricing. No surprises. Start free, upgrade when your team grows. No long contracts. AI sourcing, WhatsApp outreach, client portal, and pipeline management included." />
@@ -300,199 +319,200 @@ export default function PricingPage() {
         <meta property="og:type" content="website" />
       </Helmet>
 
-      <div className="public-theme min-h-screen bg-background text-foreground">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
+      <div className="homepage-redesign public-theme min-h-screen">
+        <GridOverlay />
+        <div className="relative z-10">
+          <HomepageNav />
 
-        <div className={`container mx-auto px-4 py-16 relative z-10 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Hero Section */}
-          <div className="text-center mb-16 pt-8">
-            <div className="w-20 h-1.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] rounded-full mx-auto mb-6"></div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              <span className="text-white">Simple pricing.</span>
-              <br />
-              <span className="gradient-text-purple">No surprises.</span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          {/* Hero */}
+          <div className="hr-pricing-hero">
+            <div className="hr-section-label">Pricing</div>
+            <h1 className="hr-section-title">Simple pricing.<br />No surprises.</h1>
+            <p className="hr-section-desc">
               Start free. Upgrade when your team grows. No long contracts. No hidden fees.
             </p>
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mb-20 max-w-5xl mx-auto">
+          <div className="hr-pricing-cards">
             {/* Free Plan */}
-            <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-6 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-300">
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="h-5 w-5 text-white/70" />
-                  <h3 className="text-xl font-bold text-white">Free</h3>
-                </div>
-                <p className="text-white/60 text-sm">{freePlanCard?.summary || "Get started in minutes"}</p>
+            <div className="hr-plan-card">
+              <div className="hr-plan-icon" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <Users size={18} style={{ color: 'var(--hr-text-muted)' }} />
               </div>
-              <div className="mb-6">
-                <div className="text-4xl font-bold text-white">
-                  {formatPriceINR(0)}
-                  <span className="text-base font-normal text-white/50">/month</span>
-                </div>
+              <div className="hr-plan-name">Free</div>
+              <div className="hr-plan-summary">{freePlanCard?.summary || "Get started in minutes"}</div>
+              <div className="hr-plan-price">
+                {formatPriceINR(0)}
+                <span className="hr-plan-period"> /month</span>
               </div>
-              <ul className="space-y-3 mb-6">
+              <div className="hr-plan-tax-note">&nbsp;</div>
+              <div className="hr-plan-divider"></div>
+              <ul className="hr-plan-features">
                 {(freePlanCard?.highlights ?? []).map((highlight) => (
-                  <li key={highlight} className="flex items-center gap-2 text-white/80 text-sm">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <li key={highlight}>
+                    <Check size={16} className="hr-check-icon" />
                     {highlight}
                   </li>
                 ))}
               </ul>
               {currentPlan === 'free' && isLoggedIn ? (
-                <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10" disabled>
-                  Current Plan
-                </Button>
+                <button className="hr-plan-btn secondary" disabled>Current Plan</button>
               ) : (
-                <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10" onClick={() => setLocation('/recruiter-auth')}>
+                <button className="hr-plan-btn secondary" onClick={() => setLocation('/recruiter-auth')}>
                   Get Started
-                </Button>
+                </button>
               )}
             </div>
 
             {/* Growth Plan */}
-            <div className="bg-gradient-to-br from-primary/20 to-primary/5 p-6 rounded-xl border-2 border-primary relative">
-              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white">
-                Most Popular
-              </Badge>
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  <h3 className="text-xl font-bold text-white">Growth</h3>
-                </div>
-                <p className="text-white/60 text-sm">{proPlanCard?.summary || "Scale your hiring output"}</p>
+            <div className="hr-plan-card featured">
+              <div className="hr-plan-badge">Most Popular</div>
+              <div className="hr-plan-icon" style={{ background: 'rgba(124,58,237,0.15)' }}>
+                <Zap size={18} style={{ color: 'var(--hr-accent-hover)' }} />
               </div>
-              <div className="mb-6">
-                <div className="text-4xl font-bold text-white">
-                  {proPlan ? formatPriceINR(proPlan.pricePerSeatMonthly) : '...'}
-                  <span className="text-base font-normal text-white/50">/seat/month</span>
-                </div>
-                <p className="text-xs text-white/50 mt-1">
-                  {taxEnabled ? `+ GST (${gstRate}%) | Save with annual billing` : 'No additional tax configured | Save with annual billing'}
-                </p>
+              <div className="hr-plan-name">Growth</div>
+              <div className="hr-plan-summary">{proPlanCard?.summary || "Scale your hiring output"}</div>
+              <div className="hr-plan-price">
+                {proPlan ? formatPriceINR(proPlan.pricePerSeatMonthly) : '...'}
+                <span className="hr-plan-period"> /seat/month</span>
               </div>
-              <p className="text-xs text-white/50 mb-4">Everything in Free, plus:</p>
-              <ul className="space-y-3 mb-6">
+              <div className="hr-plan-tax-note">
+                {taxEnabled ? `+ GST (${gstRate}%) | Save with annual billing` : 'Save with annual billing'}
+              </div>
+              <div className="hr-plan-divider"></div>
+              <div className="hr-plan-includes">Everything in Free, plus:</div>
+              <ul className="hr-plan-features">
                 {(proPlanCard?.highlights ?? []).map((highlight) => (
-                  <li key={highlight} className="flex items-center gap-2 text-white/80 text-sm">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <li key={highlight}>
+                    <Check size={16} className="hr-check-icon" />
                     {highlight.includes("top-ups") ? creditPackLabel : highlight}
                   </li>
                 ))}
               </ul>
               {isPro ? (
-                <Button className="w-full" disabled>
-                  Current Plan
-                </Button>
+                <button className="hr-plan-btn primary" disabled>Current Plan</button>
               ) : (
-                <Button variant="gold" className="w-full" onClick={handleSelectPro}>
-                  Upgrade to Growth
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <button className="hr-plan-btn primary" onClick={handleSelectPro}>
+                  Upgrade to Growth <span className="btn-arrow">&rarr;</span>
+                </button>
               )}
             </div>
 
-            {/* Business Plan */}
-            <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-6 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-300">
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Building2 className="h-5 w-5 text-white/70" />
-                  <h3 className="text-xl font-bold text-white">Enterprise</h3>
-                </div>
-                <p className="text-white/60 text-sm">{businessPlanCard?.summary || "Custom fit for large teams"}</p>
+            {/* Enterprise Plan */}
+            <div className="hr-plan-card">
+              <div className="hr-plan-icon" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <Building2 size={18} style={{ color: 'var(--hr-text-muted)' }} />
               </div>
-              <div className="mb-6">
-                <div className="text-4xl font-bold text-white">Custom</div>
-                <p className="text-xs text-white/50 mt-1">Tailored to your needs</p>
-              </div>
-              <p className="text-xs text-white/50 mb-4">Everything in Growth, plus:</p>
-              <ul className="space-y-3 mb-6">
+              <div className="hr-plan-name">Enterprise</div>
+              <div className="hr-plan-summary">{businessPlanCard?.summary || "Custom fit for large teams"}</div>
+              <div className="hr-plan-price">Custom</div>
+              <div className="hr-plan-tax-note">Tailored to your needs</div>
+              <div className="hr-plan-divider"></div>
+              <div className="hr-plan-includes">Everything in Growth, plus:</div>
+              <ul className="hr-plan-features">
                 {(businessPlanCard?.highlights ?? []).slice(1).map((highlight) => (
-                  <li key={highlight} className="flex items-center gap-2 text-white/80 text-sm">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <li key={highlight}>
+                    <Check size={16} className="hr-check-icon" />
                     {highlight}
                   </li>
                 ))}
               </ul>
-              <Button variant="outlinePurple" className="w-full" onClick={handleContactSales}>
+              <button className="hr-plan-btn secondary" onClick={handleContactSales}>
                 Contact Sales
-              </Button>
+              </button>
             </div>
           </div>
 
           {/* Feature Comparison */}
-          <div className="mb-20 max-w-5xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-center text-white mb-8">Compare plans side by side</h2>
-            <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5">
-                    <th className="text-left py-4 px-4 font-medium text-white">Feature</th>
-                    <th className="py-4 px-4 font-medium text-center w-32 text-white">Free</th>
-                    <th className="py-4 px-4 font-medium text-center w-32 bg-primary/10 text-white">Growth</th>
-                    <th className="py-4 px-4 font-medium text-center w-32 text-white">Enterprise</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonRows.map((feature, index) => (
-                    <tr key={feature.name} className={`border-b border-white/5 ${index % 2 === 0 ? 'bg-white/[0.02]' : ''}`}>
-                      <td className="py-3 px-4 text-white/80">{feature.name}</td>
-                      <td className="py-3 px-4 text-center">{renderFeatureValue(feature.free)}</td>
-                      <td className="py-3 px-4 text-center bg-primary/5">{renderFeatureValue(feature.pro)}</td>
-                      <td className="py-3 px-4 text-center">{renderFeatureValue(feature.business)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* FAQ Section */}
-          <div className="max-w-3xl mx-auto mb-16">
-            <h2 className="text-2xl md:text-3xl font-bold text-center text-white mb-8">Pricing questions, answered.</h2>
-            <div className="space-y-6">
-              {faqs.map((faq, i) => (
-                <div key={i} className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-6 rounded-xl border border-white/10">
-                  <h3 className="font-semibold text-white mb-2">{faq.question}</h3>
-                  <p className="text-white/70">{faq.answer}</p>
+          <div className="hr-struct-section">
+            <div className="struct-gutter"></div>
+            <div className="struct-body">
+              <div className="hr-comparison-section">
+                <h2 className="hr-section-title">Compare plans side by side</h2>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="hr-comparison-table">
+                    <thead>
+                      <tr>
+                        <th>Feature</th>
+                        <th>Free</th>
+                        <th className="hr-col-featured">Growth</th>
+                        <th>Enterprise</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparisonRows.map((feature) => (
+                        <tr key={feature.name}>
+                          <td>{feature.name}</td>
+                          <td>{renderFeatureValue(feature.free)}</td>
+                          <td className="hr-col-featured">{renderFeatureValue(feature.pro)}</td>
+                          <td>{renderFeatureValue(feature.business)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              </div>
             </div>
+            <div className="struct-gutter"></div>
           </div>
 
-          {/* CTA Section */}
-          <div className="text-center py-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-              Start hiring with the right plan.
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Every plan includes AI sourcing, fit scoring, and a recruiter-grade pipeline. Pick the one that fits your team today.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                variant="gold"
-                size="lg"
-                onClick={() => setLocation('/recruiter-auth')}
-                className="rounded-full px-8 py-6 text-lg font-semibold"
-              >
-                Start Free
-              </Button>
-              <Button
-                variant="outlinePurple"
-                size="lg"
-                onClick={() => setLocation('/demo')}
-                className="rounded-full px-8 py-6 text-lg"
-              >
-                Book a Demo
-              </Button>
+          {/* FAQ */}
+          <div className="hr-struct-section">
+            <div className="struct-gutter"></div>
+            <div className="struct-body">
+              <div className="hr-faq-section">
+                <div className="hr-section-label" style={{ textAlign: 'center' }}>FAQ</div>
+                <h2 className="hr-section-title">Pricing questions, answered.</h2>
+                {faqs.map((faq, i) => (
+                  <div key={i} className="hr-faq-card">
+                    <h3>{faq.question}</h3>
+                    <p>{faq.answer}</p>
+                  </div>
+                ))}
+              </div>
             </div>
+            <div className="struct-gutter"></div>
           </div>
+
+          {/* CTA */}
+          <div className="hr-struct-section">
+            <div className="struct-gutter"></div>
+            <div className="struct-body">
+              <div className="hr-pricing-cta">
+                <div className="hr-section-label">Get Started</div>
+                <h2 className="hr-section-title">Start hiring with<br />the right plan.</h2>
+                <p className="hr-section-desc" style={{ textAlign: 'center', margin: '0 auto 36px' }}>
+                  Every plan includes AI sourcing, fit scoring, and a recruiter-grade pipeline. Pick the one that fits your team today.
+                </p>
+                <div className="hr-cta-btns">
+                  <a
+                    href="/recruiter-auth"
+                    className="hr-btn-demo"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLocation('/recruiter-auth');
+                    }}
+                  >
+                    Start Free
+                  </a>
+                  <a
+                    href="/demo"
+                    className="hr-btn-pricing"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLocation('/demo');
+                    }}
+                  >
+                    Book a Demo
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div className="struct-gutter"></div>
+          </div>
+
+          <HomepageFooter />
         </div>
       </div>
 
@@ -658,6 +678,6 @@ export default function PricingPage() {
           )}
         </DialogContent>
       </Dialog>
-    </Layout>
+    </>
   );
 }
