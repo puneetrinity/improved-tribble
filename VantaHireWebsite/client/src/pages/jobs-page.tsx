@@ -2,21 +2,17 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { Search, MapPin, Clock, Filter, Briefcase, ArrowUpDown, X, User, IndianRupee } from "lucide-react";
+import { Search, MapPin, Clock, Briefcase, X, User, IndianRupee, SlidersHorizontal } from "lucide-react";
 import { DEFAULT_SITE_URL } from "@/lib/seoHelpers";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Job } from "@shared/schema";
-import Layout from "@/components/Layout";
-import { FilterPanel, MobileFilterSheet } from "@/components/FilterPanel";
+import HomepageNav from "@/components/HomepageNav";
+import HomepageFooter from "@/components/HomepageFooter";
+import "@/styles/homepage-redesign.css";
 import { useAIFeatures } from "@/hooks/use-ai-features";
 
 interface JobWithRecruiter extends Job {
   postedByName?: string;
-  postedById?: number | string; // Can be publicId (string) or numeric ID
+  postedById?: number | string;
   isRecruiterProfilePublic?: boolean;
 }
 
@@ -30,12 +26,29 @@ interface JobsResponse {
   };
 }
 
+// Grid Overlay (same as homepage)
+const GridOverlay = () => (
+  <div className="hr-page-grid-overlay">
+    <div className="hr-page-grid-overlay-inner">
+      <div className="grid-col line-both">
+        <span className="hr-grid-diamond" style={{ left: '-4px', top: '56px' }}></span>
+        <span className="hr-grid-diamond" style={{ right: '-4px', top: '56px' }}></span>
+      </div>
+      <div className="grid-col"></div>
+      <div className="grid-col"></div>
+      <div className="grid-col line-both">
+        <span className="hr-grid-diamond" style={{ left: '-4px', top: '56px' }}></span>
+        <span className="hr-grid-diamond" style={{ right: '-4px', top: '56px' }}></span>
+      </div>
+    </div>
+  </div>
+);
+
 export default function JobsPage() {
   const searchParams = new URLSearchParams(useSearch());
   const [, setUrlLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  // Initialize state from URL params
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [location, setLocationFilter] = useState(searchParams.get("location") || "");
@@ -43,16 +56,13 @@ export default function JobsPage() {
   const [minSalary, setMinSalary] = useState(searchParams.get("minSalary") || "");
   const [maxSalary, setMaxSalary] = useState(searchParams.get("maxSalary") || "");
   const [salaryPeriod, setSalaryPeriod] = useState(searchParams.get("salaryPeriod") || "per_year");
-
   const [sortBy, setSortBy] = useState<string>(searchParams.get("sortBy") || "recent");
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => { setIsVisible(true); }, []);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const { resumeAdvisor, fitScoring } = useAIFeatures();
   const aiEnabled = resumeAdvisor || fitScoring;
 
-  // Fetch jobs from API
+  // Fetch jobs
   const { data, isLoading, error } = useQuery<JobsResponse>({
     queryKey: ["/api/jobs", { page, search, location, type, minSalary, maxSalary, salaryPeriod }],
     queryFn: async () => {
@@ -64,19 +74,16 @@ export default function JobsPage() {
       if (minSalary) params.set("minSalary", minSalary);
       if (maxSalary) params.set("maxSalary", maxSalary);
       if (salaryPeriod) params.set("salaryPeriod", salaryPeriod);
-
       const response = await fetch(`/api/jobs?${params}`);
       if (!response.ok) throw new Error("Failed to fetch jobs");
       return response.json();
     },
   });
 
-  // Client-side sorting (server doesn't support sortBy yet)
+  // Client-side sorting
   const sortedJobs = useMemo(() => {
     if (!data?.jobs) return [];
-
     const jobs = [...data.jobs];
-
     switch (sortBy) {
       case "recent":
         return jobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -86,7 +93,6 @@ export default function JobsPage() {
           if (!b.deadline) return -1;
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
         });
-      case "relevant":
       default:
         return jobs;
     }
@@ -103,19 +109,15 @@ export default function JobsPage() {
     if (salaryPeriod) params.set("salaryPeriod", salaryPeriod);
     if (sortBy && sortBy !== "recent") params.set("sortBy", sortBy);
     if (page > 1) params.set("page", page.toString());
-
     const queryString = params.toString();
     setUrlLocation(`/jobs${queryString ? `?${queryString}` : ''}`, { replace: true });
   }, [search, location, type, minSalary, maxSalary, salaryPeriod, sortBy, page, setUrlLocation]);
 
-  // Scroll to top on pagination change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
-  const handleApplyFilters = () => {
-    setPage(1); // Reset to first page when applying filters
-  };
+  const handleApplyFilters = () => setPage(1);
 
   const handleResetFilters = () => {
     setSearch("");
@@ -139,7 +141,6 @@ export default function JobsPage() {
     });
   };
 
-  // Count active filters (excluding page and default sort)
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (search) count++;
@@ -150,12 +151,9 @@ export default function JobsPage() {
     return count;
   }, [search, location, type, minSalary, maxSalary]);
 
-  // Generate dynamic meta tags based on filters and results
   const metaData = useMemo(() => {
     const baseUrl = DEFAULT_SITE_URL;
     const count = data?.pagination.total || 0;
-
-    // Build title with filters
     let title = "Find Jobs";
     if (location) title += ` in ${location}`;
     if (type && type !== "all") {
@@ -163,57 +161,121 @@ export default function JobsPage() {
       title += ` - ${typeLabel}`;
     }
     title += " | VantaHire";
-
-    // Build description
     let description = `Browse ${count} open roles across IT, Telecom, Automotive, Fintech, Healthcare.`;
     if (location) description += ` Find opportunities in ${location}.`;
     if (search) description += ` Search: ${search}.`;
     description += " Recruiter-first ATS built for recruiting velocity.";
-
-    // Build canonical URL with query params (include all active filters)
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (location) params.set("location", location);
-    if (type && type !== "all") params.set("type", type);
-    if (minSalary) params.set("minSalary", minSalary);
-    if (maxSalary) params.set("maxSalary", maxSalary);
-    if (salaryPeriod) params.set("salaryPeriod", salaryPeriod);
-    if (sortBy && sortBy !== "recent") params.set("sortBy", sortBy);
-    if (page > 1) params.set("page", page.toString());
-
     const canonicalUrl = `${baseUrl}/jobs`;
-
     return { title, description, canonicalUrl, baseUrl };
-  }, [location, type, search, minSalary, maxSalary, salaryPeriod, sortBy, page, data?.pagination.total]);
+  }, [location, type, search, data?.pagination.total]);
 
   const formatDate = (dateString: string | Date) => {
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const formatSalary = (min?: number | null, max?: number | null, period?: string | null) => {
     if (!min && !max) return null;
     const currency = "₹";
     const p = period === "per_year" ? "/yr" : period === "per_month" ? "/mo" : "";
-
-    if (min && max) return `${currency}${min.toLocaleString()} - ${currency}${max.toLocaleString()}${p}`;
+    if (min && max) return `${currency}${min.toLocaleString()} – ${currency}${max.toLocaleString()}${p}`;
     if (min) return `From ${currency}${min.toLocaleString()}${p}`;
     if (max) return `Up to ${currency}${max.toLocaleString()}${p}`;
     return null;
   };
 
+  // Filter panel content (shared between desktop & mobile)
+  const filterPanel = (
+    <>
+      <div className="hr-filter-group">
+        <label><Search size={12} /> Keyword</label>
+        <div className="hr-filter-input-icon">
+          <Search />
+          <input
+            className="hr-filter-input"
+            placeholder="Job title, keywords..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+        </div>
+      </div>
+
+      <div className="hr-filter-group">
+        <label><MapPin size={12} /> Location</label>
+        <div className="hr-filter-input-icon">
+          <MapPin />
+          <input
+            className="hr-filter-input"
+            placeholder="City, state..."
+            value={location}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+        </div>
+      </div>
+
+      <div className="hr-filter-divider" />
+
+      <div className="hr-filter-group">
+        <label><Briefcase size={12} /> Job Type</label>
+        <select className="hr-filter-select" value={type} onChange={(e) => setType(e.target.value)}>
+          <option value="all">All Types</option>
+          <option value="full-time">Full-time</option>
+          <option value="part-time">Part-time</option>
+          <option value="contract">Contract</option>
+          <option value="internship">Internship</option>
+          <option value="temporary">Temporary</option>
+        </select>
+      </div>
+
+      <div className="hr-filter-group">
+        <label><IndianRupee size={12} /> Salary Range</label>
+        <div className="hr-filter-salary-row">
+          <input
+            className="hr-filter-input"
+            placeholder="Min"
+            type="number"
+            value={minSalary}
+            onChange={(e) => setMinSalary(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+          <span>–</span>
+          <input
+            className="hr-filter-input"
+            placeholder="Max"
+            type="number"
+            value={maxSalary}
+            onChange={(e) => setMaxSalary(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+        </div>
+        <select
+          className="hr-filter-select"
+          value={salaryPeriod}
+          onChange={(e) => setSalaryPeriod(e.target.value)}
+          style={{ marginTop: '8px' }}
+        >
+          <option value="per_year">Per Year</option>
+          <option value="per_month">Per Month</option>
+        </select>
+      </div>
+
+      <div className="hr-filter-divider" />
+
+      <div className="hr-filter-actions">
+        <button className="hr-btn-filter-apply" onClick={handleApplyFilters}>Apply Filters</button>
+        <button className="hr-btn-filter-reset" onClick={handleResetFilters}>Reset</button>
+      </div>
+    </>
+  );
+
   return (
-    <Layout>
+    <>
       <Helmet>
         <title>{metaData.title}</title>
         <meta name="description" content={metaData.description} />
         <link rel="canonical" href={metaData.canonicalUrl} />
-
-        {/* Open Graph */}
         <meta property="og:title" content={metaData.title} />
         <meta property="og:description" content={metaData.description} />
         <meta property="og:url" content={metaData.canonicalUrl} />
@@ -221,324 +283,261 @@ export default function JobsPage() {
         <meta property="og:image" content={`${metaData.baseUrl}/og-image.jpg`} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-
-        {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={metaData.title} />
         <meta name="twitter:description" content={metaData.description} />
         <meta name="twitter:image" content={`${metaData.baseUrl}/twitter-image.jpg`} />
       </Helmet>
 
-      <div className="public-theme min-h-screen bg-background text-foreground">
-        {/* Premium background effects */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-info/10 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
+      <div className="homepage-redesign">
+        <GridOverlay />
+        <div style={{ position: 'relative', zIndex: 10 }}>
+          <HomepageNav />
 
-        <div className={`container mx-auto px-4 py-8 relative z-10 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Premium Header */}
-          <div className="text-center mb-12 pt-16">
-            <div className="w-20 h-1.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] rounded-full mx-auto mb-6 animate-slide-right"></div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              <span className="animate-gradient-text">Find Your Next</span>
-              <br />
-              <span className="text-foreground">Dream Opportunity</span>
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-slide-up" style={{ animationDelay: '0.3s' }}>
-              Discover exciting career opportunities with leading companies powered by AI-driven matching
-            </p>
-          </div>
-
-          {/* Two-column layout: Filters + Results */}
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
-            {/* Left Sidebar - Desktop Only */}
-            <aside className="hidden lg:block">
-              <FilterPanel
-                search={search}
-                setSearch={setSearch}
-                location={location}
-                setLocation={setLocationFilter}
-                type={type}
-                setType={setType}
-                minSalary={minSalary}
-                setMinSalary={setMinSalary}
-                maxSalary={maxSalary}
-                setMaxSalary={setMaxSalary}
-                salaryPeriod={salaryPeriod}
-                setSalaryPeriod={setSalaryPeriod}
-                onApplyFilters={handleApplyFilters}
-                onResetFilters={handleResetFilters}
-              />
-            </aside>
-
-            {/* Main Content */}
-            <main>
-              {/* Mobile Filter + Sort Bar */}
-              <div className="flex items-center justify-between mb-6 gap-4">
-                <div className="lg:hidden flex items-center gap-2">
-                  <MobileFilterSheet
-                    search={search}
-                    setSearch={setSearch}
-                    location={location}
-                    setLocation={setLocationFilter}
-                    type={type}
-                    setType={setType}
-                    minSalary={minSalary}
-                    setMinSalary={setMinSalary}
-                    maxSalary={maxSalary}
-                    setMaxSalary={setMaxSalary}
-                    salaryPeriod={salaryPeriod}
-                    setSalaryPeriod={setSalaryPeriod}
-                    onApplyFilters={handleApplyFilters}
-                    onResetFilters={handleResetFilters}
-                  />
-                  {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Sort Dropdown + Reset */}
-                <div className="flex items-center gap-2 ml-auto">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-[180px] bg-muted/30 border-border text-foreground">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="recent">Most Recent</SelectItem>
-                      <SelectItem value="deadline">Deadline: Soonest</SelectItem>
-                      {aiEnabled && (
-                        <SelectItem value="relevant">Most Relevant (AI)</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {activeFilterCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleResetFilters}
-                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Reset
-                    </Button>
-                  )}
+          <div className="hr-jobs-page">
+            {/* Header */}
+            <div className="hr-struct-section">
+              <div className="struct-gutter"></div>
+              <div className="struct-body" style={{ borderBottom: 'none' }}>
+                <div className="hr-jobs-header">
+                  <div className="hr-section-label">Open Positions</div>
+                  <h1 className="hr-section-title">Find Your Next<br />Opportunity</h1>
+                  <p className="hr-section-desc">
+                    Discover roles with leading companies across India, powered by intelligent matching.
+                  </p>
                 </div>
               </div>
-
-              {/* Active Filter Chips */}
-              {activeFilterCount > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {search && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Search: {search}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setSearch("")}
-                      />
-                    </Badge>
-                  )}
-                  {location && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Location: {location}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setLocationFilter("")}
-                      />
-                    </Badge>
-                  )}
-                  {type && type !== "all" && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Type: {type.replace('-', ' ')}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setType("all")}
-                      />
-                    </Badge>
-                  )}
-                  {minSalary && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Min Salary: {minSalary}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setMinSalary("")}
-                      />
-                    </Badge>
-                  )}
-                  {maxSalary && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Max Salary: {maxSalary}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setMaxSalary("")}
-                      />
-                    </Badge>
-                  )}
-                </div>
-              )}
-
-              {/* Results */}
-        {isLoading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-foreground mt-4">Loading jobs...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12">
-            <p className="text-destructive">Error loading jobs. Please try again.</p>
-          </div>
-        ) : data?.jobs.length === 0 ? (
-          <div className="text-center py-12">
-            <Briefcase className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-foreground text-xl mb-2">No jobs found</p>
-            <p className="text-muted-foreground">Try adjusting your search criteria</p>
-          </div>
-        ) : (
-          <>
-            {/* Job Count */}
-            <div className="mb-6">
-              <p className="text-foreground">
-                Showing {sortedJobs.length} of {data?.pagination.total} jobs
-                {sortBy !== "recent" && <span className="text-muted-foreground ml-2">(sorted by {sortBy === "deadline" ? "deadline" : "AI relevance"})</span>}
-              </p>
+              <div className="struct-gutter"></div>
             </div>
 
-            {/* Job Cards */}
-            <div className="grid gap-6 mb-8">
-              {sortedJobs.map((job) => {
-                const salaryDisplay = formatSalary(job.salaryMin, job.salaryMax, job.salaryPeriod);
+            {/* Main content */}
+            <div className="hr-struct-section">
+              <div className="struct-gutter"></div>
+              <div className="struct-body">
+                <div className="hr-jobs-layout" style={{ padding: '0 0 80px' }}>
+                  {/* Desktop sidebar */}
+                  <aside className="hr-jobs-sidebar">
+                    <div className="hr-filter-panel">
+                      <h3><SlidersHorizontal size={16} /> Filters</h3>
+                      {filterPanel}
+                    </div>
+                  </aside>
 
-                return (
-                  <Card
-                    key={job.id}
-                    data-testid="job-card"
-                    className="bg-muted/50 backdrop-blur-sm border-border hover:bg-muted/40 transition-all duration-300"
-                    onMouseEnter={() => handleJobCardHover(job.id)}
-                  >
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-foreground text-xl mb-2">
-                            <Link href={`/jobs/${job.slug || job.id}`} className="hover:text-primary transition-colors">
-                              {job.title}
-                            </Link>
-                          </CardTitle>
-                          <CardDescription className="text-muted-foreground/50 flex flex-wrap items-center gap-4">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {job.location}
-                            </span>
-                            {salaryDisplay && (
-                              <span className="flex items-center gap-1">
-                                {/*<IndianRupee className="h-4 w-4" />*/}
-                                {salaryDisplay}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              Posted {formatDate(job.createdAt)}
-                            </span>
-                            {job.postedByName && (
-                              <span className="flex items-center gap-1">
-                                <User className="h-4 w-4" />
-                                by{" "}
-                                {job.postedById && job.isRecruiterProfilePublic ? (
-                                  <Link
-                                    href={`/recruiters/${job.postedById}`}
-                                    className="text-primary hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {job.postedByName}
-                                  </Link>
-                                ) : (
-                                  job.postedByName
-                                )}
-                              </span>
-                            )}
-                          </CardDescription>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="bg-primary/20 text-primary border-primary/30"
+                  {/* Results area */}
+                  <main>
+                    {/* Toolbar */}
+                    <div className="hr-jobs-toolbar">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        {/* Mobile filter trigger */}
+                        <button
+                          className="hr-mobile-filter-btn"
+                          onClick={() => setMobileFilterOpen(true)}
                         >
-                          {job.type.replace('-', ' ')}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground/50 mb-4 line-clamp-3">
-                        {job.description.substring(0, 200)}...
-                      </p>
+                          <SlidersHorizontal />
+                          Filters
+                          {activeFilterCount > 0 && (
+                            <span className="hr-mobile-filter-count">{activeFilterCount}</span>
+                          )}
+                        </button>
 
-                      <div className="flex justify-between items-center">
-                        {job.deadline && (
-                          <p className="text-sm text-muted-foreground">
-                            Deadline: {formatDate(job.deadline)}
-                          </p>
+                        {data && (
+                          <span className="hr-jobs-count">
+                            <strong>{data.pagination.total}</strong> {data.pagination.total === 1 ? 'job' : 'jobs'} found
+                          </span>
                         )}
-                        <div className="flex gap-2 ml-auto">
-                          <Link href={`/jobs/${job.slug || job.id}`}>
-                            <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
-                              View Details
-                            </Button>
-                          </Link>
-                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
 
-            {/* Pagination */}
-            {data && data.pagination.totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                  className="bg-muted/50 border-border text-foreground hover:bg-muted/60"
-                >
-                  Previous
-                </Button>
+                      <div className="hr-jobs-sort">
+                        <span>Sort</span>
+                        <select className="hr-sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                          <option value="recent">Most Recent</option>
+                          <option value="deadline">Deadline: Soonest</option>
+                          {aiEnabled && <option value="relevant">AI Relevance</option>}
+                        </select>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  {Array.from({ length: Math.min(5, data.pagination.totalPages) }, (_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={page === pageNum ? "default" : "outline"}
-                        onClick={() => setPage(pageNum)}
-                        className={page === pageNum
-                          ? "bg-gradient-to-r from-purple-500 to-blue-500"
-                          : "bg-muted/50 border-border text-foreground hover:bg-muted/60"
-                        }
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
+                    {/* Active filter chips */}
+                    {activeFilterCount > 0 && (
+                      <div className="hr-filter-chips">
+                        {search && (
+                          <span className="hr-filter-chip">
+                            Search: {search}
+                            <button onClick={() => setSearch("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {location && (
+                          <span className="hr-filter-chip">
+                            Location: {location}
+                            <button onClick={() => setLocationFilter("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {type && type !== "all" && (
+                          <span className="hr-filter-chip">
+                            {type.replace('-', ' ')}
+                            <button onClick={() => setType("all")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {minSalary && (
+                          <span className="hr-filter-chip">
+                            Min: ₹{Number(minSalary).toLocaleString()}
+                            <button onClick={() => setMinSalary("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {maxSalary && (
+                          <span className="hr-filter-chip">
+                            Max: ₹{Number(maxSalary).toLocaleString()}
+                            <button onClick={() => setMaxSalary("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        <button
+                          className="hr-btn-filter-reset"
+                          style={{ padding: '4px 12px', fontSize: '0.72rem' }}
+                          onClick={handleResetFilters}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Results */}
+                    {isLoading ? (
+                      <div className="hr-jobs-loading">
+                        <div className="hr-jobs-spinner" />
+                        <p>Loading jobs...</p>
+                      </div>
+                    ) : error ? (
+                      <div className="hr-jobs-empty">
+                        <p style={{ color: 'var(--hr-red)' }}>Error loading jobs. Please try again.</p>
+                      </div>
+                    ) : data?.jobs.length === 0 ? (
+                      <div className="hr-jobs-empty">
+                        <Briefcase />
+                        <h3>No jobs found</h3>
+                        <p>Try adjusting your search criteria</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="hr-job-cards">
+                          {sortedJobs.map((job, i) => {
+                            const salaryDisplay = formatSalary(job.salaryMin, job.salaryMax, job.salaryPeriod);
+                            return (
+                              <div
+                                key={job.id}
+                                className="hr-job-card"
+                                data-testid="job-card"
+                                style={{ animationDelay: `${i * 0.05}s` }}
+                                onMouseEnter={() => handleJobCardHover(job.id)}
+                              >
+                                <div className="hr-job-card-top">
+                                  <div>
+                                    <div className="hr-job-title">
+                                      <Link href={`/jobs/${job.slug || job.id}`}>{job.title}</Link>
+                                    </div>
+                                    <div className="hr-job-meta">
+                                      <span className="hr-job-meta-item">
+                                        <MapPin /> {job.location}
+                                      </span>
+                                      {salaryDisplay && (
+                                        <span className="hr-job-meta-item">{salaryDisplay}</span>
+                                      )}
+                                      <span className="hr-job-meta-item">
+                                        <Clock /> Posted {formatDate(job.createdAt)}
+                                      </span>
+                                      {job.postedByName && (
+                                        <span className="hr-job-meta-item">
+                                          <User />
+                                          {job.postedById && job.isRecruiterProfilePublic ? (
+                                            <a href={`/recruiters/${job.postedById}`}>{job.postedByName}</a>
+                                          ) : (
+                                            job.postedByName
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="hr-job-type-badge">
+                                    {job.type.replace('-', ' ')}
+                                  </span>
+                                </div>
+
+                                <p className="hr-job-desc">
+                                  {job.description.substring(0, 200)}...
+                                </p>
+
+                                <div className="hr-job-card-bottom">
+                                  {job.deadline ? (
+                                    <span className="hr-job-deadline">
+                                      Deadline: {formatDate(job.deadline)}
+                                    </span>
+                                  ) : <span />}
+                                  <Link href={`/jobs/${job.slug || job.id}`} className="hr-btn-view-job">
+                                    View Details
+                                  </Link>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Pagination */}
+                        {data && data.pagination.totalPages > 1 && (
+                          <div className="hr-pagination">
+                            <button
+                              className="hr-page-btn"
+                              onClick={() => setPage(page - 1)}
+                              disabled={page === 1}
+                            >
+                              Previous
+                            </button>
+                            {Array.from({ length: Math.min(5, data.pagination.totalPages) }, (_, i) => {
+                              const pageNum = i + 1;
+                              return (
+                                <button
+                                  key={pageNum}
+                                  className={`hr-page-btn ${page === pageNum ? 'active' : ''}`}
+                                  onClick={() => setPage(pageNum)}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                            <button
+                              className="hr-page-btn"
+                              onClick={() => setPage(page + 1)}
+                              disabled={page === data.pagination.totalPages}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </main>
                 </div>
-
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(page + 1)}
-                  disabled={page === data.pagination.totalPages}
-                  className="bg-muted/50 border-border text-foreground hover:bg-muted/60"
-                >
-                  Next
-                </Button>
               </div>
-            )}
-          </>
-        )}
-            </main>
+              <div className="struct-gutter"></div>
+            </div>
           </div>
+
+          <HomepageFooter />
         </div>
+
+        {/* Mobile filter drawer */}
+        {mobileFilterOpen && (
+          <div className="hr-mobile-filter-overlay open" onClick={() => setMobileFilterOpen(false)}>
+            <div className="hr-mobile-filter-drawer" onClick={(e) => e.stopPropagation()}>
+              <div className="hr-mobile-filter-header">
+                <h3>Filter Jobs</h3>
+                <button className="hr-mobile-filter-close" onClick={() => setMobileFilterOpen(false)}>
+                  <X size={20} />
+                </button>
+              </div>
+              {filterPanel}
+            </div>
+          </div>
+        )}
       </div>
-    </Layout>
+    </>
   );
 }
