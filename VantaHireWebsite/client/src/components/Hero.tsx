@@ -22,7 +22,7 @@ const Hero = () => {
             UNIFIED RECRUITMENT PLATFORM
           </div>
 
-          <h1 className="hr-hero-h1">Recruiting Rebuilt for Today</h1>
+          <h1 className="hr-hero-h1">Make better hires, faster.</h1>
 
           <p className="hr-hero-subtitle">
             VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows.

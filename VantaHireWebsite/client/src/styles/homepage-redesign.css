@@ -1156,6 +1156,7 @@
    FOOTER
 ═══════════════════════════════════════ */
 .hr-footer { padding: 56px 48px 28px; }
+.homepage-redesign footer.hr-footer { background: var(--hr-bg); border-top: none; }
 
 .hr-footer-grid {
   display: grid;
