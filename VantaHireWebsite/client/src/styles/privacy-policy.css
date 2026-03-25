@@ -3,38 +3,9 @@
    (shared legal page styles are in legal-page.css)
 ============================================================================= */
 
-/* Security grid */
+/* Security grid: 3-column override of shared info-grid */
 .hr-pp-security-grid {
-  display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 1px;
-  background: var(--hr-grid-line);
-  border: 1px solid var(--hr-border);
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 16px 0;
-}
-
-.hr-pp-security-item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  background: var(--hr-bg-elevated);
-}
-
-.hr-pp-security-label {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  color: var(--hr-accent-hover);
-}
-
-.hr-pp-security-desc {
-  font-size: 0.78rem;
-  color: var(--hr-text-secondary);
-  line-height: 1.4;
 }
 
 /* Rights list */

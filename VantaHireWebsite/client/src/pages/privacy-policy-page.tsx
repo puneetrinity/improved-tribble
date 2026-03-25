@@ -133,7 +133,7 @@ const sections: LegalSection[] = [
         <p>
           We implement industry-standard security measures to protect your information, including:
         </p>
-        <div className="hr-pp-security-grid">
+        <div className="hr-legal-info-grid hr-pp-security-grid">
           {[
             { label: "HTTPS/TLS", desc: "Encrypted data transmission" },
             { label: "Auth", desc: "Secure authentication & sessions" },
@@ -142,9 +142,9 @@ const sections: LegalSection[] = [
             { label: "RBAC", desc: "Role-based access controls" },
             { label: "GCP", desc: "Google Cloud Platform storage" },
           ].map((item) => (
-            <div key={item.label} className="hr-pp-security-item">
-              <span className="hr-pp-security-label">{item.label}</span>
-              <span className="hr-pp-security-desc">{item.desc}</span>
+            <div key={item.label} className="hr-legal-info-item">
+              <span className="hr-legal-info-label">{item.label}</span>
+              <span className="hr-legal-info-desc">{item.desc}</span>
             </div>
           ))}
         </div>
