@@ -1,0 +1,32 @@
+/* =============================================================================
+   Base Styles
+   Wrapper styling, global animations, and keyframes.
+============================================================================= */
+
+.homepage-redesign {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  line-height: normal;
+  background: var(--hr-bg);
+  color: var(--hr-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.homepage-redesign footer.hr-footer { background: var(--hr-bg); border-top: none; }
+
+/* Animations */
+@keyframes hrFadeUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes hrSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes hrSlideIn {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+.hr-hero-grid .content-center { animation: hrFadeUp 0.7s ease-out; }
+.hr-screenshot-wrapper { animation: hrFadeUp 0.9s ease-out 0.2s both; }

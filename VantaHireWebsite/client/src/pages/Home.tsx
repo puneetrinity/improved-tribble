@@ -5,7 +5,10 @@ import FeaturesGrid from "@/components/FeaturesGrid";
 import Cta from "@/components/Cta";
 import HomepageFooter from "@/components/HomepageFooter";
 import { Helmet } from "react-helmet-async";
-import "@/styles/homepage-redesign.css";
+import "@/styles/tokens.css";
+import "@/styles/base.css";
+import "@/styles/components.css";
+import "@/styles/homepage.css";
 
 // Grid Overlay Component
 const GridOverlay = () => (

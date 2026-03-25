@@ -45,7 +45,10 @@ import {
 } from "lucide-react";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
-import "@/styles/homepage-redesign.css";
+import "@/styles/tokens.css";
+import "@/styles/base.css";
+import "@/styles/components.css";
+import "@/styles/pricing.css";
 
 // Grid Overlay (same as homepage)
 const GridOverlay = () => (

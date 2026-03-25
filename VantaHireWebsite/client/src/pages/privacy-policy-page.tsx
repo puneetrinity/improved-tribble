@@ -3,7 +3,10 @@ import { Helmet } from "react-helmet-async";
 import { Shield, Database, Eye, Lock, Mail, UserCheck, Clock, Cookie, Baby, FileText } from "lucide-react";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
-import "@/styles/homepage-redesign.css";
+import "@/styles/tokens.css";
+import "@/styles/base.css";
+import "@/styles/components.css";
+import "@/styles/privacy-policy.css";
 
 const GridOverlay = () => (
   <div className="hr-page-grid-overlay">

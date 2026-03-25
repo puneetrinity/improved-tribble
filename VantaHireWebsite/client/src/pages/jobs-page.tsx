@@ -7,7 +7,10 @@ import { DEFAULT_SITE_URL } from "@/lib/seoHelpers";
 import { Job } from "@shared/schema";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
-import "@/styles/homepage-redesign.css";
+import "@/styles/tokens.css";
+import "@/styles/base.css";
+import "@/styles/components.css";
+import "@/styles/jobs.css";
 import { useAIFeatures } from "@/hooks/use-ai-features";
 
 interface JobWithRecruiter extends Job {

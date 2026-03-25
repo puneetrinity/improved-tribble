@@ -1,0 +1,104 @@
+/* =============================================================================
+   Shared Components
+   Reusable button, card, and form primitives.
+============================================================================= */
+
+/* ── Buttons ── */
+.hr-btn {
+  display: inline-block;
+  border: none;
+  border-radius: 0;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.hr-btn--primary {
+  background: var(--hr-accent);
+  color: white;
+}
+
+.hr-btn--primary:hover {
+  background: var(--hr-accent-hover);
+}
+
+.hr-btn--secondary {
+  background: transparent;
+  color: var(--hr-text);
+  border: 1px solid var(--hr-border-light);
+}
+
+.hr-btn--secondary:hover {
+  border-color: rgba(255,255,255,0.25);
+}
+
+.hr-btn--sm {
+  padding: 8px 18px;
+  font-size: 0.82rem;
+}
+
+.hr-btn--md {
+  padding: 10px 20px;
+  font-size: 0.85rem;
+}
+
+.hr-btn--lg {
+  padding: 12px 24px;
+  font-size: 0.9rem;
+}
+
+.hr-btn--xl {
+  padding: 12px 32px;
+  font-size: 0.9rem;
+}
+
+/* ── Cards ── */
+.hr-card {
+  background: var(--hr-bg-card);
+  border: 1px solid var(--hr-border);
+}
+
+.hr-card--elevated {
+  background: var(--hr-bg-elevated);
+  border: 1px solid var(--hr-border);
+}
+
+.hr-card--rounded-sm { border-radius: 4px; }
+.hr-card--rounded-md { border-radius: 8px; }
+.hr-card--rounded-lg { border-radius: 10px; }
+.hr-card--sharp { border-radius: 0; }
+
+/* ── Form primitives ── */
+.hr-input,
+.hr-select,
+.hr-textarea {
+  width: 100%;
+  background: var(--hr-bg-elevated);
+  border: 1px solid var(--hr-border);
+  color: var(--hr-text);
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.hr-input,
+.hr-select {
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 0.85rem;
+}
+
+.hr-textarea {
+  border-radius: 0;
+  padding: 10px 12px;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+
+.hr-input:focus,
+.hr-select:focus,
+.hr-textarea:focus {
+  border-color: var(--hr-accent);
+}

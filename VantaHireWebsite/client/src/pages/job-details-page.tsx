@@ -14,7 +14,10 @@ import { DEFAULT_SITE_URL, generateJobPostingJsonLd, generateJobMetaDescription,
 import { useAIFeatures } from "@/hooks/use-ai-features";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
-import "@/styles/homepage-redesign.css";
+import "@/styles/tokens.css";
+import "@/styles/base.css";
+import "@/styles/components.css";
+import "@/styles/job-detail.css";
 
 // Types for audit log
 interface AuditLogEntry {

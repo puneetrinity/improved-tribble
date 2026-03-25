@@ -86,8 +86,7 @@ const HomepageNav = () => {
       </div>
 
       {/* Mobile menu */}
-      {isMenuOpen && (
-        <div className="hr-mobile-menu" data-testid="mobile-nav">
+      <div className={`hr-mobile-menu${isMenuOpen ? ' open' : ''}`} data-testid="mobile-nav">
           {!user && (
             <>
               <Link href="/features" onClick={() => setIsMenuOpen(false)}>Features</Link>
@@ -130,8 +129,7 @@ const HomepageNav = () => {
               Get started
             </a>
           )}
-        </div>
-      )}
+      </div>
     </nav>
   );
 };

@@ -1,0 +1,378 @@
+/* =============================================================================
+   Pricing Page Styles
+============================================================================= */
+
+.hr-pricing-hero {
+  padding: 140px 48px 80px;
+  text-align: center;
+  max-width: 1100px;
+  margin: 0 auto;
+  animation: hrFadeUp 0.7s ease-out;
+}
+
+.hr-pricing-hero .hr-section-title {
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  margin-bottom: 20px;
+}
+
+.hr-pricing-hero .hr-section-desc {
+  margin: 0 auto;
+  max-width: 540px;
+}
+
+/* Pricing cards grid */
+.hr-pricing-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  max-width: 1100px;
+  margin: 0 auto 100px;
+  padding: 0 48px;
+  animation: hrFadeUp 0.9s ease-out 0.15s both;
+}
+
+.hr-plan-card {
+  background: var(--hr-bg-card);
+  border: 1px solid var(--hr-border);
+  border-radius: 10px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  transition: border-color 0.2s;
+}
+
+.hr-plan-card:hover {
+  border-color: var(--hr-border-light);
+}
+
+.hr-plan-card.featured {
+  border: 2px solid var(--hr-accent);
+  background: linear-gradient(165deg, rgba(124,58,237,0.08) 0%, var(--hr-bg-card) 40%);
+}
+
+.hr-plan-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--hr-accent);
+  color: white;
+  padding: 4px 16px;
+  white-space: nowrap;
+}
+
+.hr-plan-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.hr-plan-name {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1.3rem;
+  font-weight: 500;
+  color: var(--hr-text);
+  margin-bottom: 4px;
+}
+
+.hr-plan-summary {
+  font-size: 0.85rem;
+  color: var(--hr-text-muted);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.hr-plan-price {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 2.4rem;
+  font-weight: 700;
+  color: var(--hr-text);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.hr-plan-price .hr-plan-period {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--hr-text-muted);
+  font-family: 'DM Sans', -apple-system, sans-serif;
+}
+
+.hr-plan-tax-note {
+  font-size: 0.72rem;
+  color: var(--hr-text-muted);
+  margin-bottom: 24px;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+}
+
+.hr-plan-divider {
+  height: 1px;
+  background: var(--hr-border);
+  margin-bottom: 20px;
+}
+
+.hr-plan-includes {
+  font-size: 0.72rem;
+  color: var(--hr-text-muted);
+  margin-bottom: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.hr-plan-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.hr-plan-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: var(--hr-text-secondary);
+  line-height: 1.4;
+}
+
+.hr-plan-features li .hr-check-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--hr-green);
+}
+
+/* Plan buttons — uses .hr-btn .hr-btn--primary/.hr-btn--secondary .hr-btn--lg */
+.hr-plan-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 24px;
+  border-radius: 0;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+  border: none;
+  text-decoration: none;
+}
+
+.hr-plan-btn.primary {
+  background: var(--hr-accent);
+  color: white;
+}
+
+.hr-plan-btn.primary:hover {
+  background: var(--hr-accent-hover);
+}
+
+.hr-plan-btn.secondary {
+  background: transparent;
+  color: var(--hr-text);
+  border: 1px solid var(--hr-border-light);
+}
+
+.hr-plan-btn.secondary:hover {
+  border-color: rgba(255,255,255,0.25);
+}
+
+.hr-plan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hr-plan-btn .btn-arrow {
+  display: inline-block;
+  margin-left: 6px;
+  transition: transform 0.2s;
+}
+
+.hr-plan-btn:hover .btn-arrow {
+  transform: translateX(3px);
+}
+
+/* Comparison table */
+.hr-comparison-section {
+  max-width: 1100px;
+  margin: 0 auto 100px;
+  padding: 0 48px;
+  animation: hrFadeUp 0.9s ease-out 0.3s both;
+}
+
+.hr-comparison-section .hr-section-title {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.hr-comparison-table {
+  width: 100%;
+  border: 1px solid var(--hr-border);
+  border-radius: 10px;
+  overflow: hidden;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.hr-comparison-table thead th {
+  padding: 16px 20px;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--hr-text);
+  text-align: center;
+  background: var(--hr-bg-elevated);
+  border-bottom: 1px solid var(--hr-border);
+}
+
+.hr-comparison-table thead th:first-child {
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--hr-text-muted);
+}
+
+.hr-comparison-table thead th.hr-col-featured {
+  background: rgba(124,58,237,0.08);
+  color: var(--hr-accent-hover);
+}
+
+.hr-comparison-table tbody td {
+  padding: 12px 20px;
+  font-size: 0.85rem;
+  color: var(--hr-text-secondary);
+  border-bottom: 1px solid var(--hr-border);
+  text-align: center;
+  background: var(--hr-bg);
+}
+
+.hr-comparison-table tbody td:first-child {
+  text-align: left;
+  color: var(--hr-text);
+  font-weight: 400;
+}
+
+.hr-comparison-table tbody td.hr-col-featured {
+  background: rgba(124,58,237,0.03);
+}
+
+.hr-comparison-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.hr-comparison-table tbody tr:hover td {
+  background: rgba(255,255,255,0.02);
+}
+
+.hr-comparison-table tbody tr:hover td.hr-col-featured {
+  background: rgba(124,58,237,0.05);
+}
+
+.hr-comparison-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--hr-green);
+}
+
+.hr-comparison-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: rgba(255,255,255,0.15);
+}
+
+/* FAQ section */
+.hr-faq-section {
+  max-width: 720px;
+  margin: 0 auto 100px;
+  padding: 0 48px;
+  animation: hrFadeUp 0.9s ease-out 0.4s both;
+}
+
+.hr-faq-section .hr-section-title {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.hr-faq-card {
+  background: var(--hr-bg-card);
+  border: 1px solid var(--hr-border);
+  border-radius: 8px;
+  padding: 24px 28px;
+  margin-bottom: 12px;
+  transition: border-color 0.2s;
+}
+
+.hr-faq-card:hover {
+  border-color: var(--hr-border-light);
+}
+
+.hr-faq-card h3 {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--hr-text);
+  margin-bottom: 8px;
+}
+
+.hr-faq-card p {
+  font-size: 0.9rem;
+  color: var(--hr-text-secondary);
+  line-height: 1.7;
+}
+
+/* Pricing CTA */
+.hr-pricing-cta {
+  text-align: center;
+  padding: 80px 48px 100px;
+  border-top: 1px solid var(--hr-grid-line);
+}
+
+.hr-pricing-cta .hr-section-title {
+  max-width: 480px;
+  margin: 0 auto 16px;
+}
+
+.hr-pricing-cta .hr-section-desc {
+  margin: 0 auto 36px;
+  text-align: center;
+}
+
+/* Pricing responsive */
+@media (max-width: 1024px) {
+  .hr-pricing-cards { grid-template-columns: repeat(3, 1fr); gap: 16px; padding: 0 32px; }
+}
+
+@media (max-width: 768px) {
+  .hr-pricing-hero { padding: 100px 20px 48px; }
+  .hr-pricing-cards { grid-template-columns: 1fr; max-width: 420px; padding: 0 20px; gap: 24px; }
+  .hr-plan-card.featured { order: -1; }
+  .hr-comparison-section { padding: 0 20px; overflow-x: auto; }
+  .hr-comparison-table { min-width: 560px; }
+  .hr-faq-section { padding: 0 20px; }
+  .hr-pricing-cta { padding: 60px 20px; }
+  .hr-pricing-cta .hr-cta-btns { flex-direction: column; }
+}
