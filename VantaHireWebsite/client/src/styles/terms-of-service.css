@@ -1,0 +1,43 @@
+/* =============================================================================
+   Terms of Service Page — page-specific styles only
+   (shared legal page styles are in legal-page.css)
+============================================================================= */
+
+/* Account types grid */
+.hr-tos-roles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin: 12px 0 16px;
+}
+
+.hr-tos-role-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px;
+  background: var(--hr-bg-elevated);
+  border: 1px solid var(--hr-border);
+  border-radius: 6px;
+}
+
+.hr-tos-role-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--hr-text);
+}
+
+.hr-tos-role-desc {
+  font-size: 0.82rem;
+  color: var(--hr-text-muted);
+  line-height: 1.4;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hr-tos-roles-grid {
+    grid-template-columns: 1fr;
+  }
+}
