@@ -14,6 +14,7 @@ import { DEFAULT_SITE_URL, generateJobPostingJsonLd, generateJobMetaDescription,
 import { useAIFeatures } from "@/hooks/use-ai-features";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
+import GridOverlay from "@/components/GridOverlay";
 import "@/styles/tokens.css";
 import "@/styles/base.css";
 import "@/styles/components.css";
@@ -27,24 +28,6 @@ interface AuditLogEntry {
   performedBy: { firstName: string; lastName: string; username: string } | null;
   createdAt: string;
 }
-
-// Grid Overlay (same as homepage)
-const GridOverlay = () => (
-  <div className="hr-page-grid-overlay">
-    <div className="hr-page-grid-overlay-inner">
-      <div className="grid-col line-both">
-        <span className="hr-grid-diamond" style={{ left: '-4px', top: '56px' }}></span>
-        <span className="hr-grid-diamond" style={{ right: '-4px', top: '56px' }}></span>
-      </div>
-      <div className="grid-col"></div>
-      <div className="grid-col"></div>
-      <div className="grid-col line-both">
-        <span className="hr-grid-diamond" style={{ left: '-4px', top: '56px' }}></span>
-        <span className="hr-grid-diamond" style={{ right: '-4px', top: '56px' }}></span>
-      </div>
-    </div>
-  </div>
-);
 
 export default function JobDetailsPage() {
   const [match, params] = useRoute("/jobs/:id");
