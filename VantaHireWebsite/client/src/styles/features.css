@@ -1,0 +1,169 @@
+/* =============================================================================
+   Features Page Styles
+   Extends the homepage design system (tokens.css, base.css, homepage.css).
+============================================================================= */
+
+/* ── Hero ── */
+.hr-feat-hero {
+  text-align: center;
+  padding: 140px 48px 80px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.hr-feat-hero .hr-section-label { margin-bottom: 18px; }
+
+.hr-feat-hero .hr-section-title {
+  font-size: clamp(2.4rem, 5vw, 3.4rem);
+  line-height: 1.15;
+}
+
+.hr-feat-hero .hr-section-desc { margin: 0 auto; }
+
+/* ── Pillar Cards ── */
+.hr-pillars {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 48px;
+  padding: 0 48px 100px;
+}
+
+.hr-pillar {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 48px;
+  align-items: start;
+}
+
+.hr-pillar.reverse {
+  grid-template-columns: 1.3fr 1fr;
+}
+
+.hr-pillar.reverse .hr-pillar-text { order: 2; }
+.hr-pillar.reverse .hr-pillar-detail { order: 1; }
+
+.hr-pillar-layer {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--hr-text-muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.hr-pillar-text h2 {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 1.7rem;
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--hr-text);
+  margin-bottom: 8px;
+}
+
+.hr-pillar-label {
+  font-size: 0.88rem;
+  color: var(--hr-accent-hover);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.hr-pillar-outcome {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--hr-text-secondary);
+}
+
+.hr-pillar-outcome-label {
+  color: var(--hr-text);
+  font-weight: 500;
+}
+
+/* Detail card — reuses .hr-mock-bar from homepage.css for the bar + dots */
+.hr-pillar-detail {
+  background: var(--hr-bg-card);
+  border: 1px solid var(--hr-border-light);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.hr-pillar-detail .bar-title {
+  flex: 1;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--hr-text-muted);
+}
+
+.hr-pillar-detail-body {
+  padding: 20px;
+}
+
+.hr-pillar-features {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hr-pillar-feat-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--hr-bg-elevated);
+  border: 1px solid var(--hr-border);
+  border-radius: 7px;
+  font-size: 0.82rem;
+  color: var(--hr-text-secondary);
+  line-height: 1.5;
+}
+
+.hr-pillar-feat-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+
+/* ── CTA — extends .hr-cta-section from homepage.css ── */
+.hr-feat-cta.hr-cta-section {
+  padding: 80px 48px 100px;
+}
+
+/* ── Grid separator ── */
+.struct-body--divider {
+  border-bottom: 1px solid var(--hr-grid-line);
+}
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+  .hr-feat-hero { padding: 120px 24px 60px; }
+  .hr-pillars { padding: 0 24px 80px; }
+  .hr-pillar, .hr-pillar.reverse { gap: 32px; }
+}
+
+@media (max-width: 768px) {
+  .hr-feat-hero { padding: 100px 20px 48px; }
+  .hr-feat-hero .hr-section-title { font-size: clamp(1.8rem, 6vw, 2.4rem); }
+
+  .hr-pillars { padding: 0 20px 60px; gap: 36px; }
+  .hr-pillar,
+  .hr-pillar.reverse { grid-template-columns: 1fr; gap: 24px; }
+  .hr-pillar.reverse .hr-pillar-text { order: 1; }
+  .hr-pillar.reverse .hr-pillar-detail { order: 2; }
+
+  .hr-feat-cta.hr-cta-section { padding: 60px 20px; }
+}
+
+@media (max-width: 480px) {
+  .hr-feat-hero { padding: 88px 16px 36px; }
+  .hr-feat-hero .hr-section-title { font-size: 1.7rem; }
+  .hr-pillars { padding: 0 16px 48px; gap: 28px; }
+}

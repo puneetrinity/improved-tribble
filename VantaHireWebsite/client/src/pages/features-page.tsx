@@ -1,23 +1,35 @@
-import { useState, useEffect } from "react";
-import Layout from "@/components/Layout";
 import { Helmet } from "react-helmet-async";
-import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
-import {
-  Database,
-  Search,
-  MessageSquare,
-  Users,
-  LayoutDashboard,
-  Target,
-  ArrowRight,
-  Check
-} from "lucide-react";
+import HomepageNav from "@/components/HomepageNav";
+import HomepageFooter from "@/components/HomepageFooter";
+import GridOverlay from "@/components/GridOverlay";
+import "@/styles/tokens.css";
+import "@/styles/base.css";
+import "@/styles/components.css";
+import "@/styles/homepage.css";
+import "@/styles/features.css";
 
-const pillars = [
+const breadcrumbJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://vantahire.com/features" }
+  ]
+});
+
+interface Pillar {
+  layer: string;
+  title: string;
+  label: string;
+  outcome: string;
+  features: string[];
+  accentColor: string;
+  accentBg: string;
+}
+
+const pillars: Pillar[] = [
   {
-    id: "pillar-1",
-    icon: <Database className="w-8 h-8" />,
     layer: "Intelligence",
     title: "Resume Knowledge Graph",
     label: "Every resume builds your hiring intelligence",
@@ -29,12 +41,10 @@ const pillars = [
       "Past candidates become searchable and reusable for new roles, even across different job titles",
       "No manual tagging or categorization required"
     ],
-    iconBg: "bg-primary/20",
-    iconColor: "text-primary"
+    accentColor: "var(--hr-accent-hover)",
+    accentBg: "rgba(124,58,237,0.15)"
   },
   {
-    id: "pillar-2",
-    icon: <Search className="w-8 h-8" />,
     layer: "Intelligence",
     title: "AI Candidate Discovery",
     label: "AI-sourced candidates, ranked for recruiter action",
@@ -46,12 +56,10 @@ const pillars = [
       "Pool scan + web discovery sourcing flow — your talent pool is searched first, then the web",
       "No Boolean skills needed — describe the role and let the AI work"
     ],
-    iconBg: "bg-warning/20",
-    iconColor: "text-warning"
+    accentColor: "var(--hr-yellow)",
+    accentBg: "rgba(245,158,11,0.15)"
   },
   {
-    id: "pillar-3",
-    icon: <MessageSquare className="w-8 h-8" />,
     layer: "Outreach",
     title: "WhatsApp + Email Engagement",
     label: "Reach candidates instantly via email and WhatsApp",
@@ -63,12 +71,10 @@ const pillars = [
       "90%+ WhatsApp read rates vs 15-20% email open rates in India and APAC (industry benchmark)",
       "Every message logged for compliance"
     ],
-    iconBg: "bg-green-500/20",
-    iconColor: "text-green-400"
+    accentColor: "var(--hr-green)",
+    accentBg: "rgba(16,185,129,0.15)"
   },
   {
-    id: "pillar-4",
-    icon: <Users className="w-8 h-8" />,
     layer: "Operations",
     title: "Client Feedback Portal",
     label: "Share shortlists with clients. Get feedback without the back-and-forth.",
@@ -80,12 +86,10 @@ const pillars = [
       "Multi-client view — see all feedback across all clients and jobs in one place",
       "No email chains. No chasing. Act on structured feedback."
     ],
-    iconBg: "bg-blue-500/20",
-    iconColor: "text-blue-400"
+    accentColor: "var(--hr-cyan)",
+    accentBg: "rgba(6,182,212,0.15)"
   },
   {
-    id: "pillar-5",
-    icon: <LayoutDashboard className="w-8 h-8" />,
     layer: "Operations",
     title: "Recruiter Productivity Dashboard",
     label: "One recruiter. Many open roles. Zero chaos.",
@@ -97,12 +101,10 @@ const pillars = [
       "Analytics: pipeline velocity, conversion rates, time-in-stage, source performance",
       "Day-1 productive — no training needed"
     ],
-    iconBg: "bg-purple-500/20",
-    iconColor: "text-purple-400"
+    accentColor: "var(--hr-purple)",
+    accentBg: "rgba(139,92,246,0.15)"
   },
   {
-    id: "pillar-6",
-    icon: <Target className="w-8 h-8" />,
     layer: "Operations",
     title: "Job Command Center",
     label: "Post, source, and screen — one command center per job",
@@ -114,18 +116,14 @@ const pillars = [
       "From \"I have a JD\" to \"I'm messaging the top 5 leads\" without ever leaving VantaHire",
       "Replaces 4-6 separate tools"
     ],
-    iconBg: "bg-gradient-to-br from-purple-500/15 to-amber-500/15",
-    iconColor: "text-primary"
+    accentColor: "var(--hr-accent-hover)",
+    accentBg: "rgba(124,58,237,0.15)"
   }
 ];
 
 export default function FeaturesPage() {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => { setIsVisible(true); }, []);
-
   return (
-    <Layout>
+    <>
       <Helmet>
         <title>Features | VantaHire - Six Pillars of AI-Native Recruiting</title>
         <meta name="description" content="Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center. All the capabilities recruiters need." />
@@ -140,132 +138,111 @@ export default function FeaturesPage() {
         <meta name="twitter:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center." />
         <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
         <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "BreadcrumbList",
-            "itemListElement": [
-              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" },
-              { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://vantahire.com/features" }
-            ]
-          })}
+          {breadcrumbJsonLd}
         </script>
       </Helmet>
 
-      <div className="public-theme min-h-screen bg-background text-foreground">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
+      <div className="homepage-redesign public-theme min-h-screen">
+        <GridOverlay />
+        <div className="relative z-10">
+          <HomepageNav />
 
-        <div className={`container mx-auto px-4 py-16 relative z-10 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Hero Section */}
-          <div className="text-center mb-20 pt-8">
-            <div className="w-20 h-1.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] rounded-full mx-auto mb-6"></div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              <span className="text-white">Six Pillars of</span>
-              <br />
-              <span className="gradient-text-purple">AI-Native Recruiting</span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Three layers. Six capabilities. Every recruiter action covered.
-            </p>
+          <div className="hr-feat-hero">
+            <div className="hr-section-label">Platform Capabilities</div>
+            <h1 className="hr-section-title">Six Pillars of<br />AI-Native Recruiting</h1>
+            <p className="hr-section-desc">Three layers. Six capabilities. Every recruiter action covered — from sourcing to placement.</p>
           </div>
 
-          {/* Pillars */}
-          <div className="space-y-16 mb-20">
-            {pillars.map((pillar, index) => (
-              <div key={index} id={pillar.id} className="max-w-4xl mx-auto scroll-mt-24">
-                {/* Layer badge */}
-                <div className="mb-4">
-                  <span className="text-xs font-medium uppercase tracking-wider text-white/40">
-                    {pillar.layer} Layer
-                  </span>
-                </div>
+          <div className="hr-struct-section">
+            <div className="struct-gutter"></div>
+            <div className="struct-body struct-body--divider"></div>
+            <div className="struct-gutter"></div>
+          </div>
 
-                <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-8 md:p-10 rounded-2xl border border-white/5 hover:border-primary/20 transition-all duration-300">
-                  <div className="flex items-start gap-6">
-                    <div className={`w-16 h-16 rounded-xl ${pillar.iconBg} flex items-center justify-center flex-shrink-0`}>
-                      <span className={pillar.iconColor}>{pillar.icon}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                        {pillar.title}
-                      </h2>
-                      <p className="text-primary text-sm font-medium mb-4">
-                        {pillar.label}
+          <div className="hr-struct-section">
+            <div className="struct-gutter"></div>
+            <div className="struct-body">
+              <div className="hr-pillars">
+                {pillars.map((pillar, index) => (
+                  <div
+                    key={index}
+                    className={`hr-pillar${index % 2 !== 0 ? ' reverse' : ''}`}
+                  >
+                    <div className="hr-pillar-text">
+                      <div className="hr-pillar-layer">
+                        Layer {String(index + 1).padStart(2, '0')} — {pillar.layer}
+                      </div>
+                      <h2>{pillar.title}</h2>
+                      <div className="hr-pillar-label">{pillar.label}</div>
+                      <p className="hr-pillar-outcome">
+                        <span className="hr-pillar-outcome-label">Outcome: </span>
+                        {pillar.outcome}
                       </p>
                     </div>
-                  </div>
 
-                  {/* Features */}
-                  <div className="mt-6 space-y-3">
-                    {pillar.features.map((feature, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        <span className="text-white/70">{feature}</span>
+                    <div className="hr-pillar-detail">
+                      <div className="hr-mock-bar">
+                        <div className="dots"><span></span><span></span><span></span></div>
+                        <span className="bar-title">{pillar.title}</span>
                       </div>
-                    ))}
+                      <div className="hr-pillar-detail-body">
+                        <div className="hr-pillar-features">
+                          {pillar.features.map((feat, i) => (
+                            <div key={i} className="hr-pillar-feat-item">
+                              <span
+                                className="hr-pillar-feat-check"
+                                style={{ background: pillar.accentBg, color: pillar.accentColor }}
+                              >
+                                ✓
+                              </span>
+                              <span>{feat}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-
-                  {/* Outcome */}
-                  <div className="mt-6 pt-6 border-t border-white/5">
-                    <p className="text-white/50 text-sm">
-                      <span className="text-white/70 font-medium">Outcome:</span>{" "}
-                      {pillar.outcome}
-                    </p>
-                  </div>
-
-                  {/* Link to product for context */}
-                  <div className="mt-4">
-                    <a
-                      href="/product"
-                      className="text-primary/60 text-sm hover:text-primary transition-colors inline-flex items-center gap-1"
-                      onClick={(e) => { e.preventDefault(); window.location.href = '/product'; }}
-                    >
-                      See platform context <ArrowRight className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
+                ))}
               </div>
-            ))}
+            </div>
+            <div className="struct-gutter"></div>
           </div>
 
-          {/* CTA Section */}
-          <div className="text-center py-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-              Try AI Sourcing
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Start free and explore every capability VantaHire offers.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                variant="gold"
-                size="lg"
-                onClick={() => {
-                  trackEvent("cta_click", { location: "features", action: "start_free" });
-                  window.location.href = '/recruiter-auth';
-                }}
-                className="rounded-full px-8 py-6 text-lg font-semibold"
-              >
-                Start Free
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-              <Button
-                variant="outlinePurple"
-                size="lg"
-                onClick={() => {
-                  trackEvent("cta_click", { location: "features", action: "book_demo" });
-                  window.open('https://cal.com/vantahire/quick-connect', '_blank');
-                }}
-                className="rounded-full px-8 py-6 text-lg"
-              >
-                Book Demo
-              </Button>
+          <div className="hr-struct-section">
+            <div className="struct-gutter"></div>
+            <div className="struct-body">
+              <section className="hr-feat-cta hr-cta-section">
+                <div className="hr-section-label">Get Started Today</div>
+                <h2 className="hr-section-title">Try AI Sourcing</h2>
+                <p className="hr-section-desc">
+                  Start free and explore every capability VantaHire offers.
+                </p>
+                <div className="hr-cta-btns">
+                  <a
+                    href="/recruiter-auth"
+                    className="hr-btn-demo"
+                    onClick={() => trackEvent("cta_click", { location: "features", action: "start_free" })}
+                  >
+                    Start Free →
+                  </a>
+                  <button
+                    className="hr-btn-pricing"
+                    onClick={() => {
+                      trackEvent("cta_click", { location: "features", action: "book_demo" });
+                      window.open('https://cal.com/vantahire/quick-connect', '_blank');
+                    }}
+                  >
+                    Book a Demo
+                  </button>
+                </div>
+              </section>
             </div>
+            <div className="struct-gutter"></div>
           </div>
+
+          <HomepageFooter />
         </div>
       </div>
-    </Layout>
+    </>
   );
 }
