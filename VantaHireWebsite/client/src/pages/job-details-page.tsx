@@ -418,6 +418,31 @@ export default function JobDetailsPage() {
                     </div>
                   </section>
 
+                  {/* Education & Experience */}
+                  {(job.educationRequirement || job.experienceYears) && (
+                    <section className="hr-jd-card">
+                      <div className="hr-jd-card-header">
+                        <GraduationCap /> Requirements
+                      </div>
+                      <div className="hr-jd-card-body">
+                        <div className="hr-jd-requirements">
+                          {job.educationRequirement && (
+                            <div className="hr-jd-req-item">
+                              <span className="hr-jd-req-label">Education</span>
+                              <span className="hr-jd-req-value">{job.educationRequirement}</span>
+                            </div>
+                          )}
+                          {job.experienceYears && (
+                            <div className="hr-jd-req-item">
+                              <span className="hr-jd-req-label">Experience</span>
+                              <span className="hr-jd-req-value">{job.experienceYears}+ years</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                  )}
+
                   {/* Required Skills */}
                   {job.skills && job.skills.length > 0 && (
                     <section className="hr-jd-card">
@@ -468,31 +493,6 @@ export default function JobDetailsPage() {
                           <span className="hr-jd-salary-period">
                             {job.salaryPeriod === 'per_month' ? '/month' : '/year'}
                           </span>
-                        </div>
-                      </div>
-                    </section>
-                  )}
-
-                  {/* Education & Experience */}
-                  {(job.educationRequirement || job.experienceYears) && (
-                    <section className="hr-jd-card">
-                      <div className="hr-jd-card-header">
-                        <GraduationCap /> Requirements
-                      </div>
-                      <div className="hr-jd-card-body">
-                        <div className="hr-jd-requirements">
-                          {job.educationRequirement && (
-                            <div className="hr-jd-req-item">
-                              <span className="hr-jd-req-label">Education</span>
-                              <span className="hr-jd-req-value">{job.educationRequirement}</span>
-                            </div>
-                          )}
-                          {job.experienceYears && (
-                            <div className="hr-jd-req-item">
-                              <span className="hr-jd-req-label">Experience</span>
-                              <span className="hr-jd-req-value">{job.experienceYears}+ years</span>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </section>

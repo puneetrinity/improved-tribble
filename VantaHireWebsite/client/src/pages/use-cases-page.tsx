@@ -54,7 +54,7 @@ const useCases = [
   },
   {
     icon: <Briefcase size={20} />,
-    title: "HR Teams",
+    title: "Talent Teams",
     subtitle: "Replace spreadsheets with smart automation",
     description: "Stop tracking candidates in Excel. VantaHire gives you a proper system with automation, templates, and analytics—without the enterprise price tag.",
     features: [
@@ -98,7 +98,7 @@ export default function UseCasesPage() {
     <>
       <Helmet>
         <title>Use Cases | VantaHire - Built for Teams Like Yours</title>
-        <meta name="description" content="See how startups, agencies, enterprises, and HR teams use VantaHire to hire faster. Industry solutions for IT, Telecom, Fintech, Healthcare, and Automotive." />
+        <meta name="description" content="See how startups, agencies, enterprises, and talent teams use VantaHire to hire faster. Industry solutions for IT, Telecom, Fintech, Healthcare, and Automotive." />
         <link rel="canonical" href="https://vantahire.com/use-cases" />
         <meta property="og:title" content="Use Cases | VantaHire - Built for Teams Like Yours" />
         <meta property="og:description" content="From startups to enterprises, see how teams use VantaHire to transform their hiring." />
