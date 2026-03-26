@@ -11,7 +11,7 @@ const HomepageFooter = () => {
             <div>
               <div className="hr-footer-brand">
                 <img src={vantahireLogo} alt="VantaHire" width={24} height={24} style={{ height: '24px', width: 'auto' }} />
-                VantaHire
+                <span className="gradient-text-mixed">VantaHire</span>
               </div>
               <p className="hr-footer-tagline">AI-powered recruitment infrastructure for modern agencies. Source, engage, and place candidates faster.</p>
             </div>

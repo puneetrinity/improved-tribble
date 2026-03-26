@@ -26,9 +26,18 @@
   align-items: center;
   gap: 10px;
   font-weight: 700;
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   color: var(--hr-text);
   text-decoration: none;
+}
+
+.hr-nav-brand .gradient-text-mixed,
+.hr-footer-brand .gradient-text-mixed {
+  font-family: 'Outfit', sans-serif;
+  background: linear-gradient(135deg, var(--purple-400, #a78bfa), var(--gold-400, #fbbf24));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .hr-nav-center {

@@ -13,7 +13,7 @@ const HomepageNav = () => {
     <nav className="hr-nav">
       <Link href="/" className="hr-nav-brand" style={{ textDecoration: 'none' }}>
         <img src={vantahireLogo} alt="VantaHire" width={28} height={28} style={{ height: '28px', width: 'auto' }} />
-        VantaHire
+        <span className="gradient-text-mixed">VantaHire</span>
       </Link>
 
       {/* Desktop center links */}
