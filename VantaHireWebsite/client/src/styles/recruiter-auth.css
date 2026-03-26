@@ -1,0 +1,476 @@
+/* =============================================================================
+   Recruiter Auth Page — full-height two-panel split layout
+   Uses shared tokens from tokens.css
+============================================================================= */
+
+/* Root split */
+.hr-rauth-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100vh;
+  background: var(--hr-bg);
+}
+
+/* ─── Left panel: brand ─── */
+.hr-rauth-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 140px 60px 80px;
+  background-color: var(--hr-bg-card);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-right: 1px solid var(--hr-border);
+  overflow: hidden;
+}
+
+/* Dark overlay so text remains readable */
+.hr-rauth-brand::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(12,12,16,0.92) 0%, rgba(12,12,16,0.45) 50%, rgba(12,12,16,0.25) 100%);
+  pointer-events: none;
+}
+
+.hr-rauth-brand-inner {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 400px;
+  animation: hrFadeUp 0.7s ease-out;
+}
+
+.hr-rauth-brand-title {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: clamp(1.8rem, 3vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--hr-text);
+  margin-bottom: 16px;
+}
+
+.hr-rauth-brand-desc {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  color: var(--hr-text-secondary);
+  margin-bottom: 48px;
+}
+
+/* ─── Right panel: auth form ─── */
+.hr-rauth-form-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 48px;
+  position: relative;
+}
+
+.hr-rauth-form-wrapper {
+  width: 100%;
+  max-width: 400px;
+  animation: hrFadeUp 0.7s ease-out 0.12s both;
+}
+
+/* Card header */
+.hr-rauth-card-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.hr-rauth-card-title {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  color: var(--hr-text);
+  margin-bottom: 8px;
+}
+
+.hr-rauth-card-desc {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.85rem;
+  color: var(--hr-text-muted);
+  line-height: 1.5;
+}
+
+/* Invite banner */
+.hr-rauth-invite-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: rgba(124,58,237,0.06);
+  border: 1px solid rgba(124,58,237,0.12);
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.hr-rauth-invite-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: rgba(124,58,237,0.12);
+  color: var(--hr-accent-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hr-rauth-invite-text {
+  font-size: 0.82rem;
+  color: var(--hr-text-secondary);
+  line-height: 1.4;
+}
+
+.hr-rauth-invite-text strong {
+  color: var(--hr-accent-hover);
+  font-weight: 500;
+}
+
+.hr-rauth-invite-text span {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--hr-text-muted);
+  margin-top: 2px;
+}
+
+/* Invite error */
+.hr-rauth-invite-error {
+  padding: 12px 18px;
+  background: rgba(239,68,68,0.06);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  color: var(--hr-red);
+  margin-bottom: 24px;
+}
+
+/* Tab switcher */
+.hr-rauth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--hr-bg-elevated);
+  border-radius: 4px;
+  border: 1px solid var(--hr-border);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+
+.hr-rauth-tab {
+  padding: 10px 0;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--hr-text-muted);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  transition: color 0.2s, background 0.2s;
+}
+
+.hr-rauth-tab:hover {
+  color: var(--hr-text-secondary);
+}
+
+.hr-rauth-tab.active {
+  background: var(--hr-accent);
+  color: white;
+}
+
+/* Form */
+.hr-rauth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hr-rauth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hr-rauth-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.hr-rauth-label {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--hr-text-secondary);
+  letter-spacing: 0.02em;
+}
+
+.hr-rauth-input {
+  background: var(--hr-bg-elevated);
+  border: 1px solid var(--hr-border);
+  border-radius: 4px;
+  padding: 10px 14px;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.88rem;
+  color: var(--hr-text);
+  transition: border-color 0.2s;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hr-rauth-input::placeholder {
+  color: var(--hr-text-muted);
+  opacity: 0.6;
+}
+
+.hr-rauth-input:focus {
+  border-color: var(--hr-accent);
+}
+
+.hr-rauth-input.readonly {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hr-rauth-input-hint {
+  font-size: 0.7rem;
+  color: var(--hr-text-muted);
+}
+
+/* Forgot password link */
+.hr-rauth-forgot-link {
+  text-align: right;
+  margin-top: -8px;
+}
+
+.hr-rauth-forgot-link button {
+  background: none;
+  border: none;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.78rem;
+  color: var(--hr-accent-hover);
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.hr-rauth-forgot-link button:hover {
+  color: var(--hr-text);
+}
+
+/* Submit button */
+.hr-rauth-submit {
+  background: var(--hr-accent);
+  color: white;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 0;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.hr-rauth-submit:hover { background: var(--hr-accent-hover); }
+.hr-rauth-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* Secondary / ghost button */
+.hr-rauth-btn-secondary {
+  background: transparent;
+  color: var(--hr-text);
+  border: 1px solid var(--hr-border-light);
+  padding: 10px 24px;
+  border-radius: 0;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.hr-rauth-btn-secondary:hover { border-color: rgba(255,255,255,0.25); }
+.hr-rauth-btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.hr-rauth-btn-ghost {
+  background: transparent;
+  color: var(--hr-text-muted);
+  border: none;
+  padding: 10px 24px;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 400;
+  cursor: pointer;
+  transition: color 0.2s;
+  width: 100%;
+}
+
+.hr-rauth-btn-ghost:hover { color: var(--hr-text); }
+
+.hr-rauth-btn-ghost.with-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Muted hint text */
+.hr-rauth-state-hint {
+  font-size: 0.82rem;
+  color: var(--hr-text-muted);
+  line-height: 1.6;
+}
+
+/* Footer legal line */
+.hr-rauth-legal {
+  margin-top: 32px;
+  text-align: center;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.72rem;
+  color: var(--hr-text-muted);
+}
+
+.hr-rauth-legal a {
+  color: var(--hr-accent-hover);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(167,139,250,0.3);
+  transition: color 0.2s;
+}
+
+.hr-rauth-legal a:hover {
+  color: var(--hr-text);
+  border-bottom-color: var(--hr-text);
+}
+
+/* Verification / success state */
+.hr-rauth-state-card {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.hr-rauth-state-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hr-rauth-state-icon.success {
+  background: rgba(16,185,129,0.12);
+  color: var(--hr-green);
+}
+
+.hr-rauth-state-icon.warning {
+  background: rgba(245,158,11,0.12);
+  color: var(--hr-yellow);
+}
+
+.hr-rauth-state-title {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--hr-text);
+}
+
+.hr-rauth-state-desc {
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 0.88rem;
+  color: var(--hr-text-secondary);
+  line-height: 1.6;
+  max-width: 320px;
+}
+
+.hr-rauth-state-email {
+  color: var(--hr-text);
+  font-weight: 500;
+}
+
+.hr-rauth-state-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  max-width: 280px;
+  margin-top: 8px;
+}
+
+/* Forgot password form */
+.hr-rauth-forgot-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hr-rauth-forgot-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.hr-rauth-forgot-header-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: rgba(124,58,237,0.1);
+  color: var(--hr-accent-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hr-rauth-forgot-title {
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--hr-text);
+}
+
+.hr-rauth-forgot-desc {
+  font-size: 0.82rem;
+  color: var(--hr-text-muted);
+  line-height: 1.5;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 900px) {
+  .hr-rauth-split {
+    grid-template-columns: 1fr;
+  }
+
+  .hr-rauth-brand {
+    display: none;
+  }
+
+  .hr-rauth-form-panel {
+    padding: 100px 24px 60px;
+    min-height: 100vh;
+  }
+}
+
+@media (max-width: 480px) {
+  .hr-rauth-field-row {
+    grid-template-columns: 1fr;
+  }
+
+  .hr-rauth-form-panel {
+    padding: 90px 20px 40px;
+  }
+}
