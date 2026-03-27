@@ -6,10 +6,6 @@ import Cta from "@/components/Cta";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import { Helmet } from "react-helmet-async";
-import "@/styles/tokens.css";
-import "@/styles/base.css";
-import "@/styles/components.css";
-import "@/styles/homepage.css";
 
 const Home = () => {
   return (
@@ -28,7 +24,7 @@ const Home = () => {
         <meta name="twitter:description" content="VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows." />
         <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
       </Helmet>
-      <div className="homepage-redesign public-theme min-h-screen">
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
         <GridOverlay />
         <div className="relative z-10">
           <HomepageNav />

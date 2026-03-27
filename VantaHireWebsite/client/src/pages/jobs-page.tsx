@@ -8,10 +8,6 @@ import { Job } from "@shared/schema";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
-import "@/styles/tokens.css";
-import "@/styles/base.css";
-import "@/styles/components.css";
-import "@/styles/jobs.css";
 import { useAIFeatures } from "@/hooks/use-ai-features";
 
 interface JobWithRecruiter extends Job {
@@ -29,6 +25,12 @@ interface JobsResponse {
     totalPages: number;
   };
 }
+
+const filterInputCls = "w-full bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded px-3 py-[9px] font-dm text-[0.85rem] text-hr-text outline-none transition-colors duration-200 placeholder:text-hr-text-muted focus:border-hr-accent";
+const filterSelectCls = "w-full bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded px-3 py-[9px] font-dm text-[0.85rem] text-hr-text outline-none transition-colors duration-200 cursor-pointer appearance-none focus:border-hr-accent";
+const filterLabelCls = "flex items-center gap-1.5 font-mono text-[0.65rem] font-medium tracking-[0.1em] uppercase text-hr-text-muted mb-2";
+const metaItemCls = "flex items-center gap-[5px] text-[0.82rem] text-hr-text-muted [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0";
+const pageBtnCls = "py-2 px-3.5 rounded-none font-dm text-[0.82rem] font-medium cursor-pointer transition-all duration-200 border border-[rgba(255,255,255,0.08)] bg-transparent text-hr-text-secondary hover:enabled:border-[rgba(255,255,255,0.12)] hover:enabled:text-hr-text disabled:opacity-40 disabled:cursor-not-allowed";
 
 export default function JobsPage() {
   const searchParams = new URLSearchParams(useSearch());
@@ -173,12 +175,12 @@ export default function JobsPage() {
   // Filter panel content (shared between desktop & mobile)
   const filterPanel = (
     <>
-      <div className="hr-filter-group">
-        <label><Search size={12} /> Keyword</label>
-        <div className="hr-filter-input-icon">
-          <Search />
+      <div className="mb-5">
+        <label className={filterLabelCls}><Search size={12} /> Keyword</label>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-hr-text-muted pointer-events-none" />
           <input
-            className="hr-filter-input"
+            className={`${filterInputCls} pl-8`}
             placeholder="Job title, keywords..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -187,12 +189,12 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <div className="hr-filter-group">
-        <label><MapPin size={12} /> Location</label>
-        <div className="hr-filter-input-icon">
-          <MapPin />
+      <div className="mb-5">
+        <label className={filterLabelCls}><MapPin size={12} /> Location</label>
+        <div className="relative">
+          <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-hr-text-muted pointer-events-none" />
           <input
-            className="hr-filter-input"
+            className={`${filterInputCls} pl-8`}
             placeholder="City, state..."
             value={location}
             onChange={(e) => setLocationFilter(e.target.value)}
@@ -201,11 +203,16 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <div className="hr-filter-divider" />
+      <div className="h-px bg-[rgba(255,255,255,0.08)] my-5" />
 
-      <div className="hr-filter-group">
-        <label><Briefcase size={12} /> Job Type</label>
-        <select className="hr-filter-select" value={type} onChange={(e) => setType(e.target.value)}>
+      <div className="mb-5">
+        <label className={filterLabelCls}><Briefcase size={12} /> Job Type</label>
+        <select
+          className={filterSelectCls}
+          value={type}
+          onChange={(e) => setType(e.target.value)}
+          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'10\' height=\'6\' viewBox=\'0 0 10 6\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M1 1L5 5L9 1\' stroke=\'%238A8A9A\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+        >
           <option value="all">All Types</option>
           <option value="full-time">Full-time</option>
           <option value="part-time">Part-time</option>
@@ -215,20 +222,20 @@ export default function JobsPage() {
         </select>
       </div>
 
-      <div className="hr-filter-group">
-        <label><IndianRupee size={12} /> Salary Range</label>
-        <div className="hr-filter-salary-row">
+      <div className="mb-5">
+        <label className={filterLabelCls}><IndianRupee size={12} /> Salary Range</label>
+        <div className="flex gap-2 items-center">
           <input
-            className="hr-filter-input"
+            className={filterInputCls}
             placeholder="Min"
             type="number"
             value={minSalary}
             onChange={(e) => setMinSalary(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
           />
-          <span>–</span>
+          <span className="text-hr-text-muted text-[0.8rem]">–</span>
           <input
-            className="hr-filter-input"
+            className={filterInputCls}
             placeholder="Max"
             type="number"
             value={maxSalary}
@@ -237,21 +244,31 @@ export default function JobsPage() {
           />
         </div>
         <select
-          className="hr-filter-select"
+          className={`${filterSelectCls} mt-2`}
           value={salaryPeriod}
           onChange={(e) => setSalaryPeriod(e.target.value)}
-          style={{ marginTop: '8px' }}
+          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'10\' height=\'6\' viewBox=\'0 0 10 6\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M1 1L5 5L9 1\' stroke=\'%238A8A9A\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
         >
           <option value="per_year">Per Year</option>
           <option value="per_month">Per Month</option>
         </select>
       </div>
 
-      <div className="hr-filter-divider" />
+      <div className="h-px bg-[rgba(255,255,255,0.08)] my-5" />
 
-      <div className="hr-filter-actions">
-        <button className="hr-btn-filter-apply" onClick={handleApplyFilters}>Apply Filters</button>
-        <button className="hr-btn-filter-reset" onClick={handleResetFilters}>Reset</button>
+      <div className="flex flex-col gap-2">
+        <button
+          className="bg-hr-accent text-white border-none py-2.5 px-5 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-colors duration-200 w-full hover:bg-hr-accent-hover"
+          onClick={handleApplyFilters}
+        >
+          Apply Filters
+        </button>
+        <button
+          className="bg-transparent text-hr-text-secondary border border-[rgba(255,255,255,0.08)] py-2.5 px-5 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-all duration-200 w-full hover:border-[rgba(255,255,255,0.12)] hover:text-hr-text"
+          onClick={handleResetFilters}
+        >
+          Reset
+        </button>
       </div>
     </>
   );
@@ -275,36 +292,38 @@ export default function JobsPage() {
         <meta name="twitter:image" content={`${metaData.baseUrl}/twitter-image.jpg`} />
       </Helmet>
 
-      <div className="homepage-redesign">
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
         <GridOverlay />
-        <div style={{ position: 'relative', zIndex: 10 }}>
+        <div className="relative z-10">
           <HomepageNav />
 
-          <div className="hr-jobs-page">
+          <div className="pt-[60px] min-h-screen">
             {/* Header */}
-            <div className="hr-struct-section">
-              <div className="struct-gutter"></div>
-              <div className="struct-body" style={{ borderBottom: 'none' }}>
-                <div className="hr-jobs-header">
-                  <div className="hr-section-label">Open Positions</div>
-                  <h1 className="hr-section-title">Find Your Next<br />Opportunity</h1>
-                  <p className="hr-section-desc">
+            <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+              <div></div>
+              <div>
+                <div className="text-center pt-20 px-12 pb-[60px] animate-hr-fade-up max-md:pt-[60px] max-md:px-5 max-md:pb-10">
+                  <div className="font-mono text-[0.68rem] font-medium text-hr-accent-hover tracking-[0.12em] uppercase mb-[18px]">Open Positions</div>
+                  <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text max-w-[600px] mx-auto">Find Your Next<br />Opportunity</h1>
+                  <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto text-center">
                     Discover roles with leading companies across India, powered by intelligent matching.
                   </p>
                 </div>
               </div>
-              <div className="struct-gutter"></div>
+              <div></div>
             </div>
 
             {/* Main content */}
-            <div className="hr-struct-section">
-              <div className="struct-gutter"></div>
-              <div className="struct-body">
-                <div className="hr-jobs-layout" style={{ padding: '0 0 80px' }}>
+            <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+              <div></div>
+              <div>
+                <div className="max-w-[1100px] mx-auto pb-20 grid grid-cols-[260px_1fr] gap-8 max-lg:grid-cols-1 max-lg:pb-[60px] max-md:pb-[60px]">
                   {/* Desktop sidebar */}
-                  <aside className="hr-jobs-sidebar">
-                    <div className="hr-filter-panel">
-                      <h3><SlidersHorizontal size={16} /> Filters</h3>
+                  <aside className="sticky top-20 self-start max-lg:hidden">
+                    <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg p-6">
+                      <h3 className="font-satoshi text-base font-medium text-hr-text mb-5 flex items-center gap-2">
+                        <SlidersHorizontal size={16} /> Filters
+                      </h3>
                       {filterPanel}
                     </div>
                   </aside>
@@ -312,30 +331,35 @@ export default function JobsPage() {
                   {/* Results area */}
                   <main>
                     {/* Toolbar */}
-                    <div className="hr-jobs-toolbar">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div className="flex items-center justify-between mb-5 gap-4 max-md:flex-col max-md:items-start">
+                      <div className="flex items-center gap-2.5">
                         {/* Mobile filter trigger */}
                         <button
-                          className="hr-mobile-filter-btn"
+                          className="hidden max-lg:flex items-center gap-1.5 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2 px-4 font-dm text-[0.82rem] text-hr-text cursor-pointer transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)] [&>svg]:w-4 [&>svg]:h-4"
                           onClick={() => setMobileFilterOpen(true)}
                         >
                           <SlidersHorizontal />
                           Filters
                           {activeFilterCount > 0 && (
-                            <span className="hr-mobile-filter-count">{activeFilterCount}</span>
+                            <span className="bg-hr-accent text-white text-[0.6rem] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center">{activeFilterCount}</span>
                           )}
                         </button>
 
                         {data && (
-                          <span className="hr-jobs-count">
-                            <strong>{data.pagination.total}</strong> {data.pagination.total === 1 ? 'job' : 'jobs'} found
+                          <span className="text-[0.85rem] text-hr-text-secondary">
+                            <strong className="text-hr-text font-semibold">{data.pagination.total}</strong> {data.pagination.total === 1 ? 'job' : 'jobs'} found
                           </span>
                         )}
                       </div>
 
-                      <div className="hr-jobs-sort">
-                        <span>Sort</span>
-                        <select className="hr-sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[0.75rem] text-hr-text-muted font-mono uppercase tracking-[0.06em]">Sort</span>
+                        <select
+                          className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded px-2.5 py-1.5 pr-7 font-dm text-[0.82rem] text-hr-text outline-none cursor-pointer appearance-none"
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'10\' height=\'6\' viewBox=\'0 0 10 6\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M1 1L5 5L9 1\' stroke=\'%238A8A9A\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+                        >
                           <option value="recent">Most Recent</option>
                           <option value="deadline">Deadline: Soonest</option>
                           {aiEnabled && <option value="relevant">AI Relevance</option>}
@@ -345,40 +369,39 @@ export default function JobsPage() {
 
                     {/* Active filter chips */}
                     {activeFilterCount > 0 && (
-                      <div className="hr-filter-chips">
+                      <div className="flex flex-wrap gap-2 mb-4">
                         {search && (
-                          <span className="hr-filter-chip">
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
                             Search: {search}
-                            <button onClick={() => setSearch("")}><X size={12} /></button>
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setSearch("")}><X size={12} /></button>
                           </span>
                         )}
                         {location && (
-                          <span className="hr-filter-chip">
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
                             Location: {location}
-                            <button onClick={() => setLocationFilter("")}><X size={12} /></button>
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setLocationFilter("")}><X size={12} /></button>
                           </span>
                         )}
                         {type && type !== "all" && (
-                          <span className="hr-filter-chip">
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
                             {type.replace('-', ' ')}
-                            <button onClick={() => setType("all")}><X size={12} /></button>
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setType("all")}><X size={12} /></button>
                           </span>
                         )}
                         {minSalary && (
-                          <span className="hr-filter-chip">
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
                             Min: ₹{Number(minSalary).toLocaleString()}
-                            <button onClick={() => setMinSalary("")}><X size={12} /></button>
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setMinSalary("")}><X size={12} /></button>
                           </span>
                         )}
                         {maxSalary && (
-                          <span className="hr-filter-chip">
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
                             Max: ₹{Number(maxSalary).toLocaleString()}
-                            <button onClick={() => setMaxSalary("")}><X size={12} /></button>
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setMaxSalary("")}><X size={12} /></button>
                           </span>
                         )}
                         <button
-                          className="hr-btn-filter-reset"
-                          style={{ padding: '4px 12px', fontSize: '0.72rem' }}
+                          className="bg-transparent text-hr-text-secondary border border-[rgba(255,255,255,0.08)] py-1 px-3 rounded-none font-dm text-[0.72rem] font-medium cursor-pointer transition-all duration-200 hover:border-[rgba(255,255,255,0.12)] hover:text-hr-text"
                           onClick={handleResetFilters}
                         >
                           Clear all
@@ -388,53 +411,53 @@ export default function JobsPage() {
 
                     {/* Results */}
                     {isLoading ? (
-                      <div className="hr-jobs-loading">
-                        <div className="hr-jobs-spinner" />
-                        <p>Loading jobs...</p>
+                      <div className="text-center py-20 px-6">
+                        <div className="w-9 h-9 border-2 border-[rgba(255,255,255,0.08)] border-t-hr-accent rounded-full animate-hr-spin mx-auto mb-4" />
+                        <p className="text-[0.85rem] text-hr-text-muted">Loading jobs...</p>
                       </div>
                     ) : error ? (
-                      <div className="hr-jobs-empty">
-                        <p style={{ color: 'var(--hr-red)' }}>Error loading jobs. Please try again.</p>
+                      <div className="text-center py-20 px-6">
+                        <p className="text-[0.9rem] text-hr-red">Error loading jobs. Please try again.</p>
                       </div>
                     ) : data?.jobs.length === 0 ? (
-                      <div className="hr-jobs-empty">
+                      <div className="text-center py-20 px-6 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-hr-text-muted [&>svg]:mb-4 [&>svg]:mx-auto">
                         <Briefcase />
-                        <h3>No jobs found</h3>
-                        <p>Try adjusting your search criteria</p>
+                        <h3 className="font-satoshi text-[1.2rem] font-medium text-hr-text mb-2">No jobs found</h3>
+                        <p className="text-[0.9rem] text-hr-text-secondary">Try adjusting your search criteria</p>
                       </div>
                     ) : (
                       <>
-                        <div className="hr-job-cards">
+                        <div className="flex flex-col gap-3">
                           {sortedJobs.map((job, i) => {
                             const salaryDisplay = formatSalary(job.salaryMin, job.salaryMax, job.salaryPeriod);
                             return (
                               <div
                                 key={job.id}
-                                className="hr-job-card"
+                                className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg py-5 px-6 transition-all duration-200 hover:border-[rgba(255,255,255,0.12)] hover:bg-hr-bg-elevated max-md:p-4"
                                 data-testid="job-card"
-                                style={{ animationDelay: `${i * 0.05}s` }}
+                                style={{ animation: 'hr-fade-up 0.5s ease-out both', animationDelay: `${i * 0.05}s` }}
                                 onMouseEnter={() => handleJobCardHover(job.id)}
                               >
-                                <div className="hr-job-card-top">
+                                <div className="flex justify-between items-start gap-4 mb-3 max-md:flex-col max-md:gap-2">
                                   <div>
-                                    <div className="hr-job-title">
-                                      <Link href={`/jobs/${job.slug || job.id}`}>{job.title}</Link>
+                                    <div className="font-satoshi text-[1.1rem] font-medium text-hr-text mb-2">
+                                      <Link href={`/jobs/${job.slug || job.id}`} className="text-inherit no-underline transition-colors duration-200 hover:text-hr-accent-hover">{job.title}</Link>
                                     </div>
-                                    <div className="hr-job-meta">
-                                      <span className="hr-job-meta-item">
+                                    <div className="flex flex-wrap gap-4 items-center max-md:gap-2.5">
+                                      <span className={metaItemCls}>
                                         <MapPin /> {job.location}
                                       </span>
                                       {salaryDisplay && (
-                                        <span className="hr-job-meta-item">{salaryDisplay}</span>
+                                        <span className={metaItemCls}>{salaryDisplay}</span>
                                       )}
-                                      <span className="hr-job-meta-item">
+                                      <span className={metaItemCls}>
                                         <Clock /> Posted {formatDate(job.createdAt)}
                                       </span>
                                       {job.postedByName && (
-                                        <span className="hr-job-meta-item">
+                                        <span className={metaItemCls}>
                                           <User />
                                           {job.postedById && job.isRecruiterProfilePublic ? (
-                                            <a href={`/recruiters/${job.postedById}`}>{job.postedByName}</a>
+                                            <a href={`/recruiters/${job.postedById}`} className="text-hr-accent-hover no-underline transition-colors duration-200 hover:underline">{job.postedByName}</a>
                                           ) : (
                                             job.postedByName
                                           )}
@@ -442,22 +465,25 @@ export default function JobsPage() {
                                       )}
                                     </div>
                                   </div>
-                                  <span className="hr-job-type-badge">
+                                  <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.06em] uppercase bg-[rgba(124,58,237,0.12)] text-hr-accent-hover whitespace-nowrap shrink-0">
                                     {job.type.replace('-', ' ')}
                                   </span>
                                 </div>
 
-                                <p className="hr-job-desc">
+                                <p className="text-[0.9rem] text-hr-text-secondary leading-[1.6] mb-4 line-clamp-2">
                                   {job.description.substring(0, 200)}...
                                 </p>
 
-                                <div className="hr-job-card-bottom">
+                                <div className="flex justify-between items-center max-md:flex-col max-md:items-start max-md:gap-3">
                                   {job.deadline ? (
-                                    <span className="hr-job-deadline">
+                                    <span className="text-[0.78rem] text-hr-text-muted">
                                       Deadline: {formatDate(job.deadline)}
                                     </span>
                                   ) : <span />}
-                                  <Link href={`/jobs/${job.slug || job.id}`} className="hr-btn-view-job">
+                                  <Link
+                                    href={`/jobs/${job.slug || job.id}`}
+                                    className="bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-[0.82rem] font-medium cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center"
+                                  >
                                     View Details
                                   </Link>
                                 </div>
@@ -468,9 +494,9 @@ export default function JobsPage() {
 
                         {/* Pagination */}
                         {data && data.pagination.totalPages > 1 && (
-                          <div className="hr-pagination">
+                          <div className="flex items-center justify-center gap-1.5 mt-8">
                             <button
-                              className="hr-page-btn"
+                              className={pageBtnCls}
                               onClick={() => setPage(page - 1)}
                               disabled={page === 1}
                             >
@@ -481,7 +507,7 @@ export default function JobsPage() {
                               return (
                                 <button
                                   key={pageNum}
-                                  className={`hr-page-btn ${page === pageNum ? 'active' : ''}`}
+                                  className={`${pageBtnCls} ${page === pageNum ? '!bg-hr-accent !border-hr-accent !text-white' : ''}`}
                                   onClick={() => setPage(pageNum)}
                                 >
                                   {pageNum}
@@ -489,7 +515,7 @@ export default function JobsPage() {
                               );
                             })}
                             <button
-                              className="hr-page-btn"
+                              className={pageBtnCls}
                               onClick={() => setPage(page + 1)}
                               disabled={page === data.pagination.totalPages}
                             >
@@ -502,7 +528,7 @@ export default function JobsPage() {
                   </main>
                 </div>
               </div>
-              <div className="struct-gutter"></div>
+              <div></div>
             </div>
           </div>
 
@@ -511,11 +537,17 @@ export default function JobsPage() {
 
         {/* Mobile filter drawer */}
         {mobileFilterOpen && (
-          <div className="hr-mobile-filter-overlay open" onClick={() => setMobileFilterOpen(false)}>
-            <div className="hr-mobile-filter-drawer" onClick={(e) => e.stopPropagation()}>
-              <div className="hr-mobile-filter-header">
-                <h3>Filter Jobs</h3>
-                <button className="hr-mobile-filter-close" onClick={() => setMobileFilterOpen(false)}>
+          <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-[4px]" onClick={() => setMobileFilterOpen(false)}>
+            <div
+              className="fixed top-0 left-0 bottom-0 w-[300px] max-w-[85vw] bg-hr-bg border-r border-[rgba(255,255,255,0.08)] z-[1101] overflow-y-auto p-6 animate-hr-slide-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-satoshi text-[1.1rem] font-medium text-hr-text">Filter Jobs</h3>
+                <button
+                  className="bg-transparent border-none text-hr-text-muted cursor-pointer p-1 hover:text-hr-text"
+                  onClick={() => setMobileFilterOpen(false)}
+                >
                   <X size={20} />
                 </button>
               </div>

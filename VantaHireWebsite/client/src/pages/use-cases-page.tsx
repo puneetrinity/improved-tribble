@@ -1,13 +1,10 @@
 import { Helmet } from "react-helmet-async";
 import { trackEvent } from "@/lib/analytics";
+import { btnPrimary, btnSecondary, sectionLabel } from "@/lib/shared-styles";
 import { Rocket, Building2, Users, Briefcase, Code, Wifi, CreditCard, HeartPulse, Car } from "lucide-react";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
-import "@/styles/tokens.css";
-import "@/styles/base.css";
-import "@/styles/components.css";
-import "@/styles/use-cases.css";
 
 const breadcrumbJsonLd = JSON.stringify({
   "@context": "https://schema.org",
@@ -93,6 +90,9 @@ const industries = [
   }
 ];
 
+const btnDemo = btnPrimary;
+const btnOutline = btnSecondary;
+
 export default function UseCasesPage() {
   return (
     <>
@@ -114,75 +114,81 @@ export default function UseCasesPage() {
         </script>
       </Helmet>
 
-      <div className="homepage-redesign public-theme min-h-screen">
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
         <GridOverlay />
         <div className="relative z-10">
           <HomepageNav />
 
           {/* Hero */}
-          <div className="hr-uc-hero">
-            <div className="hr-section-label">Solutions</div>
-            <h1 className="hr-section-title">Built for teams like yours.</h1>
-            <p className="hr-section-desc">
+          <div className="pt-[140px] px-12 pb-20 text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-[60px]">
+            <div className={sectionLabel}>Solutions</div>
+            <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] font-normal leading-[1.2] tracking-tight mb-5 text-hr-text">Built for teams like yours.</h1>
+            <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[560px] mx-auto">
               From startups to enterprises, see how teams use VantaHire
               to hire smarter and faster across India and APAC.
             </p>
           </div>
 
           {/* Use Case Cards */}
-          <div className="hr-uc-cards-section">
-          <div className="hr-uc-grid">
-            {useCases.map((useCase, index) => (
-              <div key={index} className="hr-uc-card">
-                <div className="hr-uc-card-icon">
-                  {useCase.icon}
+          <div className="px-12 max-md:px-5">
+            <div
+              className="grid grid-cols-2 max-md:grid-cols-1 gap-px bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.08)] rounded-lg overflow-hidden max-w-[1100px] mx-auto"
+              style={{ animation: 'hr-fade-up 0.8s ease-out 0.1s both' }}
+            >
+              {useCases.map((useCase, index) => (
+                <div key={index} className="bg-hr-bg py-9 px-8 max-md:py-7 max-md:px-6 flex flex-col transition-colors duration-200 hover:bg-hr-bg-elevated">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[rgba(124,58,237,0.1)] text-hr-accent-hover mb-5 shrink-0">
+                    {useCase.icon}
+                  </div>
+                  <h3 className="font-satoshi text-[1.35rem] font-medium text-hr-text tracking-[-0.01em] mb-1">{useCase.title}</h3>
+                  <p className="font-dm text-[0.82rem] text-hr-accent-hover mb-3.5 font-medium">{useCase.subtitle}</p>
+                  <p className="text-[0.92rem] leading-[1.7] text-hr-text-secondary mb-5">{useCase.description}</p>
+                  <ul className="list-none p-0 m-0 flex flex-col gap-1.5 mt-auto">
+                    {useCase.features.map((feature, featureIndex) => (
+                      <li key={featureIndex} className="flex items-center gap-2.5 text-[0.82rem] text-hr-text-muted before:content-[''] before:w-1 before:h-1 before:rounded-full before:bg-hr-accent before:opacity-60 before:shrink-0">{feature}</li>
+                    ))}
+                  </ul>
                 </div>
-                <h3 className="hr-uc-card-title">{useCase.title}</h3>
-                <p className="hr-uc-card-subtitle">{useCase.subtitle}</p>
-                <p className="hr-uc-card-desc">{useCase.description}</p>
-                <ul className="hr-uc-features">
-                  {useCase.features.map((feature, featureIndex) => (
-                    <li key={featureIndex}>{feature}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
           </div>
 
           {/* Industries Section */}
-          <div className="hr-uc-industries-section">
-            <div className="hr-uc-industries-header">
-              <div className="hr-section-label">Industries</div>
-              <h2 className="hr-section-title">Deep expertise where it matters.</h2>
-              <p className="hr-section-desc">
+          <div className="max-w-[1100px] mx-auto py-[100px] px-12 max-md:py-[60px] max-md:px-5">
+            <div className="text-center mb-[60px] animate-hr-fade-up">
+              <div className={sectionLabel}>Industries</div>
+              <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text">Deep expertise where it matters.</h2>
+              <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">
                 Specialized hiring workflows for the industries where great talent makes the biggest difference.
               </p>
             </div>
-            <div className="hr-uc-industries-grid">
+            <div
+              className="grid grid-cols-5 max-lg:grid-cols-3 max-md:grid-cols-2 max-sm:grid-cols-1 gap-px bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.08)] rounded-lg overflow-hidden"
+              style={{ animation: 'hr-fade-up 0.8s ease-out 0.1s both' }}
+            >
               {industries.map((industry, index) => (
-                <div key={index} className="hr-uc-industry-card">
-                  <div className="hr-uc-industry-icon">
+                <div key={index} className="bg-hr-bg py-7 px-5 flex flex-col items-center text-center transition-colors duration-200 hover:bg-hr-bg-elevated">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[rgba(124,58,237,0.1)] text-hr-accent-hover mb-3.5">
                     {industry.icon}
                   </div>
-                  <h3 className="hr-uc-industry-name">{industry.name}</h3>
-                  <p className="hr-uc-industry-desc">{industry.description}</p>
+                  <h3 className="font-satoshi text-[0.95rem] font-medium text-hr-text mb-2">{industry.name}</h3>
+                  <p className="text-[0.8rem] leading-[1.55] text-hr-text-muted">{industry.description}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {/* CTA Section */}
-          <div className="hr-uc-cta">
-            <div className="hr-section-label">Get Started</div>
-            <h2 className="hr-section-title">Ready to transform your hiring?</h2>
-            <p className="hr-section-desc">
+          <div className="text-center max-w-[1100px] mx-auto px-12 pb-[100px] animate-hr-fade-up max-md:px-5 max-md:pb-[60px]">
+            <div className={sectionLabel}>Get Started</div>
+            <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text max-w-[480px] mx-auto">Ready to transform your hiring?</h2>
+            <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto text-center mb-9">
               Join teams across industries who hire smarter with VantaHire.
             </p>
-            <div className="hr-uc-cta-buttons">
+            <div className="flex gap-3 justify-center max-md:flex-col max-md:items-center">
               <a
                 href="/recruiter-auth"
-                className="hr-btn hr-btn--primary hr-btn--xl"
+                className={btnDemo}
                 onClick={() => trackEvent("cta_click", { location: "use_cases", action: "start_free" })}
               >
                 Get Started Free
@@ -191,7 +197,7 @@ export default function UseCasesPage() {
                 href="https://cal.com/vantahire/quick-connect"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hr-btn hr-btn--secondary hr-btn--xl"
+                className={btnOutline}
                 onClick={() => trackEvent("cta_click", { location: "use_cases", action: "get_walkthrough" })}
               >
                 Talk to Sales

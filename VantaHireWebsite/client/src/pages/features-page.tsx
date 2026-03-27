@@ -1,13 +1,9 @@
 import { Helmet } from "react-helmet-async";
 import { trackEvent } from "@/lib/analytics";
+import { btnPrimary, btnSecondary, sectionLabel } from "@/lib/shared-styles";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
-import "@/styles/tokens.css";
-import "@/styles/base.css";
-import "@/styles/components.css";
-import "@/styles/homepage.css";
-import "@/styles/features.css";
 
 const breadcrumbJsonLd = JSON.stringify({
   "@context": "https://schema.org",
@@ -41,7 +37,7 @@ const pillars: Pillar[] = [
       "Past candidates become searchable and reusable for new roles, even across different job titles",
       "No manual tagging or categorization required"
     ],
-    accentColor: "var(--hr-accent-hover)",
+    accentColor: "#A78BFA",
     accentBg: "rgba(124,58,237,0.15)"
   },
   {
@@ -56,7 +52,7 @@ const pillars: Pillar[] = [
       "Pool scan + web discovery sourcing flow — your talent pool is searched first, then the web",
       "No Boolean skills needed — describe the role and let the AI work"
     ],
-    accentColor: "var(--hr-yellow)",
+    accentColor: "#F59E0B",
     accentBg: "rgba(245,158,11,0.15)"
   },
   {
@@ -71,7 +67,7 @@ const pillars: Pillar[] = [
       "90%+ WhatsApp read rates vs 15-20% email open rates in India and APAC (industry benchmark)",
       "Every message logged for compliance"
     ],
-    accentColor: "var(--hr-green)",
+    accentColor: "#10B981",
     accentBg: "rgba(16,185,129,0.15)"
   },
   {
@@ -86,7 +82,7 @@ const pillars: Pillar[] = [
       "Multi-client view — see all feedback across all clients and jobs in one place",
       "No email chains. No chasing. Act on structured feedback."
     ],
-    accentColor: "var(--hr-cyan)",
+    accentColor: "#06B6D4",
     accentBg: "rgba(6,182,212,0.15)"
   },
   {
@@ -101,7 +97,7 @@ const pillars: Pillar[] = [
       "Analytics: pipeline velocity, conversion rates, time-in-stage, source performance",
       "Day-1 productive — no training needed"
     ],
-    accentColor: "var(--hr-purple)",
+    accentColor: "#8B5CF6",
     accentBg: "rgba(139,92,246,0.15)"
   },
   {
@@ -116,10 +112,15 @@ const pillars: Pillar[] = [
       "From \"I have a JD\" to \"I'm messaging the top 5 leads\" without ever leaving VantaHire",
       "Replaces 4-6 separate tools"
     ],
-    accentColor: "var(--hr-accent-hover)",
+    accentColor: "#A78BFA",
     accentBg: "rgba(124,58,237,0.15)"
   }
 ];
+
+const featItem = "flex items-start gap-2.5 py-2.5 px-3 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px] text-[0.82rem] text-hr-text-secondary leading-[1.5]";
+const featCheck = "w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 mt-px text-[0.6rem] font-bold";
+const btnDemo = btnPrimary;
+const btnPricing = btnSecondary;
 
 export default function FeaturesPage() {
   return (
@@ -142,91 +143,100 @@ export default function FeaturesPage() {
         </script>
       </Helmet>
 
-      <div className="homepage-redesign public-theme min-h-screen">
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
         <GridOverlay />
         <div className="relative z-10">
           <HomepageNav />
 
-          <div className="hr-feat-hero">
-            <div className="hr-section-label">Platform Capabilities</div>
-            <h1 className="hr-section-title">Six Pillars of<br />AI-Native Recruiting</h1>
-            <p className="hr-section-desc">Three layers. Six capabilities. Every recruiter action covered — from sourcing to placement.</p>
+          {/* Hero */}
+          <div className="text-center pt-[140px] px-12 pb-20 max-w-[720px] mx-auto max-lg:pt-[120px] max-lg:px-6 max-lg:pb-[60px] max-md:pt-[100px] max-md:px-5 max-md:pb-12 max-sm:pt-[88px] max-sm:px-4 max-sm:pb-9">
+            <div className={`${sectionLabel} mb-[18px]`}>Platform Capabilities</div>
+            <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] max-md:text-[clamp(1.8rem,6vw,2.4rem)] max-sm:text-[1.7rem] font-normal leading-[1.15] tracking-tight mb-4 text-hr-text">Six Pillars of<br />AI-Native Recruiting</h1>
+            <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">Three layers. Six capabilities. Every recruiter action covered — from sourcing to placement.</p>
           </div>
 
-          <div className="hr-struct-section">
-            <div className="struct-gutter"></div>
-            <div className="struct-body struct-body--divider"></div>
-            <div className="struct-gutter"></div>
+          {/* Divider */}
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div className="border-b border-[rgba(255,255,255,0.08)]"></div>
+            <div></div>
           </div>
 
-          <div className="hr-struct-section">
-            <div className="struct-gutter"></div>
-            <div className="struct-body">
-              <div className="hr-pillars">
-                {pillars.map((pillar, index) => (
-                  <div
-                    key={index}
-                    className={`hr-pillar${index % 2 !== 0 ? ' reverse' : ''}`}
-                  >
-                    <div className="hr-pillar-text">
-                      <div className="hr-pillar-layer">
-                        Layer {String(index + 1).padStart(2, '0')} — {pillar.layer}
+          {/* Pillars */}
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div className="max-w-[1100px] mx-auto flex flex-col gap-12 px-12 pb-[100px] max-lg:px-6 max-lg:pb-20 max-md:px-5 max-md:pb-[60px] max-md:gap-9 max-sm:px-4 max-sm:pb-12 max-sm:gap-7">
+                {pillars.map((pillar, index) => {
+                  const isReverse = index % 2 !== 0;
+                  return (
+                    <div
+                      key={index}
+                      className={`grid ${isReverse ? 'grid-cols-[1.3fr_1fr]' : 'grid-cols-[1fr_1.3fr]'} gap-12 items-start max-lg:gap-8 max-md:grid-cols-1 max-md:gap-6`}
+                    >
+                      <div className={isReverse ? 'order-2 max-md:order-1' : ''}>
+                        <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">
+                          Layer {String(index + 1).padStart(2, '0')} — {pillar.layer}
+                        </div>
+                        <h2 className="font-satoshi text-[1.7rem] font-normal leading-[1.25] text-hr-text mb-2">{pillar.title}</h2>
+                        <div className="text-[0.88rem] text-hr-accent-hover mb-4 leading-[1.5]">{pillar.label}</div>
+                        <p className="text-[0.9rem] leading-[1.7] text-hr-text-secondary">
+                          <span className="text-hr-text font-medium">Outcome: </span>
+                          {pillar.outcome}
+                        </p>
                       </div>
-                      <h2>{pillar.title}</h2>
-                      <div className="hr-pillar-label">{pillar.label}</div>
-                      <p className="hr-pillar-outcome">
-                        <span className="hr-pillar-outcome-label">Outcome: </span>
-                        {pillar.outcome}
-                      </p>
-                    </div>
 
-                    <div className="hr-pillar-detail">
-                      <div className="hr-mock-bar">
-                        <div className="dots"><span></span><span></span><span></span></div>
-                        <span className="bar-title">{pillar.title}</span>
-                      </div>
-                      <div className="hr-pillar-detail-body">
-                        <div className="hr-pillar-features">
-                          {pillar.features.map((feat, i) => (
-                            <div key={i} className="hr-pillar-feat-item">
-                              <span
-                                className="hr-pillar-feat-check"
-                                style={{ background: pillar.accentBg, color: pillar.accentColor }}
-                              >
-                                ✓
-                              </span>
-                              <span>{feat}</span>
-                            </div>
-                          ))}
+                      <div className={`bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] overflow-hidden ${isReverse ? 'order-1 max-md:order-2' : ''}`}>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[rgba(255,255,255,0.08)]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[rgba(255,255,255,0.12)]"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-[rgba(255,255,255,0.12)]"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-[rgba(255,255,255,0.12)]"></span>
+                          <span className="flex-1 text-center font-mono text-[0.6rem] text-hr-text-muted">{pillar.title}</span>
+                        </div>
+                        <div className="p-5">
+                          <div className="flex flex-col gap-2.5">
+                            {pillar.features.map((feat, i) => (
+                              <div key={i} className={featItem}>
+                                <span
+                                  className={featCheck}
+                                  style={{ background: pillar.accentBg, color: pillar.accentColor }}
+                                >
+                                  ✓
+                                </span>
+                                <span>{feat}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
-            <div className="struct-gutter"></div>
+            <div></div>
           </div>
 
-          <div className="hr-struct-section">
-            <div className="struct-gutter"></div>
-            <div className="struct-body">
-              <section className="hr-feat-cta hr-cta-section">
-                <div className="hr-section-label">Get Started Today</div>
-                <h2 className="hr-section-title">Try AI Sourcing</h2>
-                <p className="hr-section-desc">
+          {/* CTA */}
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <section className="text-center py-20 px-12 max-md:py-[60px] max-md:px-5">
+                <div className={sectionLabel}>Get Started Today</div>
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text">Try AI Sourcing</h2>
+                <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto mb-9">
                   Start free and explore every capability VantaHire offers.
                 </p>
-                <div className="hr-cta-btns">
+                <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
                   <a
                     href="/recruiter-auth"
-                    className="hr-btn-demo"
+                    className={btnDemo}
                     onClick={() => trackEvent("cta_click", { location: "features", action: "start_free" })}
                   >
                     Start Free →
                   </a>
                   <button
-                    className="hr-btn-pricing"
+                    className={btnPricing}
                     onClick={() => {
                       trackEvent("cta_click", { location: "features", action: "book_demo" });
                       window.open('https://cal.com/vantahire/quick-connect', '_blank');
@@ -237,7 +247,7 @@ export default function FeaturesPage() {
                 </div>
               </section>
             </div>
-            <div className="struct-gutter"></div>
+            <div></div>
           </div>
 
           <HomepageFooter />

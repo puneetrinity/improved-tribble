@@ -46,10 +46,12 @@ import {
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
-import "@/styles/tokens.css";
-import "@/styles/base.css";
-import "@/styles/components.css";
-import "@/styles/pricing.css";
+import { sectionLabel } from "@/lib/shared-styles";
+
+const planBtnBase = "block w-full py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
+const planBtnPrimary = `${planBtnBase} bg-hr-accent text-white border-none hover:bg-hr-accent-hover`;
+const planBtnSecondary = `${planBtnBase} bg-transparent text-hr-text border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)]`;
+const planFeatureLi = "flex items-start gap-2.5 text-[0.88rem] text-hr-text-secondary leading-[1.4]";
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -285,12 +287,12 @@ export default function PricingPage() {
   const renderFeatureValue = (value: boolean | string) => {
     if (typeof value === 'boolean') {
       return value ? (
-        <span className="hr-comparison-check"><Check size={16} /></span>
+        <span className="inline-flex items-center justify-center w-5 h-5 text-hr-green"><Check size={16} /></span>
       ) : (
-        <span className="hr-comparison-x"><X size={16} /></span>
+        <span className="inline-flex items-center justify-center w-5 h-5 text-[rgba(255,255,255,0.15)]"><X size={16} /></span>
       );
     }
-    return <span style={{ color: 'var(--hr-text)' }}>{value}</span>;
+    return <span style={{ color: '#E8E8ED' }}>{value}</span>;
   };
 
   return (
@@ -305,176 +307,189 @@ export default function PricingPage() {
         <meta property="og:type" content="website" />
       </Helmet>
 
-      <div className="homepage-redesign public-theme min-h-screen">
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
         <GridOverlay />
         <div className="relative z-10">
           <HomepageNav />
 
           {/* Hero */}
-          <div className="hr-pricing-hero">
-            <div className="hr-section-label">Pricing</div>
-            <h1 className="hr-section-title">Simple pricing.<br />No surprises.</h1>
-            <p className="hr-section-desc">
+          <div className="pt-[140px] px-12 pb-20 text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-12">
+            <div className={sectionLabel}>Pricing</div>
+            <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] font-normal leading-[1.2] tracking-tight mb-5 text-hr-text">Simple pricing.<br />No surprises.</h1>
+            <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[540px] mx-auto">
               Start free. Upgrade when your team grows. No long contracts. No hidden fees.
             </p>
           </div>
 
           {/* Pricing Cards */}
-          <div className="hr-pricing-cards">
+          <div
+            className="grid grid-cols-3 gap-5 max-w-[1100px] mx-auto mb-[100px] px-12 max-lg:gap-4 max-lg:px-8 max-md:grid-cols-1 max-md:max-w-[420px] max-md:px-5 max-md:gap-6"
+            style={{ animation: 'hr-fade-up 0.9s ease-out 0.15s both' }}
+          >
             {/* Free Plan */}
-            <div className="hr-plan-card">
-              <div className="hr-plan-icon" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <Users size={18} style={{ color: 'var(--hr-text-muted)' }} />
+            <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <Users size={18} style={{ color: '#8A8A9A' }} />
               </div>
-              <div className="hr-plan-name">Free</div>
-              <div className="hr-plan-summary">{freePlanCard?.summary || "Get started in minutes"}</div>
-              <div className="hr-plan-price">
+              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Free</div>
+              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{freePlanCard?.summary || "Get started in minutes"}</div>
+              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">
                 {formatPriceINR(0)}
-                <span className="hr-plan-period"> /month</span>
+                <span className="text-[0.85rem] font-normal text-hr-text-muted font-dm"> /month</span>
               </div>
-              <div className="hr-plan-tax-note">&nbsp;</div>
-              <div className="hr-plan-divider"></div>
-              <ul className="hr-plan-features">
+              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">&nbsp;</div>
+              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
+              <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(freePlanCard?.highlights ?? []).map((highlight) => (
-                  <li key={highlight}>
-                    <Check size={16} className="hr-check-icon" />
+                  <li key={highlight} className={planFeatureLi}>
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
                     {highlight}
                   </li>
                 ))}
               </ul>
               {currentPlan === 'free' && isLoggedIn ? (
-                <button className="hr-plan-btn secondary" disabled>Current Plan</button>
+                <button className={planBtnSecondary} disabled>Current Plan</button>
               ) : (
-                <button className="hr-plan-btn secondary" onClick={() => setLocation('/recruiter-auth')}>
+                <button className={planBtnSecondary} onClick={() => setLocation('/recruiter-auth')}>
                   Get Started
                 </button>
               )}
             </div>
 
             {/* Growth Plan */}
-            <div className="hr-plan-card featured">
-              <div className="hr-plan-badge">Most Popular</div>
-              <div className="hr-plan-icon" style={{ background: 'rgba(124,58,237,0.15)' }}>
-                <Zap size={18} style={{ color: 'var(--hr-accent-hover)' }} />
+            <div className="bg-[linear-gradient(165deg,rgba(124,58,237,0.08)_0%,#111116_40%)] border-2 border-hr-accent rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 max-md:-order-1">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 font-mono text-[0.68rem] font-medium tracking-[0.08em] uppercase bg-hr-accent text-white py-1 px-4 whitespace-nowrap">Most Popular</div>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(124,58,237,0.15)' }}>
+                <Zap size={18} style={{ color: '#A78BFA' }} />
               </div>
-              <div className="hr-plan-name">Growth</div>
-              <div className="hr-plan-summary">{proPlanCard?.summary || "Scale your hiring output"}</div>
-              <div className="hr-plan-price">
+              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Growth</div>
+              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{proPlanCard?.summary || "Scale your hiring output"}</div>
+              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">
                 {proPlan ? formatPriceINR(proPlan.pricePerSeatMonthly) : '...'}
-                <span className="hr-plan-period"> /seat/month</span>
+                <span className="text-[0.85rem] font-normal text-hr-text-muted font-dm"> /seat/month</span>
               </div>
-              <div className="hr-plan-tax-note">
+              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">
                 {taxEnabled ? `+ GST (${gstRate}%) | Save with annual billing` : 'Save with annual billing'}
               </div>
-              <div className="hr-plan-divider"></div>
-              <div className="hr-plan-includes">Everything in Free, plus:</div>
-              <ul className="hr-plan-features">
+              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
+              <div className="text-[0.72rem] text-hr-text-muted mb-3 font-mono tracking-[0.04em] uppercase">Everything in Free, plus:</div>
+              <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(proPlanCard?.highlights ?? []).map((highlight) => (
-                  <li key={highlight}>
-                    <Check size={16} className="hr-check-icon" />
+                  <li key={highlight} className={planFeatureLi}>
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
                     {highlight.includes("top-ups") ? creditPackLabel : highlight}
                   </li>
                 ))}
               </ul>
               {isPro ? (
-                <button className="hr-plan-btn primary" disabled>Current Plan</button>
+                <button className={planBtnPrimary} disabled>Current Plan</button>
               ) : (
-                <button className="hr-plan-btn primary" onClick={handleSelectPro}>
-                  Upgrade to Growth <span className="btn-arrow">&rarr;</span>
+                <button className={`${planBtnPrimary} group`} onClick={handleSelectPro}>
+                  Upgrade to Growth <span className="inline-block ml-1.5 transition-transform duration-200 group-hover:translate-x-[3px]">&rarr;</span>
                 </button>
               )}
             </div>
 
             {/* Enterprise Plan */}
-            <div className="hr-plan-card">
-              <div className="hr-plan-icon" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <Building2 size={18} style={{ color: 'var(--hr-text-muted)' }} />
+            <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <Building2 size={18} style={{ color: '#8A8A9A' }} />
               </div>
-              <div className="hr-plan-name">Enterprise</div>
-              <div className="hr-plan-summary">{businessPlanCard?.summary || "Custom fit for large teams"}</div>
-              <div className="hr-plan-price">Custom</div>
-              <div className="hr-plan-tax-note">Tailored to your needs</div>
-              <div className="hr-plan-divider"></div>
-              <div className="hr-plan-includes">Everything in Growth, plus:</div>
-              <ul className="hr-plan-features">
+              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Enterprise</div>
+              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{businessPlanCard?.summary || "Custom fit for large teams"}</div>
+              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">Custom</div>
+              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">Tailored to your needs</div>
+              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
+              <div className="text-[0.72rem] text-hr-text-muted mb-3 font-mono tracking-[0.04em] uppercase">Everything in Growth, plus:</div>
+              <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(businessPlanCard?.highlights ?? []).slice(1).map((highlight) => (
-                  <li key={highlight}>
-                    <Check size={16} className="hr-check-icon" />
+                  <li key={highlight} className={planFeatureLi}>
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
                     {highlight}
                   </li>
                 ))}
               </ul>
-              <button className="hr-plan-btn secondary" onClick={handleContactSales}>
+              <button className={planBtnSecondary} onClick={handleContactSales}>
                 Contact Sales
               </button>
             </div>
           </div>
 
           {/* Feature Comparison */}
-          <div className="hr-struct-section">
-            <div className="struct-gutter"></div>
-            <div className="struct-body">
-              <div className="hr-comparison-section">
-                <h2 className="hr-section-title">Compare plans side by side</h2>
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div
+                className="max-w-[1100px] mx-auto mb-[100px] px-12 max-md:px-5 max-md:overflow-x-auto"
+                style={{ animation: 'hr-fade-up 0.9s ease-out 0.3s both' }}
+              >
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-10 text-hr-text text-center">Compare plans side by side</h2>
                 <div style={{ overflowX: 'auto' }}>
-                  <table className="hr-comparison-table">
+                  <table className="w-full border border-[rgba(255,255,255,0.08)] rounded-[10px] overflow-hidden border-separate max-md:min-w-[560px]" style={{ borderSpacing: 0 }}>
                     <thead>
                       <tr>
-                        <th>Feature</th>
-                        <th>Free</th>
-                        <th className="hr-col-featured">Growth</th>
-                        <th>Enterprise</th>
+                        <th className="py-4 px-5 text-left font-mono text-[0.72rem] font-semibold tracking-[0.06em] uppercase text-hr-text-muted bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Feature</th>
+                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-text text-center bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Free</th>
+                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-accent-hover text-center bg-[rgba(124,58,237,0.08)] border-b border-[rgba(255,255,255,0.08)]">Growth</th>
+                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-text text-center bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Enterprise</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {comparisonRows.map((feature) => (
-                        <tr key={feature.name}>
-                          <td>{feature.name}</td>
-                          <td>{renderFeatureValue(feature.free)}</td>
-                          <td className="hr-col-featured">{renderFeatureValue(feature.pro)}</td>
-                          <td>{renderFeatureValue(feature.business)}</td>
-                        </tr>
-                      ))}
+                      {comparisonRows.map((feature, idx) => {
+                        const isLast = idx === comparisonRows.length - 1;
+                        const borderClass = isLast ? '' : 'border-b border-[rgba(255,255,255,0.08)]';
+                        return (
+                          <tr key={feature.name} className="group">
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text font-normal text-left bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{feature.name}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{renderFeatureValue(feature.free)}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-[rgba(124,58,237,0.03)] ${borderClass} group-hover:bg-[rgba(124,58,237,0.05)]`}>{renderFeatureValue(feature.pro)}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{renderFeatureValue(feature.business)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               </div>
             </div>
-            <div className="struct-gutter"></div>
+            <div></div>
           </div>
 
           {/* FAQ */}
-          <div className="hr-struct-section">
-            <div className="struct-gutter"></div>
-            <div className="struct-body">
-              <div className="hr-faq-section">
-                <div className="hr-section-label" style={{ textAlign: 'center' }}>FAQ</div>
-                <h2 className="hr-section-title">Pricing questions, answered.</h2>
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div
+                className="max-w-[720px] mx-auto mb-[100px] px-12 max-md:px-5"
+                style={{ animation: 'hr-fade-up 0.9s ease-out 0.4s both' }}
+              >
+                <div className={`${sectionLabel} text-center`}>FAQ</div>
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-10 text-hr-text text-center">Pricing questions, answered.</h2>
                 {faqs.map((faq, i) => (
-                  <div key={i} className="hr-faq-card">
-                    <h3>{faq.question}</h3>
-                    <p>{faq.answer}</p>
+                  <div key={i} className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg py-6 px-7 mb-3 transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
+                    <h3 className="font-satoshi text-base font-medium text-hr-text mb-2">{faq.question}</h3>
+                    <p className="text-[0.9rem] text-hr-text-secondary leading-[1.7]">{faq.answer}</p>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="struct-gutter"></div>
+            <div></div>
           </div>
 
           {/* CTA */}
-          <div className="hr-struct-section">
-            <div className="struct-gutter"></div>
-            <div className="struct-body">
-              <div className="hr-pricing-cta">
-                <div className="hr-section-label">Get Started</div>
-                <h2 className="hr-section-title">Start hiring with<br />the right plan.</h2>
-                <p className="hr-section-desc" style={{ textAlign: 'center', margin: '0 auto 36px' }}>
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div className="text-center py-20 px-12 pb-[100px] border-t border-[rgba(255,255,255,0.08)] max-md:py-[60px] max-md:px-5">
+                <div className={sectionLabel}>Get Started</div>
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text max-w-[480px] mx-auto">Start hiring with<br />the right plan.</h2>
+                <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto text-center mb-9">
                   Every plan includes AI sourcing, fit scoring, and a recruiter-grade pipeline. Pick the one that fits your team today.
                 </p>
-                <div className="hr-cta-btns">
+                <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
                   <a
                     href="/recruiter-auth"
-                    className="hr-btn-demo"
+                    className="bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center"
                     onClick={(e) => {
                       e.preventDefault();
                       setLocation('/recruiter-auth');
@@ -484,7 +499,7 @@ export default function PricingPage() {
                   </a>
                   <a
                     href="/demo"
-                    className="hr-btn-pricing"
+                    className="bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center"
                     onClick={(e) => {
                       e.preventDefault();
                       setLocation('/demo');
@@ -495,7 +510,7 @@ export default function PricingPage() {
                 </div>
               </div>
             </div>
-            <div className="struct-gutter"></div>
+            <div></div>
           </div>
 
           <HomepageFooter />

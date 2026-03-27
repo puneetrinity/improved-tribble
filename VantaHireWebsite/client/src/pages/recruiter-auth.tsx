@@ -6,9 +6,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Mail, CheckCircle, UserPlus, ArrowLeft } from "lucide-react";
 import type { OnboardingStatus } from "@/hooks/use-onboarding-status";
 import recruiterAuthBg from "@/assets/recruiter-auth-bg.png";
-import "@/styles/tokens.css";
-import "@/styles/base.css";
-import "@/styles/recruiter-auth.css";
 
 // Type for invite details response
 interface InviteDetails {
@@ -20,6 +17,47 @@ interface InviteDetails {
 }
 
 const brandBgStyle = { backgroundImage: `url(${recruiterAuthBg})` } as const;
+
+// --- Tailwind class constants ---
+
+// Border color: --hr-border = rgba(255,255,255,0.08)
+const hrBorder = "border-[rgba(255,255,255,0.08)]";
+// Border color: --hr-border-light = rgba(255,255,255,0.12)
+const hrBorderLight = "border-[rgba(255,255,255,0.12)]";
+
+// Shared input classes
+const inputCls =
+  `bg-hr-bg-elevated ${hrBorder} border rounded-[4px] px-3.5 py-2.5 font-dm text-[0.88rem] text-hr-text transition-[border-color] duration-200 outline-none w-full box-border placeholder:text-hr-text-muted placeholder:opacity-60 focus:border-hr-accent`;
+
+// Shared label classes
+const labelCls = "font-dm text-[0.78rem] font-medium text-hr-text-secondary tracking-[0.02em]";
+
+// Shared field classes
+const fieldCls = "flex flex-col gap-1.5";
+
+// Submit button
+const submitCls =
+  "bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer transition-colors duration-200 w-full mt-1 hover:bg-hr-accent-hover disabled:opacity-60 disabled:cursor-not-allowed";
+
+// Secondary button
+const secondaryCls =
+  `bg-transparent text-hr-text ${hrBorderLight} border py-2.5 px-6 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-all duration-200 w-full hover:border-[rgba(255,255,255,0.25)] disabled:opacity-60 disabled:cursor-not-allowed`;
+
+// Ghost button
+const ghostCls =
+  "bg-transparent text-hr-text-muted border-none py-2.5 px-6 font-dm text-[0.82rem] font-normal cursor-pointer transition-colors duration-200 w-full hover:text-hr-text";
+
+// Ghost button with icon
+const ghostWithIconCls = `${ghostCls} flex items-center justify-center gap-1.5`;
+
+// Form container
+const formCls = "flex flex-col gap-4";
+
+// State card (verification / success)
+const stateCardCls = "text-center flex flex-col items-center gap-4";
+
+// State icon base
+const stateIconBaseCls = "w-14 h-14 rounded-full flex items-center justify-center";
 
 export default function RecruiterAuth() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -222,22 +260,22 @@ export default function RecruiterAuth() {
     // Registration success state
     if (registrationSuccess) {
       return (
-        <div className="hr-rauth-state-card">
-          <div className="hr-rauth-state-icon success">
+        <div className={stateCardCls}>
+          <div className={`${stateIconBaseCls} bg-[rgba(16,185,129,0.12)] text-hr-green`}>
             <CheckCircle size={28} />
           </div>
-          <div className="hr-rauth-state-title">Check Your Email</div>
-          <div className="hr-rauth-state-desc">
-            We've sent a verification link to <span className="hr-rauth-state-email">{verificationEmail}</span>
+          <div className="font-satoshi text-[1.2rem] font-medium text-hr-text">Check Your Email</div>
+          <div className="font-dm text-[0.88rem] text-hr-text-secondary leading-[1.6] max-w-[320px]">
+            We've sent a verification link to <span className="text-hr-text font-medium">{verificationEmail}</span>
           </div>
-          <p className="hr-rauth-state-hint">
+          <p className="text-[0.82rem] text-hr-text-muted leading-[1.6]">
             Click the link in the email to verify your account and start using VantaHire.
           </p>
-          <div className="hr-rauth-state-actions">
-            <button className="hr-rauth-btn-secondary" onClick={handleResendVerification} disabled={resendLoading}>
+          <div className="flex flex-col gap-2 w-full max-w-[280px] mt-2">
+            <button className={secondaryCls} onClick={handleResendVerification} disabled={resendLoading}>
               {resendLoading ? "Sending..." : "Resend Verification Email"}
             </button>
-            <button className="hr-rauth-btn-ghost" onClick={() => { setRegistrationSuccess(false); setVerificationEmail(""); }}>
+            <button className={ghostCls} onClick={() => { setRegistrationSuccess(false); setVerificationEmail(""); }}>
               Back to Login
             </button>
           </div>
@@ -248,19 +286,19 @@ export default function RecruiterAuth() {
     // Email verification needed (from login attempt)
     if (verificationNeeded) {
       return (
-        <div className="hr-rauth-state-card">
-          <div className="hr-rauth-state-icon warning">
+        <div className={stateCardCls}>
+          <div className={`${stateIconBaseCls} bg-[rgba(245,158,11,0.12)] text-hr-yellow`}>
             <Mail size={28} />
           </div>
-          <div className="hr-rauth-state-title">Verify Your Email</div>
-          <div className="hr-rauth-state-desc">
-            Check your inbox at <span className="hr-rauth-state-email">{verificationEmail}</span> for a verification link.
+          <div className="font-satoshi text-[1.2rem] font-medium text-hr-text">Verify Your Email</div>
+          <div className="font-dm text-[0.88rem] text-hr-text-secondary leading-[1.6] max-w-[320px]">
+            Check your inbox at <span className="text-hr-text font-medium">{verificationEmail}</span> for a verification link.
           </div>
-          <div className="hr-rauth-state-actions">
-            <button className="hr-rauth-btn-secondary" onClick={handleResendVerification} disabled={resendLoading}>
+          <div className="flex flex-col gap-2 w-full max-w-[280px] mt-2">
+            <button className={secondaryCls} onClick={handleResendVerification} disabled={resendLoading}>
               {resendLoading ? "Sending..." : "Resend Verification Email"}
             </button>
-            <button className="hr-rauth-btn-ghost" onClick={() => { setVerificationNeeded(false); setVerificationEmail(""); }}>
+            <button className={ghostCls} onClick={() => { setVerificationNeeded(false); setVerificationEmail(""); }}>
               Back to Login
             </button>
           </div>
@@ -271,33 +309,33 @@ export default function RecruiterAuth() {
     // Forgot password form
     if (showForgotPassword) {
       return (
-        <form onSubmit={handleForgotPassword} className="hr-rauth-forgot-form">
-          <div className="hr-rauth-forgot-header">
-            <div className="hr-rauth-forgot-header-icon">
+        <form onSubmit={handleForgotPassword} className={formCls}>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-[30px] h-[30px] rounded-[6px] bg-[rgba(124,58,237,0.1)] text-hr-accent-hover flex items-center justify-center shrink-0">
               <Mail size={16} />
             </div>
-            <div className="hr-rauth-forgot-title">Reset Password</div>
+            <div className="font-satoshi text-[1.1rem] font-medium text-hr-text">Reset Password</div>
           </div>
-          <div className="hr-rauth-forgot-desc">
+          <div className="text-[0.82rem] text-hr-text-muted leading-[1.5]">
             Enter your email to receive a password reset link.
           </div>
-          <div className="hr-rauth-field">
-            <label className="hr-rauth-label">Email</label>
+          <div className={fieldCls}>
+            <label className={labelCls}>Email</label>
             <input
               type="email"
-              className="hr-rauth-input"
+              className={inputCls}
               placeholder="Enter your email"
               value={forgotPasswordEmail}
               onChange={(e) => setForgotPasswordEmail(e.target.value)}
               required
             />
           </div>
-          <button type="submit" className="hr-rauth-submit" disabled={isSendingReset}>
+          <button type="submit" className={submitCls} disabled={isSendingReset}>
             {isSendingReset ? "Sending..." : "Send Reset Link"}
           </button>
           <button
             type="button"
-            className="hr-rauth-btn-ghost with-icon"
+            className={ghostWithIconCls}
             onClick={() => setShowForgotPassword(false)}
           >
             <ArrowLeft size={14} />
@@ -312,11 +350,11 @@ export default function RecruiterAuth() {
       <>
         {/* Invite Banner */}
         {inviteToken && inviteDetails && (
-          <div className="hr-rauth-invite-banner">
-            <div className="hr-rauth-invite-icon">
+          <div className="flex items-center gap-3 py-3.5 px-[18px] bg-[rgba(124,58,237,0.06)] border border-[rgba(124,58,237,0.12)] rounded-lg mb-6">
+            <div className="w-8 h-8 rounded-[6px] bg-[rgba(124,58,237,0.12)] text-hr-accent-hover flex items-center justify-center shrink-0">
               <UserPlus size={16} />
             </div>
-            <div className="hr-rauth-invite-text">
+            <div className="text-[0.82rem] text-hr-text-secondary leading-[1.4] [&_strong]:text-hr-accent-hover [&_strong]:font-medium [&_span]:block [&_span]:text-[0.72rem] [&_span]:text-hr-text-muted [&_span]:mt-0.5">
               You've been invited to join <strong>{inviteDetails.organizationName}</strong>
               <span>Invited by {inviteDetails.inviterName} as {inviteDetails.role}</span>
             </div>
@@ -325,16 +363,16 @@ export default function RecruiterAuth() {
 
         {/* Invite Error */}
         {inviteToken && inviteError && (
-          <div className="hr-rauth-invite-error">
+          <div className="py-3 px-[18px] bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.15)] rounded-lg text-[0.82rem] text-hr-red mb-6">
             {(inviteError as Error).message || "Invalid or expired invite link"}
           </div>
         )}
 
-        <div className="hr-rauth-card-header">
-          <div className="hr-rauth-card-title">
+        <div className="text-center mb-7">
+          <div className="font-satoshi text-2xl font-medium text-hr-text mb-2">
             {inviteDetails ? "Create Your Account" : "Recruiter Access"}
           </div>
-          <div className="hr-rauth-card-desc">
+          <div className="font-dm text-[0.85rem] text-hr-text-muted leading-[1.5]">
             {inviteDetails
               ? `Register to join ${inviteDetails.organizationName}`
               : "Sign in to your recruiter account or create a new one"
@@ -343,15 +381,15 @@ export default function RecruiterAuth() {
         </div>
 
         {/* Tab Switcher */}
-        <div className="hr-rauth-tabs">
+        <div className={`grid grid-cols-2 bg-hr-bg-elevated rounded-[4px] ${hrBorder} border overflow-hidden mb-6`}>
           <button
-            className={`hr-rauth-tab ${activeTab === 'login' ? 'active' : ''}`}
+            className={`py-2.5 font-dm text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'login' ? 'bg-hr-accent text-white' : 'bg-transparent text-hr-text-muted hover:text-hr-text-secondary'}`}
             onClick={() => setActiveTab('login')}
           >
             Sign In
           </button>
           <button
-            className={`hr-rauth-tab ${activeTab === 'register' ? 'active' : ''}`}
+            className={`py-2.5 font-dm text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'register' ? 'bg-hr-accent text-white' : 'bg-transparent text-hr-text-muted hover:text-hr-text-secondary'}`}
             onClick={() => setActiveTab('register')}
           >
             Register
@@ -360,36 +398,40 @@ export default function RecruiterAuth() {
 
         {/* Login Form */}
         {activeTab === 'login' && (
-          <form onSubmit={handleLogin} className="hr-rauth-form">
-            <div className="hr-rauth-field">
-              <label className="hr-rauth-label">Username or Email</label>
+          <form onSubmit={handleLogin} className={formCls}>
+            <div className={fieldCls}>
+              <label className={labelCls}>Username or Email</label>
               <input
                 type="text"
-                className="hr-rauth-input"
+                className={inputCls}
                 placeholder="Enter your username or email"
                 value={loginData.username}
                 onChange={(e) => setLoginData(prev => ({ ...prev, username: e.target.value }))}
                 required
               />
             </div>
-            <div className="hr-rauth-field">
-              <label className="hr-rauth-label">Password</label>
+            <div className={fieldCls}>
+              <label className={labelCls}>Password</label>
               <input
                 type="password"
                 autoComplete="current-password"
-                className="hr-rauth-input"
+                className={inputCls}
                 placeholder="Enter your password"
                 value={loginData.password}
                 onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
                 required
               />
             </div>
-            <div className="hr-rauth-forgot-link">
-              <button type="button" onClick={() => setShowForgotPassword(true)}>
+            <div className="text-right -mt-2">
+              <button
+                type="button"
+                className="bg-none border-none font-dm text-[0.78rem] text-hr-accent-hover cursor-pointer p-0 transition-colors duration-200 hover:text-hr-text"
+                onClick={() => setShowForgotPassword(true)}
+              >
                 Forgot your password?
               </button>
             </div>
-            <button type="submit" className="hr-rauth-submit" disabled={loginMutation.isPending}>
+            <button type="submit" className={submitCls} disabled={loginMutation.isPending}>
               {loginMutation.isPending ? "Signing in..." : "Sign In"}
             </button>
           </form>
@@ -397,24 +439,24 @@ export default function RecruiterAuth() {
 
         {/* Register Form */}
         {activeTab === 'register' && (
-          <form onSubmit={handleRegister} className="hr-rauth-form">
-            <div className="hr-rauth-field-row">
-              <div className="hr-rauth-field">
-                <label className="hr-rauth-label">First Name</label>
+          <form onSubmit={handleRegister} className={formCls}>
+            <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+              <div className={fieldCls}>
+                <label className={labelCls}>First Name</label>
                 <input
                   type="text"
-                  className="hr-rauth-input"
+                  className={inputCls}
                   placeholder="First name"
                   value={registerData.firstName}
                   onChange={(e) => setRegisterData(prev => ({ ...prev, firstName: e.target.value }))}
                   required
                 />
               </div>
-              <div className="hr-rauth-field">
-                <label className="hr-rauth-label">Last Name</label>
+              <div className={fieldCls}>
+                <label className={labelCls}>Last Name</label>
                 <input
                   type="text"
-                  className="hr-rauth-input"
+                  className={inputCls}
                   placeholder="Last name"
                   value={registerData.lastName}
                   onChange={(e) => setRegisterData(prev => ({ ...prev, lastName: e.target.value }))}
@@ -422,11 +464,11 @@ export default function RecruiterAuth() {
                 />
               </div>
             </div>
-            <div className="hr-rauth-field">
-              <label className="hr-rauth-label">Email *</label>
+            <div className={fieldCls}>
+              <label className={labelCls}>Email *</label>
               <input
                 type="email"
-                className={`hr-rauth-input ${inviteDetails ? 'readonly' : ''}`}
+                className={`${inputCls} ${inviteDetails ? 'opacity-60 cursor-not-allowed' : ''}`}
                 placeholder="Enter your email address"
                 value={registerData.username}
                 onChange={(e) => setRegisterData(prev => ({ ...prev, username: e.target.value }))}
@@ -435,22 +477,22 @@ export default function RecruiterAuth() {
                 title={inviteDetails ? "Email is locked to the invite" : undefined}
               />
               {inviteDetails && (
-                <span className="hr-rauth-input-hint">Email is locked to the invite</span>
+                <span className="text-[0.7rem] text-hr-text-muted">Email is locked to the invite</span>
               )}
             </div>
-            <div className="hr-rauth-field">
-              <label className="hr-rauth-label">Password *</label>
+            <div className={fieldCls}>
+              <label className={labelCls}>Password *</label>
               <input
                 type="password"
                 autoComplete="new-password"
-                className="hr-rauth-input"
+                className={inputCls}
                 placeholder="Create a strong password"
                 value={registerData.password}
                 onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
                 required
               />
             </div>
-            <button type="submit" className="hr-rauth-submit" disabled={registerMutation.isPending}>
+            <button type="submit" className={submitCls} disabled={registerMutation.isPending}>
               {registerMutation.isPending ? "Creating account..." : "Create Recruiter Account"}
             </button>
           </form>
@@ -460,15 +502,18 @@ export default function RecruiterAuth() {
   };
 
   return (
-    <div className="hr-rauth-split">
+    <div className="grid grid-cols-2 min-h-screen bg-hr-bg max-[900px]:grid-cols-1">
       {/* Left Panel — Brand */}
-      <div className="hr-rauth-brand" style={brandBgStyle}>
-        <div className="hr-rauth-brand-inner">
-          <h1 className="hr-rauth-brand-title">
+      <div
+        className={`relative flex flex-col justify-start items-center pt-[140px] px-[60px] pb-20 bg-hr-bg-card bg-cover bg-center bg-no-repeat border-r ${hrBorder} overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[linear-gradient(to_bottom,rgba(12,12,16,0.92)_0%,rgba(12,12,16,0.45)_50%,rgba(12,12,16,0.25)_100%)] before:pointer-events-none max-[900px]:hidden`}
+        style={brandBgStyle}
+      >
+        <div className="relative z-[1] text-center max-w-[400px] animate-hr-fade-up">
+          <h1 className="font-satoshi text-[clamp(1.8rem,3vw,2.6rem)] font-normal leading-[1.2] tracking-[-0.01em] text-hr-text mb-4">
             AI-Powered Hiring<br />For Modern Teams
           </h1>
 
-          <p className="hr-rauth-brand-desc">
+          <p className="font-dm text-[0.92rem] leading-[1.7] text-hr-text-secondary mb-12">
             Post jobs, review applications, and find the perfect candidates — all from one intelligent platform.
           </p>
 
@@ -476,11 +521,14 @@ export default function RecruiterAuth() {
       </div>
 
       {/* Right Panel — Auth Form */}
-      <div className="hr-rauth-form-panel">
-        <div className="hr-rauth-form-wrapper">
+      <div className="flex flex-col justify-center items-center py-[60px] px-12 relative max-[900px]:px-6 max-[900px]:pt-[100px] max-[900px]:pb-[60px] max-[900px]:min-h-screen max-sm:px-5 max-sm:pt-[90px] max-sm:pb-10">
+        <div
+          className="w-full max-w-[400px]"
+          style={{ animation: "hr-fade-up 0.7s ease-out 0.12s both" }}
+        >
           {renderFormContent()}
 
-          <div className="hr-rauth-legal">
+          <div className="mt-8 text-center font-dm text-[0.72rem] text-hr-text-muted [&_a]:text-hr-accent-hover [&_a]:no-underline [&_a]:border-b [&_a]:border-[rgba(167,139,250,0.3)] [&_a]:transition-colors [&_a]:duration-200 [&_a:hover]:text-hr-text [&_a:hover]:border-hr-text">
             By continuing, you agree to the <Link href="/terms-of-service">Terms of Service</Link> and <Link href="/privacy-policy">Privacy Policy</Link>
           </div>
         </div>

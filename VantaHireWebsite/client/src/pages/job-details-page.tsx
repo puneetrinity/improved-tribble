@@ -15,10 +15,7 @@ import { useAIFeatures } from "@/hooks/use-ai-features";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
-import "@/styles/tokens.css";
-import "@/styles/base.css";
-import "@/styles/components.css";
-import "@/styles/job-detail.css";
+import { sectionLabel } from "@/lib/shared-styles";
 
 // Types for audit log
 interface AuditLogEntry {
@@ -28,6 +25,18 @@ interface AuditLogEntry {
   performedBy: { firstName: string; lastName: string; username: string } | null;
   createdAt: string;
 }
+
+const emptyStateCls = "flex flex-col items-center justify-center min-h-[60vh] text-center py-[60px] px-5 gap-3 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-hr-text-muted [&>svg]:mb-2";
+const btnApplyCls = "bg-hr-accent text-white border-none py-3 px-8 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-hr-accent-hover disabled:opacity-50 disabled:cursor-not-allowed";
+const btnSecondaryCls = "flex items-center gap-1.5 bg-transparent border border-[rgba(255,255,255,0.08)] text-hr-text-secondary py-2 px-4 rounded-none font-dm text-[0.82rem] font-normal cursor-pointer transition-all duration-200 whitespace-nowrap [&>svg]:w-3.5 [&>svg]:h-3.5 hover:border-[rgba(255,255,255,0.12)] hover:text-hr-text max-md:flex-1 max-md:justify-center";
+const cardCls = "bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none mb-4 overflow-hidden";
+const cardHeaderCls = "flex items-center gap-2.5 py-4 px-5 border-b border-[rgba(255,255,255,0.08)] font-satoshi text-base font-medium text-hr-text [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:text-hr-accent-hover [&>svg]:shrink-0";
+const cardBodyCls = "p-5 max-md:p-4";
+const sidebarCardCls = "bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none p-5";
+const sidebarItemCls = "flex items-start gap-3 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:text-hr-accent-hover [&>svg]:shrink-0 [&>svg]:mt-0.5";
+const metaItemCls = "flex items-center gap-[5px] text-[0.82rem] text-hr-text-muted [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0";
+const formInputCls = "bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 resize-y w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]";
+const statusBadgeBase = "inline-block py-1 px-3 rounded-full font-mono text-[0.6rem] font-medium tracking-[0.06em] uppercase whitespace-nowrap";
 
 export default function JobDetailsPage() {
   const [match, params] = useRoute("/jobs/:id");
@@ -179,35 +188,31 @@ export default function JobDetailsPage() {
   // --- Loading state ---
   if (!match || !jobIdOrSlug) {
     return (
-      <>
-        <div className="homepage-redesign">
-          <HomepageNav />
-          <GridOverlay />
-          <div className="hr-jd-empty-state">
-            <Briefcase />
-            <h2>Job Not Found</h2>
-            <p>The job you're looking for doesn't exist.</p>
-            <Link href="/jobs" className="hr-btn-view-job">Browse Jobs</Link>
-          </div>
-          <HomepageFooter />
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+        <HomepageNav />
+        <GridOverlay />
+        <div className={emptyStateCls}>
+          <Briefcase />
+          <h2 className="font-satoshi text-2xl font-medium text-hr-text">Job Not Found</h2>
+          <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">The job you're looking for doesn't exist.</p>
+          <Link href="/jobs" className="bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-[0.82rem] font-medium cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover">Browse Jobs</Link>
         </div>
-      </>
+        <HomepageFooter />
+      </div>
     );
   }
 
   if (isLoading) {
     return (
-      <>
-        <div className="homepage-redesign">
-          <HomepageNav />
-          <GridOverlay />
-          <div className="hr-jd-empty-state">
-            <div className="hr-jd-spinner" />
-            <p>Loading job details...</p>
-          </div>
-          <HomepageFooter />
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+        <HomepageNav />
+        <GridOverlay />
+        <div className={emptyStateCls}>
+          <div className="w-9 h-9 border-[3px] border-[rgba(255,255,255,0.08)] border-t-hr-accent rounded-full animate-hr-spin" />
+          <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">Loading job details...</p>
         </div>
-      </>
+        <HomepageFooter />
+      </div>
     );
   }
 
@@ -216,36 +221,34 @@ export default function JobDetailsPage() {
     const isExpiredOrInactive = typedError?.status === 410;
 
     return (
-      <>
-        <div className="homepage-redesign">
-          <HomepageNav />
-          <GridOverlay />
-          <div className="hr-jd-empty-state">
-            {isExpiredOrInactive ? (
-              <>
-                <AlertTriangle style={{ color: 'var(--hr-yellow)', width: 48, height: 48 }} />
-                <h2>{typedError?.code === 'EXPIRED' ? 'Job Has Expired' : 'Job No Longer Available'}</h2>
-                {typedError?.jobInfo?.title && (
-                  <p style={{ color: 'var(--hr-text-muted)', marginBottom: 4 }}>"{typedError.jobInfo.title}"</p>
-                )}
-                <p>
-                  {typedError?.code === 'EXPIRED'
-                    ? 'This job posting has expired and is no longer accepting applications.'
-                    : 'This job is no longer active. It may have been filled or removed.'}
-                </p>
-                <Link href="/jobs" className="hr-btn-view-job" style={{ marginTop: 16 }}>Browse Active Jobs</Link>
-              </>
-            ) : (
-              <>
-                <AlertTriangle style={{ color: 'var(--hr-red)', width: 48, height: 48 }} />
-                <h2>Error</h2>
-                <p>Failed to load job details. Please try again.</p>
-              </>
-            )}
-          </div>
-          <HomepageFooter />
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+        <HomepageNav />
+        <GridOverlay />
+        <div className={emptyStateCls}>
+          {isExpiredOrInactive ? (
+            <>
+              <AlertTriangle style={{ color: '#F59E0B', width: 48, height: 48 }} />
+              <h2 className="font-satoshi text-2xl font-medium text-hr-text">{typedError?.code === 'EXPIRED' ? 'Job Has Expired' : 'Job No Longer Available'}</h2>
+              {typedError?.jobInfo?.title && (
+                <p className="text-hr-text-muted mb-1">"{typedError.jobInfo.title}"</p>
+              )}
+              <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">
+                {typedError?.code === 'EXPIRED'
+                  ? 'This job posting has expired and is no longer accepting applications.'
+                  : 'This job is no longer active. It may have been filled or removed.'}
+              </p>
+              <Link href="/jobs" className="bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-[0.82rem] font-medium cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover mt-4">Browse Active Jobs</Link>
+            </>
+          ) : (
+            <>
+              <AlertTriangle style={{ color: '#EF4444', width: 48, height: 48 }} />
+              <h2 className="font-satoshi text-2xl font-medium text-hr-text">Error</h2>
+              <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">Failed to load job details. Please try again.</p>
+            </>
+          )}
         </div>
-      </>
+        <HomepageFooter />
+      </div>
     );
   }
 
@@ -290,53 +293,59 @@ export default function JobDetailsPage() {
         </script>
       </Helmet>
 
-      <div className="homepage-redesign">
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
         <HomepageNav />
         <GridOverlay />
 
         {/* Page wrapper */}
-        <div className="hr-jd-page">
-          <div className="hr-struct-section">
-            <div className="struct-gutter"></div>
-            <div className="struct-body">
+        <div className="pt-[60px] min-h-screen">
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div className="pl-8 pr-8 max-w-[1200px] mx-auto max-md:pl-0 max-md:pr-0">
 
               {/* Breadcrumb */}
-              <nav className="hr-jd-breadcrumb">
+              <nav
+                className="flex items-center gap-2 pt-7 max-md:pt-5 text-[0.82rem] text-hr-text-muted [&>a]:text-hr-text-muted [&>a]:no-underline [&>a]:transition-colors [&>a]:duration-200 hover:[&>a]:text-hr-accent-hover [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0 [&>svg]:opacity-50"
+                style={{ animation: 'hr-fade-up 0.5s ease-out both' }}
+              >
                 <Link href="/">Home</Link>
                 <ChevronRight />
                 <Link href="/jobs">Jobs</Link>
                 <ChevronRight />
-                <span>{job.title}</span>
+                <span className="text-hr-text-secondary">{job.title}</span>
               </nav>
 
               {/* Hero header */}
-              <header className="hr-jd-hero">
-                <div className="hr-jd-hero-content">
-                  <div className="hr-section-label">Job Opening</div>
-                  <h1 className="hr-jd-title">{job.title}</h1>
-                  <div className="hr-jd-hero-meta">
-                    <span className="hr-job-meta-item">
+              <header
+                className="flex justify-between items-start gap-10 pt-10 pb-9 border-b border-[rgba(255,255,255,0.08)] mb-9 max-md:flex-col max-md:gap-6 max-md:pt-7 max-md:pb-7"
+                style={{ animation: 'hr-fade-up 0.6s ease-out both' }}
+              >
+                <div className="flex-1 min-w-0">
+                  <div className={sectionLabel}>Job Opening</div>
+                  <h1 className="font-satoshi text-[clamp(1.8rem,4vw,2.6rem)] max-md:text-[1.5rem] font-medium leading-[1.2] tracking-[-0.01em] text-hr-text mb-4">{job.title}</h1>
+                  <div className="flex flex-wrap gap-[18px] mb-4">
+                    <span className={metaItemCls}>
                       <MapPin /> {job.location}
                     </span>
-                    <span className="hr-job-meta-item">
+                    <span className={metaItemCls}>
                       <Clock /> Posted {formatDate(job.createdAt)}
                     </span>
                     {job.postedByName && (
-                      <span className="hr-job-meta-item">
+                      <span className={metaItemCls}>
                         <User />
                         {job.postedById && job.isRecruiterProfilePublic ? (
-                          <Link href={`/recruiters/${job.postedById}`}>{job.postedByName}</Link>
+                          <Link href={`/recruiters/${job.postedById}`} className="text-hr-accent-hover no-underline transition-colors duration-200 hover:underline">{job.postedByName}</Link>
                         ) : (
                           job.postedByName
                         )}
                       </span>
                     )}
                   </div>
-                  <div className="hr-jd-hero-tags">
-                    <span className="hr-job-type-badge">{job.type.replace('-', ' ')}</span>
-                    {isExpired && <span className="hr-jd-status-badge expired">Expired</span>}
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.06em] uppercase bg-[rgba(124,58,237,0.12)] text-hr-accent-hover whitespace-nowrap">{job.type.replace('-', ' ')}</span>
+                    {isExpired && <span className={`${statusBadgeBase} bg-[rgba(239,68,68,0.12)] text-hr-red`}>Expired</span>}
                     {showExpiryWarning && !isExpired && (
-                      <span className="hr-jd-status-badge warning">
+                      <span className={`${statusBadgeBase} bg-[rgba(245,158,11,0.12)] text-hr-yellow`}>
                         Expires {daysUntilExpiry === 0 ? 'today' : daysUntilExpiry === 1 ? 'tomorrow' : `in ${daysUntilExpiry} days`}
                       </span>
                     )}
@@ -344,10 +353,10 @@ export default function JobDetailsPage() {
                 </div>
 
                 {/* Quick actions */}
-                <div className="hr-jd-hero-actions">
+                <div className="flex flex-col gap-3 shrink-0 pt-7 max-md:pt-0 max-md:flex-row max-md:flex-wrap max-md:items-center">
                   {!isExpired && (
                     <button
-                      className="hr-jd-btn-apply"
+                      className={btnApplyCls}
                       onClick={() => {
                         setShowApplicationForm(true);
                         document.getElementById('hr-jd-apply-section')?.scrollIntoView({ behavior: 'smooth' });
@@ -358,7 +367,7 @@ export default function JobDetailsPage() {
                   )}
                   {isExpired && isRecruiterOrAdmin && (
                     <button
-                      className="hr-jd-btn-reactivate"
+                      className="flex items-center gap-2 bg-transparent text-hr-green border border-[rgba(16,185,129,0.3)] py-2.5 px-6 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-all duration-200 [&>svg]:w-4 [&>svg]:h-4 hover:bg-[rgba(16,185,129,0.1)] hover:border-[rgba(16,185,129,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => reactivateMutation.mutate()}
                       disabled={reactivateMutation.isPending}
                     >
@@ -366,9 +375,9 @@ export default function JobDetailsPage() {
                       {reactivateMutation.isPending ? "Reactivating..." : "Reactivate Job"}
                     </button>
                   )}
-                  <div className="hr-jd-secondary-actions">
+                  <div className="flex gap-2 max-md:w-full">
                     <button
-                      className="hr-jd-btn-secondary"
+                      className={btnSecondaryCls}
                       onClick={() => {
                         navigator.share?.({ title: job.title, url: window.location.href }).catch(() => {
                           navigator.clipboard.writeText(window.location.href);
@@ -379,7 +388,7 @@ export default function JobDetailsPage() {
                       <Share2 /> Share
                     </button>
                     <button
-                      className="hr-jd-btn-secondary"
+                      className={btnSecondaryCls}
                       onClick={() => toast({ title: "Job saved", description: "We'll remind you about this opportunity" })}
                     >
                       <Bookmark /> Save
@@ -390,13 +399,16 @@ export default function JobDetailsPage() {
 
               {/* Expiry warning banner */}
               {showExpiryWarning && !isExpired && (
-                <div className="hr-jd-expiry-banner">
+                <div
+                  className="flex items-start gap-3 py-3.5 px-[18px] border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.06)] rounded-none mb-7 [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:text-hr-yellow [&>svg]:shrink-0 [&>svg]:mt-0.5"
+                  style={{ animation: 'hr-fade-up 0.7s ease-out 0.1s both' }}
+                >
                   <AlertTriangle />
                   <div>
-                    <strong>
+                    <strong className="block text-[0.88rem] text-hr-yellow font-medium mb-0.5">
                       This job posting expires {daysUntilExpiry === 0 ? 'today' : daysUntilExpiry === 1 ? 'tomorrow' : `in ${daysUntilExpiry} days`}
                     </strong>
-                    <span>
+                    <span className="text-[0.78rem] text-hr-text-muted">
                       {job.expiresAt && `Expiry date: ${format(new Date(job.expiresAt), "MMMM d, yyyy 'at' h:mm a")}`}
                     </span>
                   </div>
@@ -404,38 +416,41 @@ export default function JobDetailsPage() {
               )}
 
               {/* Main content grid */}
-              <div className="hr-jd-layout">
+              <div
+                className="grid grid-cols-[1fr_320px] gap-8 pb-20 max-lg:grid-cols-[1fr_280px] max-lg:gap-6 max-md:grid-cols-1 max-md:gap-6"
+                style={{ animation: 'hr-fade-up 0.7s ease-out 0.15s both' }}
+              >
                 {/* Left column — details */}
-                <main className="hr-jd-main">
+                <main>
 
                   {/* Description */}
-                  <section className="hr-jd-card">
-                    <div className="hr-jd-card-header">
+                  <section className={cardCls}>
+                    <div className={cardHeaderCls}>
                       <FileText /> Job Description
                     </div>
-                    <div className="hr-jd-card-body">
-                      <p className="hr-jd-description">{job.description}</p>
+                    <div className={cardBodyCls}>
+                      <p className="text-[0.92rem] leading-[1.75] text-hr-text-secondary whitespace-pre-wrap">{job.description}</p>
                     </div>
                   </section>
 
                   {/* Education & Experience */}
                   {(job.educationRequirement || job.experienceYears) && (
-                    <section className="hr-jd-card">
-                      <div className="hr-jd-card-header">
+                    <section className={cardCls}>
+                      <div className={cardHeaderCls}>
                         <GraduationCap /> Requirements
                       </div>
-                      <div className="hr-jd-card-body">
-                        <div className="hr-jd-requirements">
+                      <div className={cardBodyCls}>
+                        <div className="flex flex-col gap-4">
                           {job.educationRequirement && (
-                            <div className="hr-jd-req-item">
-                              <span className="hr-jd-req-label">Education</span>
-                              <span className="hr-jd-req-value">{job.educationRequirement}</span>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[0.78rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Education</span>
+                              <span className="text-[0.95rem] text-hr-text font-medium">{job.educationRequirement}</span>
                             </div>
                           )}
                           {job.experienceYears && (
-                            <div className="hr-jd-req-item">
-                              <span className="hr-jd-req-label">Experience</span>
-                              <span className="hr-jd-req-value">{job.experienceYears}+ years</span>
+                            <div className="flex flex-col gap-1">
+                              <span className="text-[0.78rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Experience</span>
+                              <span className="text-[0.95rem] text-hr-text font-medium">{job.experienceYears}+ years</span>
                             </div>
                           )}
                         </div>
@@ -445,14 +460,14 @@ export default function JobDetailsPage() {
 
                   {/* Required Skills */}
                   {job.skills && job.skills.length > 0 && (
-                    <section className="hr-jd-card">
-                      <div className="hr-jd-card-header">
+                    <section className={cardCls}>
+                      <div className={cardHeaderCls}>
                         <Star /> Required Skills
                       </div>
-                      <div className="hr-jd-card-body">
-                        <div className="hr-jd-skills">
+                      <div className={cardBodyCls}>
+                        <div className="flex flex-wrap gap-2">
                           {job.skills.map((skill, index) => (
-                            <span key={index} className="hr-jd-skill-tag required">{skill}</span>
+                            <span key={index} className="inline-block py-[5px] px-3.5 rounded-full text-[0.78rem] font-medium border bg-[rgba(239,68,68,0.08)] border-[rgba(239,68,68,0.2)] text-hr-red">{skill}</span>
                           ))}
                         </div>
                       </div>
@@ -461,14 +476,14 @@ export default function JobDetailsPage() {
 
                   {/* Good to Have Skills */}
                   {job.goodToHaveSkills && job.goodToHaveSkills.length > 0 && (
-                    <section className="hr-jd-card">
-                      <div className="hr-jd-card-header">
+                    <section className={cardCls}>
+                      <div className={cardHeaderCls}>
                         <Sparkles /> Good to Have
                       </div>
-                      <div className="hr-jd-card-body">
-                        <div className="hr-jd-skills">
+                      <div className={cardBodyCls}>
+                        <div className="flex flex-wrap gap-2">
                           {job.goodToHaveSkills.map((skill, index) => (
-                            <span key={index} className="hr-jd-skill-tag nice-to-have">{skill}</span>
+                            <span key={index} className="inline-block py-[5px] px-3.5 rounded-full text-[0.78rem] font-medium border bg-[rgba(16,185,129,0.08)] border-[rgba(16,185,129,0.2)] text-hr-green">{skill}</span>
                           ))}
                         </div>
                       </div>
@@ -477,20 +492,20 @@ export default function JobDetailsPage() {
 
                   {/* Compensation */}
                   {(job.salaryMin || job.salaryMax) && (
-                    <section className="hr-jd-card">
-                      <div className="hr-jd-card-header">
+                    <section className={cardCls}>
+                      <div className={cardHeaderCls}>
                         <IndianRupee /> Compensation
                       </div>
-                      <div className="hr-jd-card-body">
-                        <div className="hr-jd-salary">
-                          <span className="hr-jd-salary-value">
+                      <div className={cardBodyCls}>
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-satoshi text-2xl font-semibold text-hr-text">
                             {job.salaryMin && job.salaryMax
                               ? `₹${job.salaryMin.toLocaleString('en-IN')} – ₹${job.salaryMax.toLocaleString('en-IN')}`
                               : job.salaryMin
                               ? `₹${job.salaryMin.toLocaleString('en-IN')}+`
                               : `Up to ₹${job.salaryMax?.toLocaleString('en-IN')}`}
                           </span>
-                          <span className="hr-jd-salary-period">
+                          <span className="text-[0.85rem] text-hr-text-muted">
                             {job.salaryPeriod === 'per_month' ? '/month' : '/year'}
                           </span>
                         </div>
@@ -500,29 +515,29 @@ export default function JobDetailsPage() {
 
                   {/* Activity Log (Recruiters/Admins only) */}
                   {isRecruiterOrAdmin && auditLog.length > 0 && (
-                    <section className="hr-jd-card">
-                      <div className="hr-jd-card-header">
+                    <section className={cardCls}>
+                      <div className={cardHeaderCls}>
                         <History /> Activity Log
                       </div>
-                      <div className="hr-jd-card-body">
-                        <div className="hr-jd-timeline">
+                      <div className={cardBodyCls}>
+                        <div className="relative pl-5 before:content-[''] before:absolute before:left-1 before:top-0 before:bottom-0 before:w-px before:bg-[rgba(255,255,255,0.08)]">
                           {auditLog.slice(0, 10).map((entry) => (
-                            <div key={entry.id} className="hr-jd-timeline-entry">
-                              <div className="hr-jd-timeline-dot" />
-                              <div className="hr-jd-timeline-content">
-                                <div className="hr-jd-timeline-row">
-                                  <span className="hr-jd-timeline-action">{entry.action.replace(/_/g, ' ')}</span>
-                                  <span className="hr-jd-timeline-date">
+                            <div key={entry.id} className="relative pb-4 pl-3 last:pb-0">
+                              <div className="absolute -left-[19px] top-1 w-[9px] h-[9px] rounded-full bg-hr-accent border-2 border-hr-bg-card" />
+                              <div className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-3 px-3.5">
+                                <div className="flex justify-between items-center gap-3 mb-1">
+                                  <span className="text-[0.85rem] font-medium text-hr-text capitalize">{entry.action.replace(/_/g, ' ')}</span>
+                                  <span className="text-[0.72rem] text-hr-text-muted font-mono whitespace-nowrap">
                                     {entry.createdAt && !isNaN(new Date(entry.createdAt).getTime())
                                       ? format(new Date(entry.createdAt), "MMM d, yyyy 'at' h:mm a")
                                       : 'Unknown date'}
                                   </span>
                                 </div>
                                 {entry.performedBy && (
-                                  <span className="hr-jd-timeline-by">by {entry.performedBy.firstName} {entry.performedBy.lastName}</span>
+                                  <span className="text-[0.75rem] text-hr-text-muted">by {entry.performedBy.firstName} {entry.performedBy.lastName}</span>
                                 )}
                                 {entry.changes && Object.keys(entry.changes).length > 0 && (
-                                  <div className="hr-jd-timeline-changes">
+                                  <div className="flex flex-wrap gap-2 mt-2 text-[0.72rem] text-hr-text-muted">
                                     {Object.entries(entry.changes).map(([key, value]) => (
                                       <span key={key}>{key}: {String(value)}</span>
                                     ))}
@@ -538,53 +553,53 @@ export default function JobDetailsPage() {
                 </main>
 
                 {/* Right column — sidebar */}
-                <aside className="hr-jd-sidebar" id="hr-jd-apply-section">
+                <aside className="sticky top-20 self-start flex flex-col gap-4 max-md:static" id="hr-jd-apply-section">
                   {/* Job summary card */}
-                  <div className="hr-jd-sidebar-card">
-                    <div className="hr-jd-sidebar-title">Job Summary</div>
-                    <div className="hr-jd-sidebar-items">
-                      <div className="hr-jd-sidebar-item">
+                  <div className={sidebarCardCls}>
+                    <div className="font-satoshi text-base font-medium text-hr-text mb-4">Job Summary</div>
+                    <div className="flex flex-col gap-4">
+                      <div className={sidebarItemCls}>
                         <MapPin />
-                        <div>
-                          <span className="hr-jd-sidebar-label">Location</span>
-                          <span className="hr-jd-sidebar-value">{job.location}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Location</span>
+                          <span className="text-[0.88rem] text-hr-text font-medium">{job.location}</span>
                         </div>
                       </div>
-                      <div className="hr-jd-sidebar-item">
+                      <div className={sidebarItemCls}>
                         <Briefcase />
-                        <div>
-                          <span className="hr-jd-sidebar-label">Job Type</span>
-                          <span className="hr-jd-sidebar-value" style={{ textTransform: 'capitalize' }}>{job.type.replace('-', ' ')}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Job Type</span>
+                          <span className="text-[0.88rem] text-hr-text font-medium capitalize">{job.type.replace('-', ' ')}</span>
                         </div>
                       </div>
                       {job.deadline && (
-                        <div className="hr-jd-sidebar-item">
+                        <div className={sidebarItemCls}>
                           <Calendar />
-                          <div>
-                            <span className="hr-jd-sidebar-label">Deadline</span>
-                            <span className="hr-jd-sidebar-value" style={{ color: 'var(--hr-yellow)' }}>{formatDate(job.deadline)}</span>
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Deadline</span>
+                            <span className="text-[0.88rem] text-hr-yellow font-medium">{formatDate(job.deadline)}</span>
                           </div>
                         </div>
                       )}
-                      <div className="hr-jd-sidebar-item">
+                      <div className={sidebarItemCls}>
                         <Clock />
-                        <div>
-                          <span className="hr-jd-sidebar-label">Posted</span>
-                          <span className="hr-jd-sidebar-value">{formatDate(job.createdAt)}</span>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Posted</span>
+                          <span className="text-[0.88rem] text-hr-text font-medium">{formatDate(job.createdAt)}</span>
                         </div>
                       </div>
                       {(job.salaryMin || job.salaryMax) && (
-                        <div className="hr-jd-sidebar-item">
+                        <div className={sidebarItemCls}>
                           <IndianRupee />
-                          <div>
-                            <span className="hr-jd-sidebar-label">Salary</span>
-                            <span className="hr-jd-sidebar-value">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Salary</span>
+                            <span className="text-[0.88rem] text-hr-text font-medium">
                               {job.salaryMin && job.salaryMax
                                 ? `₹${job.salaryMin.toLocaleString('en-IN')} – ₹${job.salaryMax.toLocaleString('en-IN')}`
                                 : job.salaryMin
                                 ? `₹${job.salaryMin.toLocaleString('en-IN')}+`
                                 : `Up to ₹${job.salaryMax?.toLocaleString('en-IN')}`}
-                              <span style={{ color: 'var(--hr-text-muted)', fontWeight: 400, fontSize: '0.72rem', marginLeft: 4 }}>
+                              <span className="text-hr-text-muted font-normal text-[0.72rem] ml-1">
                                 {job.salaryPeriod === 'per_month' ? '/mo' : '/yr'}
                               </span>
                             </span>
@@ -596,25 +611,25 @@ export default function JobDetailsPage() {
 
                   {/* AI match badge */}
                   {aiEnabled && (
-                    <div className="hr-jd-ai-card">
-                      <div className="hr-jd-ai-header">
+                    <div className="bg-[linear-gradient(135deg,rgba(124,58,237,0.1),rgba(6,182,212,0.06))] border border-[rgba(124,58,237,0.2)] rounded-none py-[18px] px-5">
+                      <div className="flex items-center gap-2 text-[0.88rem] font-semibold text-hr-accent-hover mb-2 [&>svg]:w-4 [&>svg]:h-4">
                         <Sparkles /> AI Match Score
                       </div>
-                      <p>Upload your resume to see your match score</p>
-                      <span className="hr-jd-ai-badge">AI-Powered Matching Available</span>
+                      <p className="text-[0.78rem] text-hr-text-muted leading-[1.5] mb-3">Upload your resume to see your match score</p>
+                      <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.04em] bg-[rgba(124,58,237,0.12)] text-hr-accent-hover border border-[rgba(124,58,237,0.2)]">AI-Powered Matching Available</span>
                     </div>
                   )}
 
                   {/* Apply card */}
                   {!showApplicationForm ? (
-                    <div className="hr-jd-sidebar-card">
-                      <div className="hr-jd-sidebar-title">Interested?</div>
-                      <p style={{ fontSize: '0.88rem', color: 'var(--hr-text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>
+                    <div className={sidebarCardCls}>
+                      <div className="font-satoshi text-base font-medium text-hr-text mb-4">Interested?</div>
+                      <p className="text-[0.88rem] text-hr-text-secondary leading-[1.6] mb-5">
                         Submit your application and we'll get back to you.
                       </p>
                       {!isExpired && (
                         <button
-                          className="hr-jd-btn-apply full-width"
+                          className={`${btnApplyCls} w-full`}
                           onClick={() => setShowApplicationForm(true)}
                           data-testid="apply-button"
                         >
@@ -623,97 +638,104 @@ export default function JobDetailsPage() {
                       )}
                     </div>
                   ) : (
-                    <div className="hr-jd-sidebar-card hr-jd-form-card">
-                      <div className="hr-jd-form-header">
-                        <div className="hr-jd-sidebar-title">Submit Application</div>
-                        <button className="hr-jd-form-close" onClick={() => setShowApplicationForm(false)}>
+                    <div className={`${sidebarCardCls} p-5`}>
+                      <div className="flex justify-between items-start">
+                        <div className="font-satoshi text-base font-medium text-hr-text mb-4">Submit Application</div>
+                        <button className="bg-transparent border-none text-hr-text-muted cursor-pointer p-1 transition-colors duration-200 hover:text-hr-text [&>svg]:w-[18px] [&>svg]:h-[18px]" onClick={() => setShowApplicationForm(false)}>
                           <X />
                         </button>
                       </div>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--hr-text-muted)', marginBottom: 20 }}>
+                      <p className="text-[0.82rem] text-hr-text-muted mb-5">
                         Fill out the form below to apply for this position
                       </p>
-                      <form onSubmit={handleSubmit} className="hr-jd-form">
-                        <div className="hr-jd-form-group">
-                          <label htmlFor="name">Full Name *</label>
+                      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="name" className="text-[0.78rem] font-medium text-hr-text-secondary">Full Name *</label>
                           <input
                             id="name"
+                            className={formInputCls}
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             required
                             placeholder="Enter your full name"
                           />
                         </div>
-                        <div className="hr-jd-form-group">
-                          <label htmlFor="email">Email *</label>
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="email" className="text-[0.78rem] font-medium text-hr-text-secondary">Email *</label>
                           <input
                             id="email"
                             type="email"
+                            className={formInputCls}
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                             required
                             placeholder="you@example.com"
                           />
                         </div>
-                        <div className="hr-jd-form-group">
-                          <label htmlFor="phone">Phone *</label>
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="phone" className="text-[0.78rem] font-medium text-hr-text-secondary">Phone *</label>
                           <input
                             id="phone"
                             type="tel"
+                            className={formInputCls}
                             value={formData.phone}
                             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                             required
                             placeholder="+91 98765 43210"
                           />
                         </div>
-                        <div className="hr-jd-form-group">
-                          <label htmlFor="resume">Resume (PDF) *</label>
-                          <div className="hr-jd-file-input">
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="resume" className="text-[0.78rem] font-medium text-hr-text-secondary">Resume (PDF) *</label>
+                          <div className="relative">
                             <input
                               id="resume"
                               type="file"
                               accept=".pdf,.doc,.docx"
+                              className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.82rem] text-hr-text-secondary w-full cursor-pointer file:bg-hr-accent file:text-white file:border-none file:rounded-none file:py-1.5 file:px-4 file:mr-3 file:font-dm file:text-[0.78rem] file:font-medium file:cursor-pointer"
                               onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
                               required
                             />
-                            <Upload />
+                            <Upload className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-hr-text-muted pointer-events-none" />
                           </div>
                           {resumeFile && (
-                            <span className="hr-jd-file-name">
+                            <span className="flex items-center gap-1.5 text-[0.78rem] text-hr-green mt-1 [&>svg]:w-3.5 [&>svg]:h-3.5">
                               <Check /> {resumeFile.name}
                             </span>
                           )}
                         </div>
-                        <div className="hr-jd-form-group">
-                          <label htmlFor="coverLetter">Cover Letter</label>
+                        <div className="flex flex-col gap-1.5">
+                          <label htmlFor="coverLetter" className="text-[0.78rem] font-medium text-hr-text-secondary">Cover Letter</label>
                           <textarea
                             id="coverLetter"
+                            className={formInputCls}
                             value={formData.coverLetter}
                             onChange={(e) => setFormData({ ...formData, coverLetter: e.target.value })}
                             placeholder="Tell us why you're perfect for this role..."
                             rows={4}
                           />
                         </div>
-                        <div className="hr-jd-checkbox-row">
+                        <div className="flex items-start gap-2">
                           <input
                             type="checkbox"
                             id="whatsappConsent"
                             checked={formData.whatsappConsent}
                             onChange={(e) => setFormData({ ...formData, whatsappConsent: e.target.checked })}
+                            className="mt-0.5 cursor-pointer"
+                            style={{ accentColor: '#7C3AED' }}
                           />
-                          <label htmlFor="whatsappConsent">I agree to receive job updates via WhatsApp</label>
+                          <label htmlFor="whatsappConsent" className="text-[0.78rem] text-hr-text-muted leading-[1.4] cursor-pointer">I agree to receive job updates via WhatsApp</label>
                         </div>
-                        <div className="hr-jd-form-actions">
+                        <div className="flex gap-2 mt-1">
                           <button
                             type="submit"
-                            className="hr-jd-btn-apply"
+                            className={`${btnApplyCls} flex-1`}
                             disabled={applicationMutation.isPending}
                           >
                             {applicationMutation.isPending ? "Submitting..." : "Submit Application"}
                           </button>
                           <button
                             type="button"
-                            className="hr-jd-btn-secondary"
+                            className={btnSecondaryCls}
                             onClick={() => setShowApplicationForm(false)}
                           >
                             Cancel
@@ -726,7 +748,7 @@ export default function JobDetailsPage() {
               </div>
 
             </div>
-            <div className="struct-gutter"></div>
+            <div></div>
           </div>
         </div>
 

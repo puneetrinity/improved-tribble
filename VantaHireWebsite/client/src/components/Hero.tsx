@@ -1,4 +1,41 @@
 import { trackEvent } from "@/lib/analytics";
+import { btnPrimary, btnSecondary } from "@/lib/shared-styles";
+
+/* ── Reusable class-string constants ── */
+const structuralDiv = "max-md:hidden";
+const navItem = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-hr-text-muted cursor-default";
+const navItemActive = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-hr-text bg-[rgba(255,255,255,0.04)] cursor-default";
+const navIcon = "text-[0.7rem] w-4 text-center";
+const navSubItem = "text-[0.68rem] py-[5px] text-hr-text-muted cursor-default";
+const navSubItemActive = "text-[0.68rem] py-[5px] text-hr-accent-hover cursor-default relative before:content-[''] before:absolute before:-left-4 before:top-1/2 before:-translate-y-1/2 before:w-0.5 before:h-3.5 before:bg-hr-accent before:rounded-sm";
+const timeTab = "text-[0.6rem] text-hr-text-muted py-1 px-2 border border-[rgba(255,255,255,0.08)] -ml-px cursor-default first:rounded-l last:rounded-r";
+const timeTabActive = "text-[0.6rem] text-hr-text-muted py-1 px-2 border border-[rgba(255,255,255,0.08)] -ml-px cursor-default first:rounded-l last:rounded-r text-hr-text-secondary bg-[rgba(255,255,255,0.04)]";
+const filterBtn = "text-[0.6rem] text-hr-text-muted py-1 px-2.5 border border-[rgba(255,255,255,0.08)] rounded flex items-center gap-[3px]";
+const statCard = "bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-lg py-3 px-3.5";
+const statLabel = "text-[0.6rem] text-hr-text-muted flex items-center gap-1.5 mb-1.5";
+const statDot = "w-1.5 h-1.5 rounded-full";
+const statValue = "text-[1.35rem] font-bold text-hr-text";
+const stageBox = "text-left";
+const stageLabel = "text-[0.58rem] text-hr-text-muted mb-0.5";
+const stageCount = "text-[1.1rem] font-bold text-hr-text";
+const statChange = "text-[0.55rem] font-semibold ml-1 text-hr-green";
+const barCol = "flex-1 flex flex-col items-center h-full justify-end";
+const barBase = "w-full rounded-t-sm relative";
+const barPct = "absolute -top-3.5 left-1/2 -translate-x-1/2 font-mono text-[0.48rem] text-hr-text-muted";
+const pipelineActionSpan = "text-[0.6rem] text-hr-text-muted py-[3px] px-2 border border-[rgba(255,255,255,0.08)] rounded cursor-default";
+const tableActionSpan = "text-[0.58rem] text-hr-text-muted py-[3px] px-2 border border-[rgba(255,255,255,0.08)] rounded";
+const dataTableRow = "grid grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr] py-2 border-b border-[rgba(255,255,255,0.08)] text-hr-text-secondary items-center";
+const recruiterName = "flex items-center gap-2";
+const recruiterAvatar = "w-[22px] h-[22px] rounded-full flex items-center justify-center text-[0.45rem] font-bold shrink-0";
+const metricsTab = "text-[0.62rem] text-hr-text-muted py-1.5 px-2 cursor-default";
+const metricsTabActive = "text-[0.62rem] text-hr-text-secondary py-1.5 px-2 cursor-default border-b border-hr-text-secondary -mb-px";
+const metricGroup = "mb-4";
+const metricGroupLabel = "text-[0.6rem] text-hr-text-muted mb-2 flex items-center gap-1.5";
+const metricGroupNum = "font-mono text-[0.52rem]";
+const metricItem = "flex items-center gap-2 py-[5px] px-1.5 rounded mb-0.5 text-[0.62rem] text-hr-text-secondary hover:bg-[rgba(255,255,255,0.03)]";
+const metricLetter = "w-[18px] h-[18px] rounded flex items-center justify-center text-[0.5rem] font-bold font-mono";
+const metricArrow = "ml-auto text-hr-text-muted text-[0.55rem]";
+const metricSubLabel = "text-[0.55rem] text-hr-text-muted mb-1";
 
 const Hero = () => {
   const openCalendar = () => {
@@ -9,29 +46,29 @@ const Hero = () => {
   return (
     <>
       {/* Hero Grid */}
-      <div className="hr-hero-grid">
-        <div className="edge-left"></div>
-        <div className="gutter-left"></div>
-        <div className="content-left"></div>
-        <div className="content-center">
-          <div className="hr-hero-badge">
-            <span className="hr-badge-corner tl"></span>
-            <span className="hr-badge-corner tr"></span>
-            <span className="hr-badge-corner bl"></span>
-            <span className="hr-badge-corner br"></span>
+      <div className="grid grid-cols-[28px_1fr_120px_auto_120px_1fr_28px] max-md:flex max-md:flex-col min-h-auto pt-[60px] pb-0">
+        <div className={structuralDiv}></div>
+        <div className={structuralDiv}></div>
+        <div className={structuralDiv}></div>
+        <div className="border-b-0 flex flex-col items-center justify-start text-center pt-[120px] px-10 pb-0 animate-hr-fade-up max-md:pt-[80px] max-md:px-5">
+          <div className="inline-block relative font-mono text-xs font-normal text-hr-text-secondary tracking-[0.14em] uppercase mb-9 py-2.5 px-6 border border-dashed border-[rgba(255,255,255,0.18)] max-sm:text-[0.52rem] max-sm:tracking-[0.1em] max-sm:py-[7px] max-sm:px-3">
+            <span className="absolute w-2.5 h-2.5 border-[rgba(255,255,255,0.35)] border-solid border-t-2 border-l-2 border-r-0 border-b-0 -top-1 -left-1"></span>
+            <span className="absolute w-2.5 h-2.5 border-[rgba(255,255,255,0.35)] border-solid border-t-2 border-r-2 border-l-0 border-b-0 -top-1 -right-1"></span>
+            <span className="absolute w-2.5 h-2.5 border-[rgba(255,255,255,0.35)] border-solid border-b-2 border-l-2 border-t-0 border-r-0 -bottom-1 -left-1"></span>
+            <span className="absolute w-2.5 h-2.5 border-[rgba(255,255,255,0.35)] border-solid border-b-2 border-r-2 border-t-0 border-l-0 -bottom-1 -right-1"></span>
             UNIFIED RECRUITMENT PLATFORM
           </div>
 
-          <h1 className="hr-hero-h1">Make better hires, faster.</h1>
+          <h1 className="font-satoshi text-[clamp(2.8rem,5.5vw,4rem)] max-md:text-[clamp(2rem,8vw,2.8rem)] max-sm:text-[1.85rem] font-normal leading-[1.15] tracking-tight text-hr-text mb-7">Make better hires, faster.</h1>
 
-          <p className="hr-hero-subtitle">
+          <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto mb-9 font-normal max-md:text-[0.88rem]">
             VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows.
           </p>
 
-          <div className="hr-hero-actions">
+          <div className="flex items-center justify-center gap-3 mb-[18px] max-md:flex-col max-md:w-full">
             <a
               href="/recruiter-auth"
-              className="hr-btn-demo"
+              className={btnPrimary}
               onClick={(e) => {
                 e.preventDefault();
                 trackEvent("cta_click", { location: "home_hero", action: "get_started" });
@@ -40,174 +77,178 @@ const Hero = () => {
             >
               Get started
             </a>
-            <button className="hr-btn-pricing" onClick={openCalendar}>
+            <button className={btnSecondary} onClick={openCalendar}>
               Book a demo
             </button>
           </div>
         </div>
-        <div className="content-right"></div>
-        <div className="gutter-right"></div>
-        <div className="edge-right"></div>
+        <div className={structuralDiv}></div>
+        <div className={structuralDiv}></div>
+        <div className={structuralDiv}></div>
       </div>
 
       {/* Product Screenshot */}
-      <div className="hr-struct-section hr-screenshot-section">
-        <div className="struct-gutter"></div>
-        <div className="struct-body hr-screenshot-band">
-          <div className="hr-screenshot-wrapper">
-            <div className="hr-browser-bar">
-              <div className="hr-browser-dots"><span></span><span></span><span></span></div>
-              <div className="hr-browser-url">app.vantahire.com / Analytics / Pipeline Intelligence</div>
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.6rem', color: 'var(--hr-text-muted)', padding: '3px 8px', border: '1px solid var(--hr-border)', borderRadius: '3px', display: 'flex', alignItems: 'center', gap: '4px' }}>↗ Share</span>
-                <span style={{ fontSize: '0.6rem', color: 'var(--hr-text-muted)' }}>☆</span>
-                <span style={{ fontSize: '0.6rem', color: 'var(--hr-text-muted)' }}>⚡</span>
-                <span style={{ fontSize: '0.6rem', color: 'var(--hr-text-muted)' }}>⛶</span>
-                <span style={{ fontSize: '0.6rem', color: 'var(--hr-text-muted)' }}>⋯</span>
+      <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px] relative z-[2] mt-[60px] max-sm:mt-7 max-h-[420px] max-sm:max-h-[220px] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_0%,#000_60%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,#000_0%,#000_60%,transparent_100%)]">
+        <div></div>
+        <div className="bg-[linear-gradient(180deg,#0C0C10_0%,#1a1428_30%,#241a3a_50%,#1a1428_70%,#0C0C10_100%)] px-12 max-sm:px-2">
+          <div className="max-w-[1040px] mx-auto rounded-[10px] overflow-hidden border border-[rgba(255,255,255,0.1)] shadow-[0_40px_100px_rgba(0,0,0,0.6)] bg-hr-bg-card animate-hr-fade-up-delayed">
+            <div className="flex items-center py-2.5 px-4 bg-[#1a1a20] border-b border-[rgba(255,255,255,0.08)] gap-2">
+              <div className="flex gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(255,255,255,0.1)]"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(255,255,255,0.1)]"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(255,255,255,0.1)]"></span>
+              </div>
+              <div className="flex-1 text-center font-mono text-[0.65rem] text-hr-text-muted">app.vantahire.com / Analytics / Pipeline Intelligence</div>
+              <div className="flex gap-1.5 items-center">
+                <span className="text-[0.6rem] text-hr-text-muted py-[3px] px-2 border border-[rgba(255,255,255,0.08)] rounded-[3px] flex items-center gap-1">↗ Share</span>
+                <span className="text-[0.6rem] text-hr-text-muted">☆</span>
+                <span className="text-[0.6rem] text-hr-text-muted">⚡</span>
+                <span className="text-[0.6rem] text-hr-text-muted">⛶</span>
+                <span className="text-[0.6rem] text-hr-text-muted">⋯</span>
               </div>
             </div>
-            <div className="hr-app-layout">
+            <div className="flex min-h-[480px]">
               {/* Sidebar */}
-              <div className="hr-app-sidebar">
-                <div className="hr-app-sidebar-brand">
-                  <span className="dot">V</span>
+              <div className="w-[190px] bg-[#131318] border-r border-[rgba(255,255,255,0.08)] py-3.5 shrink-0 max-md:hidden">
+                <div className="px-4 pb-3.5 pt-0.5 font-bold text-[0.82rem] text-hr-text flex items-center gap-2 border-b border-[rgba(255,255,255,0.08)] mb-1.5">
+                  <span className="w-5 h-5 bg-hr-accent rounded-[5px] flex items-center justify-center text-[0.55rem] font-extrabold text-white">V</span>
                   VantaHire
                 </div>
-                <div className="hr-sidebar-select">
-                  FlowHire [INT] <span className="arrows">⇅</span>
+                <div className="mx-3 my-2 py-[5px] px-2.5 text-[0.65rem] text-hr-text-secondary border border-[rgba(255,255,255,0.08)] rounded-[5px] bg-transparent flex items-center justify-between">
+                  FlowHire [INT] <span className="text-hr-text-muted text-[0.5rem]">⇅</span>
                 </div>
-                <div className="hr-nav-item"><span className="icon">⌂</span> Home</div>
-                <div className="hr-nav-item"><span className="icon">👤</span> Candidates</div>
-                <div className="hr-nav-item"><span className="icon">🔍</span> Sourcing</div>
-                <div className="hr-nav-item"><span className="icon">📨</span> Outreach</div>
-                <div className="hr-nav-item"><span className="icon">🎤</span> Interviews</div>
-                <div className="hr-nav-item"><span className="icon">📊</span> Reports</div>
-                <div className="hr-nav-item active"><span className="icon">📈</span> Analytics</div>
-                <div className="hr-nav-sub">
-                  <div className="hr-nav-sub-item active">Pipeline Intelligence</div>
-                  <div className="hr-nav-sub-item">Team Performance</div>
+                <div className={navItem}><span className={navIcon}>⌂</span> Home</div>
+                <div className={navItem}><span className={navIcon}>👤</span> Candidates</div>
+                <div className={navItem}><span className={navIcon}>🔍</span> Sourcing</div>
+                <div className={navItem}><span className={navIcon}>📨</span> Outreach</div>
+                <div className={navItem}><span className={navIcon}>🎤</span> Interviews</div>
+                <div className={navItem}><span className={navIcon}>📊</span> Reports</div>
+                <div className={navItemActive}><span className={navIcon}>📈</span> Analytics</div>
+                <div className="pl-10">
+                  <div className={navSubItemActive}>Pipeline Intelligence</div>
+                  <div className={navSubItem}>Team Performance</div>
                 </div>
-                <div className="hr-sidebar-divider"></div>
-                <div className="hr-nav-item"><span className="icon">⚙</span> Settings</div>
-                <div className="hr-nav-item"><span className="icon">🔗</span> Integrations</div>
-                <div className="hr-nav-item"><span className="icon">🔒</span> Permissions</div>
-                <div className="hr-nav-item"><span className="icon">⚡</span> Automations</div>
+                <div className="h-px bg-[rgba(255,255,255,0.08)] my-2"></div>
+                <div className={navItem}><span className={navIcon}>⚙</span> Settings</div>
+                <div className={navItem}><span className={navIcon}>🔗</span> Integrations</div>
+                <div className={navItem}><span className={navIcon}>🔒</span> Permissions</div>
+                <div className={navItem}><span className={navIcon}>⚡</span> Automations</div>
               </div>
 
               {/* Main */}
-              <div className="hr-app-main">
-                <div className="hr-app-header">
-                  <div className="hr-app-breadcrumb">Analytics / <span>Pipeline Intelligence</span></div>
+              <div className="flex-1 py-4 px-5 overflow-hidden min-w-0">
+                <div className="flex items-center justify-between mb-3.5">
+                  <div className="text-[0.72rem] text-hr-text-muted">Analytics / <span className="text-hr-text-secondary">Pipeline Intelligence</span></div>
                 </div>
 
-                <div className="hr-date-bar">
-                  <div className="hr-date-range">📅 Mar 1, 2026 - Mar 21, 2026 ⇅</div>
-                  <div className="hr-time-tabs">
-                    <div className="hr-time-tab">Today</div>
-                    <div className="hr-time-tab">Yesterday</div>
-                    <div className="hr-time-tab active">7D</div>
-                    <div className="hr-time-tab">1M</div>
-                    <div className="hr-time-tab">3M</div>
-                    <div className="hr-time-tab">6M</div>
+                <div className="flex items-center gap-3 mb-4 flex-wrap">
+                  <div className="font-mono text-[0.62rem] text-hr-text-secondary py-[5px] px-2.5 border border-[rgba(255,255,255,0.08)] rounded flex items-center gap-1.5">📅 Mar 1, 2026 - Mar 21, 2026 ⇅</div>
+                  <div className="flex">
+                    <div className={timeTab}>Today</div>
+                    <div className={timeTab}>Yesterday</div>
+                    <div className={timeTabActive}>7D</div>
+                    <div className={timeTab}>1M</div>
+                    <div className={timeTab}>3M</div>
+                    <div className={timeTab}>6M</div>
                   </div>
-                  <div className="hr-filter-btns">
-                    <div className="hr-filter-btn"># Metric ▾</div>
-                    <div className="hr-filter-btn">Exclude ▾</div>
-                    <div className="hr-filter-btn">Compare ▾</div>
-                  </div>
-                </div>
-
-                <div className="hr-stats-row">
-                  <div className="hr-stat-card">
-                    <div className="hr-stat-label"><span className="hr-stat-dot" style={{ background: 'var(--hr-accent)' }}></span> Candidates Added</div>
-                    <div className="hr-stat-value">124</div>
-                  </div>
-                  <div className="hr-stat-card">
-                    <div className="hr-stat-label"><span className="hr-stat-dot" style={{ background: 'var(--hr-green)' }}></span> Outreach open rate</div>
-                    <div className="hr-stat-value">62%</div>
-                  </div>
-                  <div className="hr-stat-card">
-                    <div className="hr-stat-label"><span className="hr-stat-dot" style={{ background: 'var(--hr-red)' }}></span> Time to 1st Response</div>
-                    <div className="hr-stat-value">1.8 days</div>
-                  </div>
-                  <div className="hr-stat-card">
-                    <div className="hr-stat-label"><span className="hr-stat-dot" style={{ background: 'var(--hr-cyan)' }}></span> Offers Accepted</div>
-                    <div className="hr-stat-value">39</div>
+                  <div className="ml-auto flex gap-1.5">
+                    <div className={filterBtn}># Metric ▾</div>
+                    <div className={filterBtn}>Exclude ▾</div>
+                    <div className={filterBtn}>Compare ▾</div>
                   </div>
                 </div>
 
-                <div className="hr-pipeline-header">
-                  <span className="hr-pipeline-title">Pipeline Overview</span>
-                  <div className="hr-pipeline-actions">
-                    <span>✨ AI Insights</span>
-                    <span>Export ↗</span>
+                <div className="grid grid-cols-4 max-lg:grid-cols-2 gap-3 mb-[18px]">
+                  <div className={statCard}>
+                    <div className={statLabel}><span className={statDot} style={{ background: '#7C3AED' }}></span> Candidates Added</div>
+                    <div className={statValue}>124</div>
+                  </div>
+                  <div className={statCard}>
+                    <div className={statLabel}><span className={statDot} style={{ background: '#10B981' }}></span> Outreach open rate</div>
+                    <div className={statValue}>62%</div>
+                  </div>
+                  <div className={statCard}>
+                    <div className={statLabel}><span className={statDot} style={{ background: '#EF4444' }}></span> Time to 1st Response</div>
+                    <div className={statValue}>1.8 days</div>
+                  </div>
+                  <div className={statCard}>
+                    <div className={statLabel}><span className={statDot} style={{ background: '#06B6D4' }}></span> Offers Accepted</div>
+                    <div className={statValue}>39</div>
                   </div>
                 </div>
 
-                <div className="hr-pipeline-stages">
-                  <div className="hr-stage">
-                    <div className="hr-stage-label">Sourced</div>
-                    <div className="hr-stage-count">320 <span className="hr-stat-change hr-up">+67%</span></div>
-                  </div>
-                  <div className="hr-stage">
-                    <div className="hr-stage-label">Contacted</div>
-                    <div className="hr-stage-count">210</div>
-                  </div>
-                  <div className="hr-stage">
-                    <div className="hr-stage-label">Interviewed</div>
-                    <div className="hr-stage-count">44</div>
-                  </div>
-                  <div className="hr-stage">
-                    <div className="hr-stage-label">Offer</div>
-                    <div className="hr-stage-count">14 <span className="hr-stat-change hr-up">+31%</span></div>
-                  </div>
-                  <div className="hr-stage">
-                    <div className="hr-stage-label">Hired</div>
-                    <div className="hr-stage-count">9 <span className="hr-stat-change hr-up">+12%</span></div>
+                <div className="flex items-center justify-between mb-3.5">
+                  <span className="text-[0.8rem] font-semibold text-hr-text">Pipeline Overview</span>
+                  <div className="flex gap-2">
+                    <span className={pipelineActionSpan}>✨ AI Insights</span>
+                    <span className={pipelineActionSpan}>Export ↗</span>
                   </div>
                 </div>
 
-                <div className="hr-bar-chart">
-                  <div className="hr-bar-col"><div className="hr-bar" style={{ height: '85%', background: 'rgba(59,91,219,0.5)' }}><span className="hr-bar-pct">66%</span></div></div>
-                  <div className="hr-bar-col"><div className="hr-bar" style={{ height: '40%', background: 'rgba(59,91,219,0.4)' }}><span className="hr-bar-pct">11%</span></div></div>
-                  <div className="hr-bar-col"><div className="hr-bar" style={{ height: '38%', background: 'rgba(59,91,219,0.4)' }}><span className="hr-bar-pct">10%</span></div></div>
-                  <div className="hr-bar-col"><div className="hr-bar" style={{ height: '52%', background: 'rgba(59,91,219,0.45)' }}><span className="hr-bar-pct">32%</span></div></div>
-                  <div className="hr-bar-col"><div className="hr-bar" style={{ height: '75%', background: 'rgba(59,91,219,0.55)' }}><span className="hr-bar-pct">64%</span></div></div>
-                </div>
-
-                <div className="hr-table-header-row">
-                  <span className="hr-table-title">Pipeline Impact</span>
-                  <div className="hr-table-actions">
-                    <span>🔍 Search</span>
-                    <span>⚡ Filters ▾</span>
-                    <span>Export ↗</span>
+                <div className="grid grid-cols-5 gap-2 mb-3.5">
+                  <div className={stageBox}>
+                    <div className={stageLabel}>Sourced</div>
+                    <div className={stageCount}>320 <span className={statChange}>+67%</span></div>
+                  </div>
+                  <div className={stageBox}>
+                    <div className={stageLabel}>Contacted</div>
+                    <div className={stageCount}>210</div>
+                  </div>
+                  <div className={stageBox}>
+                    <div className={stageLabel}>Interviewed</div>
+                    <div className={stageCount}>44</div>
+                  </div>
+                  <div className={stageBox}>
+                    <div className={stageLabel}>Offer</div>
+                    <div className={stageCount}>14 <span className={statChange}>+31%</span></div>
+                  </div>
+                  <div className={stageBox}>
+                    <div className={stageLabel}>Hired</div>
+                    <div className={stageCount}>9 <span className={statChange}>+12%</span></div>
                   </div>
                 </div>
 
-                <div className="hr-data-table">
-                  <div className="hr-data-table-head">
+                <div className="flex items-end gap-2 h-20 mb-[18px]">
+                  <div className={barCol}><div className={barBase} style={{ height: '85%', background: 'rgba(59,91,219,0.5)' }}><span className={barPct}>66%</span></div></div>
+                  <div className={barCol}><div className={barBase} style={{ height: '40%', background: 'rgba(59,91,219,0.4)' }}><span className={barPct}>11%</span></div></div>
+                  <div className={barCol}><div className={barBase} style={{ height: '38%', background: 'rgba(59,91,219,0.4)' }}><span className={barPct}>10%</span></div></div>
+                  <div className={barCol}><div className={barBase} style={{ height: '52%', background: 'rgba(59,91,219,0.45)' }}><span className={barPct}>32%</span></div></div>
+                  <div className={barCol}><div className={barBase} style={{ height: '75%', background: 'rgba(59,91,219,0.55)' }}><span className={barPct}>64%</span></div></div>
+                </div>
+
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-[0.78rem] font-semibold text-hr-text">Pipeline Impact</span>
+                  <div className="flex gap-1.5">
+                    <span className={tableActionSpan}>🔍 Search</span>
+                    <span className={tableActionSpan}>⚡ Filters ▾</span>
+                    <span className={tableActionSpan}>Export ↗</span>
+                  </div>
+                </div>
+
+                <div className="w-full text-[0.65rem]">
+                  <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr] py-1.5 border-b border-[rgba(255,255,255,0.08)] text-hr-text-muted font-medium">
                     <span>Recruiter</span>
                     <span>Candidates</span>
                     <span>Conversion Rate</span>
                     <span>Avg Stage Time</span>
                     <span>Hires</span>
                   </div>
-                  <div className="hr-data-table-row">
-                    <span className="hr-recruiter-name"><span className="hr-recruiter-avatar" style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--hr-accent-hover)' }}>SL</span> Sarah Lee</span>
+                  <div className={dataTableRow}>
+                    <span className={recruiterName}><span className={recruiterAvatar} style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>SL</span> Sarah Lee</span>
                     <span>84</span>
                     <span>18%</span>
                     <span>2.1 days</span>
                     <span>6</span>
                   </div>
-                  <div className="hr-data-table-row">
-                    <span className="hr-recruiter-name"><span className="hr-recruiter-avatar" style={{ background: 'rgba(16,185,129,0.2)', color: 'var(--hr-green)' }}>JS</span> James Smith</span>
+                  <div className={dataTableRow}>
+                    <span className={recruiterName}><span className={recruiterAvatar} style={{ background: 'rgba(16,185,129,0.2)', color: '#10B981' }}>JS</span> James Smith</span>
                     <span>92</span>
                     <span>22%</span>
                     <span>1.5 days</span>
                     <span>5</span>
                   </div>
-                  <div className="hr-data-table-row">
-                    <span className="hr-recruiter-name"><span className="hr-recruiter-avatar" style={{ background: 'rgba(245,158,11,0.2)', color: 'var(--hr-yellow)' }}>EJ</span> Emily Johnson</span>
+                  <div className={dataTableRow}>
+                    <span className={recruiterName}><span className={recruiterAvatar} style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>EJ</span> Emily Johnson</span>
                     <span>78</span>
                     <span>15%</span>
                     <span>3.2 days</span>
@@ -217,83 +258,83 @@ const Hero = () => {
               </div>
 
               {/* Metrics Panel */}
-              <div className="hr-app-metrics">
-                <div className="hr-metrics-tabs">
-                  <div className="hr-metrics-tab active">Query</div>
-                  <div className="hr-metrics-tab">Chart</div>
-                  <div className="hr-metrics-tab">Annotations</div>
+              <div className="w-[210px] bg-[#131318] border-l border-[rgba(255,255,255,0.08)] p-4 shrink-0 overflow-hidden max-lg:hidden">
+                <div className="flex mb-3.5 border-b border-[rgba(255,255,255,0.08)]">
+                  <div className={metricsTabActive}>Query</div>
+                  <div className={metricsTab}>Chart</div>
+                  <div className={metricsTab}>Annotations</div>
                 </div>
 
-                <div className="hr-metrics-heading">
-                  Metrics <span className="plus">+</span>
+                <div className="text-[0.72rem] font-semibold text-hr-text mb-2.5 flex items-center justify-between">
+                  Metrics <span className="text-[0.8rem] text-hr-text-muted cursor-default">+</span>
                 </div>
 
-                <div className="hr-metric-group">
-                  <div className="hr-metric-group-label"><span className="num">1</span> Pipeline conversion</div>
-                  <div className="hr-metric-item">
-                    <span className="hr-metric-letter" style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--hr-accent-hover)' }}>A</span>
+                <div className={metricGroup}>
+                  <div className={metricGroupLabel}><span className={metricGroupNum}>1</span> Pipeline conversion</div>
+                  <div className={metricItem}>
+                    <span className={metricLetter} style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>A</span>
                     Candidate Added
-                    <span className="hr-metric-arrow">›</span>
+                    <span className={metricArrow}>›</span>
                   </div>
-                  <div className="hr-metric-item">
-                    <span className="hr-metric-letter" style={{ background: 'rgba(16,185,129,0.2)', color: 'var(--hr-green)' }}>B</span>
+                  <div className={metricItem}>
+                    <span className={metricLetter} style={{ background: 'rgba(16,185,129,0.2)', color: '#10B981' }}>B</span>
                     Outreach Sent
-                    <span className="hr-metric-arrow">›</span>
+                    <span className={metricArrow}>›</span>
                   </div>
-                  <div className="hr-metric-item">
-                    <span className="hr-metric-letter" style={{ background: 'rgba(245,158,11,0.2)', color: 'var(--hr-yellow)' }}>C</span>
+                  <div className={metricItem}>
+                    <span className={metricLetter} style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>C</span>
                     Reply Received
-                    <span className="hr-metric-arrow">›</span>
+                    <span className={metricArrow}>›</span>
                   </div>
-                  <div className="hr-metric-item">
-                    <span className="hr-metric-letter" style={{ background: 'rgba(6,182,212,0.2)', color: 'var(--hr-cyan)' }}>D</span>
+                  <div className={metricItem}>
+                    <span className={metricLetter} style={{ background: 'rgba(6,182,212,0.2)', color: '#06B6D4' }}>D</span>
                     Interview Completed
-                    <span className="hr-metric-arrow">›</span>
+                    <span className={metricArrow}>›</span>
                   </div>
-                  <div className="hr-metric-item">
-                    <span className="hr-metric-letter" style={{ background: 'rgba(139,92,246,0.2)', color: 'var(--hr-purple)' }}>E</span>
+                  <div className={metricItem}>
+                    <span className={metricLetter} style={{ background: 'rgba(139,92,246,0.2)', color: '#8B5CF6' }}>E</span>
                     Offer Accepted
-                    <span className="hr-metric-arrow">›</span>
+                    <span className={metricArrow}>›</span>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', padding: '0 6px' }}>
-                    <span style={{ fontSize: '0.52rem', color: 'var(--hr-text-muted)', padding: '2px 6px', border: '1px solid var(--hr-border)', borderRadius: '3px' }}># User ▾</span>
-                    <span style={{ fontSize: '0.52rem', color: 'var(--hr-text-muted)', padding: '2px 6px', border: '1px solid var(--hr-border)', borderRadius: '3px' }}>Uniques ▾</span>
+                  <div className="flex gap-2 mt-2 px-1.5">
+                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]"># User ▾</span>
+                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]">Uniques ▾</span>
                   </div>
                 </div>
 
-                <div className="hr-metric-group">
-                  <div className="hr-metric-group-label"><span className="num">2</span> Outreach engagement</div>
-                  <div className="hr-metric-sub-label" style={{ padding: '0 6px' }}>Event: <span style={{ color: 'var(--hr-text-secondary)' }}>Event Count</span></div>
-                  <div className="hr-metric-item">
-                    <span className="hr-metric-letter" style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--hr-accent-hover)' }}>📧</span>
+                <div className={metricGroup}>
+                  <div className={metricGroupLabel}><span className={metricGroupNum}>2</span> Outreach engagement</div>
+                  <div className={`${metricSubLabel} px-1.5`}>Event: <span className="text-hr-text-secondary">Event Count</span></div>
+                  <div className={metricItem}>
+                    <span className={metricLetter} style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>📧</span>
                     Email Opened
-                    <span className="hr-metric-arrow">›</span>
+                    <span className={metricArrow}>›</span>
                   </div>
-                  <div style={{ padding: '6px', fontSize: '0.52rem', color: 'var(--hr-text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <div className="p-1.5 text-[0.52rem] text-hr-text-muted flex items-center gap-1">
                     ⊕ Add Event
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', padding: '0 6px' }}>
-                    <span style={{ fontSize: '0.52rem', color: 'var(--hr-text-muted)', padding: '2px 6px', border: '1px solid var(--hr-border)', borderRadius: '3px' }}>Breakdown ▾</span>
-                    <span style={{ fontSize: '0.52rem', color: 'var(--hr-text-muted)', padding: '2px 6px', border: '1px solid var(--hr-border)', borderRadius: '3px' }}>Recruiter ▾</span>
+                  <div className="flex gap-2 px-1.5">
+                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]">Breakdown ▾</span>
+                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]">Recruiter ▾</span>
                   </div>
                 </div>
 
-                <div className="hr-metric-group">
-                  <div className="hr-metric-group-label"><span className="num">3</span> Hiring Speed</div>
-                  <div style={{ padding: '0 6px' }}>
-                    <div className="hr-metric-sub-label">Time Between Events</div>
-                    <div style={{ fontSize: '0.52rem', color: 'var(--hr-text-secondary)', padding: '4px 8px', border: '1px solid var(--hr-border)', borderRadius: '3px', marginTop: '4px' }}>From: Outreach Sent</div>
+                <div className={metricGroup}>
+                  <div className={metricGroupLabel}><span className={metricGroupNum}>3</span> Hiring Speed</div>
+                  <div className="px-1.5">
+                    <div className={metricSubLabel}>Time Between Events</div>
+                    <div className="text-[0.52rem] text-hr-text-secondary py-1 px-2 border border-[rgba(255,255,255,0.08)] rounded-[3px] mt-1">From: Outreach Sent</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div className="struct-gutter"></div>
+        <div></div>
       </div>
 
       {/* Grid separator */}
-      <div style={{ width: '100%', height: 0, borderTop: '1px solid var(--hr-grid-line)' }}></div>
+      <div className="w-full h-0 border-t border-[rgba(255,255,255,0.07)]"></div>
     </>
   );
 };

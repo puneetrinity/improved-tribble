@@ -1,150 +1,166 @@
+import { sectionLabel } from "@/lib/shared-styles";
+
+// Shared Tailwind class strings for mockup UI elements
+const mock = {
+  container: "bg-hr-bg-card border border-[rgba(255,255,255,0.12)] rounded-[10px] overflow-hidden shadow-[0_16px_48px_rgba(0,0,0,0.35)]",
+  bar: "flex items-center gap-1.5 py-[9px] px-3.5 bg-[#1a1a20] border-b border-[rgba(255,255,255,0.08)]",
+  dot: "w-2 h-2 rounded-full bg-[rgba(255,255,255,0.08)]",
+  body: "p-[18px] min-h-[280px]",
+  heading: "text-[0.72rem] font-semibold text-hr-text mb-1",
+  sub: "text-[0.55rem] text-hr-text-muted mb-3.5",
+};
+
 const ThreeLayers = () => {
   return (
-    <div className="hr-struct-section">
-      <div className="struct-gutter"></div>
-      <div className="struct-body">
-        <section className="hr-layers-section" style={{ borderBottom: 'none' }}>
-          <div className="hr-layers-intro">
-            <div className="hr-section-label">Three Powerful Layers</div>
-            <h2 className="hr-section-title">One Platform,<br />Three Dimensions of Power</h2>
-            <p className="hr-section-desc" style={{ margin: '0 auto' }}>
+    <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+      <div></div>
+      <div className="border-b border-[rgba(255,255,255,0.07)]">
+        <section className="py-[100px] px-12 max-md:py-[60px] max-md:px-5 border-b-0">
+          <div className="text-center mb-20">
+            <div className={sectionLabel}>Three Powerful Layers</div>
+            <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] max-sm:text-[1.6rem] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text">One Platform,<br />Three Dimensions of Power</h2>
+            <p className="text-base max-sm:text-[0.9rem] leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">
               VantaHire combines intelligence, outreach, and operations into a unified system that handles every aspect of modern recruitment.
             </p>
           </div>
 
           {/* Intelligence Layer */}
-          <div className="hr-layer-row">
-            <div className="hr-layer-text">
-              <div className="hr-layer-num">Layer 01 — Intelligence</div>
-              <h3>Intelligence Layer</h3>
-              <p>AI-powered resume parsing, candidate matching, and smart recommendations that learn from your hiring patterns.</p>
-              <div className="hr-layer-tags">
-                <span className="hr-layer-tag">Resume Parsing</span>
-                <span className="hr-layer-tag">Smart Matching</span>
-                <span className="hr-layer-tag">Skill Mapping</span>
-                <span className="hr-layer-tag">Pattern Learning</span>
+          <div className="grid grid-cols-[1fr_1.2fr] max-md:grid-cols-1 gap-[60px] max-md:gap-8 max-sm:gap-6 items-center max-w-[1100px] mx-auto mb-20">
+            <div>
+              <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">Layer 01 — Intelligence</div>
+              <h3 className="font-satoshi text-[1.7rem] max-md:text-[1.4rem] font-normal mb-3.5 text-hr-text">Intelligence Layer</h3>
+              <p className="text-[0.95rem] text-hr-text-secondary leading-[1.7] mb-[18px]">AI-powered resume parsing, candidate matching, and smart recommendations that learn from your hiring patterns.</p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Resume Parsing</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Smart Matching</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Skill Mapping</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Pattern Learning</span>
               </div>
             </div>
-            <div className="hr-layer-mock">
-              <div className="hr-mock-bar"><div className="dots"><span></span><span></span><span></span></div></div>
-              <div className="hr-mock-body">
-                <div className="hr-mock-heading">AI Candidate Matching</div>
-                <div className="hr-mock-sub">Senior Frontend Engineer · Bengaluru · 3 matches</div>
-                <div className="hr-cand-card">
-                  <div className="hr-cand-avatar" style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--hr-accent-hover)' }}>RP</div>
-                  <div className="hr-cand-info"><div className="hr-cand-name">Rahul Patel</div><div className="hr-cand-role">Sr. Frontend Dev · 6 yrs · React, TypeScript</div></div>
-                  <span className="hr-match-badge hr-match-high">96%</span>
+            <div className={mock.container}>
+              <div className={mock.bar}><div className="flex gap-[5px]"><span className={mock.dot}></span><span className={mock.dot}></span><span className={mock.dot}></span></div></div>
+              <div className={mock.body}>
+                <div className={mock.heading}>AI Candidate Matching</div>
+                <div className={mock.sub}>Senior Frontend Engineer · Bengaluru · 3 matches</div>
+                {/* Candidate cards */}
+                <div className="flex items-center gap-2.5 p-2.5 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px] mb-1.5">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[0.6rem] font-bold shrink-0" style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>RP</div>
+                  <div className="flex-1"><div className="text-[0.7rem] font-semibold text-hr-text mb-px">Rahul Patel</div><div className="text-[0.55rem] text-hr-text-muted">Sr. Frontend Dev · 6 yrs · React, TypeScript</div></div>
+                  <span className="font-mono text-[0.62rem] font-semibold py-[3px] px-2.5 rounded-full bg-[rgba(16,185,129,0.12)] text-hr-green">96%</span>
                 </div>
-                <div className="hr-cand-card">
-                  <div className="hr-cand-avatar" style={{ background: 'rgba(16,185,129,0.2)', color: 'var(--hr-green)' }}>AS</div>
-                  <div className="hr-cand-info"><div className="hr-cand-name">Ananya Sharma</div><div className="hr-cand-role">Lead Engineer · 8 yrs · Vue, Node.js</div></div>
-                  <span className="hr-match-badge hr-match-high">91%</span>
+                <div className="flex items-center gap-2.5 p-2.5 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px] mb-1.5">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[0.6rem] font-bold shrink-0" style={{ background: 'rgba(16,185,129,0.2)', color: '#10B981' }}>AS</div>
+                  <div className="flex-1"><div className="text-[0.7rem] font-semibold text-hr-text mb-px">Ananya Sharma</div><div className="text-[0.55rem] text-hr-text-muted">Lead Engineer · 8 yrs · Vue, Node.js</div></div>
+                  <span className="font-mono text-[0.62rem] font-semibold py-[3px] px-2.5 rounded-full bg-[rgba(16,185,129,0.12)] text-hr-green">91%</span>
                 </div>
-                <div className="hr-cand-card">
-                  <div className="hr-cand-avatar" style={{ background: 'rgba(245,158,11,0.2)', color: 'var(--hr-yellow)' }}>VK</div>
-                  <div className="hr-cand-info"><div className="hr-cand-name">Vikram Kumar</div><div className="hr-cand-role">Full Stack Dev · 4 yrs · React, Python</div></div>
-                  <span className="hr-match-badge hr-match-mid">78%</span>
+                <div className="flex items-center gap-2.5 p-2.5 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px] mb-1.5">
+                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-[0.6rem] font-bold shrink-0" style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>VK</div>
+                  <div className="flex-1"><div className="text-[0.7rem] font-semibold text-hr-text mb-px">Vikram Kumar</div><div className="text-[0.55rem] text-hr-text-muted">Full Stack Dev · 4 yrs · React, Python</div></div>
+                  <span className="font-mono text-[0.62rem] font-semibold py-[3px] px-2.5 rounded-full bg-[rgba(245,158,11,0.12)] text-hr-yellow">78%</span>
                 </div>
-                <div className="hr-skill-section">
-                  <div className="hr-skill-section-title">Skill match — Rahul Patel</div>
-                  <div className="hr-skill-row"><span className="hr-skill-name">React</span><div className="hr-skill-track"><div className="hr-skill-fill" style={{ width: '95%', background: 'var(--hr-green)' }}></div></div></div>
-                  <div className="hr-skill-row"><span className="hr-skill-name">TypeScript</span><div className="hr-skill-track"><div className="hr-skill-fill" style={{ width: '88%', background: 'var(--hr-accent)' }}></div></div></div>
-                  <div className="hr-skill-row"><span className="hr-skill-name">System Design</span><div className="hr-skill-track"><div className="hr-skill-fill" style={{ width: '72%', background: 'var(--hr-yellow)' }}></div></div></div>
+                {/* Skill bars */}
+                <div className="mt-3">
+                  <div className="text-[0.55rem] text-hr-text-muted uppercase tracking-[0.04em] mb-2">Skill match — Rahul Patel</div>
+                  <div className="flex items-center gap-2 mb-[5px]"><span className="text-[0.58rem] text-hr-text-secondary w-[72px] shrink-0">React</span><div className="flex-1 h-[3px] bg-[rgba(255,255,255,0.08)] rounded-sm overflow-hidden"><div className="h-full rounded-sm" style={{ width: '95%', background: '#10B981' }}></div></div></div>
+                  <div className="flex items-center gap-2 mb-[5px]"><span className="text-[0.58rem] text-hr-text-secondary w-[72px] shrink-0">TypeScript</span><div className="flex-1 h-[3px] bg-[rgba(255,255,255,0.08)] rounded-sm overflow-hidden"><div className="h-full rounded-sm" style={{ width: '88%', background: '#7C3AED' }}></div></div></div>
+                  <div className="flex items-center gap-2 mb-[5px]"><span className="text-[0.58rem] text-hr-text-secondary w-[72px] shrink-0">System Design</span><div className="flex-1 h-[3px] bg-[rgba(255,255,255,0.08)] rounded-sm overflow-hidden"><div className="h-full rounded-sm" style={{ width: '72%', background: '#F59E0B' }}></div></div></div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Outreach Layer */}
-          <div className="hr-layer-row reverse">
-            <div className="hr-layer-text">
-              <div className="hr-layer-num">Layer 02 — Outreach</div>
-              <h3>Outreach Layer</h3>
-              <p>Multi-channel candidate engagement through WhatsApp and email with automated sequences and templates.</p>
-              <div className="hr-layer-tags">
-                <span className="hr-layer-tag">WhatsApp</span>
-                <span className="hr-layer-tag">Email Sequences</span>
-                <span className="hr-layer-tag">Templates</span>
-                <span className="hr-layer-tag">Auto Follow-up</span>
+          <div className="grid grid-cols-[1.2fr_1fr] max-md:grid-cols-1 gap-[60px] max-md:gap-8 max-sm:gap-6 items-center max-w-[1100px] mx-auto mb-20">
+            <div className="max-md:order-2">
+              <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">Layer 02 — Outreach</div>
+              <h3 className="font-satoshi text-[1.7rem] max-md:text-[1.4rem] font-normal mb-3.5 text-hr-text">Outreach Layer</h3>
+              <p className="text-[0.95rem] text-hr-text-secondary leading-[1.7] mb-[18px]">Multi-channel candidate engagement through WhatsApp and email with automated sequences and templates.</p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">WhatsApp</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Email Sequences</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Templates</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Auto Follow-up</span>
               </div>
             </div>
-            <div className="hr-layer-mock">
-              <div className="hr-mock-bar"><div className="dots"><span></span><span></span><span></span></div></div>
-              <div className="hr-mock-body">
-                <div className="hr-mock-heading">Outreach Channels</div>
-                <div className="hr-channels-grid">
-                  <div className="hr-channel-card">
-                    <div className="hr-channel-head">
-                      <div className="hr-channel-icon" style={{ background: 'rgba(16,185,129,0.2)', color: 'var(--hr-green)' }}>W</div>
-                      <span className="hr-channel-name">WhatsApp</span>
+            <div className={`${mock.container} max-md:order-1`}>
+              <div className={mock.bar}><div className="flex gap-[5px]"><span className={mock.dot}></span><span className={mock.dot}></span><span className={mock.dot}></span></div></div>
+              <div className={mock.body}>
+                <div className={mock.heading}>Outreach Channels</div>
+                {/* Channel cards */}
+                <div className="grid grid-cols-2 gap-2 mb-3.5">
+                  <div className="p-2.5 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px]">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <div className="w-5 h-5 rounded flex items-center justify-center text-[0.55rem] font-bold" style={{ background: 'rgba(16,185,129,0.2)', color: '#10B981' }}>W</div>
+                      <span className="text-[0.68rem] font-semibold text-hr-text">WhatsApp</span>
                     </div>
-                    <div className="hr-channel-stat"><span>Delivered</span><span className="val">342</span></div>
-                    <div className="hr-channel-stat"><span>Read Rate</span><span className="val">89%</span></div>
-                    <div className="hr-channel-stat"><span>Replies</span><span className="val">156</span></div>
+                    <div className="flex justify-between text-[0.55rem] text-hr-text-muted mb-[3px]"><span>Delivered</span><span className="text-hr-text-secondary font-semibold">342</span></div>
+                    <div className="flex justify-between text-[0.55rem] text-hr-text-muted mb-[3px]"><span>Read Rate</span><span className="text-hr-text-secondary font-semibold">89%</span></div>
+                    <div className="flex justify-between text-[0.55rem] text-hr-text-muted mb-[3px]"><span>Replies</span><span className="text-hr-text-secondary font-semibold">156</span></div>
                   </div>
-                  <div className="hr-channel-card">
-                    <div className="hr-channel-head">
-                      <div className="hr-channel-icon" style={{ background: 'rgba(124,58,237,0.2)', color: 'var(--hr-accent-hover)' }}>E</div>
-                      <span className="hr-channel-name">Email</span>
+                  <div className="p-2.5 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px]">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <div className="w-5 h-5 rounded flex items-center justify-center text-[0.55rem] font-bold" style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>E</div>
+                      <span className="text-[0.68rem] font-semibold text-hr-text">Email</span>
                     </div>
-                    <div className="hr-channel-stat"><span>Sent</span><span className="val">518</span></div>
-                    <div className="hr-channel-stat"><span>Open Rate</span><span className="val">64%</span></div>
-                    <div className="hr-channel-stat"><span>Replies</span><span className="val">98</span></div>
+                    <div className="flex justify-between text-[0.55rem] text-hr-text-muted mb-[3px]"><span>Sent</span><span className="text-hr-text-secondary font-semibold">518</span></div>
+                    <div className="flex justify-between text-[0.55rem] text-hr-text-muted mb-[3px]"><span>Open Rate</span><span className="text-hr-text-secondary font-semibold">64%</span></div>
+                    <div className="flex justify-between text-[0.55rem] text-hr-text-muted mb-[3px]"><span>Replies</span><span className="text-hr-text-secondary font-semibold">98</span></div>
                   </div>
                 </div>
-                <div className="hr-sequence-label">Active Sequence: "Senior Dev Outreach"</div>
-                <div className="hr-sequence-steps">
-                  <div className="hr-step-node done">1</div>
-                  <div className="hr-step-line done"></div>
-                  <div className="hr-step-node done">2</div>
-                  <div className="hr-step-line done"></div>
-                  <div className="hr-step-node">3</div>
-                  <div className="hr-step-line"></div>
-                  <div className="hr-step-node">4</div>
+                {/* Sequence steps */}
+                <div className="text-[0.6rem] text-hr-text-secondary font-medium mb-2.5">Active Sequence: &quot;Senior Dev Outreach&quot;</div>
+                <div className="flex items-center">
+                  <div className="w-[26px] h-[26px] rounded-full border-2 border-hr-accent flex items-center justify-center text-[0.5rem] font-bold shrink-0 bg-hr-accent text-white">1</div>
+                  <div className="flex-1 h-0.5 bg-hr-accent"></div>
+                  <div className="w-[26px] h-[26px] rounded-full border-2 border-hr-accent flex items-center justify-center text-[0.5rem] font-bold shrink-0 bg-hr-accent text-white">2</div>
+                  <div className="flex-1 h-0.5 bg-hr-accent"></div>
+                  <div className="w-[26px] h-[26px] rounded-full border-2 border-hr-accent flex items-center justify-center text-[0.5rem] font-bold text-hr-accent-hover shrink-0 bg-hr-bg-elevated">3</div>
+                  <div className="flex-1 h-0.5 bg-[rgba(255,255,255,0.08)]"></div>
+                  <div className="w-[26px] h-[26px] rounded-full border-2 border-hr-accent flex items-center justify-center text-[0.5rem] font-bold text-hr-accent-hover shrink-0 bg-hr-bg-elevated">4</div>
                 </div>
-                <div className="hr-step-labels">
-                  <span className="hr-step-lbl">WhatsApp Intro</span>
-                  <span className="hr-step-lbl">Email Details</span>
-                  <span className="hr-step-lbl">Follow-up D3</span>
-                  <span className="hr-step-lbl">Final Nudge</span>
+                <div className="flex justify-between mt-1.5">
+                  <span className="text-[0.45rem] text-hr-text-muted text-center w-[50px]">WhatsApp Intro</span>
+                  <span className="text-[0.45rem] text-hr-text-muted text-center w-[50px]">Email Details</span>
+                  <span className="text-[0.45rem] text-hr-text-muted text-center w-[50px]">Follow-up D3</span>
+                  <span className="text-[0.45rem] text-hr-text-muted text-center w-[50px]">Final Nudge</span>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Operations Layer */}
-          <div className="hr-layer-row">
-            <div className="hr-layer-text">
-              <div className="hr-layer-num">Layer 03 — Operations</div>
-              <h3>Operations Layer</h3>
-              <p>End-to-end recruitment workflow management with client portals, invoicing, and team collaboration.</p>
-              <div className="hr-layer-tags">
-                <span className="hr-layer-tag">Client Portal</span>
-                <span className="hr-layer-tag">Invoicing</span>
-                <span className="hr-layer-tag">Team Collab</span>
-                <span className="hr-layer-tag">Workflows</span>
+          <div className="grid grid-cols-[1fr_1.2fr] max-md:grid-cols-1 gap-[60px] max-md:gap-8 max-sm:gap-6 items-center max-w-[1100px] mx-auto mb-20">
+            <div>
+              <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">Layer 03 — Operations</div>
+              <h3 className="font-satoshi text-[1.7rem] max-md:text-[1.4rem] font-normal mb-3.5 text-hr-text">Operations Layer</h3>
+              <p className="text-[0.95rem] text-hr-text-secondary leading-[1.7] mb-[18px]">End-to-end recruitment workflow management with client portals, invoicing, and team collaboration.</p>
+              <div className="flex flex-wrap gap-1.5">
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Client Portal</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Invoicing</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Team Collab</span>
+                <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Workflows</span>
               </div>
             </div>
-            <div className="hr-layer-mock">
-              <div className="hr-mock-bar"><div className="dots"><span></span><span></span><span></span></div></div>
-              <div className="hr-mock-body">
-                <div className="hr-mock-heading">Operations Dashboard</div>
-                <div className="hr-ops-grid">
-                  <div className="hr-ops-widget">
-                    <div className="hr-ops-label">Active Jobs</div>
-                    <div className="hr-ops-value">34</div>
-                    <div className="hr-ops-sub">8 closing this week</div>
+            <div className={mock.container}>
+              <div className={mock.bar}><div className="flex gap-[5px]"><span className={mock.dot}></span><span className={mock.dot}></span><span className={mock.dot}></span></div></div>
+              <div className={mock.body}>
+                <div className={mock.heading}>Operations Dashboard</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-3 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px]">
+                    <div className="text-[0.55rem] text-hr-text-muted uppercase tracking-[0.04em] mb-1.5">Active Jobs</div>
+                    <div className="text-[1.3rem] font-bold text-hr-text">34</div>
+                    <div className="text-[0.52rem] text-hr-text-muted mt-0.5">8 closing this week</div>
                   </div>
-                  <div className="hr-ops-widget">
-                    <div className="hr-ops-label">Revenue MTD</div>
-                    <div className="hr-ops-value">₹18.4L</div>
-                    <div className="hr-ops-sub" style={{ color: 'var(--hr-green)' }}>↑ 23% vs last month</div>
+                  <div className="p-3 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px]">
+                    <div className="text-[0.55rem] text-hr-text-muted uppercase tracking-[0.04em] mb-1.5">Revenue MTD</div>
+                    <div className="text-[1.3rem] font-bold text-hr-text">₹18.4L</div>
+                    <div className="text-[0.52rem] mt-0.5 text-hr-green">↑ 23% vs last month</div>
                   </div>
-                  <div className="hr-ops-widget" style={{ gridColumn: 'span 2' }}>
-                    <div className="hr-ops-label">Recent Invoices</div>
-                    <div className="hr-invoice-row"><span className="hr-inv-client">TechCorp India</span><span className="hr-inv-amount">₹2,40,000</span><span className="hr-status-pill hr-status-paid">Paid</span></div>
-                    <div className="hr-invoice-row"><span className="hr-inv-client">Finova Solutions</span><span className="hr-inv-amount">₹1,85,000</span><span className="hr-status-pill hr-status-pending">Pending</span></div>
-                    <div className="hr-invoice-row"><span className="hr-inv-client">DataBridge Labs</span><span className="hr-inv-amount">₹3,20,000</span><span className="hr-status-pill hr-status-paid">Paid</span></div>
+                  <div className="col-span-2 p-3 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px]">
+                    <div className="text-[0.55rem] text-hr-text-muted uppercase tracking-[0.04em] mb-1.5">Recent Invoices</div>
+                    <div className="flex items-center justify-between py-[5px] border-b border-[rgba(255,255,255,0.08)] text-[0.55rem]"><span className="text-hr-text-secondary">TechCorp India</span><span className="font-mono text-hr-text font-medium">₹2,40,000</span><span className="text-[0.45rem] py-[2px] px-1.5 rounded-full font-semibold bg-[rgba(16,185,129,0.12)] text-hr-green">Paid</span></div>
+                    <div className="flex items-center justify-between py-[5px] border-b border-[rgba(255,255,255,0.08)] text-[0.55rem]"><span className="text-hr-text-secondary">Finova Solutions</span><span className="font-mono text-hr-text font-medium">₹1,85,000</span><span className="text-[0.45rem] py-[2px] px-1.5 rounded-full font-semibold bg-[rgba(245,158,11,0.12)] text-hr-yellow">Pending</span></div>
+                    <div className="flex items-center justify-between py-[5px] text-[0.55rem]"><span className="text-hr-text-secondary">DataBridge Labs</span><span className="font-mono text-hr-text font-medium">₹3,20,000</span><span className="text-[0.45rem] py-[2px] px-1.5 rounded-full font-semibold bg-[rgba(16,185,129,0.12)] text-hr-green">Paid</span></div>
                   </div>
                 </div>
               </div>
@@ -152,7 +168,7 @@ const ThreeLayers = () => {
           </div>
         </section>
       </div>
-      <div className="struct-gutter"></div>
+      <div></div>
     </div>
   );
 };

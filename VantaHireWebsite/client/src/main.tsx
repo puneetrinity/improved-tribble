@@ -1,8 +1,9 @@
 import { hydrateRoot, createRoot } from "react-dom/client";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
-import "./index.css";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./styles/public-theme.css";
+import "./index.css";
 
 const rootEl = document.getElementById("root")!;
 

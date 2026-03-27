@@ -1,7 +1,26 @@
 import { Helmet } from "react-helmet-async";
 import { FileText, Scale, Users, Shield, AlertTriangle, Ban, Briefcase, CreditCard, Gavel, Puzzle, Mail } from "lucide-react";
 import LegalPageLayout, { type LegalSection } from "@/components/LegalPageLayout";
-import "@/styles/terms-of-service.css";
+import {
+  legalSubsectionCls as subsectionCls,
+  legalH4Cls as h4Cls,
+  legalListCls as listCls,
+  legalLinkCls as linkCls,
+  legalContactCardCls as contactCardCls,
+  legalContactOrgCls as contactOrgCls,
+  legalContactRowCls as contactRowCls,
+  legalContactSubjectCls as contactSubjectCls,
+} from "@/lib/shared-styles";
+
+const highlightBoxPurple =
+  "flex items-center gap-[10px] py-[14px] px-[18px] rounded-[6px] text-[0.88rem] mt-4 bg-[rgba(124,58,237,0.06)] border border-[rgba(124,58,237,0.15)] text-hr-accent-hover";
+
+const rolesGridCls =
+  "grid grid-cols-3 gap-[10px] my-3 mb-4 max-md:grid-cols-1";
+const roleItemCls =
+  "flex flex-col gap-[3px] p-[14px] bg-hr-bg-elevated border border-white/[0.06] rounded-[6px]";
+const roleNameCls = "font-mono text-[0.72rem] font-medium tracking-[0.04em] text-hr-text";
+const roleDescCls = "text-[0.82rem] text-hr-text-muted leading-[1.4]";
 
 const sections: LegalSection[] = [
   {
@@ -13,7 +32,7 @@ const sections: LegalSection[] = [
       <>
         <p>
           These Terms of Service ("Terms") govern your access to and use of VantaHire, an applicant
-          tracking system and recruitment platform operated by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className="hr-legal-link">Airevolabs LLP</a>
+          tracking system and recruitment platform operated by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a>
           {" "}("VantaHire," "we," "us," or "our").
         </p>
         <p>
@@ -34,26 +53,26 @@ const sections: LegalSection[] = [
     title: "User Accounts and Roles",
     content: (
       <>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Account Types</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Account Types</h4>
           <p>VantaHire offers different account types:</p>
-          <div className="hr-tos-roles-grid">
+          <div className={rolesGridCls}>
             {[
               { role: "Candidates", desc: "Individuals seeking employment who can apply to job postings" },
               { role: "Recruiters", desc: "Professionals who post jobs and manage applications" },
               { role: "Administrators", desc: "Users with elevated permissions to manage the platform" },
             ].map((item) => (
-              <div key={item.role} className="hr-tos-role-item">
-                <span className="hr-tos-role-name">{item.role}</span>
-                <span className="hr-tos-role-desc">{item.desc}</span>
+              <div key={item.role} className={roleItemCls}>
+                <span className={roleNameCls}>{item.role}</span>
+                <span className={roleDescCls}>{item.desc}</span>
               </div>
             ))}
           </div>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Account Registration</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Account Registration</h4>
           <p>To use VantaHire, you must:</p>
-          <ul className="hr-legal-list">
+          <ul className={listCls}>
             <li>Be at least 18 years of age</li>
             <li>Provide accurate and complete registration information</li>
             <li>Maintain the security of your account credentials</li>
@@ -61,8 +80,8 @@ const sections: LegalSection[] = [
             <li>Be responsible for all activities under your account</li>
           </ul>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Account Termination</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Account Termination</h4>
           <p>
             We reserve the right to suspend or terminate your account at any time for violation of
             these Terms, fraudulent activity, or any other reason we deem appropriate.
@@ -79,7 +98,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>You agree to use VantaHire only for lawful purposes. You may not:</p>
-        <ul className="hr-legal-list">
+        <ul className={listCls}>
           <li>Violate any applicable laws or regulations</li>
           <li>Infringe on intellectual property rights of others</li>
           <li>Submit false, misleading, or fraudulent information</li>
@@ -101,23 +120,23 @@ const sections: LegalSection[] = [
     title: "Content and Intellectual Property",
     content: (
       <>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Your Content</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Your Content</h4>
           <p>
             You retain ownership of content you submit to VantaHire (resumes, applications, job postings, etc.).
             By submitting content, you grant us a non-exclusive, worldwide, royalty-free license to use,
             store, and display your content for the purpose of providing our services.
           </p>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Our Content</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Our Content</h4>
           <p>
-            VantaHire's platform, design, features, and functionality are owned by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className="hr-legal-link">Airevolabs LLP</a> and are protected by copyright, trademark, and other intellectual
+            VantaHire's platform, design, features, and functionality are owned by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> and are protected by copyright, trademark, and other intellectual
             property laws. You may not copy, modify, or distribute our content without permission.
           </p>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">AI-Generated Content</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>AI-Generated Content</h4>
           <p>
             AI-generated fit scores, recommendations, and analysis are provided for informational
             purposes only. We do not guarantee their accuracy and they should not be the sole basis
@@ -134,9 +153,9 @@ const sections: LegalSection[] = [
     title: "Job Postings and Applications",
     content: (
       <>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">For Recruiters</h4>
-          <ul className="hr-legal-list">
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>For Recruiters</h4>
+          <ul className={listCls}>
             <li>Job postings must be accurate and comply with employment laws</li>
             <li>You may not post discriminatory job listings</li>
             <li>You are responsible for reviewing applications and making hiring decisions</li>
@@ -144,9 +163,9 @@ const sections: LegalSection[] = [
             <li>You may not use VantaHire for unlawful recruitment practices</li>
           </ul>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">For Candidates</h4>
-          <ul className="hr-legal-list">
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>For Candidates</h4>
+          <ul className={listCls}>
             <li>Applications must contain truthful and accurate information</li>
             <li>You may not submit fraudulent credentials or resumes</li>
             <li>You understand that applying does not guarantee employment</li>
@@ -167,7 +186,7 @@ const sections: LegalSection[] = [
           VantaHire may offer paid features or subscription plans in the future. If you purchase
           a subscription:
         </p>
-        <ul className="hr-legal-list">
+        <ul className={listCls}>
           <li>Fees are non-refundable except as required by law</li>
           <li>Paid access lasts for the billing term you purchase at checkout</li>
           <li>We may change pricing with advance notice</li>
@@ -183,29 +202,29 @@ const sections: LegalSection[] = [
     title: "Disclaimers and Limitations",
     content: (
       <>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">No Warranty</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>No Warranty</h4>
           <p>
             VantaHire is provided "as is" without warranties of any kind, either express or implied.
             We do not guarantee that our services will be uninterrupted, error-free, or secure.
           </p>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Limitation of Liability</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Limitation of Liability</h4>
           <p>
-            To the maximum extent permitted by law, <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className="hr-legal-link">Airevolabs LLP</a> shall
+            To the maximum extent permitted by law, <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> shall
             not be liable for any indirect, incidental, special, consequential, or punitive damages
             arising from your use of VantaHire.
           </p>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Third-Party Services</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Third-Party Services</h4>
           <p>
             VantaHire may integrate with third-party services (Google Cloud, OpenAI, etc.).
             We are not responsible for the availability or content of third-party services.
           </p>
         </div>
-        <div className="hr-legal-highlight-box hr-legal-highlight-box--purple">
+        <div className={highlightBoxPurple}>
           <AlertTriangle size={14} />
           <span>Use of VantaHire's AI features is subject to these limitations. Always exercise independent judgement in hiring decisions.</span>
         </div>
@@ -220,11 +239,11 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          You agree to indemnify and hold harmless <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className="hr-legal-link">Airevolabs LLP</a>,
+          You agree to indemnify and hold harmless <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a>,
           its officers, directors, employees, and agents from any claims, damages, losses, or
           expenses arising from:
         </p>
-        <ul className="hr-legal-list">
+        <ul className={listCls}>
           <li>Your violation of these Terms</li>
           <li>Your violation of any law or regulation</li>
           <li>Your infringement of third-party rights</li>
@@ -274,15 +293,15 @@ const sections: LegalSection[] = [
         <p>
           If you have questions about these Terms of Service, please contact us:
         </p>
-        <div className="hr-legal-contact-card">
-          <div className="hr-legal-contact-org">
+        <div className={contactCardCls}>
+          <div className={contactOrgCls}>
             <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer">Airevolabs LLP</a>
           </div>
-          <div className="hr-legal-contact-row">
+          <div className={contactRowCls}>
             <Mail size={13} />
             <span>legal@vantahire.com</span>
           </div>
-          <div className="hr-legal-contact-subject">Subject: Terms of Service Inquiry</div>
+          <div className={contactSubjectCls}>Subject: Terms of Service Inquiry</div>
         </div>
       </>
     ),

@@ -1,7 +1,25 @@
 import { Helmet } from "react-helmet-async";
 import { Cookie, Settings, BarChart3, Shield, Trash2, Clock, Globe, Mail } from "lucide-react";
 import LegalPageLayout, { type LegalSection } from "@/components/LegalPageLayout";
-import "@/styles/cookie-policy.css";
+import {
+  legalSubsectionCls as subsectionCls,
+  legalH4Cls as h4Cls,
+  legalListCls as listCls,
+  legalLinkCls as linkCls,
+  legalNoteCls as noteCls,
+  legalContactCardCls as contactCardCls,
+  legalContactOrgCls as contactOrgCls,
+  legalContactRowCls as contactRowCls,
+  legalContactSubjectCls as contactSubjectCls,
+  legalInfoGridCls as infoGridCls,
+  legalInfoItemCls as infoItemCls,
+  legalInfoLabelCls as infoLabelCls,
+  legalInfoDescCls as infoDescCls,
+} from "@/lib/shared-styles";
+
+const cookieNamesCls = "flex flex-wrap gap-[6px] mt-[10px]";
+const cookieTagCls =
+  "font-mono text-[0.7rem] font-normal tracking-[0.02em] text-hr-accent-hover bg-[rgba(124,58,237,0.1)] border border-[rgba(124,58,237,0.15)] py-[3px] px-[10px] rounded-[3px]";
 
 const sections: LegalSection[] = [
   {
@@ -29,67 +47,67 @@ const sections: LegalSection[] = [
     title: "Types of Cookies We Use",
     content: (
       <>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">1. Essential Cookies (Always Active)</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>1. Essential Cookies (Always Active)</h4>
           <p>
             These cookies are necessary for the website to function and cannot be disabled.
             They enable core functionality such as:
           </p>
-          <ul className="hr-legal-list">
+          <ul className={listCls}>
             <li>User authentication and session management</li>
             <li>Security features and CSRF protection</li>
             <li>Remember your login status</li>
             <li>Shopping cart functionality (if applicable)</li>
           </ul>
-          <div className="hr-cp-cookie-names">
-            <span className="hr-cp-cookie-tag">session_id</span>
-            <span className="hr-cp-cookie-tag">csrf_token</span>
+          <div className={cookieNamesCls}>
+            <span className={cookieTagCls}>session_id</span>
+            <span className={cookieTagCls}>csrf_token</span>
           </div>
         </div>
 
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">2. Analytics Cookies (Optional)</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>2. Analytics Cookies (Optional)</h4>
           <p>
             These cookies help us understand how visitors use our platform by collecting
             anonymous information about:
           </p>
-          <ul className="hr-legal-list">
+          <ul className={listCls}>
             <li>Pages visited and time spent on each page</li>
             <li>Click patterns and navigation paths</li>
             <li>Browser type, device, and screen resolution</li>
             <li>Geographic location (country/city level)</li>
           </ul>
-          <p className="hr-legal-note">Service provider: Google Analytics</p>
-          <div className="hr-cp-cookie-names">
-            <span className="hr-cp-cookie-tag">_ga</span>
-            <span className="hr-cp-cookie-tag">_gid</span>
-            <span className="hr-cp-cookie-tag">_gat</span>
+          <p className={noteCls}>Service provider: Google Analytics</p>
+          <div className={cookieNamesCls}>
+            <span className={cookieTagCls}>_ga</span>
+            <span className={cookieTagCls}>_gid</span>
+            <span className={cookieTagCls}>_gat</span>
           </div>
         </div>
 
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">3. Functional Cookies (Optional)</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>3. Functional Cookies (Optional)</h4>
           <p>
             These cookies enable enhanced functionality and personalisation:
           </p>
-          <ul className="hr-legal-list">
+          <ul className={listCls}>
             <li>Remember your preferences (language, theme)</li>
             <li>Store your cookie consent choices</li>
             <li>Personalise content based on your role (candidate/recruiter)</li>
             <li>Remember form inputs to prevent data loss</li>
           </ul>
-          <div className="hr-cp-cookie-names">
-            <span className="hr-cp-cookie-tag">cookie_consent</span>
-            <span className="hr-cp-cookie-tag">user_preferences</span>
+          <div className={cookieNamesCls}>
+            <span className={cookieTagCls}>cookie_consent</span>
+            <span className={cookieTagCls}>user_preferences</span>
           </div>
         </div>
 
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">4. Performance Cookies (Optional)</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>4. Performance Cookies (Optional)</h4>
           <p>
             These cookies help us monitor and improve platform performance:
           </p>
-          <ul className="hr-legal-list">
+          <ul className={listCls}>
             <li>Load times and page rendering speed</li>
             <li>Error tracking and debugging</li>
             <li>A/B testing for feature improvements</li>
@@ -109,8 +127,8 @@ const sections: LegalSection[] = [
         <p>
           We use third-party services that may set their own cookies on your device:
         </p>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Google Analytics</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Google Analytics</h4>
           <p>
             We use Google Analytics to analyse website traffic and user behaviour. Google Analytics
             sets cookies to track sessions and collect anonymous usage data.
@@ -121,21 +139,21 @@ const sections: LegalSection[] = [
               href="https://policies.google.com/technologies/cookies"
               target="_blank"
               rel="noopener noreferrer"
-              className="hr-legal-link"
+              className={linkCls}
             >
               Google Cookie Policy
             </a>
           </p>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Google Cloud Platform</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Google Cloud Platform</h4>
           <p>
             We use Google Cloud for hosting and file storage. Google may set cookies for
             authentication and performance monitoring.
           </p>
         </div>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">OpenAI API</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>OpenAI API</h4>
           <p>
             Our AI-powered features use OpenAI's API. While OpenAI does not set cookies directly
             on our site, your data is processed by their servers in accordance with their privacy policy.
@@ -151,22 +169,22 @@ const sections: LegalSection[] = [
     title: "Cookie Duration",
     content: (
       <>
-        <div className="hr-legal-info-grid">
-          <div className="hr-legal-info-item">
-            <span className="hr-legal-info-label">Session Cookies</span>
-            <span className="hr-legal-info-desc">
+        <div className={infoGridCls}>
+          <div className={infoItemCls}>
+            <span className={infoLabelCls}>Session Cookies</span>
+            <span className={infoDescCls}>
               Temporary cookies that are deleted when you close your browser. Used for authentication
               and session management.
             </span>
           </div>
-          <div className="hr-legal-info-item">
-            <span className="hr-legal-info-label">Persistent Cookies</span>
-            <span className="hr-legal-info-desc">
+          <div className={infoItemCls}>
+            <span className={infoLabelCls}>Persistent Cookies</span>
+            <span className={infoDescCls}>
               Remain on your device for a set period or until manually deleted.
             </span>
           </div>
         </div>
-        <ul className="hr-legal-list">
+        <ul className={listCls}>
           <li><strong>Analytics cookies</strong> — Up to 2 years</li>
           <li><strong>Preference cookies</strong> — Up to 1 year</li>
           <li><strong>Consent cookies</strong> — Up to 1 year</li>
@@ -181,15 +199,15 @@ const sections: LegalSection[] = [
     title: "Managing Your Cookie Preferences",
     content: (
       <>
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Cookie Consent Banner</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Cookie Consent Banner</h4>
           <p>
             When you first visit VantaHire, you will see a cookie consent banner. You can choose
             to accept or decline optional cookies. Essential cookies cannot be disabled as they
             are necessary for the site to function.
           </p>
           <button
-            className="hr-btn hr-btn--primary hr-btn--md hr-cp-manage-btn"
+            className="inline-flex items-center gap-2 mt-[14px] bg-hr-accent text-white border-none rounded-none font-dm font-medium text-[0.85rem] py-[10px] px-5 cursor-pointer no-underline transition-colors duration-200 hover:bg-hr-accent-hover"
             onClick={() => {
               window.dispatchEvent(new CustomEvent('cookie-consent:open', { detail: { reset: true } }));
             }}
@@ -199,46 +217,46 @@ const sections: LegalSection[] = [
           </button>
         </div>
 
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Browser Settings</h4>
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Browser Settings</h4>
           <p>
             Most browsers allow you to control cookies through their settings. You can:
           </p>
-          <ul className="hr-legal-list">
+          <ul className={listCls}>
             <li>Block all cookies</li>
             <li>Block third-party cookies only</li>
             <li>Delete cookies after each session</li>
             <li>Set exceptions for specific websites</li>
           </ul>
-          <p className="hr-legal-note">
+          <p className={noteCls}>
             Note: Blocking essential cookies may prevent you from using VantaHire.
           </p>
         </div>
 
-        <div className="hr-legal-subsection">
-          <h4 className="hr-legal-h4">Browser-Specific Instructions</h4>
-          <ul className="hr-legal-list">
+        <div className={subsectionCls}>
+          <h4 className={h4Cls}>Browser-Specific Instructions</h4>
+          <ul className={listCls}>
             <li>
               <strong>Chrome</strong> —{" "}
-              <a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener noreferrer" className="hr-legal-link">
+              <a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Chrome
               </a>
             </li>
             <li>
               <strong>Firefox</strong> —{" "}
-              <a href="https://support.mozilla.org/en-US/kb/cookies-information-websites-store-on-your-computer" target="_blank" rel="noopener noreferrer" className="hr-legal-link">
+              <a href="https://support.mozilla.org/en-US/kb/cookies-information-websites-store-on-your-computer" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Firefox
               </a>
             </li>
             <li>
               <strong>Safari</strong> —{" "}
-              <a href="https://support.apple.com/guide/safari/manage-cookies-sfri11471/mac" target="_blank" rel="noopener noreferrer" className="hr-legal-link">
+              <a href="https://support.apple.com/guide/safari/manage-cookies-sfri11471/mac" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Safari
               </a>
             </li>
             <li>
               <strong>Edge</strong> —{" "}
-              <a href="https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09" target="_blank" rel="noopener noreferrer" className="hr-legal-link">
+              <a href="https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Edge
               </a>
             </li>
@@ -257,7 +275,7 @@ const sections: LegalSection[] = [
         <p>
           You can delete cookies at any time through your browser settings. However, this may:
         </p>
-        <ul className="hr-legal-list">
+        <ul className={listCls}>
           <li>Log you out of your account</li>
           <li>Reset your preferences and settings</li>
           <li>Affect site functionality and performance</li>
@@ -302,15 +320,15 @@ const sections: LegalSection[] = [
         <p>
           If you have questions about our use of cookies, please contact us:
         </p>
-        <div className="hr-legal-contact-card">
-          <div className="hr-legal-contact-org">
+        <div className={contactCardCls}>
+          <div className={contactOrgCls}>
             <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer">Airevolabs LLP</a>
           </div>
-          <div className="hr-legal-contact-row">
+          <div className={contactRowCls}>
             <Mail size={13} />
             <span>privacy@vantahire.com</span>
           </div>
-          <div className="hr-legal-contact-subject">Subject: Cookie Policy Inquiry</div>
+          <div className={contactSubjectCls}>Subject: Cookie Policy Inquiry</div>
         </div>
       </>
     ),
