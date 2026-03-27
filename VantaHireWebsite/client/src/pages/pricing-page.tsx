@@ -12,9 +12,6 @@ import {
   formatPriceINR,
 } from "@/hooks/use-subscription";
 import { initiateCashfreeCheckout } from "@/lib/cashfree";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -26,8 +23,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -519,163 +514,166 @@ export default function PricingPage() {
 
       {/* Checkout Dialog */}
       <Dialog open={checkoutDialogOpen} onOpenChange={setCheckoutDialogOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Upgrade to Growth</DialogTitle>
-            <DialogDescription>
-              {checkoutMode === 'public'
-                ? "Enter your details to get started."
-                : checkoutMode === 'create-org'
-                ? "Create your organization and start your subscription."
-                : "Choose your seat count and billing cycle."}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none p-5 font-dm text-hr-text public-theme">
+          <div className="flex justify-between items-start">
+            <div>
+              <DialogTitle className="font-satoshi text-base font-medium text-hr-text mb-1">Upgrade to Growth</DialogTitle>
+              <DialogDescription className="text-[0.82rem] text-hr-text-muted leading-[1.5]">
+                {checkoutMode === 'public'
+                  ? "Enter your details to get started."
+                  : checkoutMode === 'create-org'
+                  ? "Create your organization and start your subscription."
+                  : "Choose your seat count and billing cycle."}
+              </DialogDescription>
+            </div>
+          </div>
 
           {requiresLogin ? (
-            <div className="py-4">
-              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="pt-2">
+              <div className="flex items-start gap-3 p-4 bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.2)] rounded-none">
+                <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  <p className="text-[0.82rem] font-medium text-amber-200">
                     Account already exists
                   </p>
-                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  <p className="text-[0.78rem] text-amber-300/80 mt-1 leading-[1.5]">
                     An account with this email already has an organization. Please log in to manage your subscription.
                   </p>
                 </div>
               </div>
               <div className="mt-4 flex gap-2">
-                <Button variant="outline" onClick={() => { setRequiresLogin(false); setEmail(''); }} className="flex-1">
+                <button className={`${planBtnSecondary} flex-1`} onClick={() => { setRequiresLogin(false); setEmail(''); }}>
                   Use Different Email
-                </Button>
-                <Button onClick={() => setLocation('/recruiter-auth?redirect=/org/billing')} className="flex-1">
+                </button>
+                <button className={`${planBtnPrimary} flex-1`} onClick={() => setLocation('/recruiter-auth?redirect=/org/billing')}>
                   Log In
-                </Button>
+                </button>
               </div>
             </div>
           ) : (
-            <>
-              <div className="space-y-4 py-4">
-                {/* Email field - only for public checkout */}
-                {checkoutMode === 'public' && (
-                  <div className="space-y-2">
-                    <Label>Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="email"
-                        placeholder="you@company.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      We'll send your receipt and login details here.
-                    </p>
+            <div className="flex flex-col gap-3.5 pt-2">
+              {/* Email field - only for public checkout */}
+              {checkoutMode === 'public' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">Email Address *</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-hr-text-muted" />
+                    <input
+                      type="email"
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 pl-10 pr-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                    />
                   </div>
-                )}
-
-                {/* Org name - for public and create-org modes */}
-                {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
-                  <div className="space-y-2">
-                    <Label>Organization Name</Label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Acme Inc"
-                        value={orgName}
-                        onChange={(e) => setOrgName(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Number of Seats</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={seats}
-                    onChange={(e) => setSeats(parseInt(e.target.value) || 1)}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Growth includes {formatMetric(proCredits)} AI credits per seat per month, pooled across the organization. With {seats} seat{seats === 1 ? "" : "s"}, that is {proCredits * seats} included credits per month. {commercialConfig?.seatPolicies?.seatAddCredits.summary} {creditPackConfig ? `Extra ${creditPackConfig.creditsPerPack}-credit packs are available at ${formatPriceINR(creditPackConfig.pricePerPack)}.` : 'Extra credit packs are available.'}
+                  <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                    We'll send your receipt and login details here.
                   </p>
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  <Label>Billing Cycle</Label>
-                  <Select value={billingCycle} onValueChange={(v: 'monthly' | 'annual') => setBillingCycle(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="annual">Annual (Save 17%)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Optional GSTIN field */}
-                {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
-                  <div className="space-y-2">
-                    <Label>GSTIN (Optional)</Label>
-                    <Input
-                      placeholder="22AAAAA0000A1Z5"
-                      value={gstin}
-                      onChange={(e) => setGstin(e.target.value.toUpperCase())}
+              {/* Org name - for public and create-org modes */}
+              {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">Organization Name *</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-hr-text-muted" />
+                    <input
+                      placeholder="Acme Inc"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 pl-10 pr-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Optional. Add GSTIN if you want it printed on the invoice.
-                    </p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {proPlan && (
-                  <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal</span>
-                      <span>{formatPriceINR(subtotal)}</span>
-                    </div>
-                    {taxEnabled && (
-                      <div className="mt-2 flex justify-between text-sm">
-                        <span>GST ({gstRate}%)</span>
-                        <span>{formatPriceINR(gstAmount)}</span>
-                      </div>
-                    )}
-                    <div className="mt-2 flex justify-between">
-                      <span>Total</span>
-                      <span className="font-bold">
-                        {formatPriceINR(totalWithTax)}
-                        <span className="text-sm font-normal text-muted-foreground">
-                          /{billingCycle === 'monthly' ? 'month' : 'year'}
-                        </span>
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {taxEnabled
-                        ? `GST (${gstRate}%) is added at checkout.`
-                        : 'No additional tax is configured.'}
-                    </p>
-                  </div>
-                )}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[0.78rem] font-medium text-hr-text-secondary">Number of Seats *</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={seats}
+                  onChange={(e) => setSeats(parseInt(e.target.value) || 1)}
+                  className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                />
+                <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                  Growth includes {formatMetric(proCredits)} AI credits per seat per month, pooled across the organization. With {seats} seat{seats === 1 ? "" : "s"}, that is {proCredits * seats} included credits per month. {commercialConfig?.seatPolicies?.seatAddCredits.summary} {creditPackConfig ? `Extra ${creditPackConfig.creditsPerPack}-credit packs are available at ${formatPriceINR(creditPackConfig.pricePerPack)}.` : 'Extra credit packs are available.'}
+                </p>
               </div>
 
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCheckoutDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCheckout} disabled={isCheckoutPending}>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[0.78rem] font-medium text-hr-text-secondary">Billing Cycle *</label>
+                <Select value={billingCycle} onValueChange={(v: 'monthly' | 'annual') => setBillingCycle(v)}>
+                  <SelectTrigger className="bg-hr-bg-elevated border-[rgba(255,255,255,0.08)] rounded-none text-hr-text font-dm text-[0.88rem] py-2.5 focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)] focus:ring-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none text-hr-text font-dm">
+                    <SelectItem value="monthly" className="text-hr-text rounded-none focus:bg-[rgba(255,255,255,0.06)] focus:text-hr-text">Monthly</SelectItem>
+                    <SelectItem value="annual" className="text-hr-text rounded-none focus:bg-[rgba(255,255,255,0.06)] focus:text-hr-text">Annual (Save 17%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Optional GSTIN field */}
+              {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">GSTIN (Optional)</label>
+                  <input
+                    placeholder="22AAAAA0000A1Z5"
+                    value={gstin}
+                    onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                    className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                  />
+                  <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                    Add GSTIN if you want it printed on the invoice.
+                  </p>
+                </div>
+              )}
+
+              {proPlan && (
+                <div className="p-4 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none">
+                  <div className="flex justify-between text-[0.88rem] text-hr-text-secondary">
+                    <span>Subtotal</span>
+                    <span className="text-hr-text">{formatPriceINR(subtotal)}</span>
+                  </div>
+                  {taxEnabled && (
+                    <div className="mt-2 flex justify-between text-[0.88rem] text-hr-text-secondary">
+                      <span>GST ({gstRate}%)</span>
+                      <span className="text-hr-text">{formatPriceINR(gstAmount)}</span>
+                    </div>
+                  )}
+                  <div className="h-px bg-[rgba(255,255,255,0.08)] my-2.5"></div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[0.88rem] text-hr-text-secondary">Total</span>
+                    <span className="font-satoshi font-bold text-hr-text text-lg">
+                      {formatPriceINR(totalWithTax)}
+                      <span className="text-[0.8rem] font-normal text-hr-text-muted font-dm">
+                        /{billingCycle === 'monthly' ? 'month' : 'year'}
+                      </span>
+                    </span>
+                  </div>
+                  <p className="text-[0.72rem] text-hr-text-muted mt-1.5">
+                    {taxEnabled
+                      ? `GST (${gstRate}%) is added at checkout.`
+                      : 'No additional tax is configured.'}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-1">
+                <button className={`${planBtnPrimary} flex-1 flex items-center justify-center gap-2`} onClick={handleCheckout} disabled={isCheckoutPending}>
                   {isCheckoutPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : null}
                   Continue to Payment
-                </Button>
-              </DialogFooter>
-            </>
+                </button>
+                <button className={`${planBtnSecondary} flex-1`} onClick={() => setCheckoutDialogOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
