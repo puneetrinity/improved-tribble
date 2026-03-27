@@ -24,7 +24,8 @@ export interface ApplicationCardProps {
   application: ApplicationWithFeedback;
   isSelected: boolean;
   onToggleSelect: (id: number) => void;
-  onOpenDetails: (application: Application) => void;
+  onOpenDetails: (application: Application, contextApplications?: Application[]) => void;
+  contextApplications?: Application[] | undefined;
   pipelineStages?: PipelineStage[] | undefined;
   onQuickMoveStage?: ((applicationId: number, stageId: number) => void) | undefined;
   onQuickEmail?: ((applicationId: number) => void) | undefined;
@@ -37,6 +38,7 @@ export function ApplicationCard({
   isSelected,
   onToggleSelect,
   onOpenDetails,
+  contextApplications,
   pipelineStages = [],
   onQuickMoveStage,
   onQuickEmail,
@@ -79,7 +81,7 @@ export function ApplicationCard({
           "group bg-card border border-border hover:shadow-md transition-all cursor-pointer shadow-sm",
           isSelected && "ring-2 ring-primary/60"
         )}
-        onClick={() => onOpenDetails(application)}
+        onClick={() => onOpenDetails(application, contextApplications)}
       >
         <CardContent className="p-4">
           <div className="flex items-start gap-3">

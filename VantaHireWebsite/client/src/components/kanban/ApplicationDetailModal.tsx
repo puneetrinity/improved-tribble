@@ -7,10 +7,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Application, EmailTemplate, PipelineStage } from "@shared/schema";
 import { FormTemplateDTO } from "@/lib/formsApi";
 import { ApplicationDetailPanel, type EmailSendPayload } from "./ApplicationDetailPanel";
-import { Download, FileText, ExternalLink, AlertCircle } from "lucide-react";
+import { Download, FileText, ExternalLink, AlertCircle, Mail, Phone } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface ApplicationDetailModalProps {
   application: Application | null;
+  applications?: Application[];
   jobId: number;
   pipelineStages: PipelineStage[];
   emailTemplates: EmailTemplate[];
@@ -19,6 +21,7 @@ interface ApplicationDetailModalProps {
   resumeText?: string | null;
   open: boolean;
   onClose: () => void;
+  onSelectApplication?: (application: Application) => void;
   onMoveStage: (stageId: number, notes?: string) => void;
   onScheduleInterview: (data: { date: string; time: string; location: string; notes: string }) => void;
   onSendEmail: (payload: EmailSendPayload) => void;
@@ -31,6 +34,7 @@ interface ApplicationDetailModalProps {
 
 export function ApplicationDetailModal({
   application,
+  applications = [],
   jobId,
   pipelineStages,
   emailTemplates,
@@ -39,6 +43,7 @@ export function ApplicationDetailModal({
   resumeText,
   open,
   onClose,
+  onSelectApplication,
   onMoveStage,
   onScheduleInterview,
   onSendEmail,
@@ -62,63 +67,111 @@ export function ApplicationDetailModal({
 
   return (
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
-      <DialogContent className="max-w-5xl w-[95vw] h-[90vh] max-h-[90vh] p-0 gap-0 flex flex-col" aria-describedby={undefined}>
-        <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <DialogTitle className="text-xl font-semibold text-foreground">
-                {application.name}
-              </DialogTitle>
-              <Badge variant="outline" className="border-info/30 text-info-foreground bg-info/10">
-                {application.status}
-              </Badge>
-            </div>
-          </div>
-          <p className="text-sm text-muted-foreground">{application.email}</p>
+      <DialogContent className="flex h-[90vh] max-h-[90vh] w-[92vw] max-w-[1360px] flex-col gap-0 overflow-hidden p-0" aria-describedby={undefined}>
+        <DialogHeader className="sr-only">
+          <DialogTitle>Candidate application details</DialogTitle>
         </DialogHeader>
 
-        {/* Tab Navigation */}
-        <div className="px-6 pt-4 shrink-0">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "details" | "resume")}>
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="details">
-                <FileText className="h-4 w-4 mr-2" />
-                Details
-              </TabsTrigger>
-              <TabsTrigger value="resume" disabled={!resumeUrl}>
-                <FileText className="h-4 w-4 mr-2" />
-                Resume Preview
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-
-        {/* Content Area */}
-        <div className="flex-1 overflow-hidden">
-          {activeTab === "details" ? (
-            <ScrollArea className="h-full">
-              <div className="p-0">
-                <ApplicationDetailPanel
-                  application={application}
-                  jobId={jobId}
-                  pipelineStages={pipelineStages}
-                  emailTemplates={emailTemplates}
-                  formTemplates={formTemplates}
-                  stageHistory={stageHistory}
-                  onClose={onClose}
-                  onMoveStage={onMoveStage}
-                  onScheduleInterview={onScheduleInterview}
-                  onSendEmail={onSendEmail}
-                  onSendForm={onSendForm}
-                  onAddNote={onAddNote}
-                  onSetRating={onSetRating}
-                  onDownloadResume={onDownloadResume}
-                  {...(onUpdateStatus ? { onUpdateStatus } : {})}
-                />
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <aside className="hidden w-[340px] shrink-0 border-r border-border bg-slate-50/60 md:flex md:flex-col">
+              <div className="border-b border-border px-4 py-3">
+                <p className="text-sm font-medium text-foreground">Candidates</p>
+                <p className="text-xs text-muted-foreground">
+                  {applications.length} candidate{applications.length === 1 ? "" : "s"} in this view
+                </p>
               </div>
-            </ScrollArea>
-          ) : (
-            <div className="h-full flex flex-col p-4">
+              <ScrollArea className="flex-1">
+                <div className="px-4 py-3">
+                  {applications.length > 0 ? (
+                    <div className="space-y-2">
+                      {applications.map((candidate) => (
+                        <button
+                          key={candidate.id}
+                          type="button"
+                          onClick={() => onSelectApplication?.(candidate)}
+                          className={cn(
+                            "w-full border px-3 py-3 text-left transition-colors",
+                            candidate.id === application.id
+                              ? "border-primary bg-primary/5"
+                              : "border-border bg-white hover:bg-muted/40",
+                          )}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium text-foreground">{candidate.name}</p>
+                              <div className="mt-1 space-y-1 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Mail className="h-3 w-3 flex-shrink-0" />
+                                  <span className="truncate">{candidate.email}</span>
+                                </div>
+                                {candidate.phone && (
+                                  <div className="flex items-center gap-1">
+                                    <Phone className="h-3 w-3 flex-shrink-0" />
+                                    <span className="truncate">{candidate.phone}</span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="shrink-0 border-info/30 bg-info/10 text-info-foreground">
+                              {candidate.status}
+                            </Badge>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex h-24 items-center justify-center text-sm text-muted-foreground">
+                      No candidates available
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+          </aside>
+
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) => setActiveTab(v as "details" | "resume")}
+            className="flex min-h-0 flex-1 flex-col"
+          >
+            <div className="flex items-center justify-center border-b border-border px-8 py-5">
+              <TabsList className="grid w-full max-w-2xl grid-cols-2 rounded-none bg-muted/50 p-1">
+                <TabsTrigger value="details" className="h-11 rounded-none text-base">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Application Details
+                </TabsTrigger>
+                <TabsTrigger value="resume" disabled={!resumeUrl} className="h-11 rounded-none text-base">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Resume Preview
+                </TabsTrigger>
+              </TabsList>
+            </div>
+
+            <div className="flex-1 min-h-0 overflow-hidden border-t border-border">
+              <TabsContent value="details" className="mt-0 h-full">
+                <ScrollArea className="h-full">
+                  <ApplicationDetailPanel
+                    application={application}
+                    jobId={jobId}
+                    pipelineStages={pipelineStages}
+                    emailTemplates={emailTemplates}
+                    formTemplates={formTemplates}
+                    stageHistory={stageHistory}
+                    onClose={onClose}
+                    onMoveStage={onMoveStage}
+                    onScheduleInterview={onScheduleInterview}
+                    onSendEmail={onSendEmail}
+                    onSendForm={onSendForm}
+                    onAddNote={onAddNote}
+                    onSetRating={onSetRating}
+                    onDownloadResume={onDownloadResume}
+                    embedded
+                    {...(onUpdateStatus ? { onUpdateStatus } : {})}
+                  />
+                </ScrollArea>
+              </TabsContent>
+
+              <TabsContent value="resume" className="mt-0 h-full">
+                <div className="h-full flex flex-col p-6">
               {/* Resume Actions Bar */}
               <div className="flex items-center justify-between mb-4 shrink-0">
                 <div className="flex items-center gap-2">
@@ -191,8 +244,10 @@ export function ApplicationDetailModal({
                   </div>
                 )}
               </div>
+                </div>
+              </TabsContent>
             </div>
-          )}
+          </Tabs>
         </div>
       </DialogContent>
     </Dialog>

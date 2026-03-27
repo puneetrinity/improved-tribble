@@ -6,6 +6,7 @@ export interface JobSubNavProps {
   jobId: number;
   jobTitle?: string;
   className?: string;
+  variant?: "default" | "inline";
 }
 
 type NavItem = {
@@ -16,7 +17,12 @@ type NavItem = {
   badge?: string;
 };
 
-export function JobSubNav({ jobId, jobTitle, className }: JobSubNavProps) {
+export function JobSubNav({
+  jobId,
+  jobTitle,
+  className,
+  variant = "default",
+}: JobSubNavProps) {
   const [location, setLocation] = useLocation();
 
   const navItems: NavItem[] = [
@@ -66,19 +72,33 @@ export function JobSubNav({ jobId, jobTitle, className }: JobSubNavProps) {
   const activeId = getActiveId();
 
   return (
-    <div className={cn("border-b border-border bg-white rounded-t-lg", className)}>
+    <div
+      className={cn(
+        variant === "inline"
+          ? "border-b border-border/70 bg-transparent"
+          : "rounded-t-lg border-b border-border bg-white",
+        className,
+      )}
+    >
       {jobTitle && (
-        <div className="px-4 pt-3 pb-1">
+        <div className={cn(variant === "inline" ? "px-0 pb-2" : "px-4 pt-3 pb-1")}>
           <h2 className="text-lg font-semibold text-foreground truncate">{jobTitle}</h2>
         </div>
       )}
-      <nav className="flex gap-1 px-2 -mb-px overflow-x-auto" aria-label="Job navigation">
+      <nav
+        className={cn(
+          "flex gap-1 overflow-x-auto",
+          variant === "inline" ? "-mb-px px-0" : "-mb-px px-2",
+        )}
+        aria-label="Job navigation"
+      >
         {navItems.map((item) => (
           <button
             key={item.id}
             onClick={() => setLocation(item.path)}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors whitespace-nowrap",
+          className={cn(
+              "flex items-center gap-2 whitespace-nowrap border-b-2 text-sm font-medium transition-colors rounded-none",
+              variant === "inline" ? "px-3 py-3 md:px-4" : "px-4 py-2.5",
               activeId === item.id
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"

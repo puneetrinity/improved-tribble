@@ -8,12 +8,15 @@ import { ApplicationCard } from "./ApplicationCard";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
+const candidateListScrollClass =
+  "max-h-[420px] overflow-y-auto pr-1 [scrollbar-width:none] hover:[scrollbar-width:thin] [&::-webkit-scrollbar]:w-0 hover:[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent hover:[&::-webkit-scrollbar-track]:bg-muted/30 [&::-webkit-scrollbar-thumb]:bg-transparent hover:[&::-webkit-scrollbar-thumb]:bg-border";
+
 export interface StageColumnProps {
   stage: PipelineStage;
   applications: Application[];
   selectedIds: number[];
   onToggleSelect: (id: number) => void;
-  onOpenDetails: (application: Application) => void;
+  onOpenDetails: (application: Application, contextApplications?: Application[]) => void;
   pipelineStages?: PipelineStage[] | undefined;
   onQuickMoveStage?: ((applicationId: number, stageId: number) => void) | undefined;
   onQuickEmail?: ((applicationId: number) => void) | undefined;
@@ -65,7 +68,7 @@ function SubSection({
   applications: Application[];
   selectedIds: number[];
   onToggleSelect: (id: number) => void;
-  onOpenDetails: (application: Application) => void;
+  onOpenDetails: (application: Application, contextApplications?: Application[]) => void;
   pipelineStages?: PipelineStage[] | undefined;
   onQuickMoveStage?: ((applicationId: number, stageId: number) => void) | undefined;
   onQuickEmail?: ((applicationId: number) => void) | undefined;
@@ -98,21 +101,24 @@ function SubSection({
         </Badge>
       </button>
       {isExpanded && (
-        <div className="mt-1.5 space-y-2">
-          {applications.map((application) => (
-            <ApplicationCard
-              key={application.id}
-              application={application}
-              isSelected={selectedIds.includes(application.id)}
-              onToggleSelect={onToggleSelect}
-              onOpenDetails={onOpenDetails}
-              pipelineStages={pipelineStages}
-              onQuickMoveStage={onQuickMoveStage}
-              onQuickEmail={onQuickEmail}
-              onQuickInterview={onQuickInterview}
-              onQuickDownload={onQuickDownload}
-            />
-          ))}
+        <div className={cn("mt-1.5", candidateListScrollClass)}>
+          <div className="space-y-2">
+            {applications.map((application) => (
+              <ApplicationCard
+                key={application.id}
+                application={application}
+                isSelected={selectedIds.includes(application.id)}
+                onToggleSelect={onToggleSelect}
+                onOpenDetails={onOpenDetails}
+                contextApplications={applications}
+                pipelineStages={pipelineStages}
+                onQuickMoveStage={onQuickMoveStage}
+                onQuickEmail={onQuickEmail}
+                onQuickInterview={onQuickInterview}
+                onQuickDownload={onQuickDownload}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -241,21 +247,24 @@ export function StageColumn({
               </>
             ) : (
               // Show flat list when only one category
-              <div className="space-y-2">
-                {applications.map((application) => (
-                  <ApplicationCard
-                    key={application.id}
-                    application={application}
-                    isSelected={selectedIds.includes(application.id)}
-                    onToggleSelect={onToggleSelect}
-                    onOpenDetails={onOpenDetails}
-                    pipelineStages={pipelineStages}
-                    onQuickMoveStage={onQuickMoveStage}
-                    onQuickEmail={onQuickEmail}
-                    onQuickInterview={onQuickInterview}
-                    onQuickDownload={onQuickDownload}
-                  />
-                ))}
+              <div className={candidateListScrollClass}>
+                <div className="space-y-2">
+                  {applications.map((application) => (
+                    <ApplicationCard
+                      key={application.id}
+                      application={application}
+                      isSelected={selectedIds.includes(application.id)}
+                      onToggleSelect={onToggleSelect}
+                      onOpenDetails={onOpenDetails}
+                      contextApplications={applications}
+                      pipelineStages={pipelineStages}
+                      onQuickMoveStage={onQuickMoveStage}
+                      onQuickEmail={onQuickEmail}
+                      onQuickInterview={onQuickInterview}
+                      onQuickDownload={onQuickDownload}
+                    />
+                  ))}
+                </div>
               </div>
             )}
           </div>

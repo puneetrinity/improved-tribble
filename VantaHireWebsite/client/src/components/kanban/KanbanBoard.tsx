@@ -20,7 +20,7 @@ interface KanbanBoardProps {
   pipelineStages: PipelineStage[];
   selectedIds: number[];
   onToggleSelect: (id: number) => void;
-  onOpenDetails: (application: Application) => void;
+  onOpenDetails: (application: Application, contextApplications?: Application[]) => void;
   onDragEnd: (applicationId: number, targetStageId: number) => Promise<void>;
   onDragCancel?: () => void;
   onQuickMoveStage?: (applicationId: number, stageId: number) => void;
