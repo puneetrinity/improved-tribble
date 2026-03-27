@@ -155,13 +155,6 @@ export default function FeaturesPage() {
             <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">Three layers. Six capabilities. Every recruiter action covered — from sourcing to placement.</p>
           </div>
 
-          {/* Divider */}
-          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
-            <div></div>
-            <div className="border-b border-[rgba(255,255,255,0.08)]"></div>
-            <div></div>
-          </div>
-
           {/* Pillars */}
           <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
             <div></div>
