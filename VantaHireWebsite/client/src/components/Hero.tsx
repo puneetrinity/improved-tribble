@@ -3,39 +3,39 @@ import { btnPrimary, btnSecondary } from "@/lib/shared-styles";
 
 /* ── Reusable class-string constants ── */
 const structuralDiv = "max-md:hidden";
-const navItem = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-hr-text-muted cursor-default";
-const navItemActive = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-hr-text bg-[rgba(255,255,255,0.04)] cursor-default";
+const navItem = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-[#9ca3af] cursor-default";
+const navItemActive = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-[#1a1a2e] bg-[rgba(0,0,0,0.03)] cursor-default";
 const navIcon = "text-[0.7rem] w-4 text-center";
-const navSubItem = "text-[0.68rem] py-[5px] text-hr-text-muted cursor-default";
+const navSubItem = "text-[0.68rem] py-[5px] text-[#9ca3af] cursor-default";
 const navSubItemActive = "text-[0.68rem] py-[5px] text-hr-accent-hover cursor-default relative before:content-[''] before:absolute before:-left-4 before:top-1/2 before:-translate-y-1/2 before:w-0.5 before:h-3.5 before:bg-hr-accent before:rounded-sm";
-const timeTab = "text-[0.6rem] text-hr-text-muted py-1 px-2 border border-[rgba(255,255,255,0.08)] -ml-px cursor-default first:rounded-l last:rounded-r";
-const timeTabActive = "text-[0.6rem] text-hr-text-muted py-1 px-2 border border-[rgba(255,255,255,0.08)] -ml-px cursor-default first:rounded-l last:rounded-r text-hr-text-secondary bg-[rgba(255,255,255,0.04)]";
-const filterBtn = "text-[0.6rem] text-hr-text-muted py-1 px-2.5 border border-[rgba(255,255,255,0.08)] rounded flex items-center gap-[3px]";
-const statCard = "bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-lg py-3 px-3.5";
-const statLabel = "text-[0.6rem] text-hr-text-muted flex items-center gap-1.5 mb-1.5";
+const timeTab = "text-[0.6rem] text-[#9ca3af] py-1 px-2 border border-[rgba(0,0,0,0.08)] -ml-px cursor-default first:rounded-l last:rounded-r";
+const timeTabActive = "text-[0.6rem] text-[#9ca3af] py-1 px-2 border border-[rgba(0,0,0,0.08)] -ml-px cursor-default first:rounded-l last:rounded-r text-[#4a5568] bg-[rgba(0,0,0,0.03)]";
+const filterBtn = "text-[0.6rem] text-[#9ca3af] py-1 px-2.5 border border-[rgba(0,0,0,0.08)] rounded flex items-center gap-[3px]";
+const statCard = "bg-[#f4f5f7] border border-[rgba(0,0,0,0.08)] rounded-lg py-3 px-3.5";
+const statLabel = "text-[0.6rem] text-[#9ca3af] flex items-center gap-1.5 mb-1.5";
 const statDot = "w-1.5 h-1.5 rounded-full";
-const statValue = "text-[1.35rem] font-bold text-hr-text";
+const statValue = "text-[1.35rem] font-bold text-[#1a1a2e]";
 const stageBox = "text-left";
-const stageLabel = "text-[0.58rem] text-hr-text-muted mb-0.5";
-const stageCount = "text-[1.1rem] font-bold text-hr-text";
+const stageLabel = "text-[0.58rem] text-[#9ca3af] mb-0.5";
+const stageCount = "text-[1.1rem] font-bold text-[#1a1a2e]";
 const statChange = "text-[0.55rem] font-semibold ml-1 text-hr-green";
 const barCol = "flex-1 flex flex-col items-center h-full justify-end";
 const barBase = "w-full rounded-t-sm relative";
-const barPct = "absolute -top-3.5 left-1/2 -translate-x-1/2 font-mono text-[0.48rem] text-hr-text-muted";
-const pipelineActionSpan = "text-[0.6rem] text-hr-text-muted py-[3px] px-2 border border-[rgba(255,255,255,0.08)] rounded cursor-default";
-const tableActionSpan = "text-[0.58rem] text-hr-text-muted py-[3px] px-2 border border-[rgba(255,255,255,0.08)] rounded";
-const dataTableRow = "grid grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr] py-2 border-b border-[rgba(255,255,255,0.08)] text-hr-text-secondary items-center";
+const barPct = "absolute -top-3.5 left-1/2 -translate-x-1/2 font-mono text-[0.48rem] text-[#9ca3af]";
+const pipelineActionSpan = "text-[0.6rem] text-[#9ca3af] py-[3px] px-2 border border-[rgba(0,0,0,0.08)] rounded cursor-default";
+const tableActionSpan = "text-[0.58rem] text-[#9ca3af] py-[3px] px-2 border border-[rgba(0,0,0,0.08)] rounded";
+const dataTableRow = "grid grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr] py-2 border-b border-[rgba(0,0,0,0.08)] text-[#4a5568] items-center";
 const recruiterName = "flex items-center gap-2";
 const recruiterAvatar = "w-[22px] h-[22px] rounded-full flex items-center justify-center text-[0.45rem] font-bold shrink-0";
-const metricsTab = "text-[0.62rem] text-hr-text-muted py-1.5 px-2 cursor-default";
-const metricsTabActive = "text-[0.62rem] text-hr-text-secondary py-1.5 px-2 cursor-default border-b border-hr-text-secondary -mb-px";
+const metricsTab = "text-[0.62rem] text-[#9ca3af] py-1.5 px-2 cursor-default";
+const metricsTabActive = "text-[0.62rem] text-[#4a5568] py-1.5 px-2 cursor-default border-b border-[#4a5568] -mb-px";
 const metricGroup = "mb-4";
-const metricGroupLabel = "text-[0.6rem] text-hr-text-muted mb-2 flex items-center gap-1.5";
+const metricGroupLabel = "text-[0.6rem] text-[#9ca3af] mb-2 flex items-center gap-1.5";
 const metricGroupNum = "font-mono text-[0.52rem]";
-const metricItem = "flex items-center gap-2 py-[5px] px-1.5 rounded mb-0.5 text-[0.62rem] text-hr-text-secondary hover:bg-[rgba(255,255,255,0.03)]";
+const metricItem = "flex items-center gap-2 py-[5px] px-1.5 rounded mb-0.5 text-[0.62rem] text-[#4a5568] hover:bg-[rgba(0,0,0,0.02)]";
 const metricLetter = "w-[18px] h-[18px] rounded flex items-center justify-center text-[0.5rem] font-bold font-mono";
-const metricArrow = "ml-auto text-hr-text-muted text-[0.55rem]";
-const metricSubLabel = "text-[0.55rem] text-hr-text-muted mb-1";
+const metricArrow = "ml-auto text-[#9ca3af] text-[0.55rem]";
+const metricSubLabel = "text-[0.55rem] text-[#9ca3af] mb-1";
 
 const Hero = () => {
   const openCalendar = () => {
@@ -91,31 +91,31 @@ const Hero = () => {
       <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px] relative z-[2] mt-[60px] max-sm:mt-7 max-h-[420px] max-sm:max-h-[220px] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_0%,#000_60%,transparent_100%)] [-webkit-mask-image:linear-gradient(to_bottom,#000_0%,#000_60%,transparent_100%)]">
         <div></div>
         <div className="bg-[linear-gradient(180deg,#0C0C10_0%,#1a1428_30%,#241a3a_50%,#1a1428_70%,#0C0C10_100%)] px-12 max-sm:px-2">
-          <div className="max-w-[1040px] mx-auto rounded-[10px] overflow-hidden border border-[rgba(255,255,255,0.1)] shadow-[0_40px_100px_rgba(0,0,0,0.6)] bg-hr-bg-card animate-hr-fade-up-delayed">
-            <div className="flex items-center py-2.5 px-4 bg-[#1a1a20] border-b border-[rgba(255,255,255,0.08)] gap-2">
+          <div className="max-w-[1040px] mx-auto rounded-[10px] overflow-hidden border border-[rgba(0,0,0,0.1)] shadow-[0_40px_100px_rgba(0,0,0,0.15)] bg-white animate-hr-fade-up-delayed">
+            <div className="flex items-center py-2.5 px-4 bg-[#f1f3f5] border-b border-[rgba(0,0,0,0.08)] gap-2">
               <div className="flex gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(255,255,255,0.1)]"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(255,255,255,0.1)]"></span>
-                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(255,255,255,0.1)]"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(0,0,0,0.1)]"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(0,0,0,0.1)]"></span>
+                <span className="w-2.5 h-2.5 rounded-full bg-[rgba(0,0,0,0.1)]"></span>
               </div>
-              <div className="flex-1 text-center font-mono text-[0.65rem] text-hr-text-muted">app.vantahire.com / Analytics / Pipeline Intelligence</div>
+              <div className="flex-1 text-center font-mono text-[0.65rem] text-[#9ca3af]">app.vantahire.com / Analytics / Pipeline Intelligence</div>
               <div className="flex gap-1.5 items-center">
-                <span className="text-[0.6rem] text-hr-text-muted py-[3px] px-2 border border-[rgba(255,255,255,0.08)] rounded-[3px] flex items-center gap-1">↗ Share</span>
-                <span className="text-[0.6rem] text-hr-text-muted">☆</span>
-                <span className="text-[0.6rem] text-hr-text-muted">⚡</span>
-                <span className="text-[0.6rem] text-hr-text-muted">⛶</span>
-                <span className="text-[0.6rem] text-hr-text-muted">⋯</span>
+                <span className="text-[0.6rem] text-[#9ca3af] py-[3px] px-2 border border-[rgba(0,0,0,0.08)] rounded-[3px] flex items-center gap-1">↗ Share</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">☆</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">⚡</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">⛶</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">⋯</span>
               </div>
             </div>
             <div className="flex min-h-[480px]">
               {/* Sidebar */}
-              <div className="w-[190px] bg-[#131318] border-r border-[rgba(255,255,255,0.08)] py-3.5 shrink-0 max-md:hidden">
-                <div className="px-4 pb-3.5 pt-0.5 font-bold text-[0.82rem] text-hr-text flex items-center gap-2 border-b border-[rgba(255,255,255,0.08)] mb-1.5">
+              <div className="w-[190px] bg-[#f7f8fa] border-r border-[rgba(0,0,0,0.08)] py-3.5 shrink-0 max-md:hidden">
+                <div className="px-4 pb-3.5 pt-0.5 font-bold text-[0.82rem] text-[#1a1a2e] flex items-center gap-2 border-b border-[rgba(0,0,0,0.08)] mb-1.5">
                   <span className="w-5 h-5 bg-hr-accent rounded-[5px] flex items-center justify-center text-[0.55rem] font-extrabold text-white">V</span>
                   VantaHire
                 </div>
-                <div className="mx-3 my-2 py-[5px] px-2.5 text-[0.65rem] text-hr-text-secondary border border-[rgba(255,255,255,0.08)] rounded-[5px] bg-transparent flex items-center justify-between">
-                  FlowHire [INT] <span className="text-hr-text-muted text-[0.5rem]">⇅</span>
+                <div className="mx-3 my-2 py-[5px] px-2.5 text-[0.65rem] text-[#4a5568] border border-[rgba(0,0,0,0.08)] rounded-[5px] bg-transparent flex items-center justify-between">
+                  FlowHire [INT] <span className="text-[#9ca3af] text-[0.5rem]">⇅</span>
                 </div>
                 <div className={navItem}><span className={navIcon}>⌂</span> Home</div>
                 <div className={navItem}><span className={navIcon}>👤</span> Candidates</div>
@@ -128,7 +128,7 @@ const Hero = () => {
                   <div className={navSubItemActive}>Pipeline Intelligence</div>
                   <div className={navSubItem}>Team Performance</div>
                 </div>
-                <div className="h-px bg-[rgba(255,255,255,0.08)] my-2"></div>
+                <div className="h-px bg-[rgba(0,0,0,0.08)] my-2"></div>
                 <div className={navItem}><span className={navIcon}>⚙</span> Settings</div>
                 <div className={navItem}><span className={navIcon}>🔗</span> Integrations</div>
                 <div className={navItem}><span className={navIcon}>🔒</span> Permissions</div>
@@ -136,13 +136,13 @@ const Hero = () => {
               </div>
 
               {/* Main */}
-              <div className="flex-1 py-4 px-5 overflow-hidden min-w-0">
+              <div className="flex-1 py-4 px-5 overflow-hidden min-w-0 bg-white">
                 <div className="flex items-center justify-between mb-3.5">
-                  <div className="text-[0.72rem] text-hr-text-muted">Analytics / <span className="text-hr-text-secondary">Pipeline Intelligence</span></div>
+                  <div className="text-[0.72rem] text-[#9ca3af]">Analytics / <span className="text-[#4a5568]">Pipeline Intelligence</span></div>
                 </div>
 
                 <div className="flex items-center gap-3 mb-4 flex-wrap">
-                  <div className="font-mono text-[0.62rem] text-hr-text-secondary py-[5px] px-2.5 border border-[rgba(255,255,255,0.08)] rounded flex items-center gap-1.5">📅 Mar 1, 2026 - Mar 21, 2026 ⇅</div>
+                  <div className="font-mono text-[0.62rem] text-[#4a5568] py-[5px] px-2.5 border border-[rgba(0,0,0,0.08)] rounded flex items-center gap-1.5">📅 Mar 1, 2026 - Mar 21, 2026 ⇅</div>
                   <div className="flex">
                     <div className={timeTab}>Today</div>
                     <div className={timeTab}>Yesterday</div>
@@ -178,7 +178,7 @@ const Hero = () => {
                 </div>
 
                 <div className="flex items-center justify-between mb-3.5">
-                  <span className="text-[0.8rem] font-semibold text-hr-text">Pipeline Overview</span>
+                  <span className="text-[0.8rem] font-semibold text-[#1a1a2e]">Pipeline Overview</span>
                   <div className="flex gap-2">
                     <span className={pipelineActionSpan}>✨ AI Insights</span>
                     <span className={pipelineActionSpan}>Export ↗</span>
@@ -217,7 +217,7 @@ const Hero = () => {
                 </div>
 
                 <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[0.78rem] font-semibold text-hr-text">Pipeline Impact</span>
+                  <span className="text-[0.78rem] font-semibold text-[#1a1a2e]">Pipeline Impact</span>
                   <div className="flex gap-1.5">
                     <span className={tableActionSpan}>🔍 Search</span>
                     <span className={tableActionSpan}>⚡ Filters ▾</span>
@@ -226,7 +226,7 @@ const Hero = () => {
                 </div>
 
                 <div className="w-full text-[0.65rem]">
-                  <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr] py-1.5 border-b border-[rgba(255,255,255,0.08)] text-hr-text-muted font-medium">
+                  <div className="grid grid-cols-[1.5fr_1fr_1fr_1fr_0.7fr] py-1.5 border-b border-[rgba(0,0,0,0.08)] text-[#9ca3af] font-medium">
                     <span>Recruiter</span>
                     <span>Candidates</span>
                     <span>Conversion Rate</span>
@@ -258,15 +258,15 @@ const Hero = () => {
               </div>
 
               {/* Metrics Panel */}
-              <div className="w-[210px] bg-[#131318] border-l border-[rgba(255,255,255,0.08)] p-4 shrink-0 overflow-hidden max-lg:hidden">
-                <div className="flex mb-3.5 border-b border-[rgba(255,255,255,0.08)]">
+              <div className="w-[210px] bg-[#f7f8fa] border-l border-[rgba(0,0,0,0.08)] p-4 shrink-0 overflow-hidden max-lg:hidden">
+                <div className="flex mb-3.5 border-b border-[rgba(0,0,0,0.08)]">
                   <div className={metricsTabActive}>Query</div>
                   <div className={metricsTab}>Chart</div>
                   <div className={metricsTab}>Annotations</div>
                 </div>
 
-                <div className="text-[0.72rem] font-semibold text-hr-text mb-2.5 flex items-center justify-between">
-                  Metrics <span className="text-[0.8rem] text-hr-text-muted cursor-default">+</span>
+                <div className="text-[0.72rem] font-semibold text-[#1a1a2e] mb-2.5 flex items-center justify-between">
+                  Metrics <span className="text-[0.8rem] text-[#9ca3af] cursor-default">+</span>
                 </div>
 
                 <div className={metricGroup}>
@@ -297,25 +297,25 @@ const Hero = () => {
                     <span className={metricArrow}>›</span>
                   </div>
                   <div className="flex gap-2 mt-2 px-1.5">
-                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]"># User ▾</span>
-                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]">Uniques ▾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]"># User ▾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Uniques ▾</span>
                   </div>
                 </div>
 
                 <div className={metricGroup}>
                   <div className={metricGroupLabel}><span className={metricGroupNum}>2</span> Outreach engagement</div>
-                  <div className={`${metricSubLabel} px-1.5`}>Event: <span className="text-hr-text-secondary">Event Count</span></div>
+                  <div className={`${metricSubLabel} px-1.5`}>Event: <span className="text-[#4a5568]">Event Count</span></div>
                   <div className={metricItem}>
                     <span className={metricLetter} style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>📧</span>
                     Email Opened
                     <span className={metricArrow}>›</span>
                   </div>
-                  <div className="p-1.5 text-[0.52rem] text-hr-text-muted flex items-center gap-1">
+                  <div className="p-1.5 text-[0.52rem] text-[#9ca3af] flex items-center gap-1">
                     ⊕ Add Event
                   </div>
                   <div className="flex gap-2 px-1.5">
-                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]">Breakdown ▾</span>
-                    <span className="text-[0.52rem] text-hr-text-muted py-0.5 px-1.5 border border-[rgba(255,255,255,0.08)] rounded-[3px]">Recruiter ▾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Breakdown ▾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Recruiter ▾</span>
                   </div>
                 </div>
 
@@ -323,7 +323,7 @@ const Hero = () => {
                   <div className={metricGroupLabel}><span className={metricGroupNum}>3</span> Hiring Speed</div>
                   <div className="px-1.5">
                     <div className={metricSubLabel}>Time Between Events</div>
-                    <div className="text-[0.52rem] text-hr-text-secondary py-1 px-2 border border-[rgba(255,255,255,0.08)] rounded-[3px] mt-1">From: Outreach Sent</div>
+                    <div className="text-[0.52rem] text-[#4a5568] py-1 px-2 border border-[rgba(0,0,0,0.08)] rounded-[3px] mt-1">From: Outreach Sent</div>
                   </div>
                 </div>
               </div>
