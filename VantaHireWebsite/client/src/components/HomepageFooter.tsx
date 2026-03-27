@@ -7,7 +7,7 @@ const HomepageFooter = () => {
       <div></div>
       <div className="border-b border-[rgba(255,255,255,0.07)]">
         <footer className="pt-14 px-12 pb-7 max-md:pt-10 max-md:px-5 max-md:pb-5 border-t-0">
-          <div className="grid grid-cols-[2fr_repeat(4,1fr)] gap-10 max-w-[1100px] mx-auto mb-10 max-md:grid-cols-2 max-md:gap-6 max-sm:grid-cols-1 max-sm:gap-5">
+          <div className="grid grid-cols-[2fr_repeat(3,1fr)] gap-10 max-w-[1100px] mx-auto mb-10 max-md:grid-cols-2 max-md:gap-6 max-sm:grid-cols-1 max-sm:gap-5">
             <div>
               <div className="flex items-center gap-2 font-bold text-base text-hr-text mb-3 no-underline">
                 <img src={vantahireLogo} alt="VantaHire" width={24} height={24} className="h-6 w-auto" />
@@ -18,29 +18,16 @@ const HomepageFooter = () => {
             <div>
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Product</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
-                <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Intelligence Layer</Link></li>
-                <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Outreach Layer</Link></li>
-                <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Operations Layer</Link></li>
-                <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Integrations</Link></li>
+                <li><Link href="/jobs" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Browse Jobs</Link></li>
+                <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Features</Link></li>
                 <li><Link href="/pricing" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Pricing</Link></li>
               </ul>
             </div>
             <div>
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Company</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
-                <li><Link href="/about" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">About</Link></li>
-                <li><Link href="/jobs" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Careers</Link></li>
-                <li><Link href="/blog" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Blog</Link></li>
+                <li><a href="https://cal.com/vantahire/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
                 <li><a href="mailto:hello@vantahire.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Resources</h5>
-              <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
-                <li><Link href="/product" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Documentation</Link></li>
-                <li><Link href="/product" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">API Reference</Link></li>
-                <li><a href="mailto:hello@vantahire.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Help Center</a></li>
-                <li><Link href="/status" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Status</Link></li>
               </ul>
             </div>
             <div>
@@ -49,7 +36,6 @@ const HomepageFooter = () => {
                 <li><Link href="/privacy-policy" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Privacy Policy</Link></li>
                 <li><Link href="/terms-of-service" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Terms of Service</Link></li>
                 <li><Link href="/cookie-policy" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Cookie Policy</Link></li>
-                <li><Link href="/privacy-policy" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">GDPR</Link></li>
               </ul>
             </div>
           </div>

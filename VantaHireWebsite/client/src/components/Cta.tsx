@@ -18,23 +18,19 @@ const Cta = () => {
             Join hundreds of recruitment agencies already using VantaHire to place candidates faster and grow their business.
           </p>
           <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
-            <a
-              href="/recruiter-auth"
-              className={btnPrimary}
-              onClick={(e) => {
-                e.preventDefault();
-                trackEvent("cta_click", { location: "cta_block", action: "book_demo" });
-                window.location.href = '/recruiter-auth';
-              }}
-            >
-              Book a Demo →
-            </a>
             <button
-              className={btnSecondary}
+              className={btnPrimary}
               onClick={openCalendar}
             >
-              View Pricing
+              Book a Demo →
             </button>
+            <a
+              href="/pricing"
+              className={btnSecondary}
+              onClick={() => trackEvent("cta_click", { location: "cta_block", action: "view_pricing" })}
+            >
+              View Pricing
+            </a>
           </div>
         </section>
       </div>

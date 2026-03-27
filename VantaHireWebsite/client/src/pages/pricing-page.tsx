@@ -493,12 +493,10 @@ export default function PricingPage() {
                     Start Free
                   </a>
                   <a
-                    href="/demo"
+                    href="https://cal.com/vantahire/quick-connect"
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setLocation('/demo');
-                    }}
                   >
                     Book a Demo
                   </a>
