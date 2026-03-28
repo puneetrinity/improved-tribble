@@ -65,7 +65,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           : ["'self'", "'unsafe-inline'", "https://assets.apollo.io", "https://mautic.evalmatch.app", "https://www.googletagmanager.com", "https://sdk.cashfree.com"],
         // style: allow inline styles for UI libraries and static landing pages with embedded CSS
         // 'unsafe-inline' needed in both dev and prod for inline <style> blocks
-        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://mautic.evalmatch.app"],
+        styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://api.fontshare.com", "https://mautic.evalmatch.app"],
         imgSrc: ["'self'", "data:", "https:"],
         // connectSrc: Restrict WebSocket connections in production
         // Mautic form submissions require connection to mautic domain
@@ -78,6 +78,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "'self'",
           "data:",
           "https://fonts.gstatic.com",
+          "https://api.fontshare.com",
+          "https://cdn.fontshare.com",
+          "https://fonts.fontshare.com",
           "https://r2cdn.perplexity.ai",
         ],
         objectSrc: ["'self'"],

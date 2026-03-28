@@ -1,18 +1,11 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useAuth } from "@/hooks/use-auth";
-import { useLocation, useSearch } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { Briefcase, Users, TrendingUp, Shield, Mail, CheckCircle, UserPlus } from "lucide-react";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import { Mail, CheckCircle, UserPlus, ArrowLeft } from "lucide-react";
 import type { OnboardingStatus } from "@/hooks/use-onboarding-status";
-import { recruiterAuthPageCopy } from "@/lib/internal-copy";
+import recruiterAuthBg from "@/assets/recruiter-auth-bg.png";
 
 // Type for invite details response
 interface InviteDetails {
@@ -22,6 +15,49 @@ interface InviteDetails {
   expiresAt: string;
   inviterName: string;
 }
+
+const brandBgStyle = { backgroundImage: `url(${recruiterAuthBg})` } as const;
+
+// --- Tailwind class constants ---
+
+// Border color: --hr-border = rgba(255,255,255,0.08)
+const hrBorder = "border-[rgba(255,255,255,0.08)]";
+// Border color: --hr-border-light = rgba(255,255,255,0.12)
+const hrBorderLight = "border-[rgba(255,255,255,0.12)]";
+
+// Shared input classes
+const inputCls =
+  `bg-hr-bg-elevated ${hrBorder} border rounded-[4px] px-3.5 py-2.5 font-dm text-[0.88rem] text-hr-text transition-[border-color] duration-200 outline-none w-full box-border placeholder:text-hr-text-muted placeholder:opacity-60 focus:border-hr-accent`;
+
+// Shared label classes
+const labelCls = "font-dm text-[0.78rem] font-medium text-hr-text-secondary tracking-[0.02em]";
+
+// Shared field classes
+const fieldCls = "flex flex-col gap-1.5";
+
+// Submit button
+const submitCls =
+  "bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer transition-colors duration-200 w-full mt-1 hover:bg-hr-accent-hover disabled:opacity-60 disabled:cursor-not-allowed";
+
+// Secondary button
+const secondaryCls =
+  `bg-transparent text-hr-text ${hrBorderLight} border py-2.5 px-6 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-all duration-200 w-full hover:border-[rgba(255,255,255,0.25)] disabled:opacity-60 disabled:cursor-not-allowed`;
+
+// Ghost button
+const ghostCls =
+  "bg-transparent text-hr-text-muted border-none py-2.5 px-6 font-dm text-[0.82rem] font-normal cursor-pointer transition-colors duration-200 w-full hover:text-hr-text";
+
+// Ghost button with icon
+const ghostWithIconCls = `${ghostCls} flex items-center justify-center gap-1.5`;
+
+// Form container
+const formCls = "flex flex-col gap-4";
+
+// State card (verification / success)
+const stateCardCls = "text-center flex flex-col items-center gap-4";
+
+// State icon base
+const stateIconBaseCls = "w-14 h-14 rounded-full flex items-center justify-center";
 
 export default function RecruiterAuth() {
   const { user, loginMutation, registerMutation } = useAuth();
@@ -35,14 +71,13 @@ export default function RecruiterAuth() {
     const redirect = params.get('redirect');
     const invite = params.get('invite');
     return {
-      // Only allow internal redirects (starting with /)
       redirectUrl: redirect && redirect.startsWith('/') ? redirect : null,
       inviteToken: invite || null,
     };
   }, [searchString]);
 
   // Controlled tab state - default to register if invite token present
-  const [activeTab, setActiveTab] = useState<string>(inviteToken ? "register" : "login");
+  const [activeTab, setActiveTab] = useState<"login" | "register">(inviteToken ? "register" : "login");
 
   // Fetch invite details if token present (64 hex chars)
   const { data: inviteDetails, isLoading: inviteLoading, error: inviteError } = useQuery<InviteDetails>({
@@ -70,7 +105,6 @@ export default function RecruiterAuth() {
     firstName: "",
     lastName: "",
     role: "recruiter",
-    inviteToken: inviteToken || undefined,
   });
 
   // Pre-fill email from invite when details are loaded
@@ -80,19 +114,18 @@ export default function RecruiterAuth() {
     }
   }, [inviteDetails]);
 
-  // Update inviteToken in registerData if it changes
-  useEffect(() => {
-    setRegisterData(prev => ({ ...prev, inviteToken: inviteToken || undefined }));
-  }, [inviteToken]);
-
   // State for email verification flow
   const [verificationNeeded, setVerificationNeeded] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState("");
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
 
+  // Forgot password state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [isSendingReset, setIsSendingReset] = useState(false);
+
   // Check onboarding status for recruiters
-  // Returns: OnboardingStatus on success, { error: true } on failure, null for non-recruiters
   const checkOnboardingAndRedirect = useCallback(async (): Promise<OnboardingStatus | { error: true } | null> => {
     if (!user || user.role !== "recruiter") return null;
 
@@ -102,52 +135,41 @@ export default function RecruiterAuth() {
         const status: OnboardingStatus = await res.json();
         return status;
       }
-      // Non-OK response - treat as error, don't allow bypass
       return { error: true };
     } catch {
-      // Network/fetch error - treat as error, don't allow bypass
       return { error: true };
     }
   }, [user]);
 
-  // Redirect if already logged in as recruiter, admin, or hiring manager (shared portal)
+  // Redirect if already logged in as recruiter, admin, or hiring manager
   useEffect(() => {
     if (!user) return;
 
-    // If there's an invite token, redirect to org choice to accept the invite
     if (inviteToken && user.role === "recruiter") {
       setLocation(`/org/choice?invite=${inviteToken}`);
       return;
     }
 
-    // For recruiters, ALWAYS check onboarding status before any redirect
-    // This ensures onboarding cannot be bypassed via redirectUrl param
     if (user.role === "recruiter") {
       checkOnboardingAndRedirect().then((status) => {
         if (!status || 'error' in status) {
-          // Status check failed - safe fallback to onboarding page
-          // The onboarding page will re-check and redirect if already complete
           setLocation("/onboarding");
           return;
         }
         if (status.needsOnboarding) {
-          // Onboarding required - ignore redirectUrl, go to onboarding
           setLocation(`/onboarding?step=${status.currentStep}`);
         } else {
-          // Onboarding complete - honor redirectUrl if provided, else dashboard
           setLocation(redirectUrl || "/recruiter-dashboard");
         }
       });
       return;
     }
 
-    // For super_admin, honor redirectUrl or go to admin
     if (user.role === "super_admin") {
       setLocation(redirectUrl || "/admin");
       return;
     }
 
-    // Other role redirects
     if (user.role === "hiring_manager") {
       setLocation("/hiring-manager");
     }
@@ -156,10 +178,8 @@ export default function RecruiterAuth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // Allow recruiters, admins, and hiring managers to use this portal
       await loginMutation.mutateAsync({ ...loginData, expectedRole: ['recruiter', 'super_admin', 'hiring_manager'] });
     } catch (error: any) {
-      // Check if this is an email verification error
       const errorData = error?.response?.data || error;
       if (errorData?.code === 'EMAIL_NOT_VERIFIED' || error?.message?.includes('verify your email')) {
         setVerificationNeeded(true);
@@ -170,8 +190,7 @@ export default function RecruiterAuth() {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    const result = await registerMutation.mutateAsync(registerData);
-    // Check if registration requires verification
+    const result = await registerMutation.mutateAsync({ ...registerData, inviteToken: inviteToken || undefined });
     if ('requiresVerification' in result && result.requiresVerification) {
       setRegistrationSuccess(true);
       setVerificationEmail(registerData.username);
@@ -207,322 +226,313 @@ export default function RecruiterAuth() {
     }
   };
 
-  return (
-    <div className="public-theme min-h-screen bg-background text-foreground">
-      <Header />
-      <div className="container mx-auto px-4 pt-32 pb-16">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-          {/* Left Column - Hero Content */}
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <h1 className="text-4xl md:text-5xl font-bold text-foreground leading-tight">
-                {recruiterAuthPageCopy.hero.title}
-              </h1>
-              <p className="text-xl text-muted-foreground leading-relaxed">
-                {recruiterAuthPageCopy.hero.subtitle}
-              </p>
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotPasswordEmail) return;
+
+    setIsSendingReset(true);
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail }),
+      });
+      const data = await res.json();
+      toast({
+        title: "Check your email",
+        description: data.message || "If an account exists with this email, a password reset link has been sent.",
+      });
+      setShowForgotPassword(false);
+      setForgotPasswordEmail("");
+    } catch {
+      toast({
+        title: "Error",
+        description: "Failed to send password reset email. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSendingReset(false);
+    }
+  };
+
+  // Render the right-panel form content
+  const renderFormContent = () => {
+    // Registration success state
+    if (registrationSuccess) {
+      return (
+        <div className={stateCardCls}>
+          <div className={`${stateIconBaseCls} bg-[rgba(16,185,129,0.12)] text-hr-green`}>
+            <CheckCircle size={28} />
+          </div>
+          <div className="font-satoshi text-[1.2rem] font-medium text-hr-text">Check Your Email</div>
+          <div className="font-dm text-[0.88rem] text-hr-text-secondary leading-[1.6] max-w-[320px]">
+            We've sent a verification link to <span className="text-hr-text font-medium">{verificationEmail}</span>
+          </div>
+          <p className="text-[0.82rem] text-hr-text-muted leading-[1.6]">
+            Click the link in the email to verify your account and start using VantaHire.
+          </p>
+          <div className="flex flex-col gap-2 w-full max-w-[280px] mt-2">
+            <button className={secondaryCls} onClick={handleResendVerification} disabled={resendLoading}>
+              {resendLoading ? "Sending..." : "Resend Verification Email"}
+            </button>
+            <button className={ghostCls} onClick={() => { setRegistrationSuccess(false); setVerificationEmail(""); }}>
+              Back to Login
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Email verification needed (from login attempt)
+    if (verificationNeeded) {
+      return (
+        <div className={stateCardCls}>
+          <div className={`${stateIconBaseCls} bg-[rgba(245,158,11,0.12)] text-hr-yellow`}>
+            <Mail size={28} />
+          </div>
+          <div className="font-satoshi text-[1.2rem] font-medium text-hr-text">Verify Your Email</div>
+          <div className="font-dm text-[0.88rem] text-hr-text-secondary leading-[1.6] max-w-[320px]">
+            Check your inbox at <span className="text-hr-text font-medium">{verificationEmail}</span> for a verification link.
+          </div>
+          <div className="flex flex-col gap-2 w-full max-w-[280px] mt-2">
+            <button className={secondaryCls} onClick={handleResendVerification} disabled={resendLoading}>
+              {resendLoading ? "Sending..." : "Resend Verification Email"}
+            </button>
+            <button className={ghostCls} onClick={() => { setVerificationNeeded(false); setVerificationEmail(""); }}>
+              Back to Login
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Forgot password form
+    if (showForgotPassword) {
+      return (
+        <form onSubmit={handleForgotPassword} className={formCls}>
+          <div className="flex items-center gap-2.5 mb-1">
+            <div className="w-[30px] h-[30px] rounded-[6px] bg-[rgba(124,58,237,0.1)] text-hr-accent-hover flex items-center justify-center shrink-0">
+              <Mail size={16} />
             </div>
+            <div className="font-satoshi text-[1.1rem] font-medium text-hr-text">Reset Password</div>
+          </div>
+          <div className="text-[0.82rem] text-hr-text-muted leading-[1.5]">
+            Enter your email to receive a password reset link.
+          </div>
+          <div className={fieldCls}>
+            <label className={labelCls}>Email</label>
+            <input
+              type="email"
+              className={inputCls}
+              placeholder="Enter your email"
+              value={forgotPasswordEmail}
+              onChange={(e) => setForgotPasswordEmail(e.target.value)}
+              required
+            />
+          </div>
+          <button type="submit" className={submitCls} disabled={isSendingReset}>
+            {isSendingReset ? "Sending..." : "Send Reset Link"}
+          </button>
+          <button
+            type="button"
+            className={ghostWithIconCls}
+            onClick={() => setShowForgotPassword(false)}
+          >
+            <ArrowLeft size={14} />
+            Back to Login
+          </button>
+        </form>
+      );
+    }
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <Briefcase className="h-8 w-8 text-[#7B38FB]" />
-                </div>
-                <div>
-                  <h3 className="text-foreground font-semibold mb-2">{recruiterAuthPageCopy.hero.features[0].title}</h3>
-                  <p className="text-muted-foreground text-sm">{recruiterAuthPageCopy.hero.features[0].description}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <Users className="h-8 w-8 text-[#FF5BA8]" />
-                </div>
-                <div>
-                  <h3 className="text-foreground font-semibold mb-2">{recruiterAuthPageCopy.hero.features[1].title}</h3>
-                  <p className="text-muted-foreground text-sm">{recruiterAuthPageCopy.hero.features[1].description}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <TrendingUp className="h-8 w-8 text-[#00D2FF]" />
-                </div>
-                <div>
-                  <h3 className="text-foreground font-semibold mb-2">{recruiterAuthPageCopy.hero.features[2].title}</h3>
-                  <p className="text-muted-foreground text-sm">{recruiterAuthPageCopy.hero.features[2].description}</p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  <Shield className="h-8 w-8 text-[#90EE90]" />
-                </div>
-                <div>
-                  <h3 className="text-foreground font-semibold mb-2">{recruiterAuthPageCopy.hero.features[3].title}</h3>
-                  <p className="text-muted-foreground text-sm">{recruiterAuthPageCopy.hero.features[3].description}</p>
-                </div>
-              </div>
+    // Normal auth form
+    return (
+      <>
+        {/* Invite Banner */}
+        {inviteToken && inviteDetails && (
+          <div className="flex items-center gap-3 py-3.5 px-[18px] bg-[rgba(124,58,237,0.06)] border border-[rgba(124,58,237,0.12)] rounded-lg mb-6">
+            <div className="w-8 h-8 rounded-[6px] bg-[rgba(124,58,237,0.12)] text-hr-accent-hover flex items-center justify-center shrink-0">
+              <UserPlus size={16} />
             </div>
-
-            <div className="pt-4">
-              <p className="text-muted-foreground text-sm">
-                {recruiterAuthPageCopy.hero.candidatePrompt} <Button variant="link" className="text-[#7B38FB] p-0 h-auto" onClick={() => setLocation("/candidate-auth")}>
-                  {recruiterAuthPageCopy.hero.candidateLink}
-                </Button>
-              </p>
+            <div className="text-[0.82rem] text-hr-text-secondary leading-[1.4] [&_strong]:text-hr-accent-hover [&_strong]:font-medium [&_span]:block [&_span]:text-[0.72rem] [&_span]:text-hr-text-muted [&_span]:mt-0.5">
+              You've been invited to join <strong>{inviteDetails.organizationName}</strong>
+              <span>Invited by {inviteDetails.inviterName} as {inviteDetails.role}</span>
             </div>
           </div>
+        )}
 
-          {/* Right Column - Auth Form */}
-          <div className="flex justify-center">
-            <Card className="w-full max-w-md bg-muted/50 backdrop-blur-sm border-border">
-              {/* Registration Success State */}
-              {registrationSuccess && (
-                <>
-                  <CardHeader className="text-center">
-                    <div className="flex justify-center mb-4">
-                      <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center">
-                        <CheckCircle className="h-8 w-8 text-success" />
-                      </div>
-                    </div>
-                    <CardTitle className="text-foreground text-2xl">{recruiterAuthPageCopy.verification.checkEmailTitle}</CardTitle>
-                    <CardDescription className="text-muted-foreground">
-                      {recruiterAuthPageCopy.verification.checkEmailDescriptionPrefix} <span className="text-foreground font-medium">{verificationEmail}</span>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground text-sm text-center">
-                      {recruiterAuthPageCopy.verification.checkEmailHint}
-                    </p>
-                    <div className="flex flex-col gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={handleResendVerification}
-                        disabled={resendLoading}
-                        className="w-full border-border text-foreground hover:bg-muted/50"
-                      >
-                        {resendLoading ? recruiterAuthPageCopy.verification.sending : recruiterAuthPageCopy.verification.resend}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => { setRegistrationSuccess(false); setVerificationEmail(""); }}
-                        className="w-full text-muted-foreground hover:text-foreground hover:bg-muted/30"
-                      >
-                        {recruiterAuthPageCopy.verification.backToLogin}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </>
+        {/* Invite Error */}
+        {inviteToken && inviteError && (
+          <div className="py-3 px-[18px] bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.15)] rounded-lg text-[0.82rem] text-hr-red mb-6">
+            {(inviteError as Error).message || "Invalid or expired invite link"}
+          </div>
+        )}
+
+        <div className="text-center mb-7">
+          <div className="font-satoshi text-2xl font-medium text-hr-text mb-2">
+            {inviteDetails ? "Create Your Account" : "Recruiter Access"}
+          </div>
+          <div className="font-dm text-[0.85rem] text-hr-text-muted leading-[1.5]">
+            {inviteDetails
+              ? `Register to join ${inviteDetails.organizationName}`
+              : "Sign in to your recruiter account or create a new one"
+            }
+          </div>
+        </div>
+
+        {/* Tab Switcher */}
+        <div className={`grid grid-cols-2 bg-hr-bg-elevated rounded-[4px] ${hrBorder} border overflow-hidden mb-6`}>
+          <button
+            className={`py-2.5 font-dm text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'login' ? 'bg-hr-accent text-white' : 'bg-transparent text-hr-text-muted hover:text-hr-text-secondary'}`}
+            onClick={() => setActiveTab('login')}
+          >
+            Sign In
+          </button>
+          <button
+            className={`py-2.5 font-dm text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'register' ? 'bg-hr-accent text-white' : 'bg-transparent text-hr-text-muted hover:text-hr-text-secondary'}`}
+            onClick={() => setActiveTab('register')}
+          >
+            Register
+          </button>
+        </div>
+
+        {/* Login Form */}
+        {activeTab === 'login' && (
+          <form onSubmit={handleLogin} className={formCls}>
+            <div className={fieldCls}>
+              <label className={labelCls}>Username or Email</label>
+              <input
+                type="text"
+                className={inputCls}
+                placeholder="Enter your username or email"
+                value={loginData.username}
+                onChange={(e) => setLoginData(prev => ({ ...prev, username: e.target.value }))}
+                required
+              />
+            </div>
+            <div className={fieldCls}>
+              <label className={labelCls}>Password</label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                className={inputCls}
+                placeholder="Enter your password"
+                value={loginData.password}
+                onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                required
+              />
+            </div>
+            <div className="text-right -mt-2">
+              <button
+                type="button"
+                className="bg-none border-none font-dm text-[0.78rem] text-hr-accent-hover cursor-pointer p-0 transition-colors duration-200 hover:text-hr-text"
+                onClick={() => setShowForgotPassword(true)}
+              >
+                Forgot your password?
+              </button>
+            </div>
+            <button type="submit" className={submitCls} disabled={loginMutation.isPending}>
+              {loginMutation.isPending ? "Signing in..." : "Sign In"}
+            </button>
+          </form>
+        )}
+
+        {/* Register Form */}
+        {activeTab === 'register' && (
+          <form onSubmit={handleRegister} className={formCls}>
+            <div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+              <div className={fieldCls}>
+                <label className={labelCls}>First Name</label>
+                <input
+                  type="text"
+                  className={inputCls}
+                  placeholder="First name"
+                  value={registerData.firstName}
+                  onChange={(e) => setRegisterData(prev => ({ ...prev, firstName: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className={fieldCls}>
+                <label className={labelCls}>Last Name</label>
+                <input
+                  type="text"
+                  className={inputCls}
+                  placeholder="Last name"
+                  value={registerData.lastName}
+                  onChange={(e) => setRegisterData(prev => ({ ...prev, lastName: e.target.value }))}
+                  required
+                />
+              </div>
+            </div>
+            <div className={fieldCls}>
+              <label className={labelCls}>Email *</label>
+              <input
+                type="email"
+                className={`${inputCls} ${inviteDetails ? 'opacity-60 cursor-not-allowed' : ''}`}
+                placeholder="Enter your email address"
+                value={registerData.username}
+                onChange={(e) => setRegisterData(prev => ({ ...prev, username: e.target.value }))}
+                required
+                readOnly={!!inviteDetails}
+                title={inviteDetails ? "Email is locked to the invite" : undefined}
+              />
+              {inviteDetails && (
+                <span className="text-[0.7rem] text-hr-text-muted">Email is locked to the invite</span>
               )}
+            </div>
+            <div className={fieldCls}>
+              <label className={labelCls}>Password *</label>
+              <input
+                type="password"
+                autoComplete="new-password"
+                className={inputCls}
+                placeholder="Create a strong password"
+                value={registerData.password}
+                onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                required
+              />
+            </div>
+            <button type="submit" className={submitCls} disabled={registerMutation.isPending}>
+              {registerMutation.isPending ? "Creating account..." : "Create Recruiter Account"}
+            </button>
+          </form>
+        )}
+      </>
+    );
+  };
 
-              {/* Email Verification Needed State (from login attempt) */}
-              {verificationNeeded && !registrationSuccess && (
-                <>
-                  <CardHeader className="text-center">
-                    <div className="flex justify-center mb-4">
-                      <div className="w-16 h-16 bg-amber-500/20 rounded-full flex items-center justify-center">
-                        <Mail className="h-8 w-8 text-warning" />
-                      </div>
-                    </div>
-                    <CardTitle className="text-foreground text-2xl">{recruiterAuthPageCopy.verification.verifyTitle}</CardTitle>
-                    <CardDescription className="text-muted-foreground">
-                      {recruiterAuthPageCopy.verification.verifyDescription}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground text-sm text-center">
-                      {recruiterAuthPageCopy.verification.verifyHintPrefix} <span className="text-foreground font-medium">{verificationEmail}</span> {recruiterAuthPageCopy.verification.verifyHintSuffix}
-                    </p>
-                    <div className="flex flex-col gap-3">
-                      <Button
-                        variant="outline"
-                        onClick={handleResendVerification}
-                        disabled={resendLoading}
-                        className="w-full border-border text-foreground hover:bg-muted/50"
-                      >
-                        {resendLoading ? recruiterAuthPageCopy.verification.sending : recruiterAuthPageCopy.verification.resend}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        onClick={() => { setVerificationNeeded(false); setVerificationEmail(""); }}
-                        className="w-full text-muted-foreground hover:text-foreground hover:bg-muted/30"
-                      >
-                        {recruiterAuthPageCopy.verification.backToLogin}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </>
-              )}
+  return (
+    <div className="grid grid-cols-2 min-h-screen bg-hr-bg max-[900px]:grid-cols-1">
+      {/* Left Panel — Brand */}
+      <div
+        className={`relative flex flex-col justify-start items-center pt-[140px] px-[60px] pb-20 bg-hr-bg-card bg-cover bg-center bg-no-repeat border-r ${hrBorder} overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[linear-gradient(to_bottom,rgba(12,12,16,0.92)_0%,rgba(12,12,16,0.45)_50%,rgba(12,12,16,0.25)_100%)] before:pointer-events-none max-[900px]:hidden`}
+        style={brandBgStyle}
+      >
+        <div className="relative z-[1] text-center max-w-[400px] animate-hr-fade-up">
+          <h1 className="font-satoshi text-[clamp(1.8rem,3vw,2.6rem)] font-normal leading-[1.2] tracking-[-0.01em] text-hr-text mb-4">
+            AI-Powered Hiring<br />For Modern Teams
+          </h1>
 
-              {/* Normal Auth Form */}
-              {!registrationSuccess && !verificationNeeded && (
-              <>
-              {/* Invite Banner */}
-              {inviteToken && inviteDetails && (
-                <div className="bg-gradient-to-r from-[#7B38FB]/10 to-[#FF5BA8]/10 border-b border-border px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0">
-                      <UserPlus className="h-5 w-5 text-[#7B38FB]" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {recruiterAuthPageCopy.invite.prefix} <span className="text-[#7B38FB]">{inviteDetails.organizationName}</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {recruiterAuthPageCopy.invite.byPrefix} {inviteDetails.inviterName} as {inviteDetails.role}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+          <p className="font-dm text-[0.92rem] leading-[1.7] text-hr-text-secondary mb-12">
+            Post jobs, review applications, and find the perfect candidates — all from one intelligent platform.
+          </p>
 
-              {/* Invite Error */}
-              {inviteToken && inviteError && (
-                <div className="bg-destructive/10 border-b border-destructive/30 px-6 py-4">
-                  <p className="text-sm text-destructive">
-                    {(inviteError as Error).message || recruiterAuthPageCopy.invite.invalid}
-                  </p>
-                </div>
-              )}
+        </div>
+      </div>
 
-              <CardHeader className="text-center">
-                <CardTitle className="text-foreground text-2xl">
-                  {inviteDetails ? recruiterAuthPageCopy.invite.createAccount : recruiterAuthPageCopy.card.title}
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  {inviteDetails
-                    ? `${recruiterAuthPageCopy.invite.joinPrefix} ${inviteDetails.organizationName}`
-                    : recruiterAuthPageCopy.card.description
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-2 bg-muted/50">
-                    <TabsTrigger value="login" className="data-[state=active]:bg-muted/60 text-foreground">
-                      {recruiterAuthPageCopy.card.signIn}
-                    </TabsTrigger>
-                    <TabsTrigger value="register" className="data-[state=active]:bg-muted/60 text-foreground">
-                      {recruiterAuthPageCopy.card.register}
-                    </TabsTrigger>
-                  </TabsList>
+      {/* Right Panel — Auth Form */}
+      <div className="flex flex-col justify-center items-center py-[60px] px-12 relative max-[900px]:px-6 max-[900px]:pt-[100px] max-[900px]:pb-[60px] max-[900px]:min-h-screen max-sm:px-5 max-sm:pt-[90px] max-sm:pb-10">
+        <div
+          className="w-full max-w-[400px]"
+          style={{ animation: "hr-fade-up 0.7s ease-out 0.12s both" }}
+        >
+          {renderFormContent()}
 
-                  <TabsContent value="login">
-                    <form onSubmit={handleLogin} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="username" className="text-foreground">{recruiterAuthPageCopy.card.usernameOrEmail}</Label>
-                        <Input
-                          id="username"
-                          type="text"
-                          value={loginData.username}
-                          onChange={(e) => setLoginData(prev => ({ ...prev, username: e.target.value }))}
-                          className="bg-muted/30 border-border text-foreground placeholder:text-muted-foreground"
-                          placeholder={recruiterAuthPageCopy.card.usernameOrEmailPlaceholder}
-                          required
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="password" className="text-foreground">{recruiterAuthPageCopy.card.password}</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          autoComplete="current-password"
-                          value={loginData.password}
-                          onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                          className="bg-muted/30 border-border text-foreground placeholder:text-muted-foreground"
-                          placeholder={recruiterAuthPageCopy.card.passwordPlaceholder}
-                          required
-                        />
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] hover:opacity-90"
-                        disabled={loginMutation.isPending}
-                      >
-                        {loginMutation.isPending ? recruiterAuthPageCopy.card.signingIn : recruiterAuthPageCopy.card.signIn}
-                      </Button>
-                    </form>
-                  </TabsContent>
-
-                  <TabsContent value="register">
-                    <form onSubmit={handleRegister} className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="firstName" className="text-foreground">{recruiterAuthPageCopy.card.firstName}</Label>
-                          <Input
-                            id="firstName"
-                            type="text"
-                            value={registerData.firstName}
-                            onChange={(e) => setRegisterData(prev => ({ ...prev, firstName: e.target.value }))}
-                            className="bg-muted/30 border-border text-foreground placeholder:text-muted-foreground"
-                            placeholder={recruiterAuthPageCopy.card.firstNamePlaceholder}
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lastName" className="text-foreground">{recruiterAuthPageCopy.card.lastName}</Label>
-                          <Input
-                            id="lastName"
-                            type="text"
-                            value={registerData.lastName}
-                            onChange={(e) => setRegisterData(prev => ({ ...prev, lastName: e.target.value }))}
-                            className="bg-muted/30 border-border text-foreground placeholder:text-muted-foreground"
-                            placeholder={recruiterAuthPageCopy.card.lastNamePlaceholder}
-                            required
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="regEmail" className="text-foreground">{recruiterAuthPageCopy.card.email}</Label>
-                        <Input
-                          id="regEmail"
-                          type="email"
-                          value={registerData.username}
-                          onChange={(e) => setRegisterData(prev => ({ ...prev, username: e.target.value }))}
-                          className={`bg-muted/30 border-border text-foreground placeholder:text-muted-foreground ${inviteDetails ? 'bg-muted/50 cursor-not-allowed' : ''}`}
-                          placeholder={recruiterAuthPageCopy.card.emailPlaceholder}
-                          required
-                          readOnly={!!inviteDetails}
-                          title={inviteDetails ? "Email is locked to the invite" : undefined}
-                        />
-                        {inviteDetails && (
-                          <p className="text-xs text-muted-foreground">
-                            {recruiterAuthPageCopy.invite.emailLocked}
-                          </p>
-                        )}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="regPassword" className="text-foreground">{recruiterAuthPageCopy.card.password}</Label>
-                        <Input
-                          id="regPassword"
-                          type="password"
-                          autoComplete="new-password"
-                          value={registerData.password}
-                          onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
-                          className="bg-muted/30 border-border text-foreground placeholder:text-muted-foreground"
-                          placeholder={recruiterAuthPageCopy.card.createPasswordPlaceholder}
-                          required
-                        />
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] hover:opacity-90"
-                        disabled={registerMutation.isPending}
-                      >
-                        {registerMutation.isPending ? recruiterAuthPageCopy.card.creatingAccount : recruiterAuthPageCopy.card.createRecruiterAccount}
-                      </Button>
-                    </form>
-                  </TabsContent>
-                </Tabs>
-              </CardContent>
-              </>
-              )}
-            </Card>
+          <div className="mt-8 text-center font-dm text-[0.72rem] text-hr-text-muted [&_a]:text-hr-accent-hover [&_a]:no-underline [&_a]:border-b [&_a]:border-[rgba(167,139,250,0.3)] [&_a]:transition-colors [&_a]:duration-200 [&_a:hover]:text-hr-text [&_a:hover]:border-hr-text">
+            By continuing, you agree to the <Link href="/terms-of-service">Terms of Service</Link> and <Link href="/privacy-policy">Privacy Policy</Link>
           </div>
         </div>
       </div>
-      <Footer />
     </div>
   );
 }

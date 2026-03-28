@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import Layout from "@/components/Layout";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
 import { useOrganization } from "@/hooks/use-organization";
@@ -13,10 +12,6 @@ import {
   formatPriceINR,
 } from "@/hooks/use-subscription";
 import { initiateCashfreeCheckout } from "@/lib/cashfree";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -28,8 +23,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -45,6 +38,15 @@ import {
   Mail,
   AlertCircle,
 } from "lucide-react";
+import HomepageNav from "@/components/HomepageNav";
+import HomepageFooter from "@/components/HomepageFooter";
+import GridOverlay from "@/components/GridOverlay";
+import { sectionLabel } from "@/lib/shared-styles";
+
+const planBtnBase = "block w-full py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
+const planBtnPrimary = `${planBtnBase} bg-hr-accent text-white border-none hover:bg-hr-accent-hover`;
+const planBtnSecondary = `${planBtnBase} bg-transparent text-hr-text border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)]`;
+const planFeatureLi = "flex items-start gap-2.5 text-[0.88rem] text-hr-text-secondary leading-[1.4]";
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -280,16 +282,16 @@ export default function PricingPage() {
   const renderFeatureValue = (value: boolean | string) => {
     if (typeof value === 'boolean') {
       return value ? (
-        <Check className="h-5 w-5 text-green-500 mx-auto" />
+        <span className="inline-flex items-center justify-center w-5 h-5 text-hr-green"><Check size={16} /></span>
       ) : (
-        <X className="h-5 w-5 text-white/20 mx-auto" />
+        <span className="inline-flex items-center justify-center w-5 h-5 text-[rgba(255,255,255,0.15)]"><X size={16} /></span>
       );
     }
-    return <span className="text-center text-white">{value}</span>;
+    return <span style={{ color: '#E8E8ED' }}>{value}</span>;
   };
 
   return (
-    <Layout>
+    <>
       <Helmet>
         <title>Pricing | VantaHire - Simple, Transparent Pricing</title>
         <meta name="description" content="Simple pricing. No surprises. Start free, upgrade when your team grows. No long contracts. AI sourcing, WhatsApp outreach, client portal, and pipeline management included." />
@@ -300,364 +302,379 @@ export default function PricingPage() {
         <meta property="og:type" content="website" />
       </Helmet>
 
-      <div className="public-theme min-h-screen bg-background text-foreground">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
+        <GridOverlay />
+        <div className="relative z-10">
+          <HomepageNav />
 
-        <div className={`container mx-auto px-4 py-16 relative z-10 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Hero Section */}
-          <div className="text-center mb-16 pt-8">
-            <div className="w-20 h-1.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] rounded-full mx-auto mb-6"></div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              <span className="text-white">Simple pricing.</span>
-              <br />
-              <span className="gradient-text-purple">No surprises.</span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+          {/* Hero */}
+          <div className="pt-[140px] px-12 pb-20 text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-12">
+            <div className={sectionLabel}>Pricing</div>
+            <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] font-normal leading-[1.2] tracking-tight mb-5 text-hr-text">Simple pricing.<br />No surprises.</h1>
+            <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[540px] mx-auto">
               Start free. Upgrade when your team grows. No long contracts. No hidden fees.
             </p>
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid md:grid-cols-3 gap-6 mb-20 max-w-5xl mx-auto">
+          <div
+            className="grid grid-cols-3 gap-5 max-w-[1100px] mx-auto mb-[100px] px-12 max-lg:gap-4 max-lg:px-8 max-md:grid-cols-1 max-md:max-w-[420px] max-md:px-5 max-md:gap-6"
+            style={{ animation: 'hr-fade-up 0.9s ease-out 0.15s both' }}
+          >
             {/* Free Plan */}
-            <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-6 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-300">
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="h-5 w-5 text-white/70" />
-                  <h3 className="text-xl font-bold text-white">Free</h3>
-                </div>
-                <p className="text-white/60 text-sm">{freePlanCard?.summary || "Get started in minutes"}</p>
+            <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <Users size={18} style={{ color: '#8A8A9A' }} />
               </div>
-              <div className="mb-6">
-                <div className="text-4xl font-bold text-white">
-                  {formatPriceINR(0)}
-                  <span className="text-base font-normal text-white/50">/month</span>
-                </div>
+              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Free</div>
+              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{freePlanCard?.summary || "Get started in minutes"}</div>
+              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">
+                {formatPriceINR(0)}
+                <span className="text-[0.85rem] font-normal text-hr-text-muted font-dm"> /month</span>
               </div>
-              <ul className="space-y-3 mb-6">
+              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">&nbsp;</div>
+              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
+              <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(freePlanCard?.highlights ?? []).map((highlight) => (
-                  <li key={highlight} className="flex items-center gap-2 text-white/80 text-sm">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <li key={highlight} className={planFeatureLi}>
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
                     {highlight}
                   </li>
                 ))}
               </ul>
               {currentPlan === 'free' && isLoggedIn ? (
-                <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10" disabled>
-                  Current Plan
-                </Button>
+                <button className={planBtnSecondary} disabled>Current Plan</button>
               ) : (
-                <Button variant="outline" className="w-full border-white/20 text-white hover:bg-white/10" onClick={() => setLocation('/recruiter-auth')}>
+                <button className={planBtnSecondary} onClick={() => setLocation('/recruiter-auth')}>
                   Get Started
-                </Button>
+                </button>
               )}
             </div>
 
             {/* Growth Plan */}
-            <div className="bg-gradient-to-br from-primary/20 to-primary/5 p-6 rounded-xl border-2 border-primary relative">
-              <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white">
-                Most Popular
-              </Badge>
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="h-5 w-5 text-primary" />
-                  <h3 className="text-xl font-bold text-white">Growth</h3>
-                </div>
-                <p className="text-white/60 text-sm">{proPlanCard?.summary || "Scale your hiring output"}</p>
+            <div className="bg-[linear-gradient(165deg,rgba(124,58,237,0.08)_0%,#111116_40%)] border-2 border-hr-accent rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 max-md:-order-1">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 font-mono text-[0.68rem] font-medium tracking-[0.08em] uppercase bg-hr-accent text-white py-1 px-4 whitespace-nowrap">Most Popular</div>
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(124,58,237,0.15)' }}>
+                <Zap size={18} style={{ color: '#A78BFA' }} />
               </div>
-              <div className="mb-6">
-                <div className="text-4xl font-bold text-white">
-                  {proPlan ? formatPriceINR(proPlan.pricePerSeatMonthly) : '...'}
-                  <span className="text-base font-normal text-white/50">/seat/month</span>
-                </div>
-                <p className="text-xs text-white/50 mt-1">
-                  {taxEnabled ? `+ GST (${gstRate}%) | Save with annual billing` : 'No additional tax configured | Save with annual billing'}
-                </p>
+              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Growth</div>
+              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{proPlanCard?.summary || "Scale your hiring output"}</div>
+              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">
+                {proPlan ? formatPriceINR(proPlan.pricePerSeatMonthly) : '...'}
+                <span className="text-[0.85rem] font-normal text-hr-text-muted font-dm"> /seat/month</span>
               </div>
-              <p className="text-xs text-white/50 mb-4">Everything in Free, plus:</p>
-              <ul className="space-y-3 mb-6">
+              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">
+                {taxEnabled ? `+ GST (${gstRate}%) | Save with annual billing` : 'Save with annual billing'}
+              </div>
+              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
+              <div className="text-[0.72rem] text-hr-text-muted mb-3 font-mono tracking-[0.04em] uppercase">Everything in Free, plus:</div>
+              <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(proPlanCard?.highlights ?? []).map((highlight) => (
-                  <li key={highlight} className="flex items-center gap-2 text-white/80 text-sm">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <li key={highlight} className={planFeatureLi}>
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
                     {highlight.includes("top-ups") ? creditPackLabel : highlight}
                   </li>
                 ))}
               </ul>
               {isPro ? (
-                <Button className="w-full" disabled>
-                  Current Plan
-                </Button>
+                <button className={planBtnPrimary} disabled>Current Plan</button>
               ) : (
-                <Button variant="gold" className="w-full" onClick={handleSelectPro}>
-                  Upgrade to Growth
-                  <ArrowRight className="h-4 w-4 ml-2" />
-                </Button>
+                <button className={`${planBtnPrimary} group`} onClick={handleSelectPro}>
+                  Upgrade to Growth <span className="inline-block ml-1.5 transition-transform duration-200 group-hover:translate-x-[3px]">&rarr;</span>
+                </button>
               )}
             </div>
 
-            {/* Business Plan */}
-            <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-6 rounded-xl border border-white/10 hover:border-white/20 transition-all duration-300">
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Building2 className="h-5 w-5 text-white/70" />
-                  <h3 className="text-xl font-bold text-white">Enterprise</h3>
-                </div>
-                <p className="text-white/60 text-sm">{businessPlanCard?.summary || "Custom fit for large teams"}</p>
+            {/* Enterprise Plan */}
+            <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
+              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
+                <Building2 size={18} style={{ color: '#8A8A9A' }} />
               </div>
-              <div className="mb-6">
-                <div className="text-4xl font-bold text-white">Custom</div>
-                <p className="text-xs text-white/50 mt-1">Tailored to your needs</p>
-              </div>
-              <p className="text-xs text-white/50 mb-4">Everything in Growth, plus:</p>
-              <ul className="space-y-3 mb-6">
+              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Enterprise</div>
+              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{businessPlanCard?.summary || "Custom fit for large teams"}</div>
+              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">Custom</div>
+              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">Tailored to your needs</div>
+              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
+              <div className="text-[0.72rem] text-hr-text-muted mb-3 font-mono tracking-[0.04em] uppercase">Everything in Growth, plus:</div>
+              <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(businessPlanCard?.highlights ?? []).slice(1).map((highlight) => (
-                  <li key={highlight} className="flex items-center gap-2 text-white/80 text-sm">
-                    <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  <li key={highlight} className={planFeatureLi}>
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
                     {highlight}
                   </li>
                 ))}
               </ul>
-              <Button variant="outlinePurple" className="w-full" onClick={handleContactSales}>
+              <button className={planBtnSecondary} onClick={handleContactSales}>
                 Contact Sales
-              </Button>
+              </button>
             </div>
           </div>
 
           {/* Feature Comparison */}
-          <div className="mb-20 max-w-5xl mx-auto">
-            <h2 className="text-2xl md:text-3xl font-bold text-center text-white mb-8">Compare plans side by side</h2>
-            <div className="overflow-x-auto rounded-xl border border-white/10">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5">
-                    <th className="text-left py-4 px-4 font-medium text-white">Feature</th>
-                    <th className="py-4 px-4 font-medium text-center w-32 text-white">Free</th>
-                    <th className="py-4 px-4 font-medium text-center w-32 bg-primary/10 text-white">Growth</th>
-                    <th className="py-4 px-4 font-medium text-center w-32 text-white">Enterprise</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonRows.map((feature, index) => (
-                    <tr key={feature.name} className={`border-b border-white/5 ${index % 2 === 0 ? 'bg-white/[0.02]' : ''}`}>
-                      <td className="py-3 px-4 text-white/80">{feature.name}</td>
-                      <td className="py-3 px-4 text-center">{renderFeatureValue(feature.free)}</td>
-                      <td className="py-3 px-4 text-center bg-primary/5">{renderFeatureValue(feature.pro)}</td>
-                      <td className="py-3 px-4 text-center">{renderFeatureValue(feature.business)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* FAQ Section */}
-          <div className="max-w-3xl mx-auto mb-16">
-            <h2 className="text-2xl md:text-3xl font-bold text-center text-white mb-8">Pricing questions, answered.</h2>
-            <div className="space-y-6">
-              {faqs.map((faq, i) => (
-                <div key={i} className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-6 rounded-xl border border-white/10">
-                  <h3 className="font-semibold text-white mb-2">{faq.question}</h3>
-                  <p className="text-white/70">{faq.answer}</p>
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div
+                className="max-w-[1100px] mx-auto mb-[100px] px-12 max-md:px-5 max-md:overflow-x-auto"
+                style={{ animation: 'hr-fade-up 0.9s ease-out 0.3s both' }}
+              >
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-10 text-hr-text text-center">Compare plans side by side</h2>
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="w-full border border-[rgba(255,255,255,0.08)] rounded-[10px] overflow-hidden border-separate max-md:min-w-[560px]" style={{ borderSpacing: 0 }}>
+                    <thead>
+                      <tr>
+                        <th className="py-4 px-5 text-left font-mono text-[0.72rem] font-semibold tracking-[0.06em] uppercase text-hr-text-muted bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Feature</th>
+                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-text text-center bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Free</th>
+                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-accent-hover text-center bg-[rgba(124,58,237,0.08)] border-b border-[rgba(255,255,255,0.08)]">Growth</th>
+                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-text text-center bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Enterprise</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparisonRows.map((feature, idx) => {
+                        const isLast = idx === comparisonRows.length - 1;
+                        const borderClass = isLast ? '' : 'border-b border-[rgba(255,255,255,0.08)]';
+                        return (
+                          <tr key={feature.name} className="group">
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text font-normal text-left bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{feature.name}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{renderFeatureValue(feature.free)}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-[rgba(124,58,237,0.03)] ${borderClass} group-hover:bg-[rgba(124,58,237,0.05)]`}>{renderFeatureValue(feature.pro)}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{renderFeatureValue(feature.business)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              ))}
+              </div>
             </div>
+            <div></div>
           </div>
 
-          {/* CTA Section */}
-          <div className="text-center py-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-              Start hiring with the right plan.
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Every plan includes AI sourcing, fit scoring, and a recruiter-grade pipeline. Pick the one that fits your team today.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                variant="gold"
-                size="lg"
-                onClick={() => setLocation('/recruiter-auth')}
-                className="rounded-full px-8 py-6 text-lg font-semibold"
+          {/* FAQ */}
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div
+                className="max-w-[720px] mx-auto mb-[100px] px-12 max-md:px-5"
+                style={{ animation: 'hr-fade-up 0.9s ease-out 0.4s both' }}
               >
-                Start Free
-              </Button>
-              <Button
-                variant="outlinePurple"
-                size="lg"
-                onClick={() => setLocation('/demo')}
-                className="rounded-full px-8 py-6 text-lg"
-              >
-                Book a Demo
-              </Button>
+                <div className={`${sectionLabel} text-center`}>FAQ</div>
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-10 text-hr-text text-center">Pricing questions, answered.</h2>
+                {faqs.map((faq, i) => (
+                  <div key={i} className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg py-6 px-7 mb-3 transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
+                    <h3 className="font-satoshi text-base font-medium text-hr-text mb-2">{faq.question}</h3>
+                    <p className="text-[0.9rem] text-hr-text-secondary leading-[1.7]">{faq.answer}</p>
+                  </div>
+                ))}
+              </div>
             </div>
+            <div></div>
           </div>
+
+          {/* CTA */}
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div className="text-center py-20 px-12 pb-[100px] border-t border-[rgba(255,255,255,0.08)] max-md:py-[60px] max-md:px-5">
+                <div className={sectionLabel}>Get Started</div>
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text max-w-[480px] mx-auto">Start hiring with<br />the right plan.</h2>
+                <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto text-center mb-9">
+                  Every plan includes AI sourcing, fit scoring, and a recruiter-grade pipeline. Pick the one that fits your team today.
+                </p>
+                <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
+                  <a
+                    href="/recruiter-auth"
+                    className="bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setLocation('/recruiter-auth');
+                    }}
+                  >
+                    Start Free
+                  </a>
+                  <a
+                    href="https://cal.com/vantahire/quick-connect"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center"
+                  >
+                    Book a Demo
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div></div>
+          </div>
+
+          <HomepageFooter />
         </div>
       </div>
 
       {/* Checkout Dialog */}
       <Dialog open={checkoutDialogOpen} onOpenChange={setCheckoutDialogOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Upgrade to Growth</DialogTitle>
-            <DialogDescription>
-              {checkoutMode === 'public'
-                ? "Enter your details to get started."
-                : checkoutMode === 'create-org'
-                ? "Create your organization and start your subscription."
-                : "Choose your seat count and billing cycle."}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none p-5 font-dm text-hr-text public-theme">
+          <div className="flex justify-between items-start">
+            <div>
+              <DialogTitle className="font-satoshi text-base font-medium text-hr-text mb-1">Upgrade to Growth</DialogTitle>
+              <DialogDescription className="text-[0.82rem] text-hr-text-muted leading-[1.5]">
+                {checkoutMode === 'public'
+                  ? "Enter your details to get started."
+                  : checkoutMode === 'create-org'
+                  ? "Create your organization and start your subscription."
+                  : "Choose your seat count and billing cycle."}
+              </DialogDescription>
+            </div>
+          </div>
 
           {requiresLogin ? (
-            <div className="py-4">
-              <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
-                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="pt-2">
+              <div className="flex items-start gap-3 p-4 bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.2)] rounded-none">
+                <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  <p className="text-[0.82rem] font-medium text-amber-200">
                     Account already exists
                   </p>
-                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                  <p className="text-[0.78rem] text-amber-300/80 mt-1 leading-[1.5]">
                     An account with this email already has an organization. Please log in to manage your subscription.
                   </p>
                 </div>
               </div>
               <div className="mt-4 flex gap-2">
-                <Button variant="outline" onClick={() => { setRequiresLogin(false); setEmail(''); }} className="flex-1">
+                <button className={`${planBtnSecondary} flex-1`} onClick={() => { setRequiresLogin(false); setEmail(''); }}>
                   Use Different Email
-                </Button>
-                <Button onClick={() => setLocation('/recruiter-auth?redirect=/org/billing')} className="flex-1">
+                </button>
+                <button className={`${planBtnPrimary} flex-1`} onClick={() => setLocation('/recruiter-auth?redirect=/org/billing')}>
                   Log In
-                </Button>
+                </button>
               </div>
             </div>
           ) : (
-            <>
-              <div className="space-y-4 py-4">
-                {/* Email field - only for public checkout */}
-                {checkoutMode === 'public' && (
-                  <div className="space-y-2">
-                    <Label>Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        type="email"
-                        placeholder="you@company.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      We'll send your receipt and login details here.
-                    </p>
+            <div className="flex flex-col gap-3.5 pt-2">
+              {/* Email field - only for public checkout */}
+              {checkoutMode === 'public' && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">Email Address *</label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-hr-text-muted" />
+                    <input
+                      type="email"
+                      placeholder="you@company.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 pl-10 pr-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                    />
                   </div>
-                )}
-
-                {/* Org name - for public and create-org modes */}
-                {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
-                  <div className="space-y-2">
-                    <Label>Organization Name</Label>
-                    <div className="relative">
-                      <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Acme Inc"
-                        value={orgName}
-                        onChange={(e) => setOrgName(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Number of Seats</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={1000}
-                    value={seats}
-                    onChange={(e) => setSeats(parseInt(e.target.value) || 1)}
-                  />
-                  <p className="text-sm text-muted-foreground">
-                    Growth includes {formatMetric(proCredits)} AI credits per seat per month, pooled across the organization. With {seats} seat{seats === 1 ? "" : "s"}, that is {proCredits * seats} included credits per month. {commercialConfig?.seatPolicies?.seatAddCredits.summary} {creditPackConfig ? `Extra ${creditPackConfig.creditsPerPack}-credit packs are available at ${formatPriceINR(creditPackConfig.pricePerPack)}.` : 'Extra credit packs are available.'}
+                  <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                    We'll send your receipt and login details here.
                   </p>
                 </div>
+              )}
 
-                <div className="space-y-2">
-                  <Label>Billing Cycle</Label>
-                  <Select value={billingCycle} onValueChange={(v: 'monthly' | 'annual') => setBillingCycle(v)}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="annual">Annual (Save 17%)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Optional GSTIN field */}
-                {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
-                  <div className="space-y-2">
-                    <Label>GSTIN (Optional)</Label>
-                    <Input
-                      placeholder="22AAAAA0000A1Z5"
-                      value={gstin}
-                      onChange={(e) => setGstin(e.target.value.toUpperCase())}
+              {/* Org name - for public and create-org modes */}
+              {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">Organization Name *</label>
+                  <div className="relative">
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-hr-text-muted" />
+                    <input
+                      placeholder="Acme Inc"
+                      value={orgName}
+                      onChange={(e) => setOrgName(e.target.value)}
+                      className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 pl-10 pr-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
                     />
-                    <p className="text-xs text-muted-foreground">
-                      Optional. Add GSTIN if you want it printed on the invoice.
-                    </p>
                   </div>
-                )}
+                </div>
+              )}
 
-                {proPlan && (
-                  <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-lg">
-                    <div className="flex justify-between text-sm">
-                      <span>Subtotal</span>
-                      <span>{formatPriceINR(subtotal)}</span>
-                    </div>
-                    {taxEnabled && (
-                      <div className="mt-2 flex justify-between text-sm">
-                        <span>GST ({gstRate}%)</span>
-                        <span>{formatPriceINR(gstAmount)}</span>
-                      </div>
-                    )}
-                    <div className="mt-2 flex justify-between">
-                      <span>Total</span>
-                      <span className="font-bold">
-                        {formatPriceINR(totalWithTax)}
-                        <span className="text-sm font-normal text-muted-foreground">
-                          /{billingCycle === 'monthly' ? 'month' : 'year'}
-                        </span>
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {taxEnabled
-                        ? `GST (${gstRate}%) is added at checkout.`
-                        : 'No additional tax is configured.'}
-                    </p>
-                  </div>
-                )}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[0.78rem] font-medium text-hr-text-secondary">Number of Seats *</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={1000}
+                  value={seats}
+                  onChange={(e) => setSeats(parseInt(e.target.value) || 1)}
+                  className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                />
+                <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                  Growth includes {formatMetric(proCredits)} AI credits per seat per month, pooled across the organization. With {seats} seat{seats === 1 ? "" : "s"}, that is {proCredits * seats} included credits per month. {commercialConfig?.seatPolicies?.seatAddCredits.summary} {creditPackConfig ? `Extra ${creditPackConfig.creditsPerPack}-credit packs are available at ${formatPriceINR(creditPackConfig.pricePerPack)}.` : 'Extra credit packs are available.'}
+                </p>
               </div>
 
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setCheckoutDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleCheckout} disabled={isCheckoutPending}>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[0.78rem] font-medium text-hr-text-secondary">Billing Cycle *</label>
+                <Select value={billingCycle} onValueChange={(v: 'monthly' | 'annual') => setBillingCycle(v)}>
+                  <SelectTrigger className="bg-hr-bg-elevated border-[rgba(255,255,255,0.08)] rounded-none text-hr-text font-dm text-[0.88rem] py-2.5 focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)] focus:ring-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none text-hr-text font-dm">
+                    <SelectItem value="monthly" className="text-hr-text rounded-none focus:bg-[rgba(255,255,255,0.06)] focus:text-hr-text">Monthly</SelectItem>
+                    <SelectItem value="annual" className="text-hr-text rounded-none focus:bg-[rgba(255,255,255,0.06)] focus:text-hr-text">Annual (Save 17%)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Optional GSTIN field */}
+              {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">GSTIN (Optional)</label>
+                  <input
+                    placeholder="22AAAAA0000A1Z5"
+                    value={gstin}
+                    onChange={(e) => setGstin(e.target.value.toUpperCase())}
+                    className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                  />
+                  <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                    Add GSTIN if you want it printed on the invoice.
+                  </p>
+                </div>
+              )}
+
+              {proPlan && (
+                <div className="p-4 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none">
+                  <div className="flex justify-between text-[0.88rem] text-hr-text-secondary">
+                    <span>Subtotal</span>
+                    <span className="text-hr-text">{formatPriceINR(subtotal)}</span>
+                  </div>
+                  {taxEnabled && (
+                    <div className="mt-2 flex justify-between text-[0.88rem] text-hr-text-secondary">
+                      <span>GST ({gstRate}%)</span>
+                      <span className="text-hr-text">{formatPriceINR(gstAmount)}</span>
+                    </div>
+                  )}
+                  <div className="h-px bg-[rgba(255,255,255,0.08)] my-2.5"></div>
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-[0.88rem] text-hr-text-secondary">Total</span>
+                    <span className="font-satoshi font-bold text-hr-text text-lg">
+                      {formatPriceINR(totalWithTax)}
+                      <span className="text-[0.8rem] font-normal text-hr-text-muted font-dm">
+                        /{billingCycle === 'monthly' ? 'month' : 'year'}
+                      </span>
+                    </span>
+                  </div>
+                  <p className="text-[0.72rem] text-hr-text-muted mt-1.5">
+                    {taxEnabled
+                      ? `GST (${gstRate}%) is added at checkout.`
+                      : 'No additional tax is configured.'}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 mt-1">
+                <button className={`${planBtnPrimary} flex-1 flex items-center justify-center gap-2`} onClick={handleCheckout} disabled={isCheckoutPending}>
                   {isCheckoutPending ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                   ) : null}
                   Continue to Payment
-                </Button>
-              </DialogFooter>
-            </>
+                </button>
+                <button className={`${planBtnSecondary} flex-1`} onClick={() => setCheckoutDialogOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
           )}
         </DialogContent>
       </Dialog>
-    </Layout>
+    </>
   );
 }

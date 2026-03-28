@@ -1,3 +1,27 @@
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/satoshi-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -538,79 +562,6 @@
   50% {
     opacity: 0.7;
   }
-}
-
-.animate-pulse-slow {
-  animation: pulse 5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-.animate-slide-left {
-  animation: slide-in-left 0.8s ease-out forwards;
-}
-
-.animate-slide-right {
-  animation: slide-in-right 0.8s ease-out forwards;
-}
-
-.animate-slide-up {
-  animation: slide-in-up 0.8s ease-out forwards;
-}
-
-/* Added for enhanced header */
-.animate-slide-right {
-  animation: slide-in-right 0.8s ease-out forwards;
-}
-
-.animate-fade-in {
-  animation: fade-in 1s ease-out forwards;
-}
-
-.animate-bounce-in {
-  animation: bounce-in 0.8s ease-out forwards;
-}
-
-.animate-pulse-glow {
-  animation: pulse-glow 2s infinite;
-}
-
-.animate-float-in {
-  animation: float-in 0.6s ease-out forwards;
-}
-
-.animate-shine {
-  background: linear-gradient(
-    to right,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.8) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  background-size: 200% 100%;
-  animation: shine 2s infinite;
-}
-
-.animate-gradient-text {
-  background: linear-gradient(-45deg, #7B38FB, #FF5BA8, #2D81FF, #7B38FB);
-  background-size: 300%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: gradient-text-animation 5s ease infinite;
-}
-
-.premium-card {
-  transition: var(--hover-transition);
-  box-shadow: var(--premium-shadow);
-}
-
-.premium-card:hover {
-  transform: translateY(-5px);
-  box-shadow: var(--premium-glow);
-}
-
-.premium-border {
-  position: relative;
-  border: 1px solid rgba(123, 56, 251, 0.3);
-  animation: border-glow 2s infinite;
 }
 
 .scrollbar-hide::-webkit-scrollbar {

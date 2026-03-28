@@ -2,21 +2,17 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
-import { Search, MapPin, Clock, Filter, Briefcase, ArrowUpDown, X, User, IndianRupee } from "lucide-react";
+import { Search, MapPin, Clock, Briefcase, X, User, IndianRupee, SlidersHorizontal } from "lucide-react";
 import { DEFAULT_SITE_URL } from "@/lib/seoHelpers";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Job } from "@shared/schema";
-import Layout from "@/components/Layout";
-import { FilterPanel, MobileFilterSheet } from "@/components/FilterPanel";
+import HomepageNav from "@/components/HomepageNav";
+import HomepageFooter from "@/components/HomepageFooter";
+import GridOverlay from "@/components/GridOverlay";
 import { useAIFeatures } from "@/hooks/use-ai-features";
 
 interface JobWithRecruiter extends Job {
   postedByName?: string;
-  postedById?: number | string; // Can be publicId (string) or numeric ID
+  postedById?: number | string;
   isRecruiterProfilePublic?: boolean;
 }
 
@@ -30,12 +26,17 @@ interface JobsResponse {
   };
 }
 
+const filterInputCls = "w-full bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded px-3 py-[9px] font-dm text-[0.85rem] text-hr-text outline-none transition-colors duration-200 placeholder:text-hr-text-muted focus:border-hr-accent";
+const filterSelectCls = "w-full bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded px-3 py-[9px] font-dm text-[0.85rem] text-hr-text outline-none transition-colors duration-200 cursor-pointer appearance-none focus:border-hr-accent";
+const filterLabelCls = "flex items-center gap-1.5 font-mono text-[0.65rem] font-medium tracking-[0.1em] uppercase text-hr-text-muted mb-2";
+const metaItemCls = "flex items-center gap-[5px] text-[0.82rem] text-hr-text-muted [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0";
+const pageBtnCls = "py-2 px-3.5 rounded-none font-dm text-[0.82rem] font-medium cursor-pointer transition-all duration-200 border border-[rgba(255,255,255,0.08)] bg-transparent text-hr-text-secondary hover:enabled:border-[rgba(255,255,255,0.12)] hover:enabled:text-hr-text disabled:opacity-40 disabled:cursor-not-allowed";
+
 export default function JobsPage() {
   const searchParams = new URLSearchParams(useSearch());
   const [, setUrlLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  // Initialize state from URL params
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [location, setLocationFilter] = useState(searchParams.get("location") || "");
@@ -43,16 +44,13 @@ export default function JobsPage() {
   const [minSalary, setMinSalary] = useState(searchParams.get("minSalary") || "");
   const [maxSalary, setMaxSalary] = useState(searchParams.get("maxSalary") || "");
   const [salaryPeriod, setSalaryPeriod] = useState(searchParams.get("salaryPeriod") || "per_year");
-
   const [sortBy, setSortBy] = useState<string>(searchParams.get("sortBy") || "recent");
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => { setIsVisible(true); }, []);
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const { resumeAdvisor, fitScoring } = useAIFeatures();
   const aiEnabled = resumeAdvisor || fitScoring;
 
-  // Fetch jobs from API
+  // Fetch jobs
   const { data, isLoading, error } = useQuery<JobsResponse>({
     queryKey: ["/api/jobs", { page, search, location, type, minSalary, maxSalary, salaryPeriod }],
     queryFn: async () => {
@@ -64,19 +62,16 @@ export default function JobsPage() {
       if (minSalary) params.set("minSalary", minSalary);
       if (maxSalary) params.set("maxSalary", maxSalary);
       if (salaryPeriod) params.set("salaryPeriod", salaryPeriod);
-
       const response = await fetch(`/api/jobs?${params}`);
       if (!response.ok) throw new Error("Failed to fetch jobs");
       return response.json();
     },
   });
 
-  // Client-side sorting (server doesn't support sortBy yet)
+  // Client-side sorting
   const sortedJobs = useMemo(() => {
     if (!data?.jobs) return [];
-
     const jobs = [...data.jobs];
-
     switch (sortBy) {
       case "recent":
         return jobs.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -86,7 +81,6 @@ export default function JobsPage() {
           if (!b.deadline) return -1;
           return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
         });
-      case "relevant":
       default:
         return jobs;
     }
@@ -103,19 +97,15 @@ export default function JobsPage() {
     if (salaryPeriod) params.set("salaryPeriod", salaryPeriod);
     if (sortBy && sortBy !== "recent") params.set("sortBy", sortBy);
     if (page > 1) params.set("page", page.toString());
-
     const queryString = params.toString();
     setUrlLocation(`/jobs${queryString ? `?${queryString}` : ''}`, { replace: true });
   }, [search, location, type, minSalary, maxSalary, salaryPeriod, sortBy, page, setUrlLocation]);
 
-  // Scroll to top on pagination change
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, [page]);
 
-  const handleApplyFilters = () => {
-    setPage(1); // Reset to first page when applying filters
-  };
+  const handleApplyFilters = () => setPage(1);
 
   const handleResetFilters = () => {
     setSearch("");
@@ -139,7 +129,6 @@ export default function JobsPage() {
     });
   };
 
-  // Count active filters (excluding page and default sort)
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (search) count++;
@@ -150,12 +139,9 @@ export default function JobsPage() {
     return count;
   }, [search, location, type, minSalary, maxSalary]);
 
-  // Generate dynamic meta tags based on filters and results
   const metaData = useMemo(() => {
     const baseUrl = DEFAULT_SITE_URL;
     const count = data?.pagination.total || 0;
-
-    // Build title with filters
     let title = "Find Jobs";
     if (location) title += ` in ${location}`;
     if (type && type !== "all") {
@@ -163,57 +149,136 @@ export default function JobsPage() {
       title += ` - ${typeLabel}`;
     }
     title += " | VantaHire";
-
-    // Build description
     let description = `Browse ${count} open roles across IT, Telecom, Automotive, Fintech, Healthcare.`;
     if (location) description += ` Find opportunities in ${location}.`;
     if (search) description += ` Search: ${search}.`;
     description += " Recruiter-first ATS built for recruiting velocity.";
-
-    // Build canonical URL with query params (include all active filters)
-    const params = new URLSearchParams();
-    if (search) params.set("search", search);
-    if (location) params.set("location", location);
-    if (type && type !== "all") params.set("type", type);
-    if (minSalary) params.set("minSalary", minSalary);
-    if (maxSalary) params.set("maxSalary", maxSalary);
-    if (salaryPeriod) params.set("salaryPeriod", salaryPeriod);
-    if (sortBy && sortBy !== "recent") params.set("sortBy", sortBy);
-    if (page > 1) params.set("page", page.toString());
-
     const canonicalUrl = `${baseUrl}/jobs`;
-
     return { title, description, canonicalUrl, baseUrl };
-  }, [location, type, search, minSalary, maxSalary, salaryPeriod, sortBy, page, data?.pagination.total]);
+  }, [location, type, search, data?.pagination.total]);
 
   const formatDate = (dateString: string | Date) => {
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
   };
 
   const formatSalary = (min?: number | null, max?: number | null, period?: string | null) => {
     if (!min && !max) return null;
     const currency = "₹";
     const p = period === "per_year" ? "/yr" : period === "per_month" ? "/mo" : "";
-
-    if (min && max) return `${currency}${min.toLocaleString()} - ${currency}${max.toLocaleString()}${p}`;
+    if (min && max) return `${currency}${min.toLocaleString()} – ${currency}${max.toLocaleString()}${p}`;
     if (min) return `From ${currency}${min.toLocaleString()}${p}`;
     if (max) return `Up to ${currency}${max.toLocaleString()}${p}`;
     return null;
   };
 
+  // Filter panel content (shared between desktop & mobile)
+  const filterPanel = (
+    <>
+      <div className="mb-5">
+        <label className={filterLabelCls}><Search size={12} /> Keyword</label>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-hr-text-muted pointer-events-none" />
+          <input
+            className={`${filterInputCls} pl-8`}
+            placeholder="Job title, keywords..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+        </div>
+      </div>
+
+      <div className="mb-5">
+        <label className={filterLabelCls}><MapPin size={12} /> Location</label>
+        <div className="relative">
+          <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-hr-text-muted pointer-events-none" />
+          <input
+            className={`${filterInputCls} pl-8`}
+            placeholder="City, state..."
+            value={location}
+            onChange={(e) => setLocationFilter(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+        </div>
+      </div>
+
+      <div className="h-px bg-[rgba(255,255,255,0.08)] my-5" />
+
+      <div className="mb-5">
+        <label className={filterLabelCls}><Briefcase size={12} /> Job Type</label>
+        <select
+          className={filterSelectCls}
+          value={type}
+          onChange={(e) => setType(e.target.value)}
+          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'10\' height=\'6\' viewBox=\'0 0 10 6\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M1 1L5 5L9 1\' stroke=\'%238A8A9A\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+        >
+          <option value="all">All Types</option>
+          <option value="full-time">Full-time</option>
+          <option value="part-time">Part-time</option>
+          <option value="contract">Contract</option>
+          <option value="internship">Internship</option>
+          <option value="temporary">Temporary</option>
+        </select>
+      </div>
+
+      <div className="mb-5">
+        <label className={filterLabelCls}><IndianRupee size={12} /> Salary Range</label>
+        <div className="flex gap-2 items-center">
+          <input
+            className={filterInputCls}
+            placeholder="Min"
+            type="number"
+            value={minSalary}
+            onChange={(e) => setMinSalary(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+          <span className="text-hr-text-muted text-[0.8rem]">–</span>
+          <input
+            className={filterInputCls}
+            placeholder="Max"
+            type="number"
+            value={maxSalary}
+            onChange={(e) => setMaxSalary(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
+          />
+        </div>
+        <select
+          className={`${filterSelectCls} mt-2`}
+          value={salaryPeriod}
+          onChange={(e) => setSalaryPeriod(e.target.value)}
+          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'10\' height=\'6\' viewBox=\'0 0 10 6\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M1 1L5 5L9 1\' stroke=\'%238A8A9A\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+        >
+          <option value="per_year">Per Year</option>
+          <option value="per_month">Per Month</option>
+        </select>
+      </div>
+
+      <div className="h-px bg-[rgba(255,255,255,0.08)] my-5" />
+
+      <div className="flex flex-col gap-2">
+        <button
+          className="bg-hr-accent text-white border-none py-2.5 px-5 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-colors duration-200 w-full hover:bg-hr-accent-hover"
+          onClick={handleApplyFilters}
+        >
+          Apply Filters
+        </button>
+        <button
+          className="bg-transparent text-hr-text-secondary border border-[rgba(255,255,255,0.08)] py-2.5 px-5 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-all duration-200 w-full hover:border-[rgba(255,255,255,0.12)] hover:text-hr-text"
+          onClick={handleResetFilters}
+        >
+          Reset
+        </button>
+      </div>
+    </>
+  );
+
   return (
-    <Layout>
+    <>
       <Helmet>
         <title>{metaData.title}</title>
         <meta name="description" content={metaData.description} />
         <link rel="canonical" href={metaData.canonicalUrl} />
-
-        {/* Open Graph */}
         <meta property="og:title" content={metaData.title} />
         <meta property="og:description" content={metaData.description} />
         <meta property="og:url" content={metaData.canonicalUrl} />
@@ -221,324 +286,276 @@ export default function JobsPage() {
         <meta property="og:image" content={`${metaData.baseUrl}/og-image.jpg`} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-
-        {/* Twitter Card */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={metaData.title} />
         <meta name="twitter:description" content={metaData.description} />
         <meta name="twitter:image" content={`${metaData.baseUrl}/twitter-image.jpg`} />
       </Helmet>
 
-      <div className="public-theme min-h-screen bg-background text-foreground">
-        {/* Premium background effects */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-info/10 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+        <GridOverlay />
+        <div className="relative z-10">
+          <HomepageNav />
 
-        <div className={`container mx-auto px-4 py-8 relative z-10 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Premium Header */}
-          <div className="text-center mb-12 pt-16">
-            <div className="w-20 h-1.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] rounded-full mx-auto mb-6 animate-slide-right"></div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              <span className="animate-gradient-text">Find Your Next</span>
-              <br />
-              <span className="text-foreground">Dream Opportunity</span>
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed animate-slide-up" style={{ animationDelay: '0.3s' }}>
-              Discover exciting career opportunities with leading companies powered by AI-driven matching
-            </p>
-          </div>
-
-          {/* Two-column layout: Filters + Results */}
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-8">
-            {/* Left Sidebar - Desktop Only */}
-            <aside className="hidden lg:block">
-              <FilterPanel
-                search={search}
-                setSearch={setSearch}
-                location={location}
-                setLocation={setLocationFilter}
-                type={type}
-                setType={setType}
-                minSalary={minSalary}
-                setMinSalary={setMinSalary}
-                maxSalary={maxSalary}
-                setMaxSalary={setMaxSalary}
-                salaryPeriod={salaryPeriod}
-                setSalaryPeriod={setSalaryPeriod}
-                onApplyFilters={handleApplyFilters}
-                onResetFilters={handleResetFilters}
-              />
-            </aside>
-
-            {/* Main Content */}
-            <main>
-              {/* Mobile Filter + Sort Bar */}
-              <div className="flex items-center justify-between mb-6 gap-4">
-                <div className="lg:hidden flex items-center gap-2">
-                  <MobileFilterSheet
-                    search={search}
-                    setSearch={setSearch}
-                    location={location}
-                    setLocation={setLocationFilter}
-                    type={type}
-                    setType={setType}
-                    minSalary={minSalary}
-                    setMinSalary={setMinSalary}
-                    maxSalary={maxSalary}
-                    setMaxSalary={setMaxSalary}
-                    salaryPeriod={salaryPeriod}
-                    setSalaryPeriod={setSalaryPeriod}
-                    onApplyFilters={handleApplyFilters}
-                    onResetFilters={handleResetFilters}
-                  />
-                  {activeFilterCount > 0 && (
-                    <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
-                      {activeFilterCount}
-                    </Badge>
-                  )}
-                </div>
-
-                {/* Sort Dropdown + Reset */}
-                <div className="flex items-center gap-2 ml-auto">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-[180px] bg-muted/30 border-border text-foreground">
-                      <SelectValue placeholder="Sort by" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="recent">Most Recent</SelectItem>
-                      <SelectItem value="deadline">Deadline: Soonest</SelectItem>
-                      {aiEnabled && (
-                        <SelectItem value="relevant">Most Relevant (AI)</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {activeFilterCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleResetFilters}
-                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Reset
-                    </Button>
-                  )}
+          <div className="pt-[60px] min-h-screen">
+            {/* Header */}
+            <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+              <div></div>
+              <div>
+                <div className="text-center pt-20 px-12 pb-[60px] animate-hr-fade-up max-md:pt-[60px] max-md:px-5 max-md:pb-10">
+                  <div className="font-mono text-[0.68rem] font-medium text-hr-accent-hover tracking-[0.12em] uppercase mb-[18px]">Open Positions</div>
+                  <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text max-w-[600px] mx-auto">Find Your Next<br />Opportunity</h1>
+                  <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto text-center">
+                    Discover roles with leading companies across India, powered by intelligent matching.
+                  </p>
                 </div>
               </div>
-
-              {/* Active Filter Chips */}
-              {activeFilterCount > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {search && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Search: {search}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setSearch("")}
-                      />
-                    </Badge>
-                  )}
-                  {location && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Location: {location}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setLocationFilter("")}
-                      />
-                    </Badge>
-                  )}
-                  {type && type !== "all" && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Type: {type.replace('-', ' ')}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setType("all")}
-                      />
-                    </Badge>
-                  )}
-                  {minSalary && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Min Salary: {minSalary}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setMinSalary("")}
-                      />
-                    </Badge>
-                  )}
-                  {maxSalary && (
-                    <Badge variant="secondary" className="bg-muted/50 text-foreground gap-1">
-                      Max Salary: {maxSalary}
-                      <X
-                        className="h-3 w-3 cursor-pointer hover:text-destructive"
-                        onClick={() => setMaxSalary("")}
-                      />
-                    </Badge>
-                  )}
-                </div>
-              )}
-
-              {/* Results */}
-        {isLoading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-foreground mt-4">Loading jobs...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12">
-            <p className="text-destructive">Error loading jobs. Please try again.</p>
-          </div>
-        ) : data?.jobs.length === 0 ? (
-          <div className="text-center py-12">
-            <Briefcase className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <p className="text-foreground text-xl mb-2">No jobs found</p>
-            <p className="text-muted-foreground">Try adjusting your search criteria</p>
-          </div>
-        ) : (
-          <>
-            {/* Job Count */}
-            <div className="mb-6">
-              <p className="text-foreground">
-                Showing {sortedJobs.length} of {data?.pagination.total} jobs
-                {sortBy !== "recent" && <span className="text-muted-foreground ml-2">(sorted by {sortBy === "deadline" ? "deadline" : "AI relevance"})</span>}
-              </p>
+              <div></div>
             </div>
 
-            {/* Job Cards */}
-            <div className="grid gap-6 mb-8">
-              {sortedJobs.map((job) => {
-                const salaryDisplay = formatSalary(job.salaryMin, job.salaryMax, job.salaryPeriod);
+            {/* Main content */}
+            <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+              <div></div>
+              <div>
+                <div className="max-w-[1100px] mx-auto pb-20 grid grid-cols-[260px_1fr] gap-8 max-lg:grid-cols-1 max-lg:pb-[60px] max-md:pb-[60px]">
+                  {/* Desktop sidebar */}
+                  <aside className="sticky top-20 self-start max-lg:hidden">
+                    <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg p-6">
+                      <h3 className="font-satoshi text-base font-medium text-hr-text mb-5 flex items-center gap-2">
+                        <SlidersHorizontal size={16} /> Filters
+                      </h3>
+                      {filterPanel}
+                    </div>
+                  </aside>
 
-                return (
-                  <Card
-                    key={job.id}
-                    data-testid="job-card"
-                    className="bg-muted/50 backdrop-blur-sm border-border hover:bg-muted/40 transition-all duration-300"
-                    onMouseEnter={() => handleJobCardHover(job.id)}
-                  >
-                    <CardHeader>
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-foreground text-xl mb-2">
-                            <Link href={`/jobs/${job.slug || job.id}`} className="hover:text-primary transition-colors">
-                              {job.title}
-                            </Link>
-                          </CardTitle>
-                          <CardDescription className="text-muted-foreground/50 flex flex-wrap items-center gap-4">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-4 w-4" />
-                              {job.location}
-                            </span>
-                            {salaryDisplay && (
-                              <span className="flex items-center gap-1">
-                                {/*<IndianRupee className="h-4 w-4" />*/}
-                                {salaryDisplay}
-                              </span>
-                            )}
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              Posted {formatDate(job.createdAt)}
-                            </span>
-                            {job.postedByName && (
-                              <span className="flex items-center gap-1">
-                                <User className="h-4 w-4" />
-                                by{" "}
-                                {job.postedById && job.isRecruiterProfilePublic ? (
-                                  <Link
-                                    href={`/recruiters/${job.postedById}`}
-                                    className="text-primary hover:underline"
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    {job.postedByName}
-                                  </Link>
-                                ) : (
-                                  job.postedByName
-                                )}
-                              </span>
-                            )}
-                          </CardDescription>
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="bg-primary/20 text-primary border-primary/30"
+                  {/* Results area */}
+                  <main>
+                    {/* Toolbar */}
+                    <div className="flex items-center justify-between mb-5 gap-4 max-md:flex-col max-md:items-start">
+                      <div className="flex items-center gap-2.5">
+                        {/* Mobile filter trigger */}
+                        <button
+                          className="hidden max-lg:flex items-center gap-1.5 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2 px-4 font-dm text-[0.82rem] text-hr-text cursor-pointer transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)] [&>svg]:w-4 [&>svg]:h-4"
+                          onClick={() => setMobileFilterOpen(true)}
                         >
-                          {job.type.replace('-', ' ')}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground/50 mb-4 line-clamp-3">
-                        {job.description.substring(0, 200)}...
-                      </p>
+                          <SlidersHorizontal />
+                          Filters
+                          {activeFilterCount > 0 && (
+                            <span className="bg-hr-accent text-white text-[0.6rem] font-bold w-[18px] h-[18px] rounded-full flex items-center justify-center">{activeFilterCount}</span>
+                          )}
+                        </button>
 
-                      <div className="flex justify-between items-center">
-                        {job.deadline && (
-                          <p className="text-sm text-muted-foreground">
-                            Deadline: {formatDate(job.deadline)}
-                          </p>
+                        {data && (
+                          <span className="text-[0.85rem] text-hr-text-secondary">
+                            <strong className="text-hr-text font-semibold">{data.pagination.total}</strong> {data.pagination.total === 1 ? 'job' : 'jobs'} found
+                          </span>
                         )}
-                        <div className="flex gap-2 ml-auto">
-                          <Link href={`/jobs/${job.slug || job.id}`}>
-                            <Button className="bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
-                              View Details
-                            </Button>
-                          </Link>
-                        </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
 
-            {/* Pagination */}
-            {data && data.pagination.totalPages > 1 && (
-              <div className="flex justify-center gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(page - 1)}
-                  disabled={page === 1}
-                  className="bg-muted/50 border-border text-foreground hover:bg-muted/60"
-                >
-                  Previous
-                </Button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[0.75rem] text-hr-text-muted font-mono uppercase tracking-[0.06em]">Sort</span>
+                        <select
+                          className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded px-2.5 py-1.5 pr-7 font-dm text-[0.82rem] text-hr-text outline-none cursor-pointer appearance-none"
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value)}
+                          style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'10\' height=\'6\' viewBox=\'0 0 10 6\' fill=\'none\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cpath d=\'M1 1L5 5L9 1\' stroke=\'%238A8A9A\' stroke-width=\'1.5\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+                        >
+                          <option value="recent">Most Recent</option>
+                          <option value="deadline">Deadline: Soonest</option>
+                          {aiEnabled && <option value="relevant">AI Relevance</option>}
+                        </select>
+                      </div>
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  {Array.from({ length: Math.min(5, data.pagination.totalPages) }, (_, i) => {
-                    const pageNum = i + 1;
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={page === pageNum ? "default" : "outline"}
-                        onClick={() => setPage(pageNum)}
-                        className={page === pageNum
-                          ? "bg-gradient-to-r from-purple-500 to-blue-500"
-                          : "bg-muted/50 border-border text-foreground hover:bg-muted/60"
-                        }
-                      >
-                        {pageNum}
-                      </Button>
-                    );
-                  })}
+                    {/* Active filter chips */}
+                    {activeFilterCount > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {search && (
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
+                            Search: {search}
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setSearch("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {location && (
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
+                            Location: {location}
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setLocationFilter("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {type && type !== "all" && (
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
+                            {type.replace('-', ' ')}
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setType("all")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {minSalary && (
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
+                            Min: ₹{Number(minSalary).toLocaleString()}
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setMinSalary("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        {maxSalary && (
+                          <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
+                            Max: ₹{Number(maxSalary).toLocaleString()}
+                            <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setMaxSalary("")}><X size={12} /></button>
+                          </span>
+                        )}
+                        <button
+                          className="bg-transparent text-hr-text-secondary border border-[rgba(255,255,255,0.08)] py-1 px-3 rounded-none font-dm text-[0.72rem] font-medium cursor-pointer transition-all duration-200 hover:border-[rgba(255,255,255,0.12)] hover:text-hr-text"
+                          onClick={handleResetFilters}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Results */}
+                    {isLoading ? (
+                      <div className="text-center py-20 px-6">
+                        <div className="w-9 h-9 border-2 border-[rgba(255,255,255,0.08)] border-t-hr-accent rounded-full animate-hr-spin mx-auto mb-4" />
+                        <p className="text-[0.85rem] text-hr-text-muted">Loading jobs...</p>
+                      </div>
+                    ) : error ? (
+                      <div className="text-center py-20 px-6">
+                        <p className="text-[0.9rem] text-hr-red">Error loading jobs. Please try again.</p>
+                      </div>
+                    ) : data?.jobs.length === 0 ? (
+                      <div className="text-center py-20 px-6 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-hr-text-muted [&>svg]:mb-4 [&>svg]:mx-auto">
+                        <Briefcase />
+                        <h3 className="font-satoshi text-[1.2rem] font-medium text-hr-text mb-2">No jobs found</h3>
+                        <p className="text-[0.9rem] text-hr-text-secondary">Try adjusting your search criteria</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-col gap-3">
+                          {sortedJobs.map((job, i) => {
+                            const salaryDisplay = formatSalary(job.salaryMin, job.salaryMax, job.salaryPeriod);
+                            return (
+                              <div
+                                key={job.id}
+                                className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg py-5 px-6 transition-all duration-200 hover:border-[rgba(255,255,255,0.12)] hover:bg-hr-bg-elevated max-md:p-4"
+                                data-testid="job-card"
+                                style={{ animation: 'hr-fade-up 0.5s ease-out both', animationDelay: `${i * 0.05}s` }}
+                                onMouseEnter={() => handleJobCardHover(job.id)}
+                              >
+                                <div className="flex justify-between items-start gap-4 mb-3 max-md:flex-col max-md:gap-2">
+                                  <div>
+                                    <div className="font-satoshi text-[1.1rem] font-medium text-hr-text mb-2">
+                                      <Link href={`/jobs/${job.slug || job.id}`} className="text-inherit no-underline transition-colors duration-200 hover:text-hr-accent-hover">{job.title}</Link>
+                                    </div>
+                                    <div className="flex flex-wrap gap-4 items-center max-md:gap-2.5">
+                                      <span className={metaItemCls}>
+                                        <MapPin /> {job.location}
+                                      </span>
+                                      {salaryDisplay && (
+                                        <span className={metaItemCls}>{salaryDisplay}</span>
+                                      )}
+                                      <span className={metaItemCls}>
+                                        <Clock /> Posted {formatDate(job.createdAt)}
+                                      </span>
+                                      {job.postedByName && (
+                                        <span className={metaItemCls}>
+                                          <User />
+                                          {job.postedById && job.isRecruiterProfilePublic ? (
+                                            <a href={`/recruiters/${job.postedById}`} className="text-hr-accent-hover no-underline transition-colors duration-200 hover:underline">{job.postedByName}</a>
+                                          ) : (
+                                            job.postedByName
+                                          )}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.06em] uppercase bg-[rgba(124,58,237,0.12)] text-hr-accent-hover whitespace-nowrap shrink-0">
+                                    {job.type.replace('-', ' ')}
+                                  </span>
+                                </div>
+
+                                <p className="text-[0.9rem] text-hr-text-secondary leading-[1.6] mb-4 line-clamp-2">
+                                  {job.description.substring(0, 200)}...
+                                </p>
+
+                                <div className="flex justify-between items-center max-md:flex-col max-md:items-start max-md:gap-3">
+                                  {job.deadline ? (
+                                    <span className="text-[0.78rem] text-hr-text-muted">
+                                      Deadline: {formatDate(job.deadline)}
+                                    </span>
+                                  ) : <span />}
+                                  <Link
+                                    href={`/jobs/${job.slug || job.id}`}
+                                    className="bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-[0.82rem] font-medium cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center"
+                                  >
+                                    View Details
+                                  </Link>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Pagination */}
+                        {data && data.pagination.totalPages > 1 && (
+                          <div className="flex items-center justify-center gap-1.5 mt-8">
+                            <button
+                              className={pageBtnCls}
+                              onClick={() => setPage(page - 1)}
+                              disabled={page === 1}
+                            >
+                              Previous
+                            </button>
+                            {Array.from({ length: Math.min(5, data.pagination.totalPages) }, (_, i) => {
+                              const pageNum = i + 1;
+                              return (
+                                <button
+                                  key={pageNum}
+                                  className={`${pageBtnCls} ${page === pageNum ? '!bg-hr-accent !border-hr-accent !text-white' : ''}`}
+                                  onClick={() => setPage(pageNum)}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            })}
+                            <button
+                              className={pageBtnCls}
+                              onClick={() => setPage(page + 1)}
+                              disabled={page === data.pagination.totalPages}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </main>
                 </div>
-
-                <Button
-                  variant="outline"
-                  onClick={() => setPage(page + 1)}
-                  disabled={page === data.pagination.totalPages}
-                  className="bg-muted/50 border-border text-foreground hover:bg-muted/60"
-                >
-                  Next
-                </Button>
               </div>
-            )}
-          </>
-        )}
-            </main>
+              <div></div>
+            </div>
           </div>
+
+          <HomepageFooter />
         </div>
+
+        {/* Mobile filter drawer */}
+        {mobileFilterOpen && (
+          <div className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-[4px]" onClick={() => setMobileFilterOpen(false)}>
+            <div
+              className="fixed top-0 left-0 bottom-0 w-[300px] max-w-[85vw] bg-hr-bg border-r border-[rgba(255,255,255,0.08)] z-[1101] overflow-y-auto p-6 animate-hr-slide-in"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="font-satoshi text-[1.1rem] font-medium text-hr-text">Filter Jobs</h3>
+                <button
+                  className="bg-transparent border-none text-hr-text-muted cursor-pointer p-1 hover:text-hr-text"
+                  onClick={() => setMobileFilterOpen(false)}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              {filterPanel}
+            </div>
+          </div>
+        )}
       </div>
-    </Layout>
+    </>
   );
 }

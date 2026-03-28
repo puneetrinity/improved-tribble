@@ -1,23 +1,31 @@
-import { useState, useEffect } from "react";
-import Layout from "@/components/Layout";
 import { Helmet } from "react-helmet-async";
-import { Button } from "@/components/ui/button";
 import { trackEvent } from "@/lib/analytics";
-import {
-  Database,
-  Search,
-  MessageSquare,
-  Users,
-  LayoutDashboard,
-  Target,
-  ArrowRight,
-  Check
-} from "lucide-react";
+import { btnPrimary, btnSecondary, sectionLabel } from "@/lib/shared-styles";
+import HomepageNav from "@/components/HomepageNav";
+import HomepageFooter from "@/components/HomepageFooter";
+import GridOverlay from "@/components/GridOverlay";
 
-const pillars = [
+const breadcrumbJsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://vantahire.com/features" }
+  ]
+});
+
+interface Pillar {
+  layer: string;
+  title: string;
+  label: string;
+  outcome: string;
+  features: string[];
+  accentColor: string;
+  accentBg: string;
+}
+
+const pillars: Pillar[] = [
   {
-    id: "pillar-1",
-    icon: <Database className="w-8 h-8" />,
     layer: "Intelligence",
     title: "Resume Knowledge Graph",
     label: "Every resume builds your hiring intelligence",
@@ -29,12 +37,10 @@ const pillars = [
       "Past candidates become searchable and reusable for new roles, even across different job titles",
       "No manual tagging or categorization required"
     ],
-    iconBg: "bg-primary/20",
-    iconColor: "text-primary"
+    accentColor: "#A78BFA",
+    accentBg: "rgba(124,58,237,0.15)"
   },
   {
-    id: "pillar-2",
-    icon: <Search className="w-8 h-8" />,
     layer: "Intelligence",
     title: "AI Candidate Discovery",
     label: "AI-sourced candidates, ranked for recruiter action",
@@ -46,12 +52,10 @@ const pillars = [
       "Pool scan + web discovery sourcing flow — your talent pool is searched first, then the web",
       "No Boolean skills needed — describe the role and let the AI work"
     ],
-    iconBg: "bg-warning/20",
-    iconColor: "text-warning"
+    accentColor: "#F59E0B",
+    accentBg: "rgba(245,158,11,0.15)"
   },
   {
-    id: "pillar-3",
-    icon: <MessageSquare className="w-8 h-8" />,
     layer: "Outreach",
     title: "WhatsApp + Email Engagement",
     label: "Reach candidates instantly via email and WhatsApp",
@@ -63,12 +67,10 @@ const pillars = [
       "90%+ WhatsApp read rates vs 15-20% email open rates in India and APAC (industry benchmark)",
       "Every message logged for compliance"
     ],
-    iconBg: "bg-green-500/20",
-    iconColor: "text-green-400"
+    accentColor: "#10B981",
+    accentBg: "rgba(16,185,129,0.15)"
   },
   {
-    id: "pillar-4",
-    icon: <Users className="w-8 h-8" />,
     layer: "Operations",
     title: "Client Feedback Portal",
     label: "Share shortlists with clients. Get feedback without the back-and-forth.",
@@ -80,12 +82,10 @@ const pillars = [
       "Multi-client view — see all feedback across all clients and jobs in one place",
       "No email chains. No chasing. Act on structured feedback."
     ],
-    iconBg: "bg-blue-500/20",
-    iconColor: "text-blue-400"
+    accentColor: "#06B6D4",
+    accentBg: "rgba(6,182,212,0.15)"
   },
   {
-    id: "pillar-5",
-    icon: <LayoutDashboard className="w-8 h-8" />,
     layer: "Operations",
     title: "Recruiter Productivity Dashboard",
     label: "One recruiter. Many open roles. Zero chaos.",
@@ -97,12 +97,10 @@ const pillars = [
       "Analytics: pipeline velocity, conversion rates, time-in-stage, source performance",
       "Day-1 productive — no training needed"
     ],
-    iconBg: "bg-purple-500/20",
-    iconColor: "text-purple-400"
+    accentColor: "#8B5CF6",
+    accentBg: "rgba(139,92,246,0.15)"
   },
   {
-    id: "pillar-6",
-    icon: <Target className="w-8 h-8" />,
     layer: "Operations",
     title: "Job Command Center",
     label: "Post, source, and screen — one command center per job",
@@ -114,18 +112,19 @@ const pillars = [
       "From \"I have a JD\" to \"I'm messaging the top 5 leads\" without ever leaving VantaHire",
       "Replaces 4-6 separate tools"
     ],
-    iconBg: "bg-gradient-to-br from-purple-500/15 to-amber-500/15",
-    iconColor: "text-primary"
+    accentColor: "#A78BFA",
+    accentBg: "rgba(124,58,237,0.15)"
   }
 ];
 
+const featItem = "flex items-start gap-2.5 py-2.5 px-3 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-[7px] text-[0.82rem] text-hr-text-secondary leading-[1.5]";
+const featCheck = "w-[18px] h-[18px] rounded flex items-center justify-center shrink-0 mt-px text-[0.6rem] font-bold";
+const btnDemo = btnPrimary;
+const btnPricing = btnSecondary;
+
 export default function FeaturesPage() {
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => { setIsVisible(true); }, []);
-
   return (
-    <Layout>
+    <>
       <Helmet>
         <title>Features | VantaHire - Six Pillars of AI-Native Recruiting</title>
         <meta name="description" content="Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center. All the capabilities recruiters need." />
@@ -140,132 +139,113 @@ export default function FeaturesPage() {
         <meta name="twitter:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center." />
         <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
         <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "BreadcrumbList",
-            "itemListElement": [
-              { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" },
-              { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://vantahire.com/features" }
-            ]
-          })}
+          {breadcrumbJsonLd}
         </script>
       </Helmet>
 
-      <div className="public-theme min-h-screen bg-background text-foreground">
-        {/* Background effects */}
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAiIGhlaWdodD0iMjAiIHZpZXdCb3g9IjAgMCAyMCAyMCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48Y2lyY2xlIGN4PSIxIiBjeT0iMSIgcj0iMSIgZmlsbD0id2hpdGUiIGZpbGwtb3BhY2l0eT0iMC4wNSIvPjwvc3ZnPg==')] opacity-10"></div>
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-[100px] animate-pulse-slow"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px] animate-pulse-slow" style={{ animationDelay: '1.2s' }}></div>
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
+        <GridOverlay />
+        <div className="relative z-10">
+          <HomepageNav />
 
-        <div className={`container mx-auto px-4 py-16 relative z-10 transition-opacity duration-1000 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-          {/* Hero Section */}
-          <div className="text-center mb-20 pt-8">
-            <div className="w-20 h-1.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] rounded-full mx-auto mb-6"></div>
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6">
-              <span className="text-white">Six Pillars of</span>
-              <br />
-              <span className="gradient-text-purple">AI-Native Recruiting</span>
-            </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Three layers. Six capabilities. Every recruiter action covered.
-            </p>
+          {/* Hero */}
+          <div className="text-center pt-[140px] px-12 pb-20 max-w-[720px] mx-auto max-lg:pt-[120px] max-lg:px-6 max-lg:pb-[60px] max-md:pt-[100px] max-md:px-5 max-md:pb-12 max-sm:pt-[88px] max-sm:px-4 max-sm:pb-9">
+            <div className={`${sectionLabel} mb-[18px]`}>Platform Capabilities</div>
+            <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] max-md:text-[clamp(1.8rem,6vw,2.4rem)] max-sm:text-[1.7rem] font-normal leading-[1.15] tracking-tight mb-4 text-hr-text">Six Pillars of<br />AI-Native Recruiting</h1>
+            <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">Three layers. Six capabilities. Every recruiter action covered — from sourcing to placement.</p>
           </div>
 
           {/* Pillars */}
-          <div className="space-y-16 mb-20">
-            {pillars.map((pillar, index) => (
-              <div key={index} id={pillar.id} className="max-w-4xl mx-auto scroll-mt-24">
-                {/* Layer badge */}
-                <div className="mb-4">
-                  <span className="text-xs font-medium uppercase tracking-wider text-white/40">
-                    {pillar.layer} Layer
-                  </span>
-                </div>
-
-                <div className="bg-gradient-to-br from-[hsl(var(--vanta-dark))]/90 to-[hsl(var(--vanta-dark))]/70 p-8 md:p-10 rounded-2xl border border-white/5 hover:border-primary/20 transition-all duration-300">
-                  <div className="flex items-start gap-6">
-                    <div className={`w-16 h-16 rounded-xl ${pillar.iconBg} flex items-center justify-center flex-shrink-0`}>
-                      <span className={pillar.iconColor}>{pillar.icon}</span>
-                    </div>
-                    <div className="flex-1">
-                      <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-                        {pillar.title}
-                      </h2>
-                      <p className="text-primary text-sm font-medium mb-4">
-                        {pillar.label}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Features */}
-                  <div className="mt-6 space-y-3">
-                    {pillar.features.map((feature, i) => (
-                      <div key={i} className="flex items-start gap-3">
-                        <Check className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                        <span className="text-white/70">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Outcome */}
-                  <div className="mt-6 pt-6 border-t border-white/5">
-                    <p className="text-white/50 text-sm">
-                      <span className="text-white/70 font-medium">Outcome:</span>{" "}
-                      {pillar.outcome}
-                    </p>
-                  </div>
-
-                  {/* Link to product for context */}
-                  <div className="mt-4">
-                    <a
-                      href="/product"
-                      className="text-primary/60 text-sm hover:text-primary transition-colors inline-flex items-center gap-1"
-                      onClick={(e) => { e.preventDefault(); window.location.href = '/product'; }}
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <div className="max-w-[1100px] mx-auto flex flex-col gap-12 px-12 pb-[100px] max-lg:px-6 max-lg:pb-20 max-md:px-5 max-md:pb-[60px] max-md:gap-9 max-sm:px-4 max-sm:pb-12 max-sm:gap-7">
+                {pillars.map((pillar, index) => {
+                  const isReverse = index % 2 !== 0;
+                  return (
+                    <div
+                      key={index}
+                      className={`grid ${isReverse ? 'grid-cols-[1.3fr_1fr]' : 'grid-cols-[1fr_1.3fr]'} gap-12 items-start max-lg:gap-8 max-md:grid-cols-1 max-md:gap-6`}
                     >
-                      See platform context <ArrowRight className="w-3 h-3" />
-                    </a>
-                  </div>
-                </div>
+                      <div className={isReverse ? 'order-2 max-md:order-1' : ''}>
+                        <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">
+                          Layer {String(index + 1).padStart(2, '0')} — {pillar.layer}
+                        </div>
+                        <h2 className="font-satoshi text-[1.7rem] font-normal leading-[1.25] text-hr-text mb-2">{pillar.title}</h2>
+                        <div className="text-[0.88rem] text-hr-accent-hover mb-4 leading-[1.5]">{pillar.label}</div>
+                        <p className="text-[0.9rem] leading-[1.7] text-hr-text-secondary">
+                          <span className="text-hr-text font-medium">Outcome: </span>
+                          {pillar.outcome}
+                        </p>
+                      </div>
+
+                      <div className={`bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] overflow-hidden ${isReverse ? 'order-1 max-md:order-2' : ''}`}>
+                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-[rgba(255,255,255,0.08)]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[rgba(255,255,255,0.12)]"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-[rgba(255,255,255,0.12)]"></span>
+                          <span className="w-1.5 h-1.5 rounded-full bg-[rgba(255,255,255,0.12)]"></span>
+                          <span className="flex-1 text-center font-mono text-[0.6rem] text-hr-text-muted">{pillar.title}</span>
+                        </div>
+                        <div className="p-5">
+                          <div className="flex flex-col gap-2.5">
+                            {pillar.features.map((feat, i) => (
+                              <div key={i} className={featItem}>
+                                <span
+                                  className={featCheck}
+                                  style={{ background: pillar.accentBg, color: pillar.accentColor }}
+                                >
+                                  ✓
+                                </span>
+                                <span>{feat}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
+            <div></div>
           </div>
 
-          {/* CTA Section */}
-          <div className="text-center py-12">
-            <h2 className="text-2xl md:text-3xl font-bold text-white mb-4">
-              Try AI Sourcing
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Start free and explore every capability VantaHire offers.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                variant="gold"
-                size="lg"
-                onClick={() => {
-                  trackEvent("cta_click", { location: "features", action: "start_free" });
-                  window.location.href = '/recruiter-auth';
-                }}
-                className="rounded-full px-8 py-6 text-lg font-semibold"
-              >
-                Start Free
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-              <Button
-                variant="outlinePurple"
-                size="lg"
-                onClick={() => {
-                  trackEvent("cta_click", { location: "features", action: "book_demo" });
-                  window.open('https://cal.com/vantahire/quick-connect', '_blank');
-                }}
-                className="rounded-full px-8 py-6 text-lg"
-              >
-                Book Demo
-              </Button>
+          {/* CTA */}
+          <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+            <div></div>
+            <div>
+              <section className="text-center py-20 px-12 max-md:py-[60px] max-md:px-5">
+                <div className={sectionLabel}>Get Started Today</div>
+                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text">Try AI Sourcing</h2>
+                <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto mb-9">
+                  Start free and explore every capability VantaHire offers.
+                </p>
+                <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
+                  <a
+                    href="/recruiter-auth"
+                    className={btnDemo}
+                    onClick={() => trackEvent("cta_click", { location: "features", action: "start_free" })}
+                  >
+                    Start Free →
+                  </a>
+                  <button
+                    className={btnPricing}
+                    onClick={() => {
+                      trackEvent("cta_click", { location: "features", action: "book_demo" });
+                      window.open('https://cal.com/vantahire/quick-connect', '_blank');
+                    }}
+                  >
+                    Book a Demo
+                  </button>
+                </div>
+              </section>
             </div>
+            <div></div>
           </div>
+
+          <HomepageFooter />
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

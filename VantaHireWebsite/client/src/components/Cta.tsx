@@ -1,6 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { ArrowRight } from "lucide-react";
 import { trackEvent } from "@/lib/analytics";
+import { btnPrimary, btnSecondary, sectionLabel } from "@/lib/shared-styles";
 
 const Cta = () => {
   const openCalendar = () => {
@@ -9,39 +8,34 @@ const Cta = () => {
   };
 
   return (
-    <section className="py-32 relative z-10 cta-glow">
-      <div className="container mx-auto px-4 text-center">
-        <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
-          Start hiring faster today.
-        </h2>
-        <p className="text-[var(--text-secondary)] text-lg md:text-xl mb-4 max-w-xl mx-auto">
-          Join recruiting teams that source smarter, engage faster, and close roles without the chaos.
-        </p>
-        <p className="text-[var(--text-muted)] text-base mb-10">
-          Start free. No credit card required.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Button
-            variant="gold"
-            onClick={() => {
-              trackEvent("cta_click", { location: "cta_block", action: "start_free" });
-              window.location.href = '/recruiter-auth';
-            }}
-            className="rounded-lg px-8 py-6 text-base font-semibold"
-          >
-            Start Free
-            <ArrowRight className="ml-2 w-5 h-5" />
-          </Button>
-          <Button
-            variant="outlinePurple"
-            onClick={openCalendar}
-            className="rounded-lg px-8 py-6 text-base"
-          >
-            Book Demo
-          </Button>
-        </div>
+    <div className="grid grid-cols-[28px_1fr_28px] md:grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
+      <div></div>
+      <div className="border-b border-[rgba(255,255,255,0.07)]">
+        <section className="text-center py-[100px] px-12 max-md:py-[60px] max-md:px-5 border-t-0">
+          <div className={sectionLabel}>Get Started Today</div>
+          <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] max-sm:text-[1.6rem] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text max-w-[560px] mx-auto">Ready to Transform Your<br />Recruitment Workflow?</h2>
+          <p className="text-base max-sm:text-[0.9rem] leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto mb-9 text-center">
+            Join hundreds of recruitment agencies already using VantaHire to place candidates faster and grow their business.
+          </p>
+          <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
+            <button
+              className={btnPrimary}
+              onClick={openCalendar}
+            >
+              Book a Demo →
+            </button>
+            <a
+              href="/pricing"
+              className={btnSecondary}
+              onClick={() => trackEvent("cta_click", { location: "cta_block", action: "view_pricing" })}
+            >
+              View Pricing
+            </a>
+          </div>
+        </section>
       </div>
-    </section>
+      <div></div>
+    </div>
   );
 };
 

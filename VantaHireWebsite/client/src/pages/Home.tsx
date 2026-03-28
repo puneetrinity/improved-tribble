@@ -1,58 +1,38 @@
-import Header from "@/components/Header";
+import HomepageNav from "@/components/HomepageNav";
 import Hero from "@/components/Hero";
-import PainPoints from "@/components/PainPoints";
-import Services from "@/components/Services";
-import Stats from "@/components/Stats";
-import SocialProof from "@/components/SocialProof";
+import ThreeLayers from "@/components/ThreeLayers";
+import FeaturesGrid from "@/components/FeaturesGrid";
 import Cta from "@/components/Cta";
-import Footer from "@/components/Footer";
+import HomepageFooter from "@/components/HomepageFooter";
+import GridOverlay from "@/components/GridOverlay";
 import { Helmet } from "react-helmet-async";
-
-// Circuit Background Animation Component (landing-specific visual)
-const CircuitBackground = () => (
-  <div className="circuit-bg">
-    {/* Animated circuit lines */}
-    <div className="circuit-line"></div>
-    <div className="circuit-line"></div>
-    <div className="circuit-line"></div>
-    <div className="circuit-line"></div>
-    <div className="circuit-line"></div>
-    {/* Glowing circuit dots */}
-    <div className="circuit-dot"></div>
-    <div className="circuit-dot"></div>
-    <div className="circuit-dot"></div>
-    <div className="circuit-dot"></div>
-  </div>
-);
 
 const Home = () => {
   return (
     <>
       <Helmet>
-        <title>VantaHire - Human Decisions, AI Acceleration | AI-Native Recruiting Platform</title>
-        <meta name="description" content="The AI-native recruiting platform that helps startups and recruiting firms find, rank, and engage the right candidates faster. AI sourcing, WhatsApp outreach, client portal, and pipeline management in one platform." />
+        <title>VantaHire — AI-Powered Recruitment Infrastructure</title>
+        <meta name="description" content="VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows. AI sourcing, WhatsApp outreach, client portal, and pipeline management in one platform." />
         <link rel="canonical" href="https://vantahire.com/" />
-        <meta property="og:title" content="Human Decisions, AI Acceleration" />
-        <meta property="og:description" content="The AI-native recruiting platform that helps startups and recruiting firms find, rank, and engage the right candidates faster." />
+        <meta property="og:title" content="VantaHire — AI-Powered Recruitment Infrastructure" />
+        <meta property="og:description" content="VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows." />
         <meta property="og:url" content="https://vantahire.com/" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="VantaHire - Human Decisions, AI Acceleration" />
-        <meta name="twitter:description" content="The AI-native recruiting platform that helps startups and recruiting firms find, rank, and engage the right candidates faster." />
+        <meta name="twitter:title" content="VantaHire — AI-Powered Recruitment Infrastructure" />
+        <meta name="twitter:description" content="VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows." />
         <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
       </Helmet>
-      <div className="public-theme min-h-screen bg-background text-foreground">
-        <CircuitBackground />
+      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
+        <GridOverlay />
         <div className="relative z-10">
-          <Header />
+          <HomepageNav />
           <Hero />
-          <PainPoints />
-          <Services />
-          <Stats />
-          <SocialProof />
+          <ThreeLayers />
+          <FeaturesGrid />
           <Cta />
-          <Footer />
+          <HomepageFooter />
         </div>
       </div>
     </>

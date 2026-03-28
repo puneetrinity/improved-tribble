@@ -10,10 +10,10 @@ export default defineConfig({
       "Content-Security-Policy": [
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://assets.apollo.io https://mautic.evalmatch.app https://www.googletagmanager.com https://sdk.cashfree.com",
-        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://mautic.evalmatch.app",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://api.fontshare.com https://mautic.evalmatch.app",
         "img-src 'self' data: https:",
         "connect-src 'self' ws: wss: https://assets.apollo.io https://mautic.evalmatch.app https://www.google-analytics.com https://region1.google-analytics.com https://*.cashfree.com",
-        "font-src 'self' data: https://fonts.gstatic.com https://r2cdn.perplexity.ai",
+        "font-src 'self' data: https://fonts.gstatic.com https://api.fontshare.com https://cdn.fontshare.com https://fonts.fontshare.com https://r2cdn.perplexity.ai",
         "object-src 'self'",
         "media-src 'self'",
         "frame-src 'self' https://mautic.evalmatch.app https://sdk.cashfree.com https://*.cashfree.com",
