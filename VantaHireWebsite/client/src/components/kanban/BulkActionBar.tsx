@@ -148,11 +148,11 @@ export function BulkActionBar({
   return (
     <>
       <div
-        className="sticky top-0 z-20 bg-white border-b border-border p-3 shadow-sm"
+        className="border border-[#d9d8ff] bg-white px-4 py-4 shadow-[0_10px_30px_rgba(15,23,42,0.06)] md:px-6"
         role="toolbar"
         aria-label="Bulk actions"
       >
-        <div className="container mx-auto flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           {/* Select All Checkbox */}
           <div
             className="flex items-center gap-2"
@@ -172,13 +172,14 @@ export function BulkActionBar({
             </span>
           </div>
 
-          <div className="h-4 w-px bg-muted" />
+          <div className="hidden h-6 w-px bg-border md:block" />
 
           {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-1">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
             <Button
               size="sm"
               variant={hasSelection ? "default" : "ghost"}
+              className="rounded-none"
               onClick={() => setShowMoveDialog(true)}
               disabled={isBulkProcessing || !hasSelection}
             >
@@ -189,6 +190,7 @@ export function BulkActionBar({
             <Button
               size="sm"
               variant="ghost"
+              className="rounded-none"
               onClick={() => setShowEmailDialog(true)}
               disabled={isBulkProcessing || !hasSelection || emailTemplates.length === 0}
             >
@@ -199,6 +201,7 @@ export function BulkActionBar({
             <Button
               size="sm"
               variant="ghost"
+              className="rounded-none"
               onClick={() => setShowFormsDialog(true)}
               disabled={isBulkProcessing || !hasSelection || formTemplates.length === 0}
             >
@@ -209,6 +212,7 @@ export function BulkActionBar({
             <Button
               size="sm"
               variant="ghost"
+              className="rounded-none"
               onClick={() => setShowHmReviewDialog(true)}
               disabled={isBulkProcessing || !hasSelection || !canRequestHiringManagerReview || !onRequestHiringManagerReview}
               title={!canRequestHiringManagerReview ? hiringManagerReviewDisabledReason : undefined}
@@ -220,9 +224,9 @@ export function BulkActionBar({
             <Button
               size="sm"
               variant="ghost"
+              className="rounded-none text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
               onClick={() => setShowArchiveDialog(true)}
               disabled={isBulkProcessing || !hasSelection}
-              className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
             >
               <Archive className="h-4 w-4 mr-2" />
               Archive
@@ -233,9 +237,9 @@ export function BulkActionBar({
               <Button
                 size="sm"
                 variant="ghost"
+                className="rounded-none text-primary hover:bg-primary/10 hover:text-primary"
                 onClick={onGenerateAISummary}
                 disabled={isBulkProcessing || !hasSelection || selectedCount > 50}
-                className="text-primary hover:text-primary hover:bg-primary/10"
               >
                 <Sparkles className="h-4 w-4 mr-2" />
                 AI Summary
@@ -244,7 +248,7 @@ export function BulkActionBar({
 
             {/* Inline Warning: Max 50 selection exceeded */}
             {selectedCount > 50 && (
-              <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 ml-2">
+              <div className="ml-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-600">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span>Select max 50 for AI Summary ({selectedCount} selected)</span>
               </div>
@@ -252,7 +256,7 @@ export function BulkActionBar({
 
             {/* Inline Warning: Rate limit warning (when to-generate count exceeds limit) */}
             {aiSummaryEnabled && aiSummaryLimit !== undefined && aiSummaryToGenerateCount !== undefined && aiSummaryToGenerateCount > 0 && selectedCount <= 50 && aiSummaryToGenerateCount > aiSummaryLimit && (
-              <div className="flex items-center gap-2 text-sm text-amber-600 bg-amber-50 px-3 py-1.5 rounded-md border border-amber-200 ml-2">
+              <div className="ml-2 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-600">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span>Only {aiSummaryLimit} AI summaries left today ({aiSummaryToGenerateCount} needed)</span>
               </div>
@@ -262,7 +266,7 @@ export function BulkActionBar({
           {/* Progress indicator */}
           {isBulkProcessing && bulkProgress && bulkProgress.total > 0 && (
             <div
-              className="flex items-center gap-2 min-w-[180px]"
+              className="flex min-w-[180px] items-center gap-2"
               role="status"
               aria-live="polite"
             >
@@ -278,9 +282,9 @@ export function BulkActionBar({
             <Button
               variant="ghost"
               size="sm"
+              className="rounded-none text-muted-foreground hover:text-foreground"
               onClick={onClearSelection}
               disabled={isBulkProcessing}
-              className="text-muted-foreground hover:text-foreground"
               aria-label="Clear selection"
             >
               <X className="h-4 w-4" />

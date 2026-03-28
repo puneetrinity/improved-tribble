@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Mail, Phone, Calendar, Clock, MapPin, Download, Star, FileText, History as HistoryIcon, MessageSquare, Target, Sparkles, Loader2 } from "lucide-react";
+import { X, Mail, Phone, Calendar, Clock, MapPin, Download, FileText, History as HistoryIcon, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +52,7 @@ interface ApplicationDetailPanelProps {
   onSetRating: (rating: number) => void;
   onDownloadResume: () => void;
   onUpdateStatus?: (status: string, notes?: string) => void;
+  embedded?: boolean;
 }
 
 export function ApplicationDetailPanel({
@@ -67,9 +68,9 @@ export function ApplicationDetailPanel({
   onSendEmail,
   onSendForm,
   onAddNote,
-  onSetRating,
   onDownloadResume,
   onUpdateStatus,
+  embedded = false,
 }: ApplicationDetailPanelProps) {
   const { toast } = useToast();
   const { showAiCreditExhaustionToast } = useAiCreditExhaustionToast();
@@ -84,8 +85,6 @@ export function ApplicationDetailPanel({
     },
   });
 
-  const [selectedStageId, setSelectedStageId] = useState<string>("");
-  const [stageNotes, setStageNotes] = useState("");
   const [interviewDate, setInterviewDate] = useState("");
   const [interviewTime, setInterviewTime] = useState("");
   const [interviewLocation, setInterviewLocation] = useState("");
@@ -93,8 +92,6 @@ export function ApplicationDetailPanel({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [selectedFormId, setSelectedFormId] = useState<string>("");
   const [formMessage, setFormMessage] = useState("");
-  const [newNote, setNewNote] = useState("");
-  const [rating, setRating] = useState<string>(application.rating?.toString() || "");
 
   // AI Email Draft state
   const [emailTone, setEmailTone] = useState<'friendly' | 'formal'>('friendly');
@@ -165,13 +162,6 @@ export function ApplicationDetailPanel({
       });
     },
   });
-
-  const handleMoveStage = () => {
-    if (!selectedStageId) return;
-    onMoveStage(parseInt(selectedStageId), stageNotes || undefined);
-    setSelectedStageId("");
-    setStageNotes("");
-  };
 
   const handleScheduleInterview = () => {
     if (!interviewDate || !interviewTime || !interviewLocation) return;
@@ -248,48 +238,24 @@ export function ApplicationDetailPanel({
     setFormMessage("");
   };
 
-  const handleAddNote = () => {
-    if (!newNote.trim()) return;
-    onAddNote(newNote);
-    setNewNote("");
-  };
-
-  const handleSetRating = () => {
-    const ratingValue = parseInt(rating);
-    if (isNaN(ratingValue) || ratingValue < 1 || ratingValue > 5) return;
-    onSetRating(ratingValue);
-  };
-
   const currentStage = pipelineStages.find((s) => s.id === application.currentStage);
+  const selectedTemplate = selectedTemplateId
+    ? emailTemplates.find((t) => t.id === parseInt(selectedTemplateId, 10))
+    : undefined;
+  const selectedForm = selectedFormId
+    ? formTemplates.find((f) => f.id === parseInt(selectedFormId, 10))
+    : undefined;
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-border">
-      {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border">
-        <h2 className="text-foreground text-lg font-semibold">Application Details</h2>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="text-muted-foreground hover:bg-muted"
-          aria-label="Close panel"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4">
+    <div className="flex h-full flex-col bg-white">
+      <div className={embedded ? "flex-1 overflow-y-auto p-6" : "flex-1 overflow-y-auto p-4"}>
         <Tabs defaultValue="summary" className="w-full">
           <TabsList className="flex w-full overflow-x-auto gap-2 whitespace-nowrap">
             <TabsTrigger className="min-w-[88px]" value="summary">Summary</TabsTrigger>
-            <TabsTrigger className="min-w-[64px]" value="ai">AI</TabsTrigger>
             <TabsTrigger className="min-w-[96px]" value="feedback">Feedback</TabsTrigger>
             <TabsTrigger className="min-w-[88px]" value="history">History</TabsTrigger>
             <TabsTrigger className="min-w-[72px]" value="emails">Emails</TabsTrigger>
-            <TabsTrigger className="min-w-[72px]" value="notes">Notes</TabsTrigger>
             <TabsTrigger className="min-w-[104px]" value="interview">Interview</TabsTrigger>
-            <TabsTrigger className="min-w-[80px]" value="rating">Rating</TabsTrigger>
           </TabsList>
 
           {/* Summary Tab */}
@@ -342,185 +308,31 @@ export function ApplicationDetailPanel({
                   Download Resume
                 </Button>
 
-                {/* Move Stage */}
-                <div className="space-y-2 pt-4 border-t border-border">
-                  <Label className="text-foreground">Move to Stage</Label>
-                  <Select value={selectedStageId} onValueChange={setSelectedStageId}>
-                    <SelectTrigger className="bg-white border-border">
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {pipelineStages.map((stage) => (
-                        <SelectItem key={stage.id} value={stage.id.toString()}>
-                          {stage.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Textarea
-                    placeholder="Add notes (optional)"
-                    value={stageNotes}
-                    onChange={(e) => setStageNotes(e.target.value)}
-                    className="bg-white border-border placeholder:text-muted-foreground"
+                <div className="pt-4 border-t border-border">
+                  <AISummaryPanel
+                    applicationId={application.id}
+                    jobId={jobId}
+                    aiSummary={application.aiSummary}
+                    aiSuggestedAction={application.aiSuggestedAction}
+                    aiSuggestedActionReason={application.aiSuggestedActionReason}
+                    aiSummaryComputedAt={application.aiSummaryComputedAt}
+                    pipelineStages={pipelineStages}
+                    currentStageId={application.currentStage}
+                    onMoveStage={onMoveStage}
+                    onAddNote={onAddNote}
+                    onUpdateStatus={onUpdateStatus}
                   />
-                  <Button
-                    onClick={handleMoveStage}
-                    disabled={!selectedStageId}
-                    className="w-full"
-                  >
-                    Move Stage
-                  </Button>
                 </div>
-
-                {/* Send Email */}
-                {emailTemplates.length > 0 && (
-                  <div className="space-y-3 pt-4 border-t border-border">
-                    <Label className="text-foreground">Send Email</Label>
-
-                    {/* Template Selector */}
-                    <Select value={selectedTemplateId} onValueChange={(value) => {
-                      setSelectedTemplateId(value);
-                      setShowAiDraft(false);
-                    }}>
-                      <SelectTrigger className="bg-white border-border">
-                        <SelectValue placeholder="Select template" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {emailTemplates
-                          .sort((a, b) => {
-                            // Sort defaults first
-                            if (a.isDefault && !b.isDefault) return -1;
-                            if (!a.isDefault && b.isDefault) return 1;
-                            return a.name.localeCompare(b.name);
-                          })
-                          .map((template) => (
-                            <SelectItem key={template.id} value={template.id.toString()}>
-                              <div className="flex max-w-[280px] flex-col items-start gap-1 py-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-medium">{template.name}</span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {templateTypeLabel(template.templateType)}
-                                  </span>
-                                  {template.isDefault && (
-                                    <span className="text-xs font-medium text-success">Default</span>
-                                  )}
-                                  {formatShortDate(template.createdAt) && (
-                                    <span className="text-xs text-muted-foreground">
-                                      Created {formatShortDate(template.createdAt)}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="line-clamp-1 text-xs text-muted-foreground">
-                                  {template.subject}
-                                </span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-
-                    {/* Template Preview */}
-                    {selectedTemplateId && (() => {
-                      const template = emailTemplates.find(t => t.id === parseInt(selectedTemplateId));
-                      if (!template) return null;
-                      const firstLine = template.body.split('\n')[0];
-                      return (
-                        <div className="p-3 bg-muted/50 border border-border rounded-md space-y-1">
-                          <p className="text-xs font-medium text-foreground">Preview:</p>
-                          <p className="text-sm text-foreground font-medium">{template.subject}</p>
-                          <p className="text-xs text-muted-foreground truncate">{firstLine || template.body.substring(0, 80)}...</p>
-                        </div>
-                      );
-                    })()}
-
-                    {/* Tone Selector */}
-                    {selectedTemplateId && (
-                      <div className="space-y-2">
-                        <Label className="text-foreground text-sm">Tone</Label>
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={emailTone === 'friendly' ? 'default' : 'outline'}
-                            onClick={() => setEmailTone('friendly')}
-                            className="flex-1"
-                          >
-                            Friendly
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={emailTone === 'formal' ? 'default' : 'outline'}
-                            onClick={() => setEmailTone('formal')}
-                            className="flex-1"
-                          >
-                            Formal
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Generate with AI Button */}
-                    {selectedTemplateId && (
-                      <Button
-                        onClick={handleGenerateAIDraft}
-                        disabled={generateEmailDraftMutation.isPending}
-                        variant="outline"
-                        className="w-full border-primary/30 text-primary hover:bg-primary/10"
-                      >
-                        {generateEmailDraftMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Generating...
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="h-4 w-4 mr-2" />
-                            Generate with AI
-                          </>
-                        )}
-                      </Button>
-                    )}
-
-                    {/* AI Draft Preview */}
-                    {showAiDraft && aiDraftSubject && aiDraftBody && (
-                      <div className="p-3 bg-primary/5 rounded-lg border border-primary/20 space-y-2">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Sparkles className="h-4 w-4 text-primary" />
-                          <Label className="text-primary font-medium text-sm">AI-Generated Preview</Label>
-                        </div>
-                        <div className="space-y-2">
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Subject:</Label>
-                            <p className="text-sm text-foreground font-medium">{aiDraftSubject}</p>
-                          </div>
-                          <div>
-                            <Label className="text-xs text-muted-foreground">Body:</Label>
-                            <p className="text-sm text-foreground whitespace-pre-wrap max-h-40 overflow-y-auto">
-                              {aiDraftBody}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Send Email Button */}
-                    <Button
-                      onClick={handleSendEmail}
-                      disabled={!selectedTemplateId}
-                      variant="outline"
-                      className="w-full border-border text-foreground hover:bg-muted"
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      {showAiDraft && aiDraftSubject && aiDraftBody ? "Send AI Draft" : "Send Email"}
-                    </Button>
-                  </div>
-                )}
 
                 {/* Send Form */}
                 {formTemplates.length > 0 && (
-                  <div className="space-y-2 pt-4 border-t border-border">
-                    <Label className="text-foreground">Invite to Form</Label>
+                  <div className="space-y-4 pt-4 border-t border-border">
+                    <div className="space-y-1">
+                      <Label className="text-foreground">Invite to Form</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Select a form to send and add an optional message for the candidate.
+                      </p>
+                    </div>
                     <Select value={selectedFormId} onValueChange={setSelectedFormId}>
                       <SelectTrigger className="bg-white border-border">
                         <SelectValue placeholder="Select form" />
@@ -528,67 +340,63 @@ export function ApplicationDetailPanel({
                       <SelectContent>
                         {formTemplates.map((form) => (
                           <SelectItem key={form.id} value={form.id.toString()}>
-                            <div className="flex max-w-[280px] flex-col items-start gap-1 py-1">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="font-medium">{form.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {form.fields.length} fields
-                                </span>
-                                <span className="text-xs text-muted-foreground">
-                                  {form.isPublished ? "Published" : "Draft"}
-                                </span>
-                                {formatShortDate(form.updatedAt) && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Updated {formatShortDate(form.updatedAt)}
-                                  </span>
-                                )}
-                              </div>
-                              {form.description && (
-                                <span className="line-clamp-1 text-xs text-muted-foreground">
-                                  {form.description}
-                                </span>
-                              )}
-                            </div>
+                            <span className="block max-w-[280px] truncate font-medium">
+                              {form.name}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                    <Textarea
-                      placeholder="Custom message (optional)"
-                      value={formMessage}
-                      onChange={(e) => setFormMessage(e.target.value)}
-                      className="bg-white border-border placeholder:text-muted-foreground"
-                    />
-                    <Button
-                      onClick={handleSendForm}
-                      disabled={!selectedFormId}
-                      variant="outline"
-                      className="w-full border-border text-foreground hover:bg-muted"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Send Invitation
-                    </Button>
+
+                    {selectedForm && (
+                      <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground">{selectedForm.name}</p>
+                              <Badge variant="outline" className="text-xs">
+                                {selectedForm.fields.length} fields
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {selectedForm.isPublished ? "Published" : "Draft"}
+                              </Badge>
+                            </div>
+                            {selectedForm.description && (
+                              <p className="text-sm text-muted-foreground leading-relaxed">
+                                {selectedForm.description}
+                              </p>
+                            )}
+                            {formatShortDate(selectedForm.updatedAt) && (
+                              <p className="text-xs text-muted-foreground">
+                                Updated {formatShortDate(selectedForm.updatedAt)}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-foreground text-sm">Optional message</Label>
+                          <Textarea
+                            placeholder="Add context for the candidate before sending the form invitation"
+                            value={formMessage}
+                            onChange={(e) => setFormMessage(e.target.value)}
+                            className="bg-white border-border placeholder:text-muted-foreground min-h-[96px]"
+                          />
+                        </div>
+                        <Button
+                          onClick={handleSendForm}
+                          disabled={!selectedFormId}
+                          variant="outline"
+                          className="w-full border-border text-foreground hover:bg-muted"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          Send Invitation
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          {/* AI Summary Tab */}
-          <TabsContent value="ai" className="space-y-4">
-            <AISummaryPanel
-              applicationId={application.id}
-              jobId={jobId}
-              aiSummary={application.aiSummary}
-              aiSuggestedAction={application.aiSuggestedAction}
-              aiSuggestedActionReason={application.aiSuggestedActionReason}
-              aiSummaryComputedAt={application.aiSummaryComputedAt}
-              pipelineStages={pipelineStages}
-              currentStageId={application.currentStage}
-              onMoveStage={onMoveStage}
-              onAddNote={onAddNote}
-              onUpdateStatus={onUpdateStatus}
-            />
           </TabsContent>
 
           {/* Feedback Tab */}
@@ -625,6 +433,162 @@ export function ApplicationDetailPanel({
 
           {/* Emails Tab */}
           <TabsContent value="emails" className="space-y-3">
+            {emailTemplates.length > 0 && (
+              <Card className="bg-muted/50 border-border">
+                <CardContent className="space-y-4 p-4">
+                  <div className="space-y-1">
+                    <Label className="text-foreground">Send Email</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Choose a template, review it, then optionally personalize it with AI before sending.
+                    </p>
+                  </div>
+
+                  <Select value={selectedTemplateId} onValueChange={(value) => {
+                    setSelectedTemplateId(value);
+                    setShowAiDraft(false);
+                  }}>
+                    <SelectTrigger className="bg-white border-border">
+                      <SelectValue placeholder="Select template" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {emailTemplates
+                        .sort((a, b) => {
+                          if (a.isDefault && !b.isDefault) return -1;
+                          if (!a.isDefault && b.isDefault) return 1;
+                          return a.name.localeCompare(b.name);
+                        })
+                        .map((template) => (
+                          <SelectItem key={template.id} value={template.id.toString()}>
+                            <span className="block max-w-[280px] truncate font-medium">
+                              {template.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+
+                  {selectedTemplate && (
+                    <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground">{selectedTemplate.name}</p>
+                              <Badge variant="outline" className="text-xs">
+                                {templateTypeLabel(selectedTemplate.templateType)}
+                              </Badge>
+                              {selectedTemplate.isDefault && (
+                                <Badge variant="outline" className="border-success/30 bg-success/10 text-success-foreground text-xs">
+                                  Default
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                              {formatShortDate(selectedTemplate.createdAt) && (
+                                <span>Created {formatShortDate(selectedTemplate.createdAt)}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-md border border-border bg-white p-3 space-y-2">
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Subject</p>
+                            <p className="text-sm font-medium text-foreground break-words">
+                              {selectedTemplate.subject}
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Preview</p>
+                            <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3 break-words">
+                              {selectedTemplate.body.split('\n').find(line => line.trim()) || selectedTemplate.body.substring(0, 140)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label className="text-foreground text-sm">Tone</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={emailTone === 'friendly' ? 'default' : 'outline'}
+                            onClick={() => setEmailTone('friendly')}
+                            className="w-full"
+                          >
+                            Friendly
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={emailTone === 'formal' ? 'outline' : 'outline'}
+                            onClick={() => setEmailTone('formal')}
+                            className={`w-full ${emailTone === 'formal' ? 'border-primary text-primary bg-primary/5 hover:bg-primary/10' : ''}`}
+                          >
+                            Formal
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <Button
+                          onClick={handleGenerateAIDraft}
+                          disabled={generateEmailDraftMutation.isPending}
+                          variant="outline"
+                          className="w-full border-primary/30 text-primary hover:bg-primary/10"
+                        >
+                          {generateEmailDraftMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="h-4 w-4 mr-2" />
+                              Generate with AI
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          onClick={handleSendEmail}
+                          disabled={!selectedTemplateId}
+                          variant="outline"
+                          className="w-full border-border text-foreground hover:bg-muted"
+                        >
+                          <Mail className="h-4 w-4 mr-2" />
+                          {showAiDraft && aiDraftSubject && aiDraftBody ? "Send AI Draft" : "Send Email"}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {showAiDraft && aiDraftSubject && aiDraftBody && (
+                    <div className="p-4 bg-primary/5 rounded-lg border border-primary/20 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <Label className="text-primary font-medium text-sm">AI-Generated Preview</Label>
+                      </div>
+                      <div className="space-y-3">
+                        <div>
+                          <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Subject</Label>
+                          <p className="mt-1 text-sm text-foreground font-medium break-words">{aiDraftSubject}</p>
+                        </div>
+                        <div>
+                          <Label className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Body</Label>
+                          <div className="mt-1 max-h-40 overflow-y-auto rounded-md border border-primary/10 bg-white/70 p-3">
+                            <p className="text-sm text-foreground whitespace-pre-wrap">
+                              {aiDraftBody}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {emailHistoryLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -669,48 +633,6 @@ export function ApplicationDetailPanel({
                   </CardContent>
                 </Card>
               ))
-            )}
-          </TabsContent>
-
-          {/* Notes Tab */}
-          <TabsContent value="notes" className="space-y-3">
-            <Card className="bg-muted/50 border-border">
-              <CardContent className="p-4 space-y-3">
-                <Textarea
-                  placeholder="Add a note..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                  className="bg-white border-border placeholder:text-muted-foreground min-h-[100px]"
-                />
-                <Button
-                  onClick={handleAddNote}
-                  disabled={!newNote.trim()}
-                  className="w-full bg-primary hover:bg-primary/90"
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Add Note
-                </Button>
-              </CardContent>
-            </Card>
-
-            {application.recruiterNotes && application.recruiterNotes.length > 0 ? (
-              application.recruiterNotes.map((note: any, index: number) => (
-                <Card
-                  key={`${typeof note === "string" ? note : note.timestamp ?? note.content ?? "note"}-${index}`}
-                  className="bg-muted/50 border-border"
-                >
-                  <CardContent className="p-4">
-                    <p className="text-muted-foreground text-sm">{note.content || note}</p>
-                    {note.timestamp && (
-                      <p className="text-muted-foreground text-xs mt-2">
-                        {new Date(note.timestamp).toLocaleString()}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <p className="text-muted-foreground text-sm text-center py-8">No notes yet</p>
             )}
           </TabsContent>
 
@@ -814,41 +736,6 @@ export function ApplicationDetailPanel({
             )}
           </TabsContent>
 
-          {/* Rating Tab */}
-          <TabsContent value="rating" className="space-y-3">
-            <Card className="bg-muted/50 border-border">
-              <CardHeader>
-                <CardTitle className="text-foreground text-base">Candidate Rating</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="space-y-2">
-                  <Label className="text-foreground">Rating (1-5)</Label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max="5"
-                    value={rating}
-                    onChange={(e) => setRating(e.target.value)}
-                    className="bg-white border-border"
-                  />
-                </div>
-                <Button
-                  onClick={handleSetRating}
-                  disabled={!rating || parseInt(rating) < 1 || parseInt(rating) > 5}
-                  className="w-full bg-primary hover:bg-primary/90"
-                >
-                  <Star className="h-4 w-4 mr-2" />
-                  Set Rating
-                </Button>
-                {application.rating !== null && application.rating !== undefined && (
-                  <div className="flex items-center justify-center gap-2 pt-4 border-t border-border">
-                    <Star className="h-5 w-5 fill-yellow-400 text-warning" />
-                    <span className="text-foreground text-lg font-semibold">{application.rating}/5</span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
     </div>

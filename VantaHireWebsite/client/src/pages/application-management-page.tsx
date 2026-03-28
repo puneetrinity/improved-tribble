@@ -15,8 +15,6 @@ import {
   XCircle,
   UserCheck,
   MessageSquare,
-  Filter,
-  Search,
   Briefcase,
   Target,
   Mail,
@@ -25,7 +23,6 @@ import {
   ArrowLeft,
   FileDown,
   Plus,
-  ArrowUpDown,
   Sparkles,
   X,
   Info,
@@ -40,7 +37,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAiCreditExhaustionToast } from "@/hooks/use-ai-credit-exhaustion";
@@ -77,16 +73,13 @@ export default function ApplicationManagementPage() {
   const { showAiCreditExhaustionToast } = useAiCreditExhaustionToast();
   const [location, setLocation] = useLocation();
   const [selectedApplications, setSelectedApplications] = useState<number[]>([]);
-  const [stageFilter, setStageFilter] = useState("all");
-  const [searchQuery, setSearchQuery] = useState("");
   const [deepLinkedApplicationId, setDeepLinkedApplicationId] = useState<number | null>(null);
-  const [selectedTab, setSelectedTab] = useState("all");
-  const [sortBy, setSortBy] = useState<'date' | 'ai_fit'>('date'); // AI Fit Sorting
   const [actionFilter, setActionFilter] = useState<string[]>([]); // AI Suggested Action Filter
   const [isVisible, setIsVisible] = useState(false);
 
   // ATS features state
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const [selectedAppContext, setSelectedAppContext] = useState<Application[]>([]);
   const [selectedAppResumeText, setSelectedAppResumeText] = useState<string | null>(null);
   const [interviewDate, setInterviewDate] = useState("");
   const [interviewTime, setInterviewTime] = useState("");
@@ -124,6 +117,7 @@ export default function ApplicationManagementPage() {
   const [showAISummaryDialog, setShowAISummaryDialog] = useState(false);
   const [aiSummaryJobId, setAiSummaryJobId] = useState<number | null>(null);
   const [regenerateSummaries, setRegenerateSummaries] = useState(false);
+  const [hasTriggeredAISummaryFilters, setHasTriggeredAISummaryFilters] = useState(false);
 
   type JobShortlistSummary = {
     id: number;
@@ -146,12 +140,10 @@ export default function ApplicationManagementPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Read stage filter from URL on mount and when URL changes
+  // Read deep-linked application from URL on mount and when URL changes
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const stageParam = params.get("stage");
     const applicationIdParam = params.get("applicationId");
-    setStageFilter(stageParam ?? "all");
     setDeepLinkedApplicationId(applicationIdParam ? Number(applicationIdParam) : null);
   }, [location]);
 
@@ -836,8 +828,11 @@ export default function ApplicationManagementPage() {
     );
   };
 
-  const handleOpenDetails = async (application: Application) => {
+  const handleOpenDetails = async (application: Application, contextApplications?: Application[]) => {
     setSelectedApp(application);
+    setSelectedAppContext(
+      (contextApplications && contextApplications.length > 0 ? contextApplications : [application]).slice()
+    );
     setSelectedAppResumeText(null);
     handleApplicationView(application.id);
 
@@ -861,6 +856,7 @@ export default function ApplicationManagementPage() {
 
   const handleCloseDetails = () => {
     setSelectedApp(null);
+    setSelectedAppContext([]);
     setSelectedAppResumeText(null);
   };
 
@@ -1208,25 +1204,13 @@ export default function ApplicationManagementPage() {
   };
 
   const filteredApplications = applications?.filter(app => {
-    const matchesStage = stageFilter === 'all' ||
-                         (stageFilter === 'unassigned' && app.currentStage == null) ||
-                         (stageFilter !== 'unassigned' && app.currentStage === parseInt(stageFilter));
-    const matchesSearch = searchQuery === '' ||
-      app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.email.toLowerCase().includes(searchQuery.toLowerCase());
     // AI Suggested Action Filter
     const matchesAction = actionFilter.length === 0 ||
       (actionFilter.includes('Not Analyzed') && !app.aiSuggestedAction) ||
       (app.aiSuggestedAction && actionFilter.includes(app.aiSuggestedAction));
-    return matchesStage && matchesSearch && matchesAction;
+    return matchesAction;
   }).sort((a, b) => {
-    // AI Fit Sorting
-    if (sortBy === 'ai_fit') {
-      const scoreA = a.aiFitScore || 0;
-      const scoreB = b.aiFitScore || 0;
-      return scoreB - scoreA; // Higher scores first
-    }
-    // Default: Sort by date (newest first)
+    // Keep existing default ordering: newest applications first
     return new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime();
   }) || [];
 
@@ -1241,23 +1225,37 @@ export default function ApplicationManagementPage() {
   // Visible apps for current tab (used by Select All)
   const getVisibleApplications = (): Application[] => {
     if (!applications) return [];
-    if (selectedTab === 'all') return filteredApplications;
-    if (selectedTab === 'unassigned') return getApplicationsWithoutStage();
-    if (selectedTab.startsWith('stage-')) {
-      const sid = parseInt(selectedTab.split('-')[1] || '0');
-      return getApplicationsByStage(sid);
-    }
-    return [];
+    return filteredApplications;
   };
 
-  const getApplicationsByStage = (stageId: number) => {
-    return applications?.filter(app => app.currentStage === stageId) || [];
-  };
+  const totalApplications = applications?.length || 0;
+  const shortlistedApplications = applications?.filter((app) => app.status === "shortlisted").length || 0;
+  const toReviewApplications =
+    applications?.filter((app) => !["shortlisted", "rejected"].includes(app.status)).length || 0;
+  const showAiFilterBar =
+    actionFilter.length > 0 || (hasTriggeredAISummaryFilters && selectedApplications.length > 0);
 
-  const getApplicationsWithoutStage = () => {
-    // Explicitly check for null/undefined (stage IDs start from 1, but be defensive)
-    return applications?.filter(app => app.currentStage == null) || [];
-  };
+  const jobStatusBadge =
+    job?.status === "approved"
+      ? {
+          label: "Active",
+          className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+        }
+      : job?.status === "pending"
+        ? {
+            label: applicationManagementCopy.header.pendingApprovalTitle,
+            className: "border-amber-200 bg-amber-50 text-amber-700",
+          }
+        : {
+            label: job?.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : "Unknown",
+            className: "border-border bg-muted text-foreground",
+          };
+
+  const heroStats = [
+    { label: "Total Apps", value: totalApplications, accent: "text-primary" },
+    { label: "To Review", value: toReviewApplications, accent: "text-amber-600" },
+    { label: "Shortlisted", value: shortlistedApplications, accent: "text-emerald-600" },
+  ];
 
 
   if (jobLoading || applicationsLoading) {
@@ -1302,158 +1300,69 @@ export default function ApplicationManagementPage() {
   return (
     <Layout>
       <div className={`container mx-auto px-4 py-8 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="max-w-7xl mx-auto">
-          {/* Back Button */}
-          <div className="flex items-center gap-3 pt-8 mb-4">
+        <div className="mx-auto max-w-7xl space-y-6">
+          <div className="flex flex-wrap items-center gap-3 pt-8 text-sm">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setLocation("/my-jobs")}
-              className="text-muted-foreground hover:bg-muted"
+              className="h-auto rounded-none px-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Back to My Jobs</span>
-              <span className="sm:hidden">Back</span>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Jobs
             </Button>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-medium text-foreground">Application Management</span>
           </div>
 
-          {/* Job-Level Sub Navigation */}
+          <section className="border border-border/70 bg-[linear-gradient(180deg,#ffffff_0%,#f8f8ff_100%)] p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8">
+            <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                    Application Management
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+                      {job.title}
+                    </h1>
+                    <Badge className={`rounded-none ${jobStatusBadge.className}`}>{jobStatusBadge.label}</Badge>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground md:text-base">
+                  <span className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4" />
+                    {job.location || "Location unavailable"}
+                  </span>
+                  <span className="hidden text-border md:inline">|</span>
+                  <span className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    {applicationManagementCopy.header.postedPrefix} {formatDate(job.createdAt)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[480px] xl:max-w-[520px] xl:flex-1">
+                {heroStats.map((stat) => (
+                  <Card key={stat.label} className="rounded-none border border-border/80 bg-white/95 shadow-sm">
+                    <CardContent className="space-y-3 p-5">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                        {stat.label}
+                      </p>
+                      <p className={`text-4xl font-semibold leading-none ${stat.accent}`}>{stat.value}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </section>
+
           <div data-tour="job-context">
-            <JobSubNav jobId={jobId!} jobTitle={job.title} className="mb-6" />
+            <JobSubNav jobId={jobId!} variant="inline" className="mb-0" />
           </div>
 
-          {/* Quick Actions Toolbar */}
-          <div className="flex flex-col md:flex-row justify-end gap-4 mb-6">
-
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (selectedApplications.length === 0) {
-                    toast({
-                      title: applicationManagementCopy.validation.noCandidatesTitle,
-                      description: applicationManagementCopy.validation.noCandidatesDescription,
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  if (selectedApplications.length > 20) {
-                    const ok = window.confirm(
-                      applicationManagementCopy.validation.bulkEmailConfirm(selectedApplications.length)
-                    );
-                    if (!ok) return;
-                  }
-                  setShowBulkEmailDialog(true);
-                }}
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                {applicationManagementCopy.actions.bulkEmail}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (selectedApplications.length === 0) {
-                    toast({
-                      title: applicationManagementCopy.validation.noCandidatesTitle,
-                      description: applicationManagementCopy.validation.noCandidatesDescription,
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  if (selectedApplications.length > 20) {
-                    const ok = window.confirm(
-                      applicationManagementCopy.validation.bulkFormsConfirm(selectedApplications.length)
-                    );
-                    if (!ok) return;
-                  }
-                  setShowBulkFormsDialog(true);
-                }}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                {applicationManagementCopy.actions.bulkForm}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (selectedApplications.length === 0) {
-                    toast({
-                      title: applicationManagementCopy.validation.noCandidatesTitle,
-                      description: applicationManagementCopy.validation.noCandidatesDescription,
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  if (!job?.clientId) {
-                    toast({
-                      title: applicationManagementCopy.validation.noClientTitle,
-                      description: applicationManagementCopy.validation.noClientDescription,
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  setShowShareShortlistDialog(true);
-                }}
-              >
-                <Users className="h-4 w-4 mr-2" />
-                {applicationManagementCopy.actions.shareWithClient}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (selectedApplications.length === 0) {
-                    toast({
-                      title: applicationManagementCopy.validation.noCandidatesTitle,
-                      description: applicationManagementCopy.validation.noCandidatesDescription,
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  setShowBatchInterviewDialog(true);
-                }}
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                {applicationManagementCopy.actions.batchInterview}
-              </Button>
-              <Button size="sm" onClick={() => setAddCandidateModalOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                {applicationManagementCopy.actions.addCandidate}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setBulkImportDialogOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Import Resumes
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleExportCSV()}
-                disabled={!applications || applications.length === 0}
-              >
-                <FileDown className="h-4 w-4 mr-2" />
-                Export CSV
-              </Button>
-            </div>
-          </div>
-
-          {/* Header */}
-          <div className="mb-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Users className="h-7 w-7 text-primary" />
-              <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-                Application Management
-              </h1>
-            </div>
-            <p className="text-muted-foreground text-sm md:text-base max-w-2xl">
-              {applicationManagementCopy.header.subtitlePrefix} "{job.title}"
-            </p>
-          </div>
-
-          {/* Pending Approval Alert */}
           {job.status === 'pending' && (
-            <Alert className="mb-4 border-warning/50 bg-warning/10">
+            <Alert className="border-warning/50 bg-warning/10">
               <Clock className="h-4 w-4 text-warning" />
               <AlertTitle className="text-warning-foreground">{applicationManagementCopy.header.pendingApprovalTitle}</AlertTitle>
               <AlertDescription className="text-muted-foreground">
@@ -1462,226 +1371,244 @@ export default function ApplicationManagementPage() {
             </Alert>
           )}
 
-          {/* Job Header */}
-          <Card className="mb-4 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-foreground text-xl">{job.title}</CardTitle>
-                {job.status === 'pending' && (
-                  <Badge className="bg-warning/10 text-warning-foreground border-warning/30">
-                    {applicationManagementCopy.header.pendingApprovalTitle}
-                  </Badge>
-                )}
+          <div className="border border-border/70 bg-white shadow-sm">
+            <div className="p-5">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                  Job Actions
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => {
+                    if (selectedApplications.length === 0) {
+                      toast({
+                        title: applicationManagementCopy.validation.noCandidatesTitle,
+                        description: applicationManagementCopy.validation.noCandidatesDescription,
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    if (!job?.clientId) {
+                      toast({
+                        title: applicationManagementCopy.validation.noClientTitle,
+                        description: applicationManagementCopy.validation.noClientDescription,
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setShowShareShortlistDialog(true);
+                  }}
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  {applicationManagementCopy.actions.shareWithClient}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => {
+                    if (selectedApplications.length === 0) {
+                      toast({
+                        title: applicationManagementCopy.validation.noCandidatesTitle,
+                        description: applicationManagementCopy.validation.noCandidatesDescription,
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setShowBatchInterviewDialog(true);
+                  }}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {applicationManagementCopy.actions.batchInterview}
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-none" onClick={() => setBulkImportDialogOpen(true)}>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import Resumes
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-none"
+                  onClick={() => handleExportCSV()}
+                  disabled={!applications || applications.length === 0}
+                >
+                  <FileDown className="mr-2 h-4 w-4" />
+                  Export CSV
+                </Button>
               </div>
-              <CardDescription>
-                <div className="flex items-center gap-4 flex-wrap">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
-                    {job.location}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    {applicationManagementCopy.header.postedPrefix} {formatDate(job.createdAt)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Users className="w-4 h-4" />
-                    {applications?.length || 0} {applicationManagementCopy.header.applicationsLabel}
-                  </span>
-                </div>
-              </CardDescription>
-            </CardHeader>
-          </Card>
 
-          {/* Sort & Filter Controls */}
-          <Card className="mb-6 shadow-sm" data-tour="applications-filters">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-4 flex-wrap">
-                {/* Sort Dropdown */}
-                <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Label htmlFor="sort-select" className="text-sm font-medium text-foreground">
-                    {applicationManagementCopy.filters.sortBy}
-                  </Label>
-                  <Select value={sortBy} onValueChange={(value: 'date' | 'ai_fit') => setSortBy(value)}>
-                    <SelectTrigger id="sort-select" className="w-40">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="date">{applicationManagementCopy.filters.newestFirst}</SelectItem>
-                      <SelectItem value="ai_fit">
-                        <span className="flex items-center gap-1">
-                          <Sparkles className="h-3 w-3" />
-                          {applicationManagementCopy.filters.aiFitScore}
+              <div className="flex justify-start xl:justify-end">
+                <Button size="sm" className="rounded-none" onClick={() => setAddCandidateModalOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  {applicationManagementCopy.actions.addCandidate}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-0 border-t border-border/70">
+              <div data-tour="bulk-actions" className="border-b border-border/70">
+                <BulkActionBar
+                  selectedCount={selectedApplications.length}
+                  totalCount={filteredApplications.length}
+                  pipelineStages={pipelineStages}
+                  emailTemplates={emailTemplates}
+                  formTemplates={formTemplates}
+                  onMoveStage={handleBulkMoveStage}
+                  onSendEmails={handleBulkSendEmails}
+                  onSendForms={handleBulkSendForms}
+                  onSelectAll={handleSelectAll}
+                  onClearSelection={handleClearSelection}
+                  onArchiveSelected={handleArchiveSelected}
+                  onRequestHiringManagerReview={handleRequestHiringManagerReview}
+                  canRequestHiringManagerReview={!!job?.hiringManagerId}
+                  hiringManagerReviewDisabledReason={!job?.hiringManagerId ? "Assign a hiring manager to this job before requesting review." : undefined}
+                  isBulkProcessing={sendBulkEmailsMutation.isPending || sendBulkFormsMutation.isPending || bulkUpdateMutation.isPending || requestHiringManagerReviewMutation.isPending || startAISummaryMutation.isPending || !!aiSummaryJobId}
+                  bulkProgress={bulkProgress}
+                  onGenerateAISummary={() => {
+                    setHasTriggeredAISummaryFilters(true);
+                    setShowAISummaryDialog(true);
+                  }}
+                  aiSummaryEnabled={true}
+                  aiSummaryLimit={summaryLimitStatus?.effectiveRemaining}
+                  aiSummaryToGenerateCount={toGenerateCount}
+                />
+              </div>
+
+              {showAiFilterBar && (
+                <div className="border-b border-border/70 bg-slate-50/60 p-4" data-tour="applications-filters">
+                  <div className="flex flex-col gap-3 border border-border bg-white px-4 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-muted-foreground" />
+                        <Label className="whitespace-nowrap text-sm font-medium text-foreground">
+                          {applicationManagementCopy.filters.aiAction}
+                        </Label>
+                        <span className="cursor-help" title={applicationManagementCopy.filters.aiActionHelp}>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground" />
                         </span>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                      </div>
 
-                {/* Stage Filter */}
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <Label htmlFor="stage-filter" className="text-sm font-medium text-foreground">
-                    {applicationManagementCopy.filters.stage}
-                  </Label>
-                  <Select value={stageFilter} onValueChange={setStageFilter}>
-                    <SelectTrigger id="stage-filter" className="w-48">
-                      <SelectValue placeholder={applicationManagementCopy.filters.allStages} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{applicationManagementCopy.filters.allStages}</SelectItem>
-                      <SelectItem value="unassigned">{applicationManagementCopy.filters.unassigned}</SelectItem>
-                      {pipelineStages
-                        .slice()
-                        .sort((a, b) => (a.order - b.order) || (a.id - b.id))
-                        .map((stage) => (
-                          <SelectItem key={stage.id} value={stage.id.toString()}>
-                            {stage.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                      <div className="text-sm text-muted-foreground">
+                        {selectedApplications.length > 0
+                          ? `${selectedApplications.length} candidate${selectedApplications.length === 1 ? "" : "s"} selected`
+                          : "AI filters ready"}
+                      </div>
+                    </div>
 
-                {/* AI Recommended Action Filter */}
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-muted-foreground" />
-                  <Label className="text-sm font-medium text-foreground whitespace-nowrap">{applicationManagementCopy.filters.aiAction}</Label>
-                  <span
-                    className="cursor-help"
-                    title={applicationManagementCopy.filters.aiActionHelp}
-                  >
-                    <Info className="h-3.5 w-3.5 text-muted-foreground" />
-                  </span>
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    {['advance', 'hold', 'reject', 'Not Analyzed'].map((action) => {
-                      const isActive = actionFilter.includes(action);
-                      const displayLabel = action === 'Not Analyzed' ? applicationManagementCopy.filters.notAnalyzed : action.charAt(0).toUpperCase() + action.slice(1);
-                      const getActionStyle = () => {
-                        if (!isActive) return 'hover:bg-muted';
-                        switch (action) {
-                          case 'advance': return 'bg-green-500 text-white hover:bg-green-600';
-                          case 'hold': return 'bg-amber-500 text-white hover:bg-amber-600';
-                          case 'reject': return 'bg-red-500 text-white hover:bg-red-600';
-                          case 'Not Analyzed': return 'bg-gray-500 text-white hover:bg-gray-600';
-                          default: return 'bg-primary text-primary-foreground hover:bg-primary/90';
-                        }
-                      };
-                      return (
-                        <Badge
-                          key={action}
-                          variant={isActive ? "default" : "outline"}
-                          className={`cursor-pointer transition-all text-xs ${getActionStyle()}`}
-                          onClick={() => {
-                            setActionFilter((prev) =>
-                              isActive
-                                ? prev.filter((a) => a !== action)
-                                : [...prev, action]
-                            );
-                          }}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {['advance', 'hold', 'reject', 'Not Analyzed'].map((action) => {
+                        const isActive = actionFilter.includes(action);
+                        const displayLabel =
+                          action === 'Not Analyzed'
+                            ? applicationManagementCopy.filters.notAnalyzed
+                            : action.charAt(0).toUpperCase() + action.slice(1);
+                        const getActionStyle = () => {
+                          if (!isActive) return 'hover:bg-muted';
+                          switch (action) {
+                            case 'advance': return 'bg-green-500 text-white hover:bg-green-600';
+                            case 'hold': return 'bg-amber-500 text-white hover:bg-amber-600';
+                            case 'reject': return 'bg-red-500 text-white hover:bg-red-600';
+                            case 'Not Analyzed': return 'bg-gray-500 text-white hover:bg-gray-600';
+                            default: return 'bg-primary text-primary-foreground hover:bg-primary/90';
+                          }
+                        };
+                        return (
+                          <Badge
+                            key={action}
+                            variant={isActive ? "default" : "outline"}
+                            className={`cursor-pointer text-xs transition-all ${getActionStyle()}`}
+                            onClick={() => {
+                              setActionFilter((prev) =>
+                                isActive
+                                  ? prev.filter((a) => a !== action)
+                                  : [...prev, action]
+                              );
+                            }}
+                          >
+                            {displayLabel}
+                          </Badge>
+                        );
+                      })}
+                      {actionFilter.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 rounded-none px-2 text-xs text-muted-foreground hover:text-foreground"
+                          onClick={() => setActionFilter([])}
                         >
-                          {displayLabel}
-                        </Badge>
-                      );
-                    })}
-                    {actionFilter.length > 0 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-5 px-1.5 text-xs text-muted-foreground hover:text-foreground"
-                        onClick={() => setActionFilter([])}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    )}
+                          <X className="mr-1 h-3 w-3" />
+                          Clear
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
+            </div>
 
-                {/* Results Count */}
-                <div className="ml-auto text-sm text-muted-foreground">
-                  {filteredApplications.length} of {applications?.length || 0} applications
+            <div className="border-t border-border/70 bg-card p-4 overflow-hidden" data-tour="kanban-board">
+              <div className="mb-4 flex justify-end">
+                <div className="pointer-events-none border border-border bg-white/95 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+                  Showing {filteredApplications.length} of {totalApplications} applications
                 </div>
               </div>
-            </CardContent>
-          </Card>
+              <div className="min-h-[600px]">
+              <KanbanBoard
+                applications={filteredApplications}
+                pipelineStages={[...pipelineStages].sort((a, b) => (a.order - b.order) || (a.id - b.id))}
+                selectedIds={selectedApplications}
+                onToggleSelect={handleToggleSelect}
+                onOpenDetails={handleOpenDetails}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+                onQuickMoveStage={(appId, stageId) => {
+                  updateStageMutation.mutate({ applicationId: appId, stageId });
+                }}
+                onQuickEmail={(appId) => {
+                  const app = applications?.find(a => a.id === appId);
+                  if (app) {
+                    setEmailDialogApp(app);
+                    setSelectedTemplateId(null);
+                    setShowEmailDialog(true);
+                  }
+                }}
+                onQuickInterview={(appId) => {
+                  const app = applications?.find(a => a.id === appId);
+                  if (app) {
+                    handleOpenDetails(app);
+                  }
+                }}
+                onQuickDownload={(appId) => {
+                  window.open(`/api/applications/${appId}/resume?download=1`, '_blank');
+                }}
+                onToggleStageSelect={(stageId, shouldSelect) => {
+                  const stageApps = applications?.filter(app => 
+                    // Handle unassigned (stageId null) vs specific stage
+                    stageId === null ? app.currentStage === null : app.currentStage === stageId
+                  ) || [];
+                  const stageAppIds = stageApps.map(app => app.id);
 
-          {/* Kanban Board Section */}
-          <div data-tour="bulk-actions">
-          <BulkActionBar
-            selectedCount={selectedApplications.length}
-            totalCount={filteredApplications.length}
-            pipelineStages={pipelineStages}
-            emailTemplates={emailTemplates}
-            formTemplates={formTemplates}
-            onMoveStage={handleBulkMoveStage}
-            onSendEmails={handleBulkSendEmails}
-            onSendForms={handleBulkSendForms}
-            onSelectAll={handleSelectAll}
-            onClearSelection={handleClearSelection}
-            onArchiveSelected={handleArchiveSelected}
-            onRequestHiringManagerReview={handleRequestHiringManagerReview}
-            canRequestHiringManagerReview={!!job?.hiringManagerId}
-            hiringManagerReviewDisabledReason={!job?.hiringManagerId ? "Assign a hiring manager to this job before requesting review." : undefined}
-            isBulkProcessing={sendBulkEmailsMutation.isPending || sendBulkFormsMutation.isPending || bulkUpdateMutation.isPending || requestHiringManagerReviewMutation.isPending || startAISummaryMutation.isPending || !!aiSummaryJobId}
-            bulkProgress={bulkProgress}
-            onGenerateAISummary={() => setShowAISummaryDialog(true)}
-            aiSummaryEnabled={true}
-            aiSummaryLimit={summaryLimitStatus?.effectiveRemaining}
-            aiSummaryToGenerateCount={toGenerateCount}
-          />
-          </div>
-
-          {/* Kanban Board */}
-          <div className="min-h-[600px] rounded-lg border border-border bg-card shadow-sm p-4 overflow-auto" data-tour="kanban-board">
-            <KanbanBoard
-              applications={filteredApplications}
-              pipelineStages={[...pipelineStages].sort((a, b) => (a.order - b.order) || (a.id - b.id))}
-              selectedIds={selectedApplications}
-              onToggleSelect={handleToggleSelect}
-              onOpenDetails={handleOpenDetails}
-              onDragEnd={handleDragEnd}
-              onDragCancel={handleDragCancel}
-              onQuickMoveStage={(appId, stageId) => {
-                updateStageMutation.mutate({ applicationId: appId, stageId });
-              }}
-              onQuickEmail={(appId) => {
-                const app = applications?.find(a => a.id === appId);
-                if (app) {
-                  setEmailDialogApp(app);
-                  setSelectedTemplateId(null);
-                  setShowEmailDialog(true);
-                }
-              }}
-              onQuickInterview={(appId) => {
-                const app = applications?.find(a => a.id === appId);
-                if (app) {
-                  handleOpenDetails(app);
-                }
-              }}
-              onQuickDownload={(appId) => {
-                window.open(`/api/applications/${appId}/resume?download=1`, '_blank');
-              }}
-              onToggleStageSelect={(stageId, shouldSelect) => {
-                const stageApps = applications?.filter(app => 
-                  // Handle unassigned (stageId null) vs specific stage
-                  stageId === null ? app.currentStage === null : app.currentStage === stageId
-                ) || [];
-                const stageAppIds = stageApps.map(app => app.id);
-
-                if (shouldSelect) {
-                  // Exclusive selection: Select ONLY this stage's apps
-                  setSelectedApplications(stageAppIds);
-                } else {
-                  // Deselect ONLY this stage's apps
-                  setSelectedApplications(prev => prev.filter(id => !stageAppIds.includes(id)));
-                }
-              }}
-            />
+                  if (shouldSelect) {
+                    // Exclusive selection: Select ONLY this stage's apps
+                    setSelectedApplications(stageAppIds);
+                  } else {
+                    // Deselect ONLY this stage's apps
+                    setSelectedApplications(prev => prev.filter(id => !stageAppIds.includes(id)));
+                  }
+                }}
+              />
+              </div>
+            </div>
           </div>
 
           {/* Application Detail Modal */}
           <ApplicationDetailModal
             application={selectedApp}
+            applications={selectedAppContext}
             jobId={jobId!}
             pipelineStages={pipelineStages}
             emailTemplates={emailTemplates}
@@ -1690,6 +1617,9 @@ export default function ApplicationManagementPage() {
             resumeText={selectedAppResumeText}
             open={!!selectedApp}
             onClose={handleCloseDetails}
+            onSelectApplication={(application) => {
+              void handleOpenDetails(application, selectedAppContext);
+            }}
             onMoveStage={handleMoveStageFromPanel}
             onScheduleInterview={handleScheduleInterviewFromPanel}
             onSendEmail={handleSendEmailFromPanel}
