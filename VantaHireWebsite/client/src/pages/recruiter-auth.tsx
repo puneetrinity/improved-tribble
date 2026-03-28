@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Mail, CheckCircle, UserPlus, ArrowLeft } from "lucide-react";
 import type { OnboardingStatus } from "@/hooks/use-onboarding-status";
-import recruiterAuthBg from "@/assets/recruiter-auth-bg.png";
+import { recruiterAuthPageCopy } from "@/lib/internal-copy";
+import recruiterAuthBg from "@/assets/recruiter-auth-bg.webp";
 
 // Type for invite details response
 interface InviteDetails {
