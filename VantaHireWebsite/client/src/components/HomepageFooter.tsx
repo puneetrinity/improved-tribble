@@ -2,6 +2,10 @@ import { Link } from "wouter";
 import vantahireLogo from "@/assets/vantahire-logo.png";
 
 const HomepageFooter = () => {
+  const openCookiePreferences = () => {
+    window.dispatchEvent(new CustomEvent("cookie-consent:open", { detail: { reset: true } }));
+  };
+
   return (
     <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
       <div></div>
@@ -33,13 +37,22 @@ const HomepageFooter = () => {
             <div>
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Legal</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
+                <li>
+                  <button
+                    type="button"
+                    onClick={openCookiePreferences}
+                    className="bg-transparent border-none p-0 text-hr-text-muted text-[0.82rem] transition-colors duration-200 hover:text-hr-text"
+                  >
+                    Cookie Preferences
+                  </button>
+                </li>
                 <li><Link href="/privacy-policy" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Privacy Policy</Link></li>
                 <li><Link href="/terms-of-service" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Terms of Service</Link></li>
                 <li><Link href="/cookie-policy" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Cookie Policy</Link></li>
               </ul>
             </div>
           </div>
-          <div className="max-w-[1100px] mx-auto pt-5 border-t border-[rgba(255,255,255,0.08)] flex justify-between text-[0.78rem] text-hr-text-muted max-md:flex-col max-md:gap-2 max-md:text-center">
+          <div className="max-w-[1100px] mx-auto pt-5 border-t border-[rgba(255,255,255,0.08)] flex items-center justify-between gap-4 text-[0.78rem] text-hr-text-muted max-md:flex-col max-md:text-center">
             <span>© 2026 VantaHire. All rights reserved.</span>
             <span>Made in India 🇮🇳</span>
           </div>
