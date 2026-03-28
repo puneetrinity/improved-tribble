@@ -52,7 +52,6 @@ const PublicFormPage = lazy(() => import("@/pages/public-form-page"));
 const PrivacyPolicyPage = lazy(() => import("@/pages/privacy-policy-page"));
 const TermsOfServicePage = lazy(() => import("@/pages/terms-of-service-page"));
 const CookiePolicyPage = lazy(() => import("@/pages/cookie-policy-page"));
-const BrandAssetsPage = lazy(() => import("@/pages/brand-assets-page"));
 const VerifyEmailPage = lazy(() => import("@/pages/verify-email-page"));
 const ResetPasswordPage = lazy(() => import("@/pages/reset-password-page"));
 const ProfileSettingsPage = lazy(() => import("@/pages/profile-settings-page"));
@@ -75,14 +74,10 @@ const SeatRemovedPage = lazy(() => import("@/pages/seat-removed-page"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding-page"));
 
 // Marketing pages
-const ProductPage = lazy(() => import("@/pages/product-page"));
 const FeaturesPage = lazy(() => import("@/pages/features-page"));
 const PricingPage = lazy(() => import("@/pages/pricing-page"));
 const ClaimPage = lazy(() => import("@/pages/claim-page"));
-const ComparePage = lazy(() => import("@/pages/compare-page"));
 const UseCasesPage = lazy(() => import("@/pages/use-cases-page"));
-const DemoPage = lazy(() => import("@/pages/demo-page"));
-const AboutPage = lazy(() => import("@/pages/about-page"));
 
 // Dev-only UI gallery (lazy loaded, tree-shaken in production)
 const DevUIGallery = import.meta.env.DEV
@@ -95,14 +90,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/product" component={ProductPage} />
       <Route path="/features" component={FeaturesPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/claim/:token" component={ClaimPage} />
-      <Route path="/compare" component={ComparePage} />
-      <Route path="/use-cases" component={UseCasesPage} />
-      <Route path="/demo" component={DemoPage} />
-      <Route path="/about" component={AboutPage} />
+      <Route path="/solutions" component={UseCasesPage} />
       <Route path="/auth" component={AuthPage} />
       <Route path="/recruiter-auth" component={RecruiterAuth} />
       <Route path="/candidate-auth" component={CandidateAuth} />
@@ -112,7 +103,6 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms-of-service" component={TermsOfServicePage} />
       <Route path="/cookie-policy" component={CookiePolicyPage} />
-      <Route path="/brand" component={BrandAssetsPage} />
       <Route path="/verify-email/:token" component={VerifyEmailPage} />
       <Route path="/reset-password/:token" component={ResetPasswordPage} />
       <Route path="/register-hiring-manager/:token" component={RegisterHiringManager} />

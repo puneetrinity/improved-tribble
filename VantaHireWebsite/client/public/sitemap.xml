@@ -4,77 +4,52 @@
   <!-- Homepage -->
   <url>
     <loc>https://vantahire.com/</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
-  <!-- Marketing Pages -->
-  <url>
-    <loc>https://vantahire.com/product</loc>
-    <lastmod>2026-03-18</lastmod>
-  </url>
-
+  <!-- Core Pages -->
   <url>
     <loc>https://vantahire.com/features</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
   <url>
     <loc>https://vantahire.com/pricing</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
+  <!-- Solutions -->
   <url>
-    <loc>https://vantahire.com/compare</loc>
-    <lastmod>2026-03-18</lastmod>
-  </url>
-
-  <url>
-    <loc>https://vantahire.com/use-cases</loc>
-    <lastmod>2026-03-18</lastmod>
-  </url>
-
-  <url>
-    <loc>https://vantahire.com/about</loc>
-    <lastmod>2026-03-18</lastmod>
-  </url>
-
-  <url>
-    <loc>https://vantahire.com/brand</loc>
-    <lastmod>2026-03-18</lastmod>
+    <loc>https://vantahire.com/solutions</loc>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
   <!-- Jobs -->
   <url>
     <loc>https://vantahire.com/jobs</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
   <!-- Recruiters Directory -->
   <url>
     <loc>https://vantahire.com/recruiters</loc>
-    <lastmod>2026-03-18</lastmod>
-  </url>
-
-  <!-- Landing Pages -->
-  <url>
-    <loc>https://vantahire.com/landing/hiring-insights.html</loc>
-    <lastmod>2026-03-17</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
   <!-- Legal Pages -->
   <url>
     <loc>https://vantahire.com/privacy-policy</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
   <url>
     <loc>https://vantahire.com/terms-of-service</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
   <url>
     <loc>https://vantahire.com/cookie-policy</loc>
-    <lastmod>2026-03-18</lastmod>
+    <lastmod>2026-03-28</lastmod>
   </url>
 
 </urlset>

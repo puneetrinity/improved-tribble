@@ -7,16 +7,16 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Eagerly import public page components (no lazy() for SSR)
 import Home from './pages/Home';
-import ProductPage from './pages/product-page';
 import FeaturesPage from './pages/features-page';
 import PricingPage from './pages/pricing-page';
-import ComparePage from './pages/compare-page';
 import UseCasesPage from './pages/use-cases-page';
-import AboutPage from './pages/about-page';
 import JobsPage from './pages/jobs-page';
 import JobDetailsPage from './pages/job-details-page';
 import RecruitersDirectoryPage from './pages/recruiters-directory-page';
 import RecruiterProfilePage from './pages/recruiter-profile-page';
+import PrivacyPolicyPage from './pages/privacy-policy-page';
+import TermsOfServicePage from './pages/terms-of-service-page';
+import CookiePolicyPage from './pages/cookie-policy-page';
 
 // Null auth context for SSR — public pages always render unauthenticated view
 const nullAuthContext = {
@@ -69,16 +69,16 @@ export function render(
               <Router ssrPath={url}>
                 <Switch>
                   <Route path="/" component={Home} />
-                  <Route path="/product" component={ProductPage} />
                   <Route path="/features" component={FeaturesPage} />
                   <Route path="/pricing" component={PricingPage} />
-                  <Route path="/compare" component={ComparePage} />
-                  <Route path="/use-cases" component={UseCasesPage} />
-                  <Route path="/about" component={AboutPage} />
+                  <Route path="/solutions" component={UseCasesPage} />
                   <Route path="/jobs" component={JobsPage} />
                   <Route path="/jobs/:id" component={JobDetailsPage} />
                   <Route path="/recruiters" component={RecruitersDirectoryPage} />
                   <Route path="/recruiters/:id" component={RecruiterProfilePage} />
+                  <Route path="/privacy-policy" component={PrivacyPolicyPage} />
+                  <Route path="/terms-of-service" component={TermsOfServicePage} />
+                  <Route path="/cookie-policy" component={CookiePolicyPage} />
                 </Switch>
               </Router>
             </TooltipProvider>

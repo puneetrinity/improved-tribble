@@ -25,7 +25,7 @@ const HomepageNav = () => {
         {!user && (
           <>
             <li><Link href="/features" className={navLink}>Features</Link></li>
-            <li><Link href="/use-cases" className={navLink}>Solutions</Link></li>
+            <li><Link href="/solutions" className={navLink}>Solutions</Link></li>
             <li><Link href="/pricing" className={navLink}>Pricing</Link></li>
           </>
         )}
@@ -97,7 +97,7 @@ const HomepageNav = () => {
           {!user && (
             <>
               <Link href="/features" className={mobileLink} onClick={() => setIsMenuOpen(false)}>Features</Link>
-              <Link href="/use-cases" className={mobileLink} onClick={() => setIsMenuOpen(false)}>Solutions</Link>
+              <Link href="/solutions" className={mobileLink} onClick={() => setIsMenuOpen(false)}>Solutions</Link>
               <Link href="/pricing" className={mobileLink} onClick={() => setIsMenuOpen(false)}>Pricing</Link>
             </>
           )}

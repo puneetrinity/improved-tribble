@@ -102,13 +102,13 @@ const Footer = ({ minimal = false }: FooterProps) => {
             </h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/use-cases" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
-                  Use Cases
+                <Link href="/solutions" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
+                  Solutions
                 </Link>
               </li>
               <li>
-                <Link href="/compare" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
-                  Compare
+                <Link href="/recruiters" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
+                  Recruiters
                 </Link>
               </li>
             </ul>
@@ -121,18 +121,8 @@ const Footer = ({ minimal = false }: FooterProps) => {
             </h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/about" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
-                  About
-                </Link>
-              </li>
-              <li>
                 <Link href="/jobs" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
                   Jobs
-                </Link>
-              </li>
-              <li>
-                <Link href="/brand" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
-                  Brand Assets
                 </Link>
               </li>
             </ul>

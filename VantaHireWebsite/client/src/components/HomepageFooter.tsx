@@ -22,9 +22,11 @@ const HomepageFooter = () => {
             <div>
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Product</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
-                <li><Link href="/jobs" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Browse Jobs</Link></li>
                 <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Features</Link></li>
+                <li><Link href="/solutions" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Solutions</Link></li>
                 <li><Link href="/pricing" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Pricing</Link></li>
+                <li><Link href="/jobs" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Browse Jobs</Link></li>
+                <li><Link href="/recruiters" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Recruiters</Link></li>
               </ul>
             </div>
             <div>

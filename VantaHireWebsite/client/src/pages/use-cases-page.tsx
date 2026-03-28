@@ -11,7 +11,7 @@ const breadcrumbJsonLd = JSON.stringify({
   "@type": "BreadcrumbList",
   "itemListElement": [
     { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" },
-    { "@type": "ListItem", "position": 2, "name": "Use Cases", "item": "https://vantahire.com/use-cases" }
+    { "@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://vantahire.com/solutions" }
   ]
 });
 
@@ -97,17 +97,17 @@ export default function UseCasesPage() {
   return (
     <>
       <Helmet>
-        <title>Use Cases | VantaHire - Built for Teams Like Yours</title>
-        <meta name="description" content="See how startups, agencies, enterprises, and talent teams use VantaHire to hire faster. Industry solutions for IT, Telecom, Fintech, Healthcare, and Automotive." />
-        <link rel="canonical" href="https://vantahire.com/use-cases" />
-        <meta property="og:title" content="Use Cases | VantaHire - Built for Teams Like Yours" />
-        <meta property="og:description" content="From startups to enterprises, see how teams use VantaHire to transform their hiring." />
-        <meta property="og:url" content="https://vantahire.com/use-cases" />
+        <title>Solutions | VantaHire — Built for Startups, Agencies & HR Teams</title>
+        <meta name="description" content="See how startups, recruiting agencies, enterprises, and HR teams use VantaHire to hire faster. AI sourcing, client portal, and pipeline management for every team size." />
+        <link rel="canonical" href="https://vantahire.com/solutions" />
+        <meta property="og:title" content="Solutions | VantaHire — Built for Startups, Agencies & HR Teams" />
+        <meta property="og:description" content="See how startups, recruiting agencies, enterprises, and HR teams use VantaHire to hire faster." />
+        <meta property="og:url" content="https://vantahire.com/solutions" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Use Cases | VantaHire - Built for Teams Like Yours" />
-        <meta name="twitter:description" content="From startups to enterprises, see how teams use VantaHire to transform their hiring." />
+        <meta name="twitter:title" content="Solutions | VantaHire — Built for Startups, Agencies & HR Teams" />
+        <meta name="twitter:description" content="See how startups, recruiting agencies, enterprises, and HR teams use VantaHire to hire faster." />
         <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
         <script type="application/ld+json">
           {breadcrumbJsonLd}

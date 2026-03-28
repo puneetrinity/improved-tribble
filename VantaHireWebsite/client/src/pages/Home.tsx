@@ -11,17 +11,17 @@ const Home = () => {
   return (
     <>
       <Helmet>
-        <title>VantaHire — AI-Powered Recruitment Infrastructure</title>
-        <meta name="description" content="VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows. AI sourcing, WhatsApp outreach, client portal, and pipeline management in one platform." />
+        <title>VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration</title>
+        <meta name="description" content="The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free." />
         <link rel="canonical" href="https://vantahire.com/" />
-        <meta property="og:title" content="VantaHire — AI-Powered Recruitment Infrastructure" />
-        <meta property="og:description" content="VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows." />
+        <meta property="og:title" content="VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration" />
+        <meta property="og:description" content="The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free." />
         <meta property="og:url" content="https://vantahire.com/" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="VantaHire — AI-Powered Recruitment Infrastructure" />
-        <meta name="twitter:description" content="VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows." />
+        <meta name="twitter:title" content="VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration" />
+        <meta name="twitter:description" content="The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free." />
         <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
       </Helmet>
       <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
