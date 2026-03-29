@@ -13,9 +13,10 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 
 interface LayoutProps {
   children: React.ReactNode;
+  noFooter?: boolean;
 }
 
-const Layout = ({ children }: LayoutProps) => {
+const Layout = ({ children, noFooter }: LayoutProps) => {
   const [location, setLocation] = useLocation();
   const { user, logoutMutation } = useAuth();
   const { data: orgData } = useOrganization();
@@ -174,7 +175,7 @@ const Layout = ({ children }: LayoutProps) => {
               <div className="min-w-0 flex-1 overflow-x-hidden">
                 {children}
               </div>
-              <Footer minimal />
+              {!noFooter && <Footer minimal />}
             </div>
           </SidebarInset>
         </SidebarProvider>

@@ -1298,10 +1298,10 @@ export default function ApplicationManagementPage() {
   }
 
   return (
-    <Layout>
-      <div className={`container mx-auto px-4 py-8 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="mx-auto max-w-7xl space-y-6">
-          <div className="flex flex-wrap items-center gap-3 pt-8 text-sm">
+    <Layout noFooter>
+      <div className={`container mx-auto flex min-h-[calc(100svh-3.5rem)] flex-col px-4 py-4 transition-opacity duration-500 md:min-h-svh ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col space-y-3">
+          <div className="flex flex-wrap items-center gap-3 text-sm">
             <Button
               variant="ghost"
               size="sm"
@@ -1315,41 +1315,39 @@ export default function ApplicationManagementPage() {
             <span className="font-medium text-foreground">Application Management</span>
           </div>
 
-          <section className="border border-border/70 bg-[linear-gradient(180deg,#ffffff_0%,#f8f8ff_100%)] p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:p-8">
-            <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                    Application Management
-                  </p>
-                  <div className="flex flex-wrap items-center gap-3">
-                    <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
-                      {job.title}
-                    </h1>
-                    <Badge className={`rounded-none ${jobStatusBadge.className}`}>{jobStatusBadge.label}</Badge>
-                  </div>
+          <section className="border border-border/70 bg-[linear-gradient(180deg,#ffffff_0%,#f8f8ff_100%)] px-5 py-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:px-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="space-y-1.5">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+                  Application Management
+                </p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+                    {job.title}
+                  </h1>
+                  <Badge className={`rounded-none ${jobStatusBadge.className}`}>{jobStatusBadge.label}</Badge>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground md:text-base">
-                  <span className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="h-3.5 w-3.5" />
                     {job.location || "Location unavailable"}
                   </span>
                   <span className="hidden text-border md:inline">|</span>
-                  <span className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
                     {applicationManagementCopy.header.postedPrefix} {formatDate(job.createdAt)}
                   </span>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-3 xl:min-w-[480px] xl:max-w-[520px] xl:flex-1">
+              <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[420px] xl:max-w-[480px] xl:flex-1">
                 {heroStats.map((stat) => (
                   <Card key={stat.label} className="rounded-none border border-border/80 bg-white/95 shadow-sm">
-                    <CardContent className="space-y-3 p-5">
+                    <CardContent className="space-y-1 px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
                         {stat.label}
                       </p>
-                      <p className={`text-4xl font-semibold leading-none ${stat.accent}`}>{stat.value}</p>
+                      <p className={`text-3xl font-semibold leading-none ${stat.accent}`}>{stat.value}</p>
                     </CardContent>
                   </Card>
                 ))}
@@ -1371,9 +1369,9 @@ export default function ApplicationManagementPage() {
             </Alert>
           )}
 
-          <div className="border border-border/70 bg-white shadow-sm">
-            <div className="p-5">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-1 flex-col border border-border/70 bg-white shadow-sm">
+            <div className="px-4 py-3">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                   Job Actions
@@ -1550,13 +1548,13 @@ export default function ApplicationManagementPage() {
             </div>
             </div>
 
-            <div className="border-t border-border/70 bg-card p-4 overflow-hidden" data-tour="kanban-board">
-              <div className="mb-4 flex justify-end">
-                <div className="pointer-events-none border border-border bg-white/95 px-3 py-1 text-xs text-muted-foreground shadow-sm">
+            <div className="flex flex-1 flex-col border-t border-border/70 bg-card px-4 py-2 overflow-x-auto" data-tour="kanban-board">
+              <div className="mb-2 flex justify-end">
+                <div className="pointer-events-none border border-border bg-white/95 px-3 py-0.5 text-xs text-muted-foreground shadow-sm">
                   Showing {filteredApplications.length} of {totalApplications} applications
                 </div>
               </div>
-              <div className="min-h-[600px]">
+              <div className="flex-1">
               <KanbanBoard
                 applications={filteredApplications}
                 pipelineStages={[...pipelineStages].sort((a, b) => (a.order - b.order) || (a.id - b.id))}
