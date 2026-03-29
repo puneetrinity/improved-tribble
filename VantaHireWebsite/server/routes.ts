@@ -71,9 +71,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Mautic form submissions require connection to mautic domain
         // Google Analytics requires connection to google-analytics.com
         // Cashfree SDK makes API calls to their servers
-        connectSrc: isDevelopment
-          ? ["'self'", "ws:", "wss:", "https://assets.apollo.io", "https://mautic.evalmatch.app", "https://www.google-analytics.com", "https://region1.google-analytics.com", "https://*.cashfree.com"]
-          : ["'self'", "https://assets.apollo.io", "https://mautic.evalmatch.app", "https://www.google-analytics.com", "https://region1.google-analytics.com", "https://*.cashfree.com"],
+        connectSrc: (() => {
+          const base = ["'self'", "https://assets.apollo.io", "https://mautic.evalmatch.app", "https://www.google-analytics.com", "https://region1.google-analytics.com", "https://*.cashfree.com"];
+          if (isDevelopment) base.push("ws:", "wss:");
+          // Allow browser Sentry SDK to post errors to GlitchTip
+          const sentryDsn = process.env.VITE_SENTRY_DSN || process.env.SENTRY_DSN;
+          if (sentryDsn) {
+            try { base.push(new URL(sentryDsn).origin); } catch {}
+          }
+          return base;
+        })(),
         fontSrc: [
           "'self'",
           "data:",
