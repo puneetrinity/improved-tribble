@@ -176,7 +176,7 @@ function RouteScopedBoundary() {
 
   return (
     <ErrorBoundary key={location}>
-      <Suspense fallback={<div className="p-8 text-center">Loading...</div>}>
+      <Suspense fallback={null}>
         <Router />
       </Suspense>
     </ErrorBoundary>
