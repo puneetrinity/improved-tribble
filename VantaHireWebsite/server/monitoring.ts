@@ -95,6 +95,20 @@ function parseSampleRate(value: string | undefined, fallback: number) {
   return Math.max(0, Math.min(1, parsed));
 }
 
+export function isExpectedDisconnectError(error: unknown): boolean {
+  const normalizedError = error instanceof Error ? error as NodeJS.ErrnoException : null;
+  const code = normalizedError?.code;
+  const message = normalizedError?.message || String(error ?? "");
+
+  return (
+    code === "EPIPE" ||
+    code === "ECONNRESET" ||
+    /write EPIPE/i.test(message) ||
+    /socket hang up/i.test(message) ||
+    /aborted/i.test(message)
+  );
+}
+
 export function initServerMonitoring() {
   const dsn = process.env.SENTRY_DSN;
   if (!dsn || Sentry.isInitialized()) return;
@@ -136,6 +150,10 @@ export function captureServerException(
   },
 ) {
   const normalizedError = error instanceof Error ? error : new Error(String(error));
+
+  if (isExpectedDisconnectError(normalizedError)) {
+    return;
+  }
 
   if (!Sentry.isEnabled()) {
     console.error("Monitoring capture skipped (disabled):", normalizedError, context);

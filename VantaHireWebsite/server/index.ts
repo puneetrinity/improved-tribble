@@ -11,7 +11,7 @@ import { ensureAtsSchema } from "./bootstrapSchema";
 import { seedDefaultWhatsAppTemplates } from "./seedWhatsAppTemplates";
 import { startApplicationGraphSyncProcessor, stopApplicationGraphSyncProcessor } from "./lib/applicationGraphSyncProcessor";
 import { startResumeImportProcessor, stopResumeImportProcessor } from "./lib/resumeImportProcessor";
-import { captureServerException, initServerMonitoring, monitoringRequestContext } from "./monitoring";
+import { captureServerException, initServerMonitoring, isExpectedDisconnectError, monitoringRequestContext } from "./monitoring";
 
 initServerMonitoring();
 const app = express();
@@ -97,6 +97,10 @@ app.use((req, res, next) => {
   }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    if (isExpectedDisconnectError(err)) {
+      return;
+    }
+
     // Normalize common upload/validation errors to 400 instead of 500
     let status = err.status || err.statusCode || 500;
     const isMulter = err?.name === 'MulterError' || err?.code === 'LIMIT_FILE_SIZE' || /Only PDF files/.test(err?.message || '');
@@ -104,7 +108,9 @@ app.use((req, res, next) => {
 
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ error: message });
+    if (!res.headersSent && !res.writableEnded) {
+      res.status(status).json({ error: message });
+    }
     console.error('Server error:', err);
   });
 
@@ -188,12 +194,18 @@ app.use((req, res, next) => {
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
   process.on('unhandledRejection', (reason) => {
+    if (isExpectedDisconnectError(reason)) {
+      return;
+    }
     captureServerException(reason, {
       area: "server",
       action: "unhandled-rejection",
     });
   });
   process.on('uncaughtException', (error) => {
+    if (isExpectedDisconnectError(error)) {
+      return;
+    }
     captureServerException(error, {
       area: "server",
       action: "uncaught-exception",
