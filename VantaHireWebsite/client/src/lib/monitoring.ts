@@ -101,15 +101,26 @@ function sanitizeEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
   return sanitized;
 }
 
+function parseSampleRate(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.min(1, parsed));
+}
+
 export function initClientMonitoring() {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn || Sentry.isInitialized()) return;
+  const tracesSampleRate = parseSampleRate(import.meta.env.VITE_SENTRY_TRACES_SAMPLE_RATE, 0.01);
 
   Sentry.init({
     dsn,
     enabled: Boolean(dsn),
     environment: import.meta.env.MODE,
-    tracesSampleRate: 0,
+    tracesSampleRate,
+    integrations: [
+      Sentry.browserTracingIntegration(),
+    ],
     sendDefaultPii: false,
     beforeSend(event) {
       return sanitizeEvent(event);

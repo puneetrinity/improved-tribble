@@ -88,15 +88,23 @@ function sanitizeEvent(event: Sentry.ErrorEvent): Sentry.ErrorEvent {
   return sanitized;
 }
 
+function parseSampleRate(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Math.min(1, parsed));
+}
+
 export function initServerMonitoring() {
   const dsn = process.env.SENTRY_DSN;
   if (!dsn || Sentry.isInitialized()) return;
+  const tracesSampleRate = parseSampleRate(process.env.SENTRY_TRACES_SAMPLE_RATE, 0.01);
 
   Sentry.init({
     dsn,
     enabled: Boolean(dsn),
     environment: process.env.SENTRY_ENVIRONMENT || process.env.NODE_ENV || "development",
-    tracesSampleRate: 0,
+    tracesSampleRate,
     sendDefaultPii: false,
     beforeSend(event) {
       return sanitizeEvent(event);
