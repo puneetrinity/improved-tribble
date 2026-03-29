@@ -45,7 +45,19 @@ export async function setupVite(app: Express, server: Server) {
   // Compute dirname in ESM
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
   const { createServer: createViteServer, createLogger } = await import("vite");
-  const viteConfig = (await import("../vite.config"))?.default ?? {};
+  const viteConfigModule = (await import("../vite.config"))?.default as
+    | Record<string, unknown>
+    | ((env: { command: "serve" | "build"; mode: string; isSsrBuild?: boolean; isPreview?: boolean }) => Record<string, unknown> | Promise<Record<string, unknown>>)
+    | undefined;
+  const viteConfig =
+    typeof viteConfigModule === "function"
+      ? await viteConfigModule({
+          command: "serve",
+          mode: process.env.NODE_ENV === "production" ? "production" : "development",
+          isSsrBuild: false,
+          isPreview: false,
+        })
+      : viteConfigModule ?? {};
   const viteLogger = createLogger();
   const port = Number(process.env.PORT) || 5000;
   const serverOptions: any = {
