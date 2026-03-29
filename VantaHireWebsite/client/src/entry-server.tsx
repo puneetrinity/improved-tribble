@@ -1,9 +1,13 @@
+import { Suspense } from 'react';
 import { renderToString } from 'react-dom/server';
 import { Router, Switch, Route } from 'wouter';
 import { HelmetProvider } from 'react-helmet-async';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { AuthContext } from './hooks/use-auth';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/toaster';
+import { AnalyticsOnConsent, CookieConsent } from '@/components/CookieConsent';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 // Eagerly import public page components (no lazy() for SSR)
 import Home from './pages/Home';
@@ -66,21 +70,28 @@ export function render(
         <QueryClientProvider client={queryClient}>
           <AuthContext.Provider value={nullAuthContext}>
             <TooltipProvider>
-              <Router ssrPath={url}>
-                <Switch>
-                  <Route path="/" component={Home} />
-                  <Route path="/features" component={FeaturesPage} />
-                  <Route path="/pricing" component={PricingPage} />
-                  <Route path="/solutions" component={UseCasesPage} />
-                  <Route path="/jobs" component={JobsPage} />
-                  <Route path="/jobs/:id" component={JobDetailsPage} />
-                  <Route path="/recruiters" component={RecruitersDirectoryPage} />
-                  <Route path="/recruiters/:id" component={RecruiterProfilePage} />
-                  <Route path="/privacy-policy" component={PrivacyPolicyPage} />
-                  <Route path="/terms-of-service" component={TermsOfServicePage} />
-                  <Route path="/cookie-policy" component={CookiePolicyPage} />
-                </Switch>
-              </Router>
+              <Toaster />
+              <AnalyticsOnConsent />
+              <CookieConsent />
+              <ErrorBoundary>
+                <Suspense fallback={null}>
+                  <Router ssrPath={url}>
+                    <Switch>
+                      <Route path="/" component={Home} />
+                      <Route path="/features" component={FeaturesPage} />
+                      <Route path="/pricing" component={PricingPage} />
+                      <Route path="/solutions" component={UseCasesPage} />
+                      <Route path="/jobs" component={JobsPage} />
+                      <Route path="/jobs/:id" component={JobDetailsPage} />
+                      <Route path="/recruiters" component={RecruitersDirectoryPage} />
+                      <Route path="/recruiters/:id" component={RecruiterProfilePage} />
+                      <Route path="/privacy-policy" component={PrivacyPolicyPage} />
+                      <Route path="/terms-of-service" component={TermsOfServicePage} />
+                      <Route path="/cookie-policy" component={CookiePolicyPage} />
+                    </Switch>
+                  </Router>
+                </Suspense>
+              </ErrorBoundary>
             </TooltipProvider>
           </AuthContext.Provider>
         </QueryClientProvider>
