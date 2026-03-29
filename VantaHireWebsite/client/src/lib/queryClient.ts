@@ -1,5 +1,6 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getCsrfToken, clearCsrfToken } from "./csrf";
+import { captureFrontendException, shouldCaptureClientError } from "@/lib/monitoring";
 
 // Rate limit info returned from 429 responses
 export interface RateLimitInfo {
@@ -130,38 +131,49 @@ export async function apiRequest(
   data?: unknown | undefined,
   _retryCount = 0,
 ): Promise<Response> {
-  // Build headers with CSRF token for mutating requests
-  const headers: HeadersInit = data ? { "Content-Type": "application/json" } : {};
+  try {
+    // Build headers with CSRF token for mutating requests
+    const headers: HeadersInit = data ? { "Content-Type": "application/json" } : {};
 
-  // Add CSRF token for state-changing operations
-  const mutatingMethods = ['POST', 'PATCH', 'DELETE', 'PUT'];
-  const isMutating = mutatingMethods.includes(method.toUpperCase());
-  if (isMutating) {
-    try {
-      const csrfToken = await getCsrfToken();
-      headers['x-csrf-token'] = csrfToken;
-    } catch (error) {
-      console.error('Failed to get CSRF token:', error);
-      throw new Error('CSRF token unavailable');
+    // Add CSRF token for state-changing operations
+    const mutatingMethods = ['POST', 'PATCH', 'DELETE', 'PUT'];
+    const isMutating = mutatingMethods.includes(method.toUpperCase());
+    if (isMutating) {
+      try {
+        const csrfToken = await getCsrfToken();
+        headers['x-csrf-token'] = csrfToken;
+      } catch (error) {
+        console.error('Failed to get CSRF token:', error);
+        throw new Error('CSRF token unavailable');
+      }
     }
+
+    const res = await fetch(url, {
+      method,
+      headers,
+      ...(data !== undefined && { body: JSON.stringify(data) }),
+      credentials: "include",
+    });
+
+    // Retry once on 403 for mutating requests (likely stale CSRF token)
+    if (res.status === 403 && isMutating && _retryCount === 0) {
+      clearCsrfToken();
+      // Retry with fresh token
+      return apiRequest(method, url, data, 1);
+    }
+
+    await throwIfResNotOk(res);
+    return res;
+  } catch (error) {
+    if (shouldCaptureClientError(error)) {
+      captureFrontendException(error, {
+        area: "api",
+        action: "request",
+        extra: { method, url },
+      });
+    }
+    throw error;
   }
-
-  const res = await fetch(url, {
-    method,
-    headers,
-    ...(data !== undefined && { body: JSON.stringify(data) }),
-    credentials: "include",
-  });
-
-  // Retry once on 403 for mutating requests (likely stale CSRF token)
-  if (res.status === 403 && isMutating && _retryCount === 0) {
-    clearCsrfToken();
-    // Retry with fresh token
-    return apiRequest(method, url, data, 1);
-  }
-
-  await throwIfResNotOk(res);
-  return res;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -170,28 +182,39 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const doFetch = async (isRetry = false): Promise<Response> => {
-      const res = await fetch(queryKey[0] as string, {
-        credentials: "include",
-      });
+    try {
+      const doFetch = async (isRetry = false): Promise<Response> => {
+        const res = await fetch(queryKey[0] as string, {
+          credentials: "include",
+        });
 
-      // Handle 403 with one retry (clear stale CSRF token state)
-      if (res.status === 403 && !isRetry) {
-        clearCsrfToken();
-        return doFetch(true);
+        // Handle 403 with one retry (clear stale CSRF token state)
+        if (res.status === 403 && !isRetry) {
+          clearCsrfToken();
+          return doFetch(true);
+        }
+
+        return res;
+      };
+
+      const res = await doFetch();
+
+      if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+        return null;
       }
 
-      return res;
-    };
-
-    const res = await doFetch();
-
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      if (shouldCaptureClientError(error)) {
+        captureFrontendException(error, {
+          area: "api",
+          action: "query",
+          extra: { queryKey: queryKey[0] },
+        });
+      }
+      throw error;
     }
-
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
