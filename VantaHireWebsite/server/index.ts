@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import * as Sentry from "@sentry/node";
 import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -10,7 +11,9 @@ import { ensureAtsSchema } from "./bootstrapSchema";
 import { seedDefaultWhatsAppTemplates } from "./seedWhatsAppTemplates";
 import { startApplicationGraphSyncProcessor, stopApplicationGraphSyncProcessor } from "./lib/applicationGraphSyncProcessor";
 import { startResumeImportProcessor, stopResumeImportProcessor } from "./lib/resumeImportProcessor";
+import { captureServerException, initServerMonitoring, monitoringRequestContext } from "./monitoring";
 
+initServerMonitoring();
 const app = express();
 
 // Enable GZIP compression for all responses
@@ -36,6 +39,7 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+app.use(monitoringRequestContext);
 
 // WWW to non-WWW redirect for SEO (301 permanent redirect)
 // Host header validation to prevent injection attacks
@@ -87,6 +91,10 @@ app.use((req, res, next) => {
 
 (async () => {
   const server = await registerRoutes(app);
+
+  if (process.env.SENTRY_DSN) {
+    Sentry.setupExpressErrorHandler?.(app);
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     // Normalize common upload/validation errors to 400 instead of 500
@@ -146,6 +154,10 @@ app.use((req, res, next) => {
         console.log('🔒 Production mode: Skipping test data seeding');
       }
     } catch (error) {
+      captureServerException(error, {
+        area: "server",
+        action: "startup-initialization",
+      });
       console.error('Error initializing database:', error);
     }
 
@@ -175,4 +187,16 @@ app.use((req, res, next) => {
   };
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+  process.on('unhandledRejection', (reason) => {
+    captureServerException(reason, {
+      area: "server",
+      action: "unhandled-rejection",
+    });
+  });
+  process.on('uncaughtException', (error) => {
+    captureServerException(error, {
+      area: "server",
+      action: "uncaught-exception",
+    });
+  });
 })();

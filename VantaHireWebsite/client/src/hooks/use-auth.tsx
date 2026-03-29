@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext } from "react";
+import { createContext, ReactNode, useContext, useEffect } from "react";
 import {
   useQuery,
   useMutation,
@@ -7,6 +7,7 @@ import {
 import { User as SelectUser, InsertUser, RegisterPayload } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { captureFrontendException, setMonitoringUser, shouldCaptureClientError } from "@/lib/monitoring";
 
 type RegisterResponse = {
   message: string;
@@ -40,6 +41,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
+  useEffect(() => {
+    setMonitoringUser(user ? { id: user.id, role: user.role } : null);
+  }, [user]);
+
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
@@ -53,6 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      if (shouldCaptureClientError(error)) {
+        captureFrontendException(error, {
+          area: "auth",
+          action: "login",
+        });
+      }
       toast({
         title: "Login failed",
         description: error.message,
@@ -84,6 +95,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      if (shouldCaptureClientError(error)) {
+        captureFrontendException(error, {
+          area: "auth",
+          action: "register",
+        });
+      }
       toast({
         title: "Registration failed",
         description: error.message,
@@ -104,6 +121,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     },
     onError: (error: Error) => {
+      if (shouldCaptureClientError(error)) {
+        captureFrontendException(error, {
+          area: "auth",
+          action: "logout",
+        });
+      }
       toast({
         title: "Logout failed",
         description: error.message,

@@ -12,6 +12,7 @@ import OrgSetupStep from "@/components/onboarding/OrgSetupStep";
 import ProfileStep from "@/components/onboarding/ProfileStep";
 import PlanSelectionStep from "@/components/onboarding/PlanSelectionStep";
 import { onboardingPageCopy } from "@/lib/internal-copy";
+import { captureFrontendException, shouldCaptureClientError } from "@/lib/monitoring";
 
 type OnboardingStep = 'org' | 'profile' | 'plan';
 
@@ -96,6 +97,16 @@ export default function OnboardingPage() {
     try {
       const result = await refetch();
       if (result.isError) {
+        if (result.error && shouldCaptureClientError(result.error)) {
+          captureFrontendException(result.error, {
+            area: "onboarding",
+            action: "step-complete-refetch",
+            extra: {
+              step,
+              currentStep,
+            },
+          });
+        }
         setStepCompletionError(onboardingPageCopy.error.description);
         return;
       }
@@ -117,7 +128,17 @@ export default function OnboardingPage() {
       }
       setStepCompletionError(onboardingPageCopy.error.description);
       return;
-    } catch {
+    } catch (error) {
+      if (shouldCaptureClientError(error)) {
+        captureFrontendException(error, {
+          area: "onboarding",
+          action: "step-complete-refetch",
+          extra: {
+            step,
+            currentStep,
+          },
+        });
+      }
       setStepCompletionError(onboardingPageCopy.error.description);
       return;
     } finally {

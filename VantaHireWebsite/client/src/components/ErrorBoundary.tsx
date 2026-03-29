@@ -1,6 +1,7 @@
 import { Component, ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle, RefreshCw, Home, ExternalLink } from "lucide-react";
+import { captureFrontendException } from "@/lib/monitoring";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -25,6 +26,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   override componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     this.setState({ errorInfo });
+    captureFrontendException(error, {
+      area: "react",
+      action: "error-boundary",
+      extra: {
+        componentStack: errorInfo.componentStack?.slice(0, 1200),
+      },
+    });
     // Log error to console in development
     if (import.meta.env.DEV) {
       console.error('ErrorBoundary caught an error:', error, errorInfo);
