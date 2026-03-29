@@ -36,6 +36,7 @@ import { registerSignalWebhook } from "./webhooks/signal.webhook";
 import { registerSignalRoutes } from "./signal.routes";
 import { registerCandidateSemanticRoutes } from "./candidates.semantic.routes";
 import { registerRecruiterDashboardRoutes } from "./recruiterDashboard.routes";
+import { isExpectedDisconnectError } from "./monitoring";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup security middleware with environment-aware CSP
@@ -520,12 +521,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Handle HTTP parse errors gracefully (malformed requests, health checks, bots)
   httpServer.on('clientError', (err: NodeJS.ErrnoException, socket) => {
-    // Don't log ECONNRESET as it's common and harmless
+    if (isExpectedDisconnectError(err)) {
+      if (!socket.destroyed) {
+        socket.destroy();
+      }
+      return;
+    }
+
     if (err.code !== 'ECONNRESET') {
       console.warn('HTTP client error:', err.message);
     }
-    // Only respond if socket is writable
-    if (socket.writable) {
+
+    if (socket.writable && !socket.destroyed) {
       socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
     }
   });
