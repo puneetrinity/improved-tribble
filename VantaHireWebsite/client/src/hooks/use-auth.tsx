@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect } from "react";
+import { createContext, ReactNode, startTransition, useContext, useEffect, useState } from "react";
 import {
   useQuery,
   useMutation,
@@ -30,8 +30,38 @@ type LoginData = Pick<InsertUser, "username" | "password"> & {
 
 export const AuthContext = createContext<AuthContextType | null>(null);
 
+function isPublicSsrPath(pathname: string): boolean {
+  return (
+    pathname === "/" ||
+    pathname === "/features" ||
+    pathname === "/pricing" ||
+    pathname === "/solutions" ||
+    pathname === "/jobs" ||
+    pathname.startsWith("/jobs/") ||
+    pathname === "/recruiters" ||
+    pathname.startsWith("/recruiters/") ||
+    pathname === "/privacy-policy" ||
+    pathname === "/terms-of-service" ||
+    pathname === "/cookie-policy"
+  );
+}
+
+function shouldDelayInitialAuthBootstrap(): boolean {
+  if (typeof window === "undefined" || typeof document === "undefined") {
+    return false;
+  }
+
+  const rootEl = document.getElementById("root");
+  if (!rootEl?.hasAttribute("data-ssr")) {
+    return false;
+  }
+
+  return isPublicSsrPath(window.location.pathname);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
+  const [authQueryEnabled, setAuthQueryEnabled] = useState(() => !shouldDelayInitialAuthBootstrap());
   const {
     data: user,
     error,
@@ -39,7 +69,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery<SelectUser | null, Error>({
     queryKey: ["/api/user"],
     queryFn: getQueryFn({ on401: "returnNull" }),
+    enabled: authQueryEnabled,
   });
+
+  useEffect(() => {
+    if (!authQueryEnabled) {
+      startTransition(() => {
+        setAuthQueryEnabled(true);
+      });
+    }
+  }, [authQueryEnabled]);
 
   useEffect(() => {
     setMonitoringUser(user ? { id: user.id, role: user.role } : null);
