@@ -525,11 +525,11 @@ export async function sendSubscriptionRenewalReminders(): Promise<void> {
 
       await emailService.sendEmail({
         to: billingEmail,
-        subject: `Paid term ends in 7 days - ${organization.name}`,
+        subject: `VantaHire paid term ends in 7 days - ${organization.name}`,
         html: `
           <h2>Paid Term Reminder</h2>
           <p>Hello,</p>
-          <p>Your current paid term for <strong>${organization.name}</strong> ends in 7 days.</p>
+          <p>Your current VantaHire paid term for <strong>${organization.name}</strong> ends in 7 days.</p>
 
           <h3>Billing Details:</h3>
           <ul>
@@ -595,11 +595,11 @@ export async function sendSubscriptionRenewalReminders(): Promise<void> {
 
       await emailService.sendEmail({
         to: billingEmail,
-        subject: `Paid term ends in 3 days - ${organization.name}`,
+        subject: `VantaHire paid term ends in 3 days - ${organization.name}`,
         html: `
           <h2>Paid Term Reminder</h2>
           <p>Hello,</p>
-          <p>Your current paid term for <strong>${organization.name}</strong> ends in 3 days.</p>
+          <p>Your current VantaHire paid term for <strong>${organization.name}</strong> ends in 3 days.</p>
 
           <h3>Billing Details:</h3>
           <ul>
@@ -661,11 +661,11 @@ export async function sendSubscriptionRenewalReminders(): Promise<void> {
 
       await emailService.sendEmail({
         to: billingEmail,
-        subject: `Paid term ends tomorrow - ${organization.name}`,
+        subject: `VantaHire paid term ends tomorrow - ${organization.name}`,
         html: `
           <h2>Paid Term Ends Tomorrow</h2>
           <p>Hello,</p>
-          <p>Your current paid term for <strong>${organization.name}</strong> ends <strong>tomorrow</strong>.</p>
+          <p>Your current VantaHire paid term for <strong>${organization.name}</strong> ends <strong>tomorrow</strong>.</p>
 
           <h3>Billing Details:</h3>
           <ul>
@@ -812,11 +812,11 @@ export async function processGracePeriodExpirations(): Promise<void> {
       if (ownerEmail && emailService) {
         await emailService.sendEmail({
           to: ownerEmail,
-          subject: `Subscription cancelled - ${organization.name}`,
+          subject: `VantaHire subscription cancelled - ${organization.name}`,
           html: `
             <h2>Subscription Cancelled</h2>
             <p>Hello,</p>
-            <p>Your subscription for <strong>${organization.name}</strong> has been cancelled due to payment failure.</p>
+            <p>Your VantaHire subscription for <strong>${organization.name}</strong> has been cancelled due to payment failure.</p>
             <p>Your organization has been downgraded to the Free plan with 1 seat.</p>
             <p>To restore paid access, please start a new payment from billing.</p>
           `
