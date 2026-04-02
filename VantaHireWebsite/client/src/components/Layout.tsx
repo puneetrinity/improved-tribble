@@ -134,7 +134,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
 
   if (atsContext) {
     return (
-      <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#F4F6FA_0%,#EEF2F6_100%)] text-foreground ats-theme">
+      <div className="min-h-screen w-full overflow-x-hidden bg-[linear-gradient(180deg,#F4F6FA_0%,#EEF2F6_100%)] text-foreground ats-theme">
         <SidebarProvider
           defaultOpen
           open={sidebarOpen}
@@ -172,7 +172,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
             </div>
 
             <div className="flex min-h-[calc(100svh-3.5rem)] min-w-0 flex-1 flex-col overflow-x-hidden md:min-h-svh">
-              <div className="min-w-0 flex-1 overflow-x-hidden">
+              <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden">
                 {children}
               </div>
               {!noFooter && <Footer minimal />}

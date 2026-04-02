@@ -155,9 +155,9 @@ export function KanbanBoard({
       onDragCancel={handleDragCancel}
     >
       <div
-        className="grid gap-4 overflow-x-auto pb-4"
+        className="grid w-max min-w-full gap-4 pb-4"
         style={{
-          gridTemplateColumns: `repeat(${allColumns.length}, minmax(320px, 1fr))`,
+          gridTemplateColumns: `repeat(${allColumns.length}, minmax(280px, 1fr))`,
         }}
       >
         {allColumns.map((stage) => {
