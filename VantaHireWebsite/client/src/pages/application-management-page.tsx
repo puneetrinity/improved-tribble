@@ -1261,8 +1261,8 @@ export default function ApplicationManagementPage() {
   if (jobLoading || applicationsLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-7xl mx-auto space-y-6 pt-8">
+        <div className="w-full px-4 py-8">
+          <div className="space-y-6 pt-8">
             <PageHeaderSkeleton />
             <Card className="shadow-sm">
               <CardHeader>
@@ -1283,7 +1283,7 @@ export default function ApplicationManagementPage() {
   if (!job) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
+        <div className="w-full px-4 py-8">
           <Card className="shadow-sm">
             <CardContent className="p-8 text-center">
               <h3 className="text-xl font-semibold text-foreground mb-2">Job Not Found</h3>
@@ -1299,8 +1299,8 @@ export default function ApplicationManagementPage() {
 
   return (
     <Layout noFooter>
-      <div className={`container mx-auto flex min-h-[calc(100svh-3.5rem)] flex-col px-4 py-4 transition-opacity duration-500 md:min-h-svh ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col space-y-3">
+      <div className={`flex min-h-0 w-full flex-1 flex-col px-4 py-4 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="flex min-h-0 w-full flex-1 flex-col space-y-3">
           <div className="flex flex-wrap items-center gap-3 text-sm">
             <Button
               variant="ghost"
@@ -1369,7 +1369,7 @@ export default function ApplicationManagementPage() {
             </Alert>
           )}
 
-          <div className="flex flex-1 flex-col border border-border/70 bg-white shadow-sm">
+          <div className="flex min-h-0 flex-1 flex-col border border-border/70 bg-white shadow-sm">
             <div className="px-4 py-3">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="flex flex-wrap items-center gap-3">
@@ -1548,13 +1548,13 @@ export default function ApplicationManagementPage() {
             </div>
             </div>
 
-            <div className="flex flex-1 flex-col border-t border-border/70 bg-card px-4 py-2 overflow-x-auto" data-tour="kanban-board">
+            <div className="flex min-h-0 flex-1 flex-col border-t border-border/70 bg-card px-4 py-2" data-tour="kanban-board">
               <div className="mb-2 flex justify-end">
                 <div className="pointer-events-none border border-border bg-white/95 px-3 py-0.5 text-xs text-muted-foreground shadow-sm">
                   Showing {filteredApplications.length} of {totalApplications} applications
                 </div>
               </div>
-              <div className="flex-1">
+              <div className="min-h-0 flex-1 overflow-x-auto pb-2">
               <KanbanBoard
                 applications={filteredApplications}
                 pipelineStages={[...pipelineStages].sort((a, b) => (a.order - b.order) || (a.id - b.id))}
