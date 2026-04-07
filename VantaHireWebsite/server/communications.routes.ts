@@ -16,6 +16,7 @@ import { requireRole, requireSeat } from './auth';
 import { getUserOrganization } from './lib/organizationService';
 import { requireFeatureAccess, FEATURES } from './lib/featureGating';
 import { getAiCreditExhaustionPayload, hasEnoughCredits, useCredits } from './lib/creditService';
+import { queueMauticOutreachSync } from './lib/mauticService';
 import {
   insertEmailTemplateSchema,
   type InsertEmailTemplate,
@@ -197,6 +198,7 @@ export function registerCommunicationsRoutes(
         ...(body ? { bodyOverride: body } : {}),
       };
       await sendTemplatedEmail(appId, templateId, sendOptions);
+      queueMauticOutreachSync(req.user!.id, appData.organizationId ?? null, 'email');
       res.json({ success: true });
       return;
     } catch (e) { next(e); }

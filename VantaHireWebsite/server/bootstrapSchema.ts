@@ -1069,6 +1069,28 @@ export async function ensureAtsSchema(): Promise<void> {
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_members_org_user_idx ON organization_members(organization_id, user_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS org_members_user_idx ON organization_members(user_id);`);
 
+  console.log('  Creating mautic_contact_links table...');
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS mautic_contact_links (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      organization_id INTEGER REFERENCES organizations(id) ON DELETE SET NULL,
+      email TEXT NOT NULL,
+      mautic_contact_id INTEGER,
+      last_known_segment_id INTEGER,
+      first_login_synced_at TIMESTAMP,
+      first_job_created_synced_at TIMESTAMP,
+      last_synced_at TIMESTAMP,
+      last_error TEXT,
+      created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+      updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+    );
+  `);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS mautic_contact_links_email_idx ON mautic_contact_links(email);`);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS mautic_contact_links_user_idx ON mautic_contact_links(user_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS mautic_contact_links_contact_idx ON mautic_contact_links(mautic_contact_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS mautic_contact_links_org_idx ON mautic_contact_links(organization_id);`);
+
   // Organization Invites table
   console.log('  Creating organization_invites table...');
   await db.execute(sql`

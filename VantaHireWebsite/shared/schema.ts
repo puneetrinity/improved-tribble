@@ -727,6 +727,26 @@ export const organizationMembers = pgTable("organization_members", {
   seatAssignedIdx: index("org_members_seat_assigned_idx").on(table.seatAssigned),
 }));
 
+export const mauticContactLinks = pgTable("mautic_contact_links", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id, { onDelete: 'cascade' }),
+  organizationId: integer("organization_id").references(() => organizations.id, { onDelete: 'set null' }),
+  email: text("email").notNull(),
+  mauticContactId: integer("mautic_contact_id"),
+  lastKnownSegmentId: integer("last_known_segment_id"),
+  firstLoginSyncedAt: timestamp("first_login_synced_at"),
+  firstJobCreatedSyncedAt: timestamp("first_job_created_synced_at"),
+  lastSyncedAt: timestamp("last_synced_at"),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  emailIdx: uniqueIndex("mautic_contact_links_email_idx").on(table.email),
+  userIdx: uniqueIndex("mautic_contact_links_user_idx").on(table.userId),
+  contactIdx: index("mautic_contact_links_contact_idx").on(table.mauticContactId),
+  orgIdx: index("mautic_contact_links_org_idx").on(table.organizationId),
+}));
+
 // Organization invites
 export const organizationInvites = pgTable("organization_invites", {
   id: serial("id").primaryKey(),
@@ -1131,6 +1151,7 @@ export const resumeImportItems = pgTable("resume_import_items", {
 export const usersRelations = relations(users, ({ many, one }) => ({
   jobs: many(jobs),
   reviewedJobs: many(jobs, { relationName: "reviewedJobs" }),
+  mauticContactLinks: many(mauticContactLinks),
   profile: one(userProfiles, {
     fields: [users.id],
     references: [userProfiles.userId],
@@ -1518,6 +1539,7 @@ export const aiFitJobsRelations = relations(aiFitJobs, ({ one }) => ({
 
 export const organizationsRelations = relations(organizations, ({ many, one }) => ({
   members: many(organizationMembers),
+  mauticContactLinks: many(mauticContactLinks),
   invites: many(organizationInvites),
   joinRequests: many(organizationJoinRequests),
   domainClaimRequests: many(domainClaimRequests),
@@ -1550,6 +1572,17 @@ export const organizationMembersRelations = relations(organizationMembers, ({ on
     fields: [organizationMembers.invitedBy],
     references: [users.id],
     relationName: "invitedByUser",
+  }),
+}));
+
+export const mauticContactLinksRelations = relations(mauticContactLinks, ({ one }) => ({
+  user: one(users, {
+    fields: [mauticContactLinks.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [mauticContactLinks.organizationId],
+    references: [organizations.id],
   }),
 }));
 
@@ -2452,6 +2485,8 @@ export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
 
 export type OrganizationMember = typeof organizationMembers.$inferSelect;
 export type InsertOrganizationMember = z.infer<typeof insertOrganizationMemberSchema>;
+
+export type MauticContactLink = typeof mauticContactLinks.$inferSelect;
 
 export type OrganizationInvite = typeof organizationInvites.$inferSelect;
 export type InsertOrganizationInvite = z.infer<typeof insertOrganizationInviteSchema>;

@@ -12,6 +12,7 @@ import { getEmailService } from "./simpleEmailService";
 import rateLimit from "express-rate-limit";
 import { computeProfileCompletion } from "./lib/profileCompletion";
 import { getOrganizationInviteByToken } from "./lib/organizationService";
+import { queueMauticFirstLoginSync, queueMauticSignupSync } from "./lib/mauticService";
 
 declare global {
   namespace Express {
@@ -439,6 +440,7 @@ export function setupAuth(app: Express) {
         lastName,
         role: finalRole
       });
+      queueMauticSignupSync(user.id);
 
       // Mark invitation as accepted if this was an invitation flow
       if (hiringManagerInvitation) {
@@ -494,6 +496,7 @@ export function setupAuth(app: Express) {
               emailVerified: true,
             },
           });
+          queueMauticFirstLoginSync(user.id);
         });
       } else {
         // Normal flow: require email verification
@@ -559,6 +562,7 @@ export function setupAuth(app: Express) {
           next(loginErr);
           return;
         }
+        queueMauticFirstLoginSync(user.id);
         // Link any existing applications (by email) to this user account for proper candidate access
         // Await to ensure immediate visibility on first dashboard load; log but do not fail login
         storage.claimApplicationsForUser(user.id, user.username)

@@ -13,6 +13,7 @@ import { jobs, organizations, jobSourcingRuns, jobSourcedCandidates, recruiterFe
 import { requireRole } from './auth';
 import { requireSeat } from './auth';
 import { getUserOrganization, requireSignalTenantId } from './lib/organizationService';
+import { queueMauticSourcingRunSync } from './lib/mauticService';
 import { sourceJob } from './lib/services/signal-client';
 import {
   CONTEXT_HASH_VERSION,
@@ -378,6 +379,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         }
         throw insertError;
       }
+
+      queueMauticSourcingRunSync(req.user!.id, organizationId);
 
       res.status(202).json({
         success: true,
