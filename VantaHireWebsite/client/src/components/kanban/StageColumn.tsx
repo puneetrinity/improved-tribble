@@ -195,7 +195,7 @@ export function StageColumn({
           </div>
         </CardHeader>
 
-        <CardContent className="flex-1 overflow-y-auto min-h-[200px] p-3">
+        <CardContent className="min-h-[200px] flex-1 overflow-visible p-3">
           <div ref={setNodeRef} className="min-h-full">
             {applications.length === 0 ? (
               <div className="flex items-center justify-center h-32 text-muted-foreground text-sm">

@@ -14,7 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { DASHBOARD_EYEBROW, DASHBOARD_PAGE_BACKGROUND, DASHBOARD_SHELL_PANEL, DASHBOARD_TITLE } from "@/lib/dashboard-theme";
 import { recruiterDashboardCopy } from "@/lib/internal-copy";
 import { cn } from "@/lib/utils";
-import { Mail, Send, Loader2, ChevronDown } from "lucide-react";
+import { Mail, Send, Loader2, ChevronDown, Plus } from "lucide-react";
 import { RecruiterKpiRibbon } from "@/components/recruiter/RecruiterKpiRibbon";
 import type { RecruiterDashboardKpiResponse } from "@/components/recruiter/RecruiterKpiRibbon";
 import { AIActionsPanel } from "@/components/recruiter/AIActionsPanel";
@@ -305,7 +305,15 @@ export default function RecruiterDashboard() {
                       {recruiterDashboardCopy.header.subtitle}
                     </p>
                   </div>
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex flex-col items-stretch gap-3 sm:items-end">
+                    <Button
+                      size="sm"
+                      onClick={() => setLocation("/jobs/post")}
+                      className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[13px] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Post New Job
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
