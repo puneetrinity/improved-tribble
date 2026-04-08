@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import {
+  AutoScrollActivator,
   DndContext,
   DragEndEvent,
   DragOverlay,
@@ -150,12 +151,22 @@ export function KanbanBoard({
     <DndContext
       sensors={sensors}
       collisionDetection={closestCorners}
+      autoScroll={{
+        activator: AutoScrollActivator.Pointer,
+        canScroll(element) {
+          return (
+            element instanceof HTMLElement &&
+            element.dataset.kanbanScrollContainer === "true"
+          );
+        },
+        layoutShiftCompensation: false,
+      }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
       <div
-        className="grid w-max min-w-full gap-4 pb-4"
+        className="inline-grid min-w-max gap-4 pb-4"
         style={{
           gridTemplateColumns: `repeat(${allColumns.length}, minmax(280px, 1fr))`,
         }}
