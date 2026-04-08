@@ -16,6 +16,7 @@ import { db } from './db';
 import { storage } from './storage';
 import { requireRole } from './auth';
 import { whatsappTemplates, whatsappAuditLog } from '@shared/schema';
+import { queueMauticOutreachSync } from './lib/mauticService';
 import {
   sendWhatsAppTemplatedMessage,
   getAllWhatsAppTemplates,
@@ -289,6 +290,7 @@ export function registerWhatsAppRoutes(
 
         // Send message
         await sendWhatsAppTemplatedMessage(appId, templateId, customizations || {});
+        queueMauticOutreachSync(req.user!.id, application.organizationId ?? null, 'whatsapp');
 
         res.json({ success: true });
       } catch (e) {

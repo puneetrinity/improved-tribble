@@ -15,6 +15,7 @@ import { requireAuth, requireRole, requireSeat } from './auth';
 import { insertJobSchema, applications, applicationStageHistory, jobs, pipelineStages, users, jobRecruiters } from '@shared/schema';
 import { getUserOrganization } from './lib/organizationService';
 import { updateMemberActivity } from './lib/membershipService';
+import { queueMauticFirstJobCreatedSync } from './lib/mauticService';
 import { getHiringMetrics } from './lib/analyticsHelper';
 import { requireFeatureAccess, FEATURES } from './lib/featureGating';
 import {
@@ -100,6 +101,8 @@ export function registerJobsRoutes(
         postedBy: req.user!.id,
         organizationId,
       });
+
+      queueMauticFirstJobCreatedSync(req.user!.id, organizationId);
 
       res.status(201).json(job);
       return;
