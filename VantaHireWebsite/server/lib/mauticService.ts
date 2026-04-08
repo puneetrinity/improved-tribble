@@ -199,7 +199,7 @@ async function ensureRemoteContact(
 
   const response = contactId
     ? await mauticRequest<any>(config, `/api/contacts/${contactId}/edit`, {
-        method: 'POST',
+        method: 'PATCH',
         body: JSON.stringify(payload),
       })
     : await mauticRequest<any>(config, '/api/contacts/new', {
@@ -264,7 +264,7 @@ async function tagContact(config: MauticConfig, contactId: number, tags: string[
   }
 
   await mauticRequest(config, `/api/contacts/${contactId}/edit`, {
-    method: 'POST',
+    method: 'PATCH',
     body: JSON.stringify({
       tags: normalizedTags.join(','),
     }),
