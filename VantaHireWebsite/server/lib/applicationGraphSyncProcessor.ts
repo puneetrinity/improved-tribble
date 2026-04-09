@@ -21,6 +21,8 @@ import {
 } from './services/activekg-client';
 import { chunkText, buildParentExternalId } from './activekgChunker';
 import { resolveActiveKGTenantId } from './activekgTenant';
+import { extractResumeLinks, extractResumeLinksFromBuffer, type ResumeLinks } from './resumeLinkExtractor';
+import { downloadFromGCS } from '../gcs-storage';
 import type { ApplicationGraphSyncJob } from '@shared/schema';
 
 /** Minimum length of extractedResumeText required for graph sync */
@@ -138,6 +140,21 @@ async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
 
   const tenantId = expectedTenantId;
 
+  // Step 3b: Extract links from resume for ActiveKG
+  // Download file from GCS to get real hyperlinks (PDF annotations / DOCX hrefs),
+  // falling back to text-based regex if download fails or file has no embedded links
+  let resumeLinks: ResumeLinks;
+  if (application.resumeUrl) {
+    try {
+      const buffer = await downloadFromGCS(application.resumeUrl);
+      resumeLinks = await extractResumeLinksFromBuffer(buffer, application.extractedResumeText);
+    } catch (err) {
+      resumeLinks = extractResumeLinks(application.extractedResumeText);
+    }
+  } else {
+    resumeLinks = extractResumeLinks(application.extractedResumeText);
+  }
+
   // Step 4: Build parent external ID
   const parentExternalId = buildParentExternalId(
     application.organizationId,
@@ -161,6 +178,10 @@ async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
           is_parent: true,
           has_chunks: true,
           resume_text: application.extractedResumeText,
+          linkedin_url: resumeLinks.linkedinUrl,
+          github_url: resumeLinks.githubUrl,
+          medium_url: resumeLinks.mediumUrl,
+          other_links: resumeLinks.otherLinks,
           application_id: application.id,
           job_id: application.jobId,
           org_id: application.organizationId,
@@ -188,6 +209,10 @@ async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
           consent_captured_at: (application as any).consentCapturedAt?.toISOString?.() || null,
           applicant_name: application.name || null,
           applicant_email: application.email || null,
+          linkedin_url: resumeLinks.linkedinUrl,
+          github_url: resumeLinks.githubUrl,
+          medium_url: resumeLinks.mediumUrl,
+          other_links: resumeLinks.otherLinks,
         },
         tenant_id: job.activekgTenantId,
       },
