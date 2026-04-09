@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap');
+
 @font-face {
   font-family: 'Satoshi';
   src: url('/fonts/satoshi-400.woff2') format('woff2');
@@ -306,6 +308,14 @@
 
   .font-inter {
     font-family: "Inter", sans-serif;
+  }
+
+  .font-sora {
+    font-family: "Sora", sans-serif;
+  }
+
+  .font-dm-sans {
+    font-family: "DM Sans", sans-serif;
   }
 
   .ai-actions-scroll {
