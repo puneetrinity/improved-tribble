@@ -1,5 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap');
-
 @font-face {
   font-family: 'Satoshi';
   src: url('/fonts/satoshi-400.woff2') format('woff2');
@@ -311,7 +309,7 @@
   }
 
   .font-sora {
-    font-family: "Sora", sans-serif;
+    font-family: "Outfit", sans-serif;
   }
 
   .font-dm-sans {
