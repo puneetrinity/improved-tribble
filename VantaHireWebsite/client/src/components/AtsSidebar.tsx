@@ -315,8 +315,8 @@ export default function AtsSidebar({
                       <span className="min-w-0 truncate">
                         <span>{item.label}</span>
                         {item.path === "/candidates" && (
-                          <span className="ml-1 text-[8px] font-semibold uppercase tracking-[0.06em] text-sidebar-primary/65">
-                            Powered by Active Graph
+                          <span className="ml-0.5 text-[7px] font-semibold uppercase tracking-normal text-sidebar-primary/65">
+                            by ActiveGraph
                           </span>
                         )}
                       </span>
