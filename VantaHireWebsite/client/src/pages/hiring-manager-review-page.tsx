@@ -153,7 +153,7 @@ export default function HiringManagerReviewPage() {
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                   <div className="space-y-3">
                     <p className={DASHBOARD_EYEBROW}>Recruiter-Requested Review Queue</p>
-                    <h1 className={cn(DASHBOARD_TITLE, "text-[28px] md:text-[34px]")}>
+                    <h1 className={cn(DASHBOARD_TITLE, "text-xl")}>
                       {hiringManagerReviewPageCopy.header.title}
                     </h1>
                     <p className="max-w-2xl text-sm text-[#5F6675] md:text-[15px]">
@@ -434,3 +434,4 @@ export default function HiringManagerReviewPage() {
     </Layout>
   );
 }
+

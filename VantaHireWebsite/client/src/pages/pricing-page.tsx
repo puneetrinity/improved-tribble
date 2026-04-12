@@ -43,7 +43,7 @@ import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import { sectionLabel } from "@/lib/shared-styles";
 
-const planBtnBase = "block w-full py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
+const planBtnBase = "block w-full py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
 const planBtnPrimary = `${planBtnBase} bg-hr-accent text-white border-none hover:bg-hr-accent-hover`;
 const planBtnSecondary = `${planBtnBase} bg-transparent text-hr-text border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)]`;
 const planFeatureLi = "flex items-start gap-2.5 text-[0.88rem] text-hr-text-secondary leading-[1.4]";
@@ -463,7 +463,7 @@ export default function PricingPage() {
                 {faqs.map((faq, i) => (
                   <div key={i} className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg py-6 px-7 mb-3 transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
                     <h3 className="font-satoshi text-base font-medium text-hr-text mb-2">{faq.question}</h3>
-                    <p className="text-[0.9rem] text-hr-text-secondary leading-[1.7]">{faq.answer}</p>
+                    <p className="text-[0.875rem] text-hr-text-secondary leading-[1.7]">{faq.answer}</p>
                   </div>
                 ))}
               </div>
@@ -484,7 +484,7 @@ export default function PricingPage() {
                 <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
                   <a
                     href="/recruiter-auth"
-                    className="bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center"
+                    className="bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center"
                     onClick={(e) => {
                       e.preventDefault();
                       setLocation('/recruiter-auth');
@@ -496,7 +496,7 @@ export default function PricingPage() {
                     href="https://cal.com/vantahire/quick-connect"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center"
+                    className="bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center"
                   >
                     Book a Demo
                   </a>
@@ -678,3 +678,4 @@ export default function PricingPage() {
     </>
   );
 }
+

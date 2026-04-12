@@ -185,15 +185,15 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
           <div className="space-y-2">
             <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.actionsPanel.eyebrow}</p>
             <div className="flex items-center gap-3">
-              <h2 className={cn(DASHBOARD_TITLE, "text-[20px] leading-none")}>{recruiterDashboardCopy.actionsPanel.title}</h2>
-              <span className="inline-flex items-center rounded-[20px] bg-[#EEF0FF] px-2 py-1 font-inter text-[12px] font-semibold leading-none text-[#4D41DF]">
+              <h2 className={cn(DASHBOARD_TITLE, "text-base leading-none")}>{recruiterDashboardCopy.actionsPanel.title}</h2>
+              <span className="inline-flex items-center rounded-[20px] bg-[#EEF0FF] px-2 py-1 font-inter text-xs font-semibold leading-none text-[#4D41DF]">
                 {totalCount}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 font-inter text-[12px] font-normal leading-none text-[#9CA3AF]">
+        <div className="flex items-center gap-2 font-inter text-xs font-normal leading-none text-[#9CA3AF]">
           {isFetching && !isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#C4C0FF]" /> : null}
           <span>{updatedLabel ? `Updated ${updatedLabel}` : recruiterDashboardCopy.actionsPanel.updatedFallback}</span>
         </div>
@@ -212,7 +212,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                 type="button"
                 onClick={() => setActiveTab(section.key)}
                 className={cn(
-                  "nav-label relative -mb-px border-b-2 pb-5 font-inter text-[13px] font-medium leading-none transition-colors",
+                  "nav-label relative -mb-px border-b-2 pb-5 font-inter text-sm font-medium leading-none transition-colors",
                   isActive
                     ? "border-[#4D41DF] text-[#4D41DF]"
                     : "border-transparent text-[#9CA3AF] hover:text-[#6B7280]",
@@ -233,17 +233,17 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
       >
         {isLoading ? (
           <div className="flex flex-1 items-center justify-center">
-            <p className="font-inter text-[13px] text-[#9CA3AF]">{recruiterDashboardCopy.actionsPanel.loading}</p>
+            <p className="font-inter text-sm text-[#9CA3AF]">{recruiterDashboardCopy.actionsPanel.loading}</p>
           </div>
         ) : error || !activeSection ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <AlertCircle className="h-5 w-5 text-[#9CA3AF]" />
-            <p className="font-inter text-[13px] text-[#9CA3AF]">{recruiterDashboardCopy.actionsPanel.unavailable}</p>
+            <p className="font-inter text-sm text-[#9CA3AF]">{recruiterDashboardCopy.actionsPanel.unavailable}</p>
           </div>
         ) : activeSection.items.length === 0 ? (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
             <Zap className="h-5 w-5 text-[#9CA3AF]" />
-            <p className="font-inter text-[13px] text-[#9CA3AF]">{activeSection.emptyMessage}</p>
+            <p className="font-inter text-sm text-[#9CA3AF]">{activeSection.emptyMessage}</p>
           </div>
         ) : (
           <div className="actions-list flex-1 space-y-3 overflow-y-auto pr-1 transition-[overflow] duration-150 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#C4C0FF] [&::-webkit-scrollbar-thumb:hover]:bg-[#6C63FF] [&::-webkit-scrollbar-track]:bg-transparent md:overflow-y-hidden md:hover:[scrollbar-color:#C4C0FF_transparent] md:[.actions-panel:hover_&]:overflow-y-auto">
@@ -265,10 +265,10 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-manrope text-[15px] font-semibold leading-[1.25] text-[#191C1E]">
+                      <h3 className="truncate font-manrope text-sm font-semibold leading-[1.25] text-[#191C1E]">
                         {item.title}
                       </h3>
-                      <p className="mt-1 truncate font-inter text-[13px] font-normal leading-[1.35] text-[#464555]">
+                      <p className="mt-1 truncate font-inter text-sm font-normal leading-[1.35] text-[#464555]">
                         {item.subtitle}
                       </p>
                       <button
@@ -277,7 +277,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                           event.stopPropagation();
                           setLocation(item.ctaHref);
                         }}
-                        className="mt-5 inline-flex items-center gap-2 rounded-[12px] bg-[#FFFFFF] px-5 py-3 font-inter text-[13px] font-medium leading-none text-[#4D41DF] shadow-[0_2px_8px_rgba(77,65,223,0.08)] transition-colors hover:bg-[#EEF0FF]"
+                        className="mt-5 inline-flex items-center gap-2 rounded-[12px] bg-[#FFFFFF] px-5 py-3 font-inter text-[0.875rem] font-medium leading-none text-[#4D41DF] shadow-[0_2px_8px_rgba(77,65,223,0.08)] transition-colors hover:bg-[#EEF0FF]"
                       >
                         <span>{item.ctaLabel}</span>
                         <ArrowRight className="h-4 w-4" />
@@ -288,7 +288,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                       {item.badge ? (
                         <span
                           className={cn(
-                            "inline-flex rounded-[6px] px-2 py-1 font-inter text-[10px] font-bold uppercase tracking-[0.08em]",
+                            "inline-flex rounded-[6px] px-2 py-1 font-inter text-[0.65rem] font-bold uppercase tracking-[0.08em]",
                             fitBadgeClass,
                           )}
                         >
@@ -297,7 +297,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                       ) : null}
                       <span
                         className={cn(
-                          "inline-flex rounded-[6px] px-2 py-1 font-inter text-[11px] font-medium leading-none",
+                          "inline-flex rounded-[6px] px-2 py-1 font-inter text-[0.7rem] font-medium leading-none",
                           urgencyStyle.container,
                         )}
                       >
@@ -317,7 +317,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
         onClick={() => {
           void refetch();
         }}
-        className="flex items-center justify-center gap-2 border-t border-[#191C1E]/15 bg-[#FFFFFF] px-6 py-5 font-inter text-[11px] font-medium uppercase tracking-[0.08em] text-[#9CA3AF] transition-colors hover:text-[#6B7280]"
+        className="flex items-center justify-center gap-2 border-t border-[#191C1E]/15 bg-[#FFFFFF] px-6 py-5 font-inter text-[0.68rem] font-medium uppercase tracking-[0.08em] text-[#9CA3AF] transition-colors hover:text-[#6B7280]"
       >
         <RefreshCcw className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
         <span>{recruiterDashboardCopy.actionsPanel.syncLabel}</span>
@@ -325,3 +325,6 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
     </section>
   );
 }
+
+
+

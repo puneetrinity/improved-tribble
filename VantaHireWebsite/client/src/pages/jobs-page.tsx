@@ -417,13 +417,13 @@ export default function JobsPage() {
                       </div>
                     ) : error ? (
                       <div className="text-center py-20 px-6">
-                        <p className="text-[0.9rem] text-hr-red">Error loading jobs. Please try again.</p>
+                        <p className="text-[0.875rem] text-hr-red">Error loading jobs. Please try again.</p>
                       </div>
                     ) : data?.jobs.length === 0 ? (
                       <div className="text-center py-20 px-6 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-hr-text-muted [&>svg]:mb-4 [&>svg]:mx-auto">
                         <Briefcase />
                         <h3 className="font-satoshi text-[1.2rem] font-medium text-hr-text mb-2">No jobs found</h3>
-                        <p className="text-[0.9rem] text-hr-text-secondary">Try adjusting your search criteria</p>
+                        <p className="text-[0.875rem] text-hr-text-secondary">Try adjusting your search criteria</p>
                       </div>
                     ) : (
                       <>
@@ -470,7 +470,7 @@ export default function JobsPage() {
                                   </span>
                                 </div>
 
-                                <p className="text-[0.9rem] text-hr-text-secondary leading-[1.6] mb-4 line-clamp-2">
+                                <p className="text-[0.875rem] text-hr-text-secondary leading-[1.6] mb-4 line-clamp-2">
                                   {job.description.substring(0, 200)}...
                                 </p>
 
@@ -559,3 +559,4 @@ export default function JobsPage() {
     </>
   );
 }
+

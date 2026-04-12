@@ -169,7 +169,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
         <div className="space-y-2">
           <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.interviewsPanel.eyebrow}</p>
           <div className="flex items-center gap-3">
-            <h2 className={cn(DASHBOARD_TITLE, "text-[20px] sm:text-[21px]")}>{recruiterDashboardCopy.interviewsPanel.title}</h2>
+            <h2 className={cn(DASHBOARD_TITLE, "text-base")}>{recruiterDashboardCopy.interviewsPanel.title}</h2>
             <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#F1EEFF] px-2 text-[11px] font-medium text-[#5B4FF7]">
               {count}
             </span>
@@ -338,3 +338,4 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
     </section>
   );
 }
+

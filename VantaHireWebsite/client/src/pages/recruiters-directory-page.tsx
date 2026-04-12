@@ -128,7 +128,7 @@ export default function RecruitersDirectoryPage() {
             <div className="text-center py-20 px-12 max-md:px-5">
               <User className="h-12 w-12 text-hr-text-muted mx-auto mb-4 opacity-40" />
               <h2 className="font-satoshi text-xl font-medium text-hr-text mb-2">No Recruiters Found</h2>
-              <p className="text-hr-text-secondary text-[0.92rem] mb-6">
+              <p className="text-hr-text-secondary text-sm mb-6">
                 {searchTerm
                   ? "Try adjusting your search terms."
                   : "No recruiters have made their profiles public yet."}
@@ -209,3 +209,4 @@ export default function RecruitersDirectoryPage() {
     </>
   );
 }
+

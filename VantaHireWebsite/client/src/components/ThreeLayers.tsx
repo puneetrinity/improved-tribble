@@ -19,7 +19,7 @@ const ThreeLayers = () => {
           <div className="text-center mb-20">
             <div className={sectionLabel}>Three Powerful Layers</div>
             <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] max-sm:text-[1.6rem] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text">One Platform,<br />Three Dimensions of Power</h2>
-            <p className="text-base max-sm:text-[0.9rem] leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">
+            <p className="text-base max-sm:text-[0.875rem] leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">
               VantaHire combines intelligence, outreach, and operations into a unified system that handles every aspect of modern recruitment.
             </p>
           </div>
@@ -29,7 +29,7 @@ const ThreeLayers = () => {
             <div>
               <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">Layer 01 — Intelligence</div>
               <h3 className="font-satoshi text-[1.7rem] max-md:text-[1.4rem] font-normal mb-3.5 text-hr-text">Intelligence Layer</h3>
-              <p className="text-[0.95rem] text-hr-text-secondary leading-[1.7] mb-[18px]">AI-powered resume parsing, candidate matching, and smart recommendations that learn from your hiring patterns.</p>
+              <p className="text-sm text-hr-text-secondary leading-[1.7] mb-[18px]">AI-powered resume parsing, candidate matching, and smart recommendations that learn from your hiring patterns.</p>
               <div className="flex flex-wrap gap-1.5">
                 <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Resume Parsing</span>
                 <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Smart Matching</span>
@@ -118,7 +118,7 @@ const ThreeLayers = () => {
             <div className="max-md:order-2">
               <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">Layer 02 — Outreach</div>
               <h3 className="font-satoshi text-[1.7rem] max-md:text-[1.4rem] font-normal mb-3.5 text-hr-text">Outreach Layer</h3>
-              <p className="text-[0.95rem] text-hr-text-secondary leading-[1.7] mb-[18px]">Multi-channel candidate engagement through WhatsApp and email with automated sequences and templates.</p>
+              <p className="text-sm text-hr-text-secondary leading-[1.7] mb-[18px]">Multi-channel candidate engagement through WhatsApp and email with automated sequences and templates.</p>
               <div className="flex flex-wrap gap-1.5">
                 <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">WhatsApp</span>
                 <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Email Sequences</span>
@@ -133,7 +133,7 @@ const ThreeLayers = () => {
             <div>
               <div className="font-mono text-[0.62rem] text-hr-text-muted tracking-[0.12em] uppercase mb-2.5">Layer 03 — Operations</div>
               <h3 className="font-satoshi text-[1.7rem] max-md:text-[1.4rem] font-normal mb-3.5 text-hr-text">Operations Layer</h3>
-              <p className="text-[0.95rem] text-hr-text-secondary leading-[1.7] mb-[18px]">End-to-end recruitment workflow management with client portals, invoicing, and team collaboration.</p>
+              <p className="text-sm text-hr-text-secondary leading-[1.7] mb-[18px]">End-to-end recruitment workflow management with client portals, invoicing, and team collaboration.</p>
               <div className="flex flex-wrap gap-1.5">
                 <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Client Portal</span>
                 <span className="text-[0.7rem] text-hr-text-muted py-1 px-3 border border-[rgba(255,255,255,0.08)] rounded-full">Invoicing</span>
@@ -174,3 +174,4 @@ const ThreeLayers = () => {
 };
 
 export default ThreeLayers;
+

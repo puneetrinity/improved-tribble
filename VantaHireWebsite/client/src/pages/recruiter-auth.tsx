@@ -38,7 +38,7 @@ const fieldCls = "flex flex-col gap-1.5";
 
 // Submit button
 const submitCls =
-  "bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer transition-colors duration-200 w-full mt-1 hover:bg-hr-accent-hover disabled:opacity-60 disabled:cursor-not-allowed";
+  "bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium cursor-pointer transition-colors duration-200 w-full mt-1 hover:bg-hr-accent-hover disabled:opacity-60 disabled:cursor-not-allowed";
 
 // Secondary button
 const secondaryCls =
@@ -514,7 +514,7 @@ export default function RecruiterAuth() {
             AI-Powered Hiring<br />For Modern Teams
           </h1>
 
-          <p className="font-dm text-[0.92rem] leading-[1.7] text-hr-text-secondary mb-12">
+          <p className="font-dm text-sm leading-[1.7] text-hr-text-secondary mb-12">
             Post jobs, review applications, and find the perfect candidates — all from one intelligent platform.
           </p>
 
@@ -537,3 +537,4 @@ export default function RecruiterAuth() {
     </div>
   );
 }
+

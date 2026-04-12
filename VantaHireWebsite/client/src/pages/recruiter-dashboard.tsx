@@ -296,12 +296,12 @@ export default function RecruiterDashboard() {
                   <div className="space-y-3">
                     <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.header.eyebrow}</p>
                     <div className="flex flex-wrap items-center gap-3">
-                      <h1 className={cn(DASHBOARD_TITLE, "text-[28px] md:text-[34px]")}>{recruiterDashboardCopy.header.title}</h1>
+                      <h1 className={cn(DASHBOARD_TITLE, "text-xl")}>{recruiterDashboardCopy.header.title}</h1>
                       <Badge variant="outline" className="rounded-full border-[#D8DBE6] bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B4FF7]">
                     {planName} Plan
                   </Badge>
                     </div>
-                    <p className="max-w-2xl text-sm text-[#5F6675] md:text-[15px]">
+                    <p className="max-w-2xl text-sm text-[#5F6675] ">
                       {recruiterDashboardCopy.header.subtitle}
                     </p>
                   </div>
@@ -309,7 +309,7 @@ export default function RecruiterDashboard() {
                     <Button
                       size="sm"
                       onClick={() => setLocation("/jobs/post")}
-                      className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[13px] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+                      className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Post New Job
@@ -319,7 +319,7 @@ export default function RecruiterDashboard() {
                       size="sm"
                       onClick={() => setShowInviteHMDialog(true)}
                       data-tour="invite-hiring-manager-btn"
-                      className="h-11 rounded-2xl border-[#D9DDEA] bg-white px-5 text-[13px] font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                      className="h-11 rounded-2xl border-[#D9DDEA] bg-white px-5 text-[0.875rem] font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       {recruiterDashboardCopy.header.inviteHiringManager}
@@ -330,7 +330,7 @@ export default function RecruiterDashboard() {
                 <ProfileCompletionBanner />
 
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="text-sm text-[#687182]">
+                  <div className="text-xs text-[#687182]">
                     {recruiterDashboardCopy.header.filterSummaryPrefix}{" "}
                     <span className="font-semibold text-[#111827]">
                       Last {RANGE_PRESETS[rangePreset]} days
@@ -342,7 +342,7 @@ export default function RecruiterDashboard() {
                   </div>
                   <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto">
                     <Select value={rangePreset} onValueChange={(val) => setRangePreset(val as keyof typeof RANGE_PRESETS)}>
-                      <SelectTrigger className="h-11 w-full min-w-0 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] px-5 text-[0.95rem] font-semibold text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] sm:w-[164px] [&>svg]:hidden">
+                      <SelectTrigger className="h-11 w-full min-w-0 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] px-5 text-sm font-semibold text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] sm:w-[164px] [&>svg]:hidden">
                         <SelectValue placeholder={recruiterDashboardCopy.filters.dateRangePlaceholder} />
                         <ChevronDown className="h-4 w-4 text-[#4B5563]" />
                       </SelectTrigger>
@@ -356,7 +356,7 @@ export default function RecruiterDashboard() {
                       value={selectedJobId === "all" ? "all" : String(selectedJobId)}
                       onValueChange={(val) => setSelectedJobId(val === "all" ? "all" : Number(val))}
                     >
-                      <SelectTrigger className="h-11 w-full min-w-0 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] px-5 text-[0.95rem] font-semibold text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] sm:w-[154px] [&>svg]:hidden">
+                      <SelectTrigger className="h-11 w-full min-w-0 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] px-5 text-sm font-semibold text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] sm:w-[154px] [&>svg]:hidden">
                         <SelectValue placeholder={recruiterDashboardCopy.filters.allJobsPlaceholder} />
                         <ChevronDown className="h-4 w-4 text-[#4B5563]" />
                       </SelectTrigger>
@@ -485,3 +485,8 @@ export default function RecruiterDashboard() {
     </Layout>
   );
 }
+
+
+
+
+

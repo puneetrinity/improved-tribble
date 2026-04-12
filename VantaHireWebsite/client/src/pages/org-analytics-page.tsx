@@ -256,10 +256,10 @@ export default function OrgAnalyticsPage() {
               className={`${SURFACE_CLASS_NAME} flex flex-col gap-6 p-5 md:flex-row md:items-center md:justify-between md:px-6`}
             >
               <div className="min-w-0 flex-1">
-                <div className="mb-2 font-dm-sans text-[11px] uppercase tracking-[0.08em] text-[#9CA3AF]">
+                <div className="mb-2 font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">
                   ORGANIZATION ANALYTICS
                 </div>
-                <h1 className="font-sora text-[22px] font-bold tracking-[-0.03em] text-[#111827]">
+                <h1 className="font-sora text-xl font-bold tracking-[-0.03em] text-[#111827]">
                   Hiring Performance Overview
                 </h1>
               </div>
@@ -271,14 +271,14 @@ export default function OrgAnalyticsPage() {
                     className="min-w-[120px] px-0 md:px-5"
                     style={{ borderLeft: index === 0 ? "none" : "1px solid #E4E7EF" }}
                   >
-                    <div className="font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">
+                    <div className="font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">
                       {stat.label}
                     </div>
-                    <div className="mt-2 font-sora text-[28px] font-bold leading-none" style={{ color: stat.color }}>
+                    <div className="mt-2 font-sora text-2xl font-bold leading-none" style={{ color: stat.color }}>
                       {stat.value}
                     </div>
                     {stat.subtitle ? (
-                      <div className="mt-2 font-dm-sans text-[11px] text-[#9CA3AF]">{stat.subtitle}</div>
+                      <div className="mt-2 font-dm-sans text-xs text-[#9CA3AF]">{stat.subtitle}</div>
                     ) : null}
                   </div>
                 ))}
@@ -288,13 +288,13 @@ export default function OrgAnalyticsPage() {
 
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <div className={`${SURFACE_CLASS_NAME} p-5`}>
-              <h2 className="font-sora text-[16px] font-semibold text-[#111827]">Time to Fill by Job</h2>
+              <h2 className="font-sora text-base font-semibold text-[#111827]">Time to Fill by Job</h2>
               <div className="mt-5">
                 <div className="grid grid-cols-[150px_50px_minmax(0,1fr)_55px] items-center gap-3 border-b border-[#E4E7EF] pb-2">
                   {["JOB", "APPS", "PROGRESS", "DAYS TO FILL"].map((label, index) => (
                     <div
                       key={label}
-                      className={`font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF] ${index > 0 ? "text-center" : ""} ${index === 3 ? "text-right" : ""}`}
+                      className={`font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF] ${index > 0 ? "text-center" : ""} ${index === 3 ? "text-right" : ""}`}
                     >
                       {label}
                     </div>
@@ -315,8 +315,8 @@ export default function OrgAnalyticsPage() {
                         key={item.jobId}
                         className="grid h-11 grid-cols-[150px_50px_minmax(0,1fr)_55px] items-center gap-3 border-b border-[#F3F4F6] transition-all duration-150 ease-in-out hover:bg-[#FAFAFA]"
                       >
-                        <div className="truncate font-dm-sans text-[13px] font-semibold text-[#111827]">{item.jobTitle || "—"}</div>
-                        <div className="text-center font-dm-sans text-[12px] text-[#6B7280]">
+                        <div className="truncate font-dm-sans text-sm font-semibold text-[#111827]">{item.jobTitle || "—"}</div>
+                        <div className="text-center font-dm-sans text-sm text-[#6B7280]">
                           {typeof item.totalApplications === "number" ? `${item.totalApplications} app${item.totalApplications === 1 ? "" : "s"}` : "—"}
                         </div>
                         <div className="h-2 rounded-[4px] bg-[#F3F4F6]">
@@ -328,26 +328,26 @@ export default function OrgAnalyticsPage() {
                             }}
                           />
                         </div>
-                        <div className="text-right font-sora text-[13px] font-bold text-[#5B4FE8]">
+                        <div className="text-right font-sora text-sm font-bold text-[#5B4FE8]">
                           {formatDayValue(item.daysToFill)}
                         </div>
                       </div>
                     ))}
 
                 {!timeToFillQuery.isLoading && timeToFillRows.length === 0 ? (
-                  <div className="py-8 text-center font-dm-sans text-[13px] text-[#9CA3AF]">No data available</div>
+                  <div className="py-8 text-center font-dm-sans text-sm text-[#9CA3AF]">No data available</div>
                 ) : null}
               </div>
             </div>
 
             <div className={`${SURFACE_CLASS_NAME} p-5`}>
-              <h2 className="font-sora text-[16px] font-semibold text-[#111827]">Time in Stage Breakdown</h2>
+              <h2 className="font-sora text-base font-semibold text-[#111827]">Time in Stage Breakdown</h2>
               <div className="mt-5">
                 <div className="grid grid-cols-[minmax(160px,1.2fr)_70px_minmax(0,1fr)_80px] items-center gap-4 border-b border-[#E4E7EF] pb-2">
-                  <div className="font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">STAGE</div>
-                  <div className="text-center font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">AVG DAYS</div>
-                  <div className="font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">PROGRESS</div>
-                  <div className="text-right font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">TRANSITIONS</div>
+                  <div className="font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">STAGE</div>
+                  <div className="text-center font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">AVG DAYS</div>
+                  <div className="font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">PROGRESS</div>
+                  <div className="text-right font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">TRANSITIONS</div>
                 </div>
 
                 {stageBreakdownQuery.isLoading
@@ -368,9 +368,9 @@ export default function OrgAnalyticsPage() {
                         >
                           <div className="flex min-w-0 items-center gap-2">
                             <span className="h-2 w-2 flex-none rounded-full" style={{ backgroundColor: color }} />
-                            <span className="font-dm-sans text-[13px] font-semibold text-[#111827]">{item.stageName || "—"}</span>
+                            <span className="font-dm-sans text-sm font-semibold text-[#111827]">{item.stageName || "—"}</span>
                           </div>
-                          <div className="text-center font-sora text-[13px] font-bold" style={{ color }}>
+                          <div className="text-center font-sora text-sm font-bold" style={{ color }}>
                             {formatDayValue(item.avgDays)}
                           </div>
                           <div className="h-2 rounded-[4px] bg-[#F3F4F6]">
@@ -382,7 +382,7 @@ export default function OrgAnalyticsPage() {
                               }}
                             />
                           </div>
-                          <div className="text-right font-dm-sans text-[13px] text-[#6B7280]">
+                          <div className="text-right font-dm-sans text-sm text-[#6B7280]">
                             {formatCount(item.transitions)}
                           </div>
                         </div>
@@ -390,7 +390,7 @@ export default function OrgAnalyticsPage() {
                     })}
 
                 {!stageBreakdownQuery.isLoading && stageRows.length === 0 ? (
-                  <div className="py-8 text-center font-dm-sans text-[13px] text-[#9CA3AF]">No data available</div>
+                  <div className="py-8 text-center font-dm-sans text-sm text-[#9CA3AF]">No data available</div>
                 ) : null}
               </div>
             </div>
@@ -398,8 +398,8 @@ export default function OrgAnalyticsPage() {
 
           <section className={`${SURFACE_CLASS_NAME} px-6 py-5`}>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <h2 className="font-sora text-[16px] font-semibold text-[#111827]">Source Performance</h2>
-              <div className="flex flex-wrap items-center gap-4 font-dm-sans text-[11px] text-[#6B7280]">
+              <h2 className="font-sora text-base font-semibold text-[#111827]">Source Performance</h2>
+              <div className="flex flex-wrap items-center gap-4 font-dm-sans text-xs text-[#6B7280]">
                 <span className="inline-flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-[2px] bg-[#5B4FE8]" />
                   Applications
@@ -417,9 +417,9 @@ export default function OrgAnalyticsPage() {
 
             <div className="mt-5">
               <div className="grid grid-cols-[120px_minmax(0,1fr)_70px] items-center gap-4 border-b border-[#E4E7EF] pb-2">
-                <div className="font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">SOURCE</div>
-                <div className="font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">FUNNEL DISTRIBUTION</div>
-                <div className="text-right font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">CONV. RATE</div>
+                <div className="font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">SOURCE</div>
+                <div className="font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">FUNNEL DISTRIBUTION</div>
+                <div className="text-right font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">CONV. RATE</div>
               </div>
 
               {sourcesQuery.isLoading
@@ -446,7 +446,7 @@ export default function OrgAnalyticsPage() {
                         key={item.source}
                         className="grid h-16 grid-cols-[120px_minmax(0,1fr)_70px] items-center gap-4 border-b border-[#F3F4F6] py-2 transition-all duration-150 ease-in-out hover:bg-[#FAFAFA]"
                       >
-                        <div className="font-dm-sans text-[13px] text-[#111827]">{sourceDisplayName(item.source)}</div>
+                        <div className="font-dm-sans text-sm text-[#111827]">{sourceDisplayName(item.source)}</div>
                         <div>
                           <div className="h-3 w-full rounded-[4px] bg-[#F3F4F6]">
                             <div className="flex h-3 overflow-hidden rounded-[4px]" style={{ width: `${totalRelativeWidth}%` }}>
@@ -458,13 +458,13 @@ export default function OrgAnalyticsPage() {
                             </div>
                           </div>
                           <div className="mt-2 flex flex-wrap gap-3">
-                            <span className="font-sora text-[11px] font-semibold text-[#5B4FE8]">{item.applications} Applied</span>
-                            <span className="font-sora text-[11px] font-semibold text-[#8B5CF6]">{item.shortlisted} Shortlisted</span>
-                            <span className="font-sora text-[11px] font-semibold text-[#9CA3AF]">{item.hired} Hired</span>
+                            <span className="font-sora text-[0.68rem] font-semibold text-[#5B4FE8]">{item.applications} Applied</span>
+                            <span className="font-sora text-[0.68rem] font-semibold text-[#8B5CF6]">{item.shortlisted} Shortlisted</span>
+                            <span className="font-sora text-[0.68rem] font-semibold text-[#9CA3AF]">{item.hired} Hired</span>
                           </div>
                         </div>
                         <div
-                          className="text-right font-sora text-[13px] font-semibold"
+                          className="text-right font-sora text-sm font-semibold"
                           style={{ color: item.conversionRate > 0 ? "#10B981" : "#9CA3AF" }}
                         >
                           {conversionLabel}
@@ -474,20 +474,20 @@ export default function OrgAnalyticsPage() {
                   })}
 
               {!sourcesQuery.isLoading && sourceRows.length === 0 ? (
-                <div className="py-8 text-center font-dm-sans text-[13px] text-[#9CA3AF]">No data available</div>
+                <div className="py-8 text-center font-dm-sans text-sm text-[#9CA3AF]">No data available</div>
               ) : null}
             </div>
           </section>
 
           <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
             <div className={`${SURFACE_CLASS_NAME} p-5`}>
-              <h2 className="font-sora text-[16px] font-semibold text-[#111827]">Recruiter Performance</h2>
+              <h2 className="font-sora text-base font-semibold text-[#111827]">Recruiter Performance</h2>
               <div className="mt-5">
                 <div className="grid grid-cols-[minmax(0,1fr)_50px_70px_120px] items-center gap-3 border-b border-[#E4E7EF] pb-2">
-                  <div className="font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">RECRUITER</div>
-                  <div className="text-center font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">JOBS</div>
-                  <div className="text-center font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">SCREENED</div>
-                  <div className="text-right font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">AVG FIRST ACTION</div>
+                  <div className="font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">RECRUITER</div>
+                  <div className="text-center font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">JOBS</div>
+                  <div className="text-center font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">SCREENED</div>
+                  <div className="text-right font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">AVG FIRST ACTION</div>
                 </div>
 
                 {recruitersQuery.isLoading
@@ -512,29 +512,29 @@ export default function OrgAnalyticsPage() {
                           }}
                         >
                           <div className="flex min-w-0 items-center gap-3">
-                            <div className="font-sora text-[12px] font-bold" style={{ color: rankColor(rank) }}>
+                            <div className="font-sora text-xs font-bold" style={{ color: rankColor(rank) }}>
                               #{rank}
                             </div>
                             <div
-                              className="flex h-8 w-8 flex-none items-center justify-center rounded-full font-sora text-[12px] font-bold text-white"
+                              className="flex h-8 w-8 flex-none items-center justify-center rounded-full font-sora text-xs font-bold text-white"
                               style={{ backgroundColor: avatarColorFromName(person.recruiterName) }}
                             >
                               {initialsFromName(person.recruiterName)}
                             </div>
                             <div className="min-w-0">
-                              <div className="truncate font-sora text-[13px] font-semibold text-[#111827]">{person.recruiterName || "—"}</div>
-                              <div className="truncate font-dm-sans text-[11px] text-[#9CA3AF]">N/A</div>
+                              <div className="truncate font-sora text-sm font-semibold text-[#111827]">{person.recruiterName || "—"}</div>
+                              <div className="truncate font-dm-sans text-xs text-[#9CA3AF]">N/A</div>
                             </div>
                           </div>
-                          <div className="text-center font-dm-sans text-[13px] text-[#374151]">{formatCount(person.jobsPosted)}</div>
+                          <div className="text-center font-dm-sans text-sm text-[#374151]">{formatCount(person.jobsPosted)}</div>
                           <div
-                            className={`text-center font-dm-sans text-[13px] ${person.applicationsScreened > 0 ? "text-[#374151]" : "italic text-[#9CA3AF]"}`}
+                            className={`text-center font-dm-sans text-sm ${person.applicationsScreened > 0 ? "text-[#374151]" : "italic text-[#9CA3AF]"}`}
                           >
                             {person.applicationsScreened > 0 ? formatCount(person.applicationsScreened) : "N/A"}
                           </div>
                           <div className="flex justify-end">
                             <span
-                              className="rounded-none border px-[10px] py-[3px] font-dm-sans text-[11px] font-semibold"
+                              className="rounded-none border px-[10px] py-[3px] font-dm-sans text-[0.7rem] font-semibold"
                               style={timePillStyles(timeTone(timeValue))}
                             >
                               {formatDurationPill(timeValue)}
@@ -545,19 +545,19 @@ export default function OrgAnalyticsPage() {
                     })}
 
                 {!recruitersQuery.isLoading && recruiterRows.length === 0 ? (
-                  <div className="py-8 text-center font-dm-sans text-[13px] text-[#9CA3AF]">No data available</div>
+                  <div className="py-8 text-center font-dm-sans text-sm text-[#9CA3AF]">No data available</div>
                 ) : null}
               </div>
             </div>
 
             <div className={`${SURFACE_CLASS_NAME} p-5`}>
-              <h2 className="font-sora text-[16px] font-semibold text-[#111827]">Hiring Manager Performance</h2>
+              <h2 className="font-sora text-base font-semibold text-[#111827]">Hiring Manager Performance</h2>
               <div className="mt-5">
                 <div className="grid grid-cols-[minmax(0,1fr)_50px_70px_120px] items-center gap-3 border-b border-[#E4E7EF] pb-2">
-                  <div className="font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">MANAGER</div>
-                  <div className="text-center font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">JOBS</div>
-                  <div className="text-center font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">FEEDBACK</div>
-                  <div className="text-right font-dm-sans text-[10px] uppercase tracking-[0.08em] text-[#9CA3AF]">FEEDBACK TIME</div>
+                  <div className="font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">MANAGER</div>
+                  <div className="text-center font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">JOBS</div>
+                  <div className="text-center font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">FEEDBACK</div>
+                  <div className="text-right font-dm-sans text-[0.68rem] uppercase tracking-[0.08em] text-[#9CA3AF]">FEEDBACK TIME</div>
                 </div>
 
                 {hiringManagersQuery.isLoading
@@ -582,25 +582,25 @@ export default function OrgAnalyticsPage() {
                           }}
                         >
                           <div className="flex min-w-0 items-center gap-3">
-                            <div className="font-sora text-[12px] font-bold" style={{ color: rankColor(rank) }}>
+                            <div className="font-sora text-xs font-bold" style={{ color: rankColor(rank) }}>
                               #{rank}
                             </div>
                             <div
-                              className="flex h-8 w-8 flex-none items-center justify-center rounded-full font-sora text-[12px] font-bold text-white"
+                              className="flex h-8 w-8 flex-none items-center justify-center rounded-full font-sora text-xs font-bold text-white"
                               style={{ backgroundColor: avatarColorFromName(person.managerName) }}
                             >
                               {initialsFromName(person.managerName)}
                             </div>
                             <div className="min-w-0">
-                              <div className="truncate font-sora text-[13px] font-semibold text-[#111827]">{person.managerName || "—"}</div>
-                              <div className="truncate font-dm-sans text-[11px] text-[#9CA3AF]">N/A</div>
+                              <div className="truncate font-sora text-sm font-semibold text-[#111827]">{person.managerName || "—"}</div>
+                              <div className="truncate font-dm-sans text-xs text-[#9CA3AF]">N/A</div>
                             </div>
                           </div>
-                          <div className="text-center font-dm-sans text-[13px] text-[#374151]">{formatCount(person.jobsAssigned)}</div>
-                          <div className="text-center font-dm-sans text-[13px] text-[#374151]">{formatCount(person.feedbackGiven)}</div>
+                          <div className="text-center font-dm-sans text-sm text-[#374151]">{formatCount(person.jobsAssigned)}</div>
+                          <div className="text-center font-dm-sans text-sm text-[#374151]">{formatCount(person.feedbackGiven)}</div>
                           <div className="flex justify-end">
                             <span
-                              className="rounded-none border px-[10px] py-[3px] font-dm-sans text-[11px] font-semibold"
+                              className="rounded-none border px-[10px] py-[3px] font-dm-sans text-[0.7rem] font-semibold"
                               style={timePillStyles(timeTone(timeValue))}
                             >
                               {formatDurationPill(timeValue)}
@@ -611,7 +611,7 @@ export default function OrgAnalyticsPage() {
                     })}
 
                 {!hiringManagersQuery.isLoading && hiringManagerRows.length === 0 ? (
-                  <div className="py-8 text-center font-dm-sans text-[13px] text-[#9CA3AF]">No data available</div>
+                  <div className="py-8 text-center font-dm-sans text-sm text-[#9CA3AF]">No data available</div>
                 ) : null}
               </div>
             </div>
@@ -621,3 +621,10 @@ export default function OrgAnalyticsPage() {
     </Layout>
   );
 }
+
+
+
+
+
+
+

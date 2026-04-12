@@ -447,13 +447,10 @@ export function StageFunnel({
     <Card className={cn(DASHBOARD_PANEL, "rounded-[28px] bg-white/95")}>
       <CardHeader className="pb-2">
         <p className={cn(DASHBOARD_EYEBROW, "mb-3")}>{recruiterDashboardCopy.funnel.eyebrow}</p>
-        <CardTitle
-          className={cn(DASHBOARD_TITLE, "text-[22px] leading-tight")}
-          style={{ fontFamily: "Manrope, sans-serif" }}
-        >
+        <CardTitle className={cn(DASHBOARD_TITLE, "text-xl leading-tight")}>
           {title}
         </CardTitle>
-        <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-[#6B7280]">
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#6B7280]">
           {recruiterDashboardCopy.funnel.description}
         </p>
       </CardHeader>
@@ -487,8 +484,7 @@ export function StageFunnel({
                       >
                         <div className="min-w-0 text-right">
                           <span
-                            className="block truncate text-[12px] font-[600] tracking-[-0.01em] text-[#221B3A] md:text-[13px] xl:text-[14px]"
-                            style={{ fontFamily: "Manrope, sans-serif" }}
+                            className="block truncate font-satoshi text-sm font-[600] tracking-[-0.01em] text-[#221B3A]"
                           >
                             {stage.name}
                           </span>
@@ -532,14 +528,12 @@ export function StageFunnel({
 
                         <div className="w-[72px] shrink-0 text-right md:w-[84px] xl:w-[96px]">
                           <div
-                            className="text-[15px] font-[700] leading-none text-[#111827] md:text-[16px] xl:text-[17px]"
-                            style={{ fontFamily: "Manrope, sans-serif" }}
+                            className="font-satoshi text-sm font-[700] leading-none text-[#111827]"
                           >
                             {formatCompactNumber(stage.count)}
                           </div>
                           <div
-                            className="mt-1 text-[11px] leading-none text-[#6B7280]"
-                            style={{ fontFamily: "Inter, sans-serif" }}
+                            className="mt-1 font-dm text-xs leading-none text-[#6B7280]"
                           >
                             {formatPercent(percentage)}
                           </div>
@@ -549,7 +543,7 @@ export function StageFunnel({
                   })}
                 </div>
                 {isMobile ? (
-                  <p className="pt-3 text-[11px] font-medium text-[#7B8191]">
+                  <p className="pt-3 text-xs font-medium text-[#7B8191]">
                     Tap a stage to see details
                   </p>
                 ) : null}
@@ -567,9 +561,8 @@ export function StageFunnel({
                   style={{ transitionDuration: `${CONTENT_FADE_MS}ms` }}
                 >
                   <div
-                    className="inline-flex rounded-full px-4 py-2 text-[10px] font-[700] uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(77,65,223,0.18)]"
+                    className="inline-flex font-mono rounded-full px-4 py-2 text-[0.68rem] font-[700] uppercase tracking-[0.08em] text-white shadow-[0_10px_24px_rgba(77,65,223,0.18)]"
                     style={{
-                      fontFamily: "Inter, sans-serif",
                       background: "linear-gradient(90deg, #4D41DF 0%, #675DF9 100%)",
                     }}
                   >
@@ -577,15 +570,13 @@ export function StageFunnel({
                   </div>
 
                   <h3
-                    className="mt-9 min-h-[60px] text-[24px] font-[700] leading-tight text-[#191C1E]"
-                    style={{ fontFamily: "Manrope, sans-serif" }}
+                    className="mt-9 min-h-[60px] font-satoshi text-base font-[700] leading-tight text-[#191C1E]"
                   >
                     {hoveredStage ? `${hoveredStage.name} ${recruiterDashboardCopy.funnel.snapshotSuffix}` : recruiterDashboardCopy.funnel.overviewTitle}
                   </h3>
 
                   <p
-                    className="mt-6 min-h-[92px] max-w-[30rem] text-[14px] leading-[1.6] text-[#464555]"
-                    style={{ fontFamily: "Inter, sans-serif" }}
+                    className="mt-6 min-h-[92px] max-w-[30rem] font-outfit text-sm leading-[1.6] text-[#464555]"
                   >
                     {summary.prefix}
                     <span className={summary.deltaClassName}>{summary.deltaText}</span>
@@ -596,14 +587,12 @@ export function StageFunnel({
                     {statCards.map((stat) => (
                       <div key={stat.label} className="rounded-[12px] bg-white p-4">
                         <div
-                          className="text-[10px] font-[600] uppercase tracking-[0.08em] text-[#6B7280]"
-                          style={{ fontFamily: "Inter, sans-serif" }}
+                          className="font-mono text-[0.68rem] font-[600] uppercase tracking-[0.08em] text-[#6B7280]"
                         >
                           {stat.label}
                         </div>
                         <div
-                          className="mt-2 text-[22px] font-[700] leading-tight text-[#111827]"
-                          style={{ fontFamily: "Manrope, sans-serif" }}
+                          className="mt-2 font-satoshi text-2xl font-[700] leading-tight text-[#111827]"
                         >
                           {stat.value}
                         </div>
@@ -612,10 +601,10 @@ export function StageFunnel({
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-[#768094] shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#768094] shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
                       {hoveredStage ? recruiterDashboardCopy.funnel.stageSnapshot : recruiterDashboardCopy.funnel.recruiterWideView}
                     </span>
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-medium text-[#768094] shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                    <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-[#768094] shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
                       {details?.periodLabel ?? "Current period"}
                     </span>
                   </div>
@@ -663,3 +652,8 @@ export function StageFunnel({
     </Card>
   );
 }
+
+
+
+
+

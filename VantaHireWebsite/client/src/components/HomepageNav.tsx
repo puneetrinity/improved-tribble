@@ -7,7 +7,7 @@ import vantahireLogo from "@/assets/vantahire-logo.png";
 
 const navLink = "text-hr-text-secondary no-underline font-dm text-sm font-normal transition-colors duration-200 hover:text-hr-text";
 const btnGetStarted = "bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-sm font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 hover:bg-hr-accent-hover";
-const mobileLink = "text-hr-text-secondary no-underline font-dm text-[0.95rem] py-1.5 block transition-colors duration-200 hover:text-hr-text";
+const mobileLink = "text-hr-text-secondary no-underline font-dm text-sm py-1.5 block transition-colors duration-200 hover:text-hr-text";
 
 const HomepageNav = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -140,3 +140,4 @@ const HomepageNav = () => {
 };
 
 export default HomepageNav;
+
