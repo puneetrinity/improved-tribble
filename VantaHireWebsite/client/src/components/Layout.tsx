@@ -141,11 +141,11 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
           />
 
           <SidebarInset className="min-h-svh overflow-x-hidden bg-transparent transition-[width] duration-200 ease-linear">
-            <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border/70 bg-background/95 px-4 backdrop-blur md:hidden">
-              <SidebarTrigger className="-ml-1" />
+            <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground shadow-[0_10px_28px_rgba(0,0,0,0.18)] backdrop-blur md:hidden">
+              <SidebarTrigger className="-ml-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary" />
               <div className="flex min-w-0 items-center gap-2">
                 <img src={vantahireLogo} alt="VantaHire" className="h-8 w-auto" />
-                <span className="truncate text-sm font-semibold text-foreground">VantaHire ATS</span>
+                <span className="truncate text-sm font-semibold text-sidebar-foreground">VantaHire ATS</span>
               </div>
             </div>
 
