@@ -177,7 +177,7 @@ export default function CandidatesPage() {
         </div>
 
         {/* Search Bar */}
-        <Card className="mb-6 shadow-sm">
+        <Card className="mb-6 shadow-sm" data-tour="talent-search-input">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex-1">
@@ -253,7 +253,7 @@ export default function CandidatesPage() {
         )}
 
         {semanticSearchQuery.isSuccess && semanticResults.length > 0 && (
-          <div className="space-y-3">
+          <div className="space-y-3" data-tour="talent-search-results">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               {talentSearchPageCopy.search.rankingHint}
               <TooltipProvider>
@@ -268,7 +268,7 @@ export default function CandidatesPage() {
               </TooltipProvider>
             </p>
             {semanticResults.map((result) => (
-              <Card key={result.applicationId} className="shadow-sm hover:shadow-md transition-shadow">
+              <Card key={result.applicationId} className="shadow-sm hover:shadow-md transition-shadow" data-tour="talent-search-result-card">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-4">
                     {/* Candidate Info */}
@@ -369,7 +369,7 @@ export default function CandidatesPage() {
         {!semanticSearchQuery.isFetching &&
           !semanticSearchQuery.isSuccess &&
           !semanticSearchQuery.isError && (
-          <Card className="shadow-sm">
+          <Card className="shadow-sm" data-tour="talent-search-results">
             <CardContent className="p-12 text-center">
               <Sparkles className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-foreground mb-2">

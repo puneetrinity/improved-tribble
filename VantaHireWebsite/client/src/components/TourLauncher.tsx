@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { HelpCircle, Play, RefreshCw, Check, ChevronRight, X, Sparkles } from "lucide-react";
+import { HelpCircle, Play, RefreshCw, Check, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -66,8 +66,8 @@ export function TourLauncher() {
   const completedCount = completedTours.length;
   const totalTours = availableTours.length;
 
-  // Don't show tour launcher for unauthenticated users
-  if (!user) {
+  // Super admins are internal operators; keep product tours focused on end users.
+  if (!user || user.role === "super_admin") {
     return null;
   }
 
@@ -103,7 +103,7 @@ export function TourLauncher() {
                   Welcome to VantaHire!
                 </h3>
                 <p className="text-muted-foreground text-sm mb-4">
-                  Take a quick tour to learn how to make the most of your recruitment dashboard.
+                  Take a short guided setup tour focused on the actions you will use first.
                 </p>
                 <div className="flex gap-2">
                   <Button
@@ -164,7 +164,7 @@ export function TourLauncher() {
 
           <DropdownMenuSeparator className="bg-primary/20" />
 
-          {/* Full Tour Option */}
+          {/* Recommended Tour Option */}
           <DropdownMenuItem
             onClick={handleStartFullTour}
             className="py-3 px-4 cursor-pointer hover:bg-primary/20 focus:bg-primary/20"
@@ -174,19 +174,18 @@ export function TourLauncher() {
                 <Play className="h-4 w-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm">Full Platform Tour</div>
+                <div className="font-medium text-sm">Recommended Start</div>
                 <div className="text-xs text-muted-foreground">
-                  Complete walkthrough of all features
+                  Short guided path for your role
                 </div>
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </div>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator className="bg-primary/20" />
 
           <DropdownMenuLabel className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wide">
-            Quick Tours
+            Page Guides
           </DropdownMenuLabel>
 
           {/* Individual Tour Options */}
@@ -233,7 +232,7 @@ export function TourLauncher() {
           >
             <div className="flex items-center gap-3">
               <RefreshCw className="h-4 w-4" />
-              <span className="text-sm">Reset All Tours</span>
+              <span className="text-sm">Reset Guides</span>
             </div>
           </DropdownMenuItem>
         </DropdownMenuContent>

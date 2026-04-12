@@ -73,9 +73,10 @@ export function TourProvider({ children }: TourProviderProps) {
       }
     }
 
-    // Check first visit
+    // Check first visit. Super admins are internal operators, so they do not
+    // receive product tours.
     const firstVisit = localStorage.getItem(TOUR_STORAGE_KEYS.FIRST_VISIT);
-    if (!firstVisit && user) {
+    if (!firstVisit && user && user.role !== "super_admin") {
       setHasSeenFirstVisitTour(false);
     }
   }, [user]);
