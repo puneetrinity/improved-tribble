@@ -84,8 +84,8 @@ export async function setupVite(app: Express, server: Server) {
 
   // 301 redirects for killed pages (before static middleware to catch /brand)
   app.get(['/product', '/compare'], (_req, res) => res.redirect(301, '/features'));
-  app.get(['/about', '/brand'], (_req, res) => res.redirect(301, '/'));
-  app.get('/demo', (_req, res) => res.redirect(301, '/recruiter-auth'));
+  app.get(['/about', '/brand', '/brand-assets'], (_req, res) => res.redirect(301, '/'));
+  app.get(['/consultants', '/demo'], (_req, res) => res.redirect(301, '/recruiter-auth'));
 
   // Serve static HTML files from client/public (e.g., landing pages)
   // These bypass SPA routing
@@ -360,8 +360,8 @@ export async function serveStatic(app: Express) {
 
   // 301 redirects for killed pages
   app.get(['/product', '/compare'], (_req, res) => res.redirect(301, '/features'));
-  app.get(['/about', '/brand'], (_req, res) => res.redirect(301, '/'));
-  app.get('/demo', (_req, res) => res.redirect(301, '/recruiter-auth'));
+  app.get(['/about', '/brand', '/brand-assets'], (_req, res) => res.redirect(301, '/'));
+  app.get(['/consultants', '/demo'], (_req, res) => res.redirect(301, '/recruiter-auth'));
 
   // SSR meta injection for marketing pages (registered before static middleware
   // to prevent express.static from intercepting routes that match directories)
@@ -639,7 +639,7 @@ export async function serveStatic(app: Express) {
   // Known SPA routes that should return 200 (client-side routing handles them)
   const KNOWN_SPA_ROUTES = new Set([
     ...Object.keys(MARKETING_PAGES),
-    '/auth', '/candidate-auth', '/recruiter-auth', '/verify-email', '/reset-password',
+    '/candidate-auth', '/recruiter-auth', '/verify-email', '/reset-password',
     '/register-hiring-manager', '/accept-co-recruiter', '/register-co-recruiter',
     '/recruiter-dashboard', '/admin', '/admin-dashboard', '/admin-super-dashboard',
     '/unified-admin-dashboard', '/applications', '/candidates', '/my-jobs',

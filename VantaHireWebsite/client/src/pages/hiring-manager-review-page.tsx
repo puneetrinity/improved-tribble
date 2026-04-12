@@ -66,7 +66,7 @@ export default function HiringManagerReviewPage() {
   const jobId = params?.id ? parseInt(params.id, 10) : null;
 
   if (!user || user.role !== "hiring_manager") {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   if (!match || !jobId || Number.isNaN(jobId)) {

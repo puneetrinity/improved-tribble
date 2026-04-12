@@ -110,7 +110,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
     logoutMutation.mutate();
   };
 
-  const isJobsRoute = location.startsWith('/jobs') || location === '/auth';
+  const isJobsRoute = location.startsWith('/jobs');
 
   if (atsContext) {
     return (
@@ -247,19 +247,6 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
               </>
             ) : (
               <>
-                <a
-                  href="/about"
-                  className={`relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group ${
-                    location === '/about' ? 'text-white font-medium' : 'text-white/70'
-                  }`}
-                  onClick={(e) => { e.preventDefault(); setLocation("/about"); }}
-                >
-                  <span className="relative z-10">About</span>
-                  <span className={`absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 ${
-                    location === '/about' ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                  }`}></span>
-                </a>
-
                 <a
                   href="/features"
                   className={`relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group ${
@@ -406,13 +393,6 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
                 </>
               ) : (
                 <>
-                  <a
-                    href="/about"
-                    className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"
-                    onClick={(e) => { e.preventDefault(); setLocation("/about"); setIsMenuOpen(false); }}
-                  >
-                    About
-                  </a>
                   <a
                     href="/features"
                     className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"

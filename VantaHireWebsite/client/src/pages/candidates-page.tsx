@@ -83,7 +83,7 @@ export default function CandidatesPage() {
   const [resumePreviewCandidate, setResumePreviewCandidate] = useState<SemanticResult | null>(null);
 
   if (!user || !['recruiter', 'super_admin'].includes(user.role)) {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   // ── Semantic Search query ───────────────────────────────────────

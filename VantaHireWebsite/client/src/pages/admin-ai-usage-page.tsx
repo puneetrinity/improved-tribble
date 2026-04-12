@@ -72,7 +72,7 @@ export default function AdminAIUsagePage() {
 
   // Redirect non-admin users
   if (!user || user.role !== "super_admin") {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   // Calculate date range

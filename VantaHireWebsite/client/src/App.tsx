@@ -11,7 +11,6 @@ import Home from "@/pages/Home";
 import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
 import React, { lazy, Suspense } from "react";
 
-const AuthPage = lazy(() => import("@/pages/auth-page"));
 const RecruiterAuth = lazy(() => import("@/pages/recruiter-auth"));
 const CandidateAuth = lazy(() => import("@/pages/candidate-auth"));
 const JobsPage = lazy(() => import("@/pages/jobs-page"));
@@ -94,7 +93,6 @@ function Router() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/claim/:token" component={ClaimPage} />
       <Route path="/solutions" component={UseCasesPage} />
-      <Route path="/auth" component={AuthPage} />
       <Route path="/recruiter-auth" component={RecruiterAuth} />
       <Route path="/candidate-auth" component={CandidateAuth} />
       <ProtectedRoute path="/onboarding" component={OnboardingPage} requiredRole={['recruiter']} />

@@ -85,7 +85,7 @@ const Services = () => {
         <div className="text-center mb-16">
           <Button
             variant="ghost"
-            onClick={() => window.location.href = '/product'}
+            onClick={() => window.location.href = '/features'}
             className="text-primary hover:text-primary/80"
           >
             See how it works
@@ -147,7 +147,7 @@ const Services = () => {
           </Button>
           <Button
             variant="ghost"
-            onClick={() => window.location.href = '/product'}
+            onClick={() => window.location.href = '/features'}
             className="text-white/70 hover:text-white"
           >
             Learn More About the Product

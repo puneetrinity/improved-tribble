@@ -255,6 +255,16 @@
     --ats-success: var(--success);
     --ats-warning: var(--warning);
     --ats-info: var(--info);
+
+    /* Internal app sidebar: dark, aligned with the public marketing surface. */
+    --sidebar-background: 240 33% 8%; /* #0D0D1A */
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 262 83% 76%; /* #A78BFA */
+    --sidebar-primary-foreground: 240 33% 8%;
+    --sidebar-accent: 240 33% 12%; /* #141428 */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 262 83% 56% / 0.24;
+    --sidebar-ring: 262 83% 76%;
   }
 
   * {

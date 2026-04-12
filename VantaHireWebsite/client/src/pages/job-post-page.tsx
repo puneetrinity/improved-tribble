@@ -22,7 +22,7 @@ export default function JobPostPage() {
 
   // Redirect if not authenticated
   if (!user) {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   // Check role permissions

@@ -98,7 +98,7 @@ export default function ResetPasswordPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/auth">
+              <Link href="/recruiter-auth">
                 <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
                   Go to Login
                 </Button>
@@ -203,7 +203,7 @@ export default function ResetPasswordPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Link href="/auth">
+                  <Link href="/recruiter-auth">
                     <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
                       Continue to Login
                     </Button>
@@ -229,7 +229,7 @@ export default function ResetPasswordPage() {
                   <p className="text-sm text-muted-foreground text-center">
                     The reset link may be invalid or already used.
                   </p>
-                  <Link href="/auth">
+                  <Link href="/recruiter-auth">
                     <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
                       Go to Login
                     </Button>
@@ -255,7 +255,7 @@ export default function ResetPasswordPage() {
                   <p className="text-sm text-muted-foreground text-center">
                     Please request a new password reset link.
                   </p>
-                  <Link href="/auth">
+                  <Link href="/recruiter-auth">
                     <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
                       Go to Login
                     </Button>

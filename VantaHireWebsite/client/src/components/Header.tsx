@@ -98,12 +98,6 @@ const Header = () => {
           {/* Marketing links - only show when NOT logged in */}
           {!user && (
             <>
-              <Link href="/about" className="relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group text-white/70 hover:text-white">
-                <span className="relative z-10">About</span>
-                <span className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 scale-x-0 group-hover:scale-x-100"></span>
-                <span className="absolute inset-0 -z-10 bg-white/0 group-hover:bg-white/5 transition-colors duration-300 rounded-md"></span>
-              </Link>
-
               <Link href="/features" className="relative px-3 py-2 hover:text-white transition-all duration-300 overflow-hidden group text-white/70 hover:text-white">
                 <span className="relative z-10">Features</span>
                 <span className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] w-full transform origin-left transition-transform duration-300 scale-x-0 group-hover:scale-x-100"></span>
@@ -280,13 +274,6 @@ const Header = () => {
           {/* Marketing links - only show when NOT logged in */}
           {!user && (
             <>
-              <Link
-                href="/about"
-                className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"
-                onClick={() => setIsMenuOpen(false)}
-              >
-                About
-              </Link>
               <Link
                 href="/features"
                 className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"

@@ -50,9 +50,9 @@ const PainPoints = () => {
 
             {/* Contrast */}
             <a
-              href="/product"
+              href="/features"
               className="inline-flex items-center gap-3 text-xl font-semibold group cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={(e) => { e.preventDefault(); window.location.href = '/product'; }}
+              onClick={(e) => { e.preventDefault(); window.location.href = '/features'; }}
             >
               <ArrowRight className="w-6 h-6 text-primary" />
               <span className="gradient-text-purple">See how VantaHire fixes this.</span>

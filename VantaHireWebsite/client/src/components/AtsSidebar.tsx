@@ -251,32 +251,32 @@ export default function AtsSidebar({
   return (
     <Sidebar
       collapsible="icon"
-      className="border-r border-[#E1E5F0] bg-[linear-gradient(180deg,#F9FAFD_0%,#F2F4F8_100%)] shadow-[0_18px_50px_rgba(17,24,39,0.06)]"
+      className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
     >
-      <SidebarHeader className="gap-3 border-b border-[#E8ECF4] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,249,252,0.92)_100%)] px-3 py-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3">
+      <SidebarHeader className="gap-3 border-b border-sidebar-border bg-sidebar px-3 py-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3">
         <div className="flex items-start justify-between gap-2 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
           <button
             type="button"
             onClick={() => navigate("/")}
             className="flex min-w-0 flex-1 items-start gap-3 rounded-2xl text-left transition-opacity hover:opacity-90 group-data-[collapsible=icon]:hidden"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#FFFFFF_0%,#EBEEFF_100%)] shadow-[0_12px_28px_rgba(77,65,223,0.12)]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sidebar-accent shadow-[0_12px_28px_rgba(123,56,251,0.16)]">
               <img src={vantahireLogo} alt="VantaHire" className="h-8 w-auto shrink-0" />
             </div>
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <div className="flex items-center gap-2">
-                <div className="truncate text-[18px] font-semibold leading-none text-[#1E2332]">{atsShellCopy.brand.name}</div>
-                <div className="rounded-full bg-[#EEF0FF] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5B52F5]">{atsShellCopy.brand.badge}</div>
+                <div className="truncate text-[18px] font-semibold leading-none text-sidebar-foreground">{atsShellCopy.brand.name}</div>
+                <div className="rounded-full bg-sidebar-accent px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-primary">{atsShellCopy.brand.badge}</div>
               </div>
               {organizationData?.organization?.name && (
-                <div className="mt-1 truncate text-xs font-medium text-[#8D94A7]">
+                <div className="mt-1 truncate text-xs font-medium text-sidebar-foreground/60">
                   {organizationData.organization.name}
                 </div>
               )}
             </div>
           </button>
           <SidebarTrigger
-            className="mt-1 shrink-0 rounded-xl border border-transparent text-[#8D94A7] transition-colors hover:border-[#E6E9F4] hover:bg-[#FFFFFF] hover:text-[#6C63FF] group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10"
+            className="mt-1 shrink-0 rounded-xl border border-transparent text-sidebar-foreground/60 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-primary group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10"
           />
         </div>
       </SidebarHeader>
@@ -288,7 +288,7 @@ export default function AtsSidebar({
         )}
       >
         <SidebarGroup className="gap-2 p-0">
-          <SidebarGroupLabel className="px-6 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A4A9B8] group-data-[collapsible=icon]:hidden">
+          <SidebarGroupLabel className="px-6 pb-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden">
             {atsShellCopy.sections.workspace}
           </SidebarGroupLabel>
           <SidebarGroupContent>
@@ -303,11 +303,11 @@ export default function AtsSidebar({
                       isActive={item.active}
                       onClick={() => item.path && navigate(item.path)}
                       className={cn(
-                        "mx-2 h-10 rounded-2xl bg-transparent pl-6 pr-3 text-[13px] font-medium text-[#364152] transition-colors duration-100 ease-out hover:bg-transparent hover:text-[#242C3D]",
-                        "data-[active=true]:bg-[#ECEFFE] data-[active=true]:text-[#242C3D]",
+                        "mx-2 h-10 rounded-2xl bg-transparent pl-6 pr-3 text-[13px] font-medium text-sidebar-foreground/70 transition-colors duration-100 ease-out hover:bg-sidebar-accent/70 hover:text-sidebar-foreground",
+                        "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-foreground",
                         "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:h-11 group-data-[collapsible=icon]:w-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:px-0",
-                        "group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-transparent group-data-[collapsible=icon]:data-[active=true]:bg-transparent",
-                        "group-data-[collapsible=icon]:text-[#364152] group-data-[collapsible=icon]:hover:text-[#242C3D] group-data-[collapsible=icon]:data-[active=true]:text-[#242C3D]",
+                        "group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-sidebar-accent group-data-[collapsible=icon]:data-[active=true]:bg-sidebar-accent",
+                        "group-data-[collapsible=icon]:text-sidebar-foreground/70 group-data-[collapsible=icon]:hover:text-sidebar-foreground group-data-[collapsible=icon]:data-[active=true]:text-sidebar-primary",
                         "[&>span]:transition-opacity [&>span]:duration-150 group-data-[collapsible=icon]:[&>span]:opacity-0"
                       )}
                     >
@@ -321,7 +321,7 @@ export default function AtsSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarSeparator className="mx-0 my-3 bg-[#E6EAF3]" />
+        <SidebarSeparator className="mx-0 my-3 bg-sidebar-border" />
 
         {orgManagementItems.length > 0 && (
           isCollapsed ? (
@@ -333,7 +333,7 @@ export default function AtsSidebar({
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl text-[#6E7891] transition-colors duration-200 hover:text-[#4F46E5]"
+                          className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl text-sidebar-foreground/70 transition-colors duration-200 hover:bg-sidebar-accent hover:text-sidebar-primary"
                         >
                           <ChevronRight className="h-4 w-4" />
                         </button>
@@ -347,9 +347,9 @@ export default function AtsSidebar({
                     align="end"
                     side="right"
                     sideOffset={12}
-                    className="w-60 rounded-xl border-[#E6E8F0] p-2"
+                    className="w-60 rounded-xl border-sidebar-border bg-sidebar p-2 text-sidebar-foreground"
                   >
-                    <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#A4A9B8]">
+                    <DropdownMenuLabel className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-foreground/50">
                       Org Management
                     </DropdownMenuLabel>
                     <DropdownMenuSeparator />
@@ -360,7 +360,7 @@ export default function AtsSidebar({
                         <DropdownMenuItem
                           key={item.label}
                           onClick={item.onClick ?? (() => item.path && navigate(item.path))}
-                          className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-[#6E7891] focus:bg-[#F1F2FB] focus:text-[#5B54E8]"
+                          className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-sidebar-foreground/70 focus:bg-sidebar-accent focus:text-sidebar-primary"
                         >
                           <Icon className="mr-2 h-4 w-4" />
                           <span>{item.label}</span>
@@ -376,13 +376,13 @@ export default function AtsSidebar({
               <button
                 type="button"
                 onClick={() => setOrgManagementOpen((open) => !open)}
-                className="mx-2 flex h-10 w-[calc(100%-1rem)] items-center justify-between rounded-2xl bg-transparent pl-6 pr-3 text-left transition-colors duration-100 ease-out hover:bg-transparent"
+                className="mx-2 flex h-10 w-[calc(100%-1rem)] items-center justify-between rounded-2xl bg-transparent pl-6 pr-3 text-left transition-colors duration-100 ease-out hover:bg-sidebar-accent/70"
               >
-                <span className="text-[13px] font-medium text-[#364152]">{atsShellCopy.menu.organizationManagement}</span>
+                <span className="text-[13px] font-medium text-sidebar-foreground/70">{atsShellCopy.menu.organizationManagement}</span>
                 <ChevronDown
                   className={cn(
-                    "h-4 w-4 text-[#7B8498] transition-transform duration-150 ease-out",
-                    orgManagementOpen && "rotate-180 text-[#364152]"
+                    "h-4 w-4 text-sidebar-foreground/60 transition-transform duration-150 ease-out",
+                    orgManagementOpen && "rotate-180 text-sidebar-primary"
                   )}
                 />
               </button>
@@ -399,7 +399,7 @@ export default function AtsSidebar({
                             tooltip={item.label}
                             isActive={item.active}
                             onClick={item.onClick ?? (() => item.path && navigate(item.path))}
-                            className="mx-2 h-10 rounded-2xl bg-transparent pl-6 pr-3 text-[13px] font-medium text-[#364152] transition-colors duration-100 ease-out hover:bg-transparent hover:text-[#242C3D] data-[active=true]:bg-[#ECEFFE] data-[active=true]:text-[#242C3D]"
+                            className="mx-2 h-10 rounded-2xl bg-transparent pl-6 pr-3 text-[13px] font-medium text-sidebar-foreground/70 transition-colors duration-100 ease-out hover:bg-sidebar-accent/70 hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-foreground"
                           >
                             <Icon className="h-4 w-4 shrink-0" />
                             <span>{item.label}</span>
@@ -415,47 +415,47 @@ export default function AtsSidebar({
         )}
       </SidebarContent>
 
-      <SidebarFooter className="mt-auto gap-2 bg-[linear-gradient(180deg,rgba(248,249,252,0)_0%,rgba(255,255,255,0.96)_18%)] px-0 py-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
+      <SidebarFooter className="mt-auto gap-2 bg-sidebar px-0 py-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
         <div className="w-full">
-          <div className="mb-2 h-px w-full bg-[#E6EAF3]" />
+          <div className="mb-2 h-px w-full bg-sidebar-border" />
           <div className="overflow-hidden transition-all duration-200">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className={cn(
-                    "mx-2 flex h-12 w-[calc(100%-1rem)] items-center gap-3 rounded-2xl border border-transparent bg-white/75 pl-4 pr-2 text-left shadow-[0_10px_24px_rgba(15,23,42,0.04)] transition-colors duration-200 hover:border-[#E6EAF3] hover:bg-white",
-                    isCollapsed && "mx-auto h-11 w-11 justify-center rounded-2xl px-0 hover:bg-[#F6F7FD]"
+                    "mx-2 flex h-12 w-[calc(100%-1rem)] items-center gap-3 rounded-2xl border border-transparent bg-sidebar-accent/70 pl-4 pr-2 text-left shadow-[0_10px_24px_rgba(0,0,0,0.14)] transition-colors duration-200 hover:border-sidebar-border hover:bg-sidebar-accent",
+                    isCollapsed && "mx-auto h-11 w-11 justify-center rounded-2xl px-0 hover:bg-sidebar-accent"
                   )}
                   title={profileSettingsItem?.label ?? "Profile Settings"}
                 >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E5E4FF] text-sm font-semibold text-[#6C63FF]">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sidebar-primary text-sm font-semibold text-sidebar-primary-foreground">
                     {initials}
                   </div>
                   <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-                    <div className="truncate text-sm font-semibold text-[#20263A]">{displayName}</div>
-                    <div className="truncate text-xs text-[#8D94A7]">{accountSubtitle}</div>
+                    <div className="truncate text-sm font-semibold text-sidebar-foreground">{displayName}</div>
+                    <div className="truncate text-xs text-sidebar-foreground/60">{accountSubtitle}</div>
                   </div>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-[#A4A9B8] group-data-[collapsible=icon]:hidden" />
+                  <ChevronRight className="h-4 w-4 shrink-0 text-sidebar-foreground/50 group-data-[collapsible=icon]:hidden" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" side={isCollapsed ? "right" : "top"} sideOffset={12} className="w-60 rounded-xl border-[#E6E8F0] p-2">
+              <DropdownMenuContent align="end" side={isCollapsed ? "right" : "top"} sideOffset={12} className="w-60 rounded-xl border-sidebar-border bg-sidebar p-2 text-sidebar-foreground">
                 {profileSettingsItem && (
                   <DropdownMenuItem
                     onClick={() => profileSettingsItem.path && navigate(profileSettingsItem.path)}
-                    className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-[#364152] focus:bg-[#F1F2FB] focus:text-[#242C3D]"
+                    className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-sidebar-foreground/70 focus:bg-sidebar-accent focus:text-sidebar-foreground"
                   >
                     <Settings className="mr-2 h-4 w-4" />
                     <span>{profileSettingsItem.label}</span>
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuLabel className="px-2 py-2 text-[12px] font-medium text-[#6E7891]">
+                <DropdownMenuLabel className="px-2 py-2 text-[12px] font-medium text-sidebar-foreground/60">
                   Current Plan :- {currentPlanName}
                 </DropdownMenuLabel>
                 {shouldShowUpgradePlan && (
                   <DropdownMenuItem
                     onClick={() => navigate("/pricing")}
-                    className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-[#364152] focus:bg-[#F1F2FB] focus:text-[#242C3D]"
+                    className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-sidebar-foreground/70 focus:bg-sidebar-accent focus:text-sidebar-foreground"
                   >
                     <Sparkles className="mr-2 h-4 w-4" />
                     <span>Upgrade Plan</span>
@@ -466,7 +466,7 @@ export default function AtsSidebar({
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       onClick={logoutItem.onClick}
-                      className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-[#E35D5B] focus:bg-[#FFF1F1] focus:text-[#D84C49]"
+                      className="cursor-pointer rounded-lg px-2 py-2 text-[13px] font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"
                     >
                       <LogOut className="mr-2 h-4 w-4" />
                       <span>{logoutItem.label}</span>
@@ -479,7 +479,7 @@ export default function AtsSidebar({
         </div>
       </SidebarFooter>
 
-      <SidebarRail className="after:bg-[#CFD6EA]" />
+      <SidebarRail className="after:bg-sidebar-border" />
     </Sidebar>
   );
 }

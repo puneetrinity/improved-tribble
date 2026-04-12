@@ -149,7 +149,7 @@ export default function ApplicationManagementPage() {
 
   // Redirect if not recruiter or admin
   if (!user || !['recruiter', 'super_admin'].includes(user.role)) {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   const { data: job, isLoading: jobLoading, error: jobError } = useQuery<Job>({
