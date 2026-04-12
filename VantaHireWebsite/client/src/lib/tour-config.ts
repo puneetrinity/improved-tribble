@@ -13,6 +13,7 @@ export interface TourConfig {
   title: string;
   description: string;
   roles?: UserRole[];
+  contextual?: boolean;
   steps: TourStep[];
 }
 
@@ -59,6 +60,7 @@ export const tourConfigs: TourConfig[] = [
     title: "Candidate Pipeline",
     description: "Review, filter, and move candidates through stages",
     roles: ["recruiter", "hiring_manager"],
+    contextual: true,
     steps: [
       {
         target: '[data-tour="job-context"]',
@@ -105,13 +107,6 @@ export const tourConfigs: TourConfig[] = [
         target: '[data-tour="talent-search-results"]',
         content:
           "Active Graph ranks candidates using stored resume evidence, match signals, and prior pipeline context so strong existing candidates are easier to reuse.",
-        route: "/candidates",
-        tourId: "talent-search",
-      },
-      {
-        target: '[data-tour="talent-search-result-card"]',
-        content:
-          "Each result shows why the candidate matched, where they currently sit, and the next actions: open resume or add them to a job.",
         route: "/candidates",
         tourId: "talent-search",
       },
@@ -242,7 +237,7 @@ export function getTourById(tourId: string, userRole?: UserRole): TourStep[] {
 }
 
 export function getAvailableTours(userRole?: UserRole): TourConfig[] {
-  return tourConfigs.filter((config) => roleCanSeeTour(config, userRole));
+  return tourConfigs.filter((config) => !config.contextual && roleCanSeeTour(config, userRole));
 }
 
 export function getQuickStartTours(userRole?: UserRole): TourConfig[] {
