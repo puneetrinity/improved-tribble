@@ -88,6 +88,36 @@ export const tourConfigs: TourConfig[] = [
     ],
   },
   {
+    id: "talent-search",
+    title: "Talent Search",
+    description: "Find reusable candidates with Active Graph",
+    roles: ["recruiter"],
+    steps: [
+      {
+        target: '[data-tour="talent-search-input"]',
+        content:
+          "Search your reusable candidate pool in plain English. Describe the role, skills, seniority, or background you need.",
+        disableBeacon: true,
+        route: "/candidates",
+        tourId: "talent-search",
+      },
+      {
+        target: '[data-tour="talent-search-results"]',
+        content:
+          "Active Graph ranks candidates using stored resume evidence, match signals, and prior pipeline context so strong existing candidates are easier to reuse.",
+        route: "/candidates",
+        tourId: "talent-search",
+      },
+      {
+        target: '[data-tour="talent-search-result-card"]',
+        content:
+          "Each result shows why the candidate matched, where they currently sit, and the next actions: open resume or add them to a job.",
+        route: "/candidates",
+        tourId: "talent-search",
+      },
+    ],
+  },
+  {
     id: "client-workflow",
     title: "Client Workflow",
     description: "Manage clients and shared shortlists",
