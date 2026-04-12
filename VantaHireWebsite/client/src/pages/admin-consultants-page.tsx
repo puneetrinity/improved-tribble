@@ -104,7 +104,7 @@ export default function AdminConsultantsPage() {
 
   // Redirect non-admin users
   if (!user || user.role !== "super_admin") {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   // Fetch all consultants

@@ -95,7 +95,7 @@ export default function AdminFormResponsesPage() {
 
   // Redirect non-admin users
   if (!user || user.role !== "super_admin") {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   // Fetch all form templates for filter dropdown

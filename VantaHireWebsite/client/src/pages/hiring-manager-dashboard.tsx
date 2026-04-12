@@ -56,7 +56,7 @@ export default function HiringManagerDashboard() {
   const [, setLocation] = useLocation();
 
   if (!user || user.role !== "hiring_manager") {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   const { data: allJobs = [], isLoading: jobsLoading } = useQuery<Job[]>({

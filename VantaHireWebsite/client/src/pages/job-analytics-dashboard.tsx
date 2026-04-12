@@ -171,7 +171,7 @@ export default function JobAnalyticsDashboard() {
 
   // Redirect if not authorized
   if (!user || (user.role !== 'super_admin' && user.role !== 'recruiter')) {
-    return <Redirect to="/auth" />;
+    return <Redirect to="/recruiter-auth" />;
   }
 
   const { data: jobsWithAnalytics, isLoading } = useQuery<JobWithAnalytics[]>({

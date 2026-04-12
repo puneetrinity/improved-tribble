@@ -78,7 +78,7 @@ export function ProtectedRoute({
 
   if (!user) {
     // Redirect to appropriate auth page based on required role
-    const authPath = requiredRole?.includes('candidate') ? '/candidate-auth' : '/auth';
+    const authPath = requiredRole?.includes('candidate') ? '/candidate-auth' : '/recruiter-auth';
     const redirectParam = encodeURIComponent(location);
     return (
       <Route path={path}>

@@ -78,8 +78,8 @@ const Footer = ({ minimal = false }: FooterProps) => {
             </h4>
             <ul className="space-y-3">
               <li>
-                <Link href="/product" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
-                  Product
+                <Link href="/features" className="text-[var(--text-muted)] text-sm hover:text-primary transition-colors">
+                  Platform
                 </Link>
               </li>
               <li>
