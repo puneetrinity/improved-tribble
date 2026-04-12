@@ -309,15 +309,14 @@ export default function AtsSidebar({
                         "group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:hover:bg-sidebar-accent group-data-[collapsible=icon]:data-[active=true]:bg-sidebar-accent",
                         "group-data-[collapsible=icon]:text-sidebar-foreground/70 group-data-[collapsible=icon]:hover:text-sidebar-foreground group-data-[collapsible=icon]:data-[active=true]:text-sidebar-primary",
                         "[&>span]:transition-opacity [&>span]:duration-150 group-data-[collapsible=icon]:[&>span]:opacity-0",
-                        item.path === "/candidates" && "h-12"
                       )}
                     >
                       <Icon className="h-4 w-4 shrink-0 group-data-[collapsible=icon]:m-0" />
-                      <span className="min-w-0">
-                        <span className="block truncate">{item.label}</span>
+                      <span className="min-w-0 truncate">
+                        <span>{item.label}</span>
                         {item.path === "/candidates" && (
-                          <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-sidebar-primary/85">
-                            Powered by Active Graph
+                          <span className="ml-1 text-[9px] font-semibold uppercase tracking-[0.08em] text-sidebar-primary/75">
+                            Active Graph
                           </span>
                         )}
                       </span>
