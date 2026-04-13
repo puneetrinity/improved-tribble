@@ -1,11 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { EmailTemplate } from "@shared/schema";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +20,13 @@ import {
 } from "@/components/ui/dialog";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Mail, Plus, Loader2, Eye, Pencil } from "lucide-react";
+import {
+  InternalEmptyState,
+  InternalHero,
+  InternalPageShell,
+  InternalPanel,
+  InternalSectionHeader,
+} from "@/components/internal";
 
 export default function AdminEmailTemplatesPage() {
   const { user } = useAuth();
@@ -206,74 +211,90 @@ export default function AdminEmailTemplatesPage() {
     }
   };
 
+  const filteredTemplates = templates
+    .filter((template) => typeFilter === "all" || template.templateType === typeFilter)
+    .sort((a, b) => {
+      if (a.isDefault && !b.isDefault) return -1;
+      if (!a.isDefault && b.isDefault) return 1;
+      return a.name.localeCompare(b.name);
+    });
+
   return (
-    <Layout>
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between pt-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground flex items-center gap-2">
-              <Mail className="w-7 h-7 text-primary" />
-              Email Templates
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              View and create reusable email templates for candidates.
-            </p>
-          </div>
-          {(user && ["super_admin", "recruiter"].includes(user.role)) && (
-            <Button onClick={() => setShowCreateDialog(true)} data-tour="create-template-button">
-              <Plus className="w-4 h-4 mr-2" />
+    <InternalPageShell>
+      <InternalHero
+        eyebrow="Communication Library"
+        title="Email Templates"
+        subtitle="View and create reusable email templates for candidates."
+        icon={Mail}
+        actions={
+          user && ["super_admin", "recruiter"].includes(user.role) ? (
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              data-tour="create-template-button"
+              className="h-11 rounded-2xl bg-[#5B4FF7] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+            >
+              <Plus className="mr-2 h-4 w-4" />
               Create Template
             </Button>
-          )}
+          ) : null
+        }
+        stats={[
+          { label: "Templates", value: templates.length },
+          { label: "Defaults", value: templates.filter((template) => template.isDefault).length },
+          {
+            label: "Visible",
+            value: filteredTemplates.length,
+            accentClassName: "text-[#4D41DF]",
+          },
+        ]}
+      />
+
+      <InternalPanel className="p-5" data-tour="email-templates-list">
+        <InternalSectionHeader
+          title="Templates"
+          description={
+            user?.role === "super_admin"
+              ? "All email templates (system defaults and custom templates)"
+              : "Email templates available for your ATS workflows"
+          }
+        />
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            { value: "all", label: "All" },
+            { value: "application_received", label: "App Received" },
+            { value: "interview_invite", label: "Interview" },
+            { value: "status_update", label: "Status Update" },
+            { value: "offer_extended", label: "Offer" },
+            { value: "rejection", label: "Rejection" },
+            { value: "custom", label: "Custom" },
+          ].map(({ value, label }) => (
+            <Badge
+              key={value}
+              variant={typeFilter === value ? "default" : "outline"}
+              className="cursor-pointer rounded-full px-3 py-1 font-dm text-xs hover:bg-primary/10"
+              onClick={() => setTypeFilter(value)}
+            >
+              {label}
+            </Badge>
+          ))}
         </div>
 
-        {/* Templates Table */}
-        <Card className="shadow-sm" data-tour="email-templates-list">
-          <CardHeader>
-            <CardTitle className="text-foreground">Templates</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              {user?.role === "super_admin"
-                ? "All email templates (system defaults and custom templates)"
-                : "Email templates available for your ATS workflows"}
-            </CardDescription>
-
-            {/* Filter Chips */}
-            <div className="flex flex-wrap gap-2 pt-3">
-              {[
-                { value: "all", label: "All" },
-                { value: "application_received", label: "App Received" },
-                { value: "interview_invite", label: "Interview" },
-                { value: "status_update", label: "Status Update" },
-                { value: "offer_extended", label: "Offer" },
-                { value: "rejection", label: "Rejection" },
-                { value: "custom", label: "Custom" },
-              ].map(({ value, label }) => (
-                <Badge
-                  key={value}
-                  variant={typeFilter === value ? "default" : "outline"}
-                  className="cursor-pointer hover:bg-primary/10"
-                  onClick={() => setTypeFilter(value)}
-                >
-                  {label}
-                </Badge>
-              ))}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              </div>
-            ) : templates.length === 0 ? (
-              <div className="text-center py-12">
-                <Mail className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-2">No email templates yet</p>
-                <p className="text-muted-foreground text-sm">
-                  Create your first template to standardize candidate communication.
-                </p>
-              </div>
-            ) : (
+        <div className="mt-5">
+          {isLoading ? (
+            <InternalEmptyState
+              icon={Loader2}
+              title="Loading email templates"
+              className="[&_svg]:animate-spin"
+            />
+          ) : templates.length === 0 ? (
+            <InternalEmptyState
+              icon={Mail}
+              title="No email templates yet"
+              description="Create your first template to standardize candidate communication."
+            />
+          ) : (
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-muted/50">
@@ -287,15 +308,7 @@ export default function AdminEmailTemplatesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {templates
-                    .filter((t) => typeFilter === "all" || t.templateType === typeFilter)
-                    .sort((a, b) => {
-                      // Sort defaults to top
-                      if (a.isDefault && !b.isDefault) return -1;
-                      if (!a.isDefault && b.isDefault) return 1;
-                      return a.name.localeCompare(b.name);
-                    })
-                    .map((tpl) => (
+                  {filteredTemplates.map((tpl) => (
                     <TableRow
                       key={tpl.id}
                       data-template-id={tpl.id}
@@ -382,9 +395,10 @@ export default function AdminEmailTemplatesPage() {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
+      </InternalPanel>
 
         {/* Create Template Dialog */}
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
@@ -601,7 +615,6 @@ export default function AdminEmailTemplatesPage() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
-    </Layout>
+    </InternalPageShell>
   );
 }

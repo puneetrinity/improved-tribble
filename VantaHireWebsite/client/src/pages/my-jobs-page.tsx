@@ -2,17 +2,21 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Eye, Briefcase, Plus, Play, Search, Edit, LayoutGrid, CheckCircle, Clock, Archive } from "lucide-react";
-import Layout from "@/components/Layout";
+import { Eye, Briefcase, Plus, Play, Search, LayoutGrid, CheckCircle, Clock, Archive } from "lucide-react";
 import { PageHeaderSkeleton, FilterBarSkeleton, JobListSkeleton } from "@/components/skeletons";
 import { SubNav, type SubNavItem } from "@/components/SubNav";
 import { myJobsPageCopy } from "@/lib/internal-copy";
+import {
+  InternalEmptyState,
+  InternalHero,
+  InternalPageShell,
+  InternalPanel,
+  InternalSectionHeader,
+} from "@/components/internal";
 import type { Job } from "@shared/schema";
 
 type JobWithCounts = Job & {
@@ -101,178 +105,176 @@ export default function MyJobsPage() {
 
   if (jobsLoading) {
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="space-y-6 pt-8">
-            <PageHeaderSkeleton />
-            <FilterBarSkeleton />
-            <JobListSkeleton count={4} />
-          </div>
-        </div>
-      </Layout>
+      <InternalPageShell>
+        <PageHeaderSkeleton />
+        <FilterBarSkeleton />
+        <InternalPanel className="p-5">
+          <JobListSkeleton count={4} />
+        </InternalPanel>
+      </InternalPageShell>
     );
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-6 pt-8">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{myJobsPageCopy.header.title}</h1>
-              <p className="text-muted-foreground text-sm md:text-base">{myJobsPageCopy.header.subtitle}</p>
-            </div>
-            <Button onClick={() => setLocation("/jobs/post")} data-tour="post-job-button">
-              <Plus className="h-4 w-4 mr-2" />
-              {myJobsPageCopy.header.primaryAction}
-            </Button>
-          </div>
+    <InternalPageShell>
+      <InternalHero
+        eyebrow="Job Workspace"
+        title={myJobsPageCopy.header.title}
+        subtitle={myJobsPageCopy.header.subtitle}
+        icon={Briefcase}
+        actions={
+          <Button
+            onClick={() => setLocation("/jobs/post")}
+            data-tour="post-job-button"
+            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {myJobsPageCopy.header.primaryAction}
+          </Button>
+        }
+        stats={[
+          { label: "Total Jobs", value: jobs.length },
+          { label: "Active", value: activeCount, accentClassName: "text-[#16A34A]" },
+          { label: "Pending", value: pendingCount, accentClassName: pendingCount > 0 ? "text-[#D97706]" : undefined },
+        ]}
+      />
 
-          {/* Sub Navigation */}
-          <SubNav
-            items={subNavItems}
-            activeId={activeTab}
-            onChange={setActiveTab}
-            className="rounded-lg"
+      <InternalPanel className="p-4 sm:p-5">
+        <SubNav
+          items={subNavItems}
+          activeId={activeTab}
+          onChange={setActiveTab}
+          className="rounded-2xl border border-[#EEF0F4] bg-[#F8F8FA]"
+        />
+
+        <div className="relative mt-4">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8191]" />
+          <Input
+            placeholder={myJobsPageCopy.searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-11 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] pl-10 font-outfit text-sm text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] placeholder:text-[#9CA3AF]"
           />
+        </div>
+      </InternalPanel>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-            <Input
-              placeholder={myJobsPageCopy.searchPlaceholder}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-
-          {/* Jobs List */}
-          <Card className="shadow-sm" data-tour="jobs-list">
-            <CardHeader>
-              <CardTitle className="text-foreground text-lg">
-                {myJobsPageCopy.list.title} ({filteredJobs.length})
-              </CardTitle>
-              <CardDescription>
-                {myJobsPageCopy.list.description}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredJobs.length === 0 ? (
-                  <div className="text-center py-8">
-                    {/* Show pending approval message when user has pending jobs but none in current filter */}
-                    {pendingCount > 0 && activeTab !== "pending" && !searchQuery ? (
-                      <>
-                        <Clock className="h-12 w-12 text-warning/50 mx-auto mb-4" />
-                        <p className="text-foreground font-medium mb-2">
-                          {pendingCount === 1
-                            ? myJobsPageCopy.empty.pendingSingle
-                            : `${myJobsPageCopy.empty.pendingMultiplePrefix} ${pendingCount} ${myJobsPageCopy.empty.pendingMultipleSuffix}`}
-                        </p>
-                        <p className="text-muted-foreground text-sm mb-4">
-                          {myJobsPageCopy.empty.pendingDescription}
-                        </p>
-                        <div className="flex gap-3 justify-center">
-                          <Button variant="outline" onClick={() => setActiveTab("pending")}>
-                            <Clock className="h-4 w-4 mr-2" />
-                            {myJobsPageCopy.empty.viewPending}
-                          </Button>
-                          <Button onClick={() => setLocation("/jobs/post")}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            {myJobsPageCopy.empty.postAnother}
-                          </Button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <Briefcase className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                        <p className="text-muted-foreground mb-2">
-                          {searchQuery || activeTab !== "all"
-                            ? myJobsPageCopy.empty.filtered
-                            : myJobsPageCopy.empty.none}
-                        </p>
-                        {!searchQuery && activeTab === "all" && (
-                          <Button className="mt-4" onClick={() => setLocation("/jobs/post")}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            {myJobsPageCopy.empty.firstJob}
-                          </Button>
-                        )}
-                      </>
+      <InternalPanel className="p-5" data-tour="jobs-list">
+        <InternalSectionHeader
+          title={`${myJobsPageCopy.list.title} (${filteredJobs.length})`}
+          description={myJobsPageCopy.list.description}
+        />
+        <div className="mt-5 space-y-4">
+          {filteredJobs.length === 0 ? (
+            <>
+              {pendingCount > 0 && activeTab !== "pending" && !searchQuery ? (
+                <InternalEmptyState
+                  icon={Clock}
+                  title={
+                    pendingCount === 1
+                      ? myJobsPageCopy.empty.pendingSingle
+                      : `${myJobsPageCopy.empty.pendingMultiplePrefix} ${pendingCount} ${myJobsPageCopy.empty.pendingMultipleSuffix}`
+                  }
+                  description={myJobsPageCopy.empty.pendingDescription}
+                  actions={
+                    <>
+                      <Button variant="outline" onClick={() => setActiveTab("pending")}>
+                        <Clock className="mr-2 h-4 w-4" />
+                        {myJobsPageCopy.empty.viewPending}
+                      </Button>
+                      <Button onClick={() => setLocation("/jobs/post")}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {myJobsPageCopy.empty.postAnother}
+                      </Button>
+                    </>
+                  }
+                />
+              ) : (
+                <InternalEmptyState
+                  icon={Briefcase}
+                  title={
+                    searchQuery || activeTab !== "all"
+                      ? myJobsPageCopy.empty.filtered
+                      : myJobsPageCopy.empty.none
+                  }
+                  actions={
+                    !searchQuery && activeTab === "all" ? (
+                      <Button onClick={() => setLocation("/jobs/post")}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        {myJobsPageCopy.empty.firstJob}
+                      </Button>
+                    ) : null
+                  }
+                />
+              )}
+            </>
+          ) : (
+            filteredJobs.map((job) => (
+              <div
+                key={job.id}
+                className="rounded-[20px] border border-[#EEF0F4] bg-[#F8F8FA] p-4 transition-all hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_14px_34px_rgba(15,23,42,0.07)]"
+              >
+                <div className="mb-3 flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-satoshi text-lg font-bold tracking-[-0.02em] text-[#111827]">{job.title}</h3>
+                    <p className="font-dm text-sm text-[#687182]">{job.company} • {job.location}</p>
+                    {job.hiringManager && (
+                      <p className="mt-1 font-dm text-sm text-[#687182]">
+                        {myJobsPageCopy.empty.hiringManager}: {job.hiringManager.firstName && job.hiringManager.lastName
+                          ? `${job.hiringManager.firstName} ${job.hiringManager.lastName}`
+                          : job.hiringManager.username}
+                      </p>
+                    )}
+                    {!job.hiringManager && (
+                      <p className="mt-1 font-dm text-sm text-[#687182]">{myJobsPageCopy.empty.hiringManager}: —</p>
+                    )}
+                    <p className="mt-1 font-dm text-sm text-[#687182]">{job.type}</p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <Badge className={getStatusColor(job.status)}>
+                      {job.status}
+                    </Badge>
+                    {job.isActive && (
+                      <Badge className="border-info/30 bg-info/10 text-info-foreground">
+                        Live
+                      </Badge>
                     )}
                   </div>
-                ) : (
-                  filteredJobs.map((job) => (
-                    <div
-                      key={job.id}
-                      className="p-4 rounded-lg bg-muted/50 border border-border"
+                </div>
+
+                <p className="mb-3 line-clamp-2 font-outfit text-sm leading-relaxed text-[#5F6675]">{job.description}</p>
+
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="font-dm text-sm text-[#687182]">
+                    {job.applicationCount || 0} applications
+                  </span>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setLocation(`/jobs/${job.id}/applications`)}
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <h3 className="text-foreground font-medium text-lg">{job.title}</h3>
-                          <p className="text-muted-foreground">{job.company} • {job.location}</p>
-                          {job.hiringManager && (
-                            <p className="text-muted-foreground text-sm mt-1">
-                              {myJobsPageCopy.empty.hiringManager}: {job.hiringManager.firstName && job.hiringManager.lastName
-                                ? `${job.hiringManager.firstName} ${job.hiringManager.lastName}`
-                                : job.hiringManager.username}
-                            </p>
-                          )}
-                          {!job.hiringManager && (
-                            <p className="text-muted-foreground text-sm mt-1">{myJobsPageCopy.empty.hiringManager}: —</p>
-                          )}
-                          <p className="text-muted-foreground text-sm mt-1">{job.type}</p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge className={getStatusColor(job.status)}>
-                            {job.status}
-                          </Badge>
-                          {job.isActive && (
-                            <Badge className="bg-info/10 text-info-foreground border-info/30">
-                              Live
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      <p className="text-muted-foreground text-sm mb-3 line-clamp-2">{job.description}</p>
-
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground text-sm">
-                          {job.applicationCount || 0} applications
-                        </span>
-
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setLocation(`/jobs/${job.id}/applications`)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View Applications
-                          </Button>
-                          {job.status === 'approved' && !job.isActive && (
-                            <Button
-                              size="sm"
-                              onClick={() => publishJobMutation.mutate({ jobId: job.id, isActive: true })}
-                              disabled={publishJobMutation.isPending}
-                              className="bg-success hover:bg-success/80 text-foreground"
-                            >
-                              <Play className="h-4 w-4 mr-1" />
-                              {publishJobMutation.isPending ? 'Publishing...' : 'Publish'}
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                      <Eye className="mr-1 h-4 w-4" />
+                      View Applications
+                    </Button>
+                    {job.status === 'approved' && !job.isActive && (
+                      <Button
+                        size="sm"
+                        onClick={() => publishJobMutation.mutate({ jobId: job.id, isActive: true })}
+                        disabled={publishJobMutation.isPending}
+                        className="bg-success text-foreground hover:bg-success/80"
+                      >
+                        <Play className="mr-1 h-4 w-4" />
+                        {publishJobMutation.isPending ? 'Publishing...' : 'Publish'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            ))
+          )}
         </div>
-      </div>
-    </Layout>
+      </InternalPanel>
+    </InternalPageShell>
   );
 }

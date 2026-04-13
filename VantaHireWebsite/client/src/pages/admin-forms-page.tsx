@@ -1,6 +1,5 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,12 +26,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FileText, Plus, Edit, Trash2, Eye, EyeOff, Loader2, Upload, X, Users, AlertTriangle, CheckCircle } from "lucide-react";
-import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect, useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { formsApi, formsQueryKeys, type FormTemplateDTO, type InvitationQuotaResponse } from "@/lib/formsApi";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import {
+  InternalEmptyState,
+  InternalHero,
+  InternalPageShell,
+  InternalPanel,
+  InternalSectionHeader,
+} from "@/components/internal";
 
 // Helper to validate email
 const isValidEmail = (email: string): boolean => {
@@ -311,55 +316,63 @@ export default function AdminFormsPage() {
   };
 
   const templates = templatesData?.templates || [];
+  const publishedCount = templates.filter((template) => template.isPublished).length;
+  const draftCount = templates.length - publishedCount;
 
   return (
-    <Layout>
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between pt-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground flex items-center gap-2">
-              <FileText className="w-7 h-7 text-primary" />
-              Form Templates
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Create and manage custom forms to send to candidates
-            </p>
-          </div>
+    <InternalPageShell>
+      <InternalHero
+        eyebrow="Candidate Intake"
+        title="Form Templates"
+        subtitle="Create and manage custom forms to send to candidates"
+        icon={FileText}
+        actions={
           <Button
             onClick={handleCreateNew}
-            className=""
             data-tour="create-form-button"
+            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
           >
-            <Plus className="w-4 h-4 mr-2" />
+            <Plus className="mr-2 h-4 w-4" />
             Create Template
           </Button>
-        </div>
+        }
+        stats={[
+          { label: "Templates", value: templates.length },
+          { label: "Published", value: publishedCount, accentClassName: "text-[#16A34A]" },
+          { label: "Drafts", value: draftCount, accentClassName: draftCount > 0 ? "text-[#D97706]" : undefined },
+        ]}
+      />
 
-        {/* Templates Table */}
-        <Card className="shadow-sm" data-tour="forms-list">
-          <CardHeader>
-            <CardTitle className="text-foreground">Templates</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              {user?.role === 'super_admin'
-                ? 'All form templates (published and drafts)'
-                : 'Published templates and your own drafts'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              </div>
-            ) : templates.length === 0 ? (
-              <div className="text-center py-12">
-                <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-2">No templates yet</p>
-                <p className="text-muted-foreground text-sm">
-                  Create your first template to get started
-                </p>
-              </div>
-            ) : (
+      <InternalPanel className="p-5" data-tour="forms-list">
+        <InternalSectionHeader
+          title="Templates"
+          description={
+            user?.role === 'super_admin'
+              ? 'All form templates (published and drafts)'
+              : 'Published templates and your own drafts'
+          }
+        />
+        <div className="mt-5">
+          {isLoading ? (
+            <InternalEmptyState
+              icon={Loader2}
+              title="Loading form templates"
+              className="[&_svg]:animate-spin"
+            />
+          ) : templates.length === 0 ? (
+            <InternalEmptyState
+              icon={FileText}
+              title="No templates yet"
+              description="Create your first template to get started"
+              actions={
+                <Button onClick={handleCreateNew}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Template
+                </Button>
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-muted/50">
@@ -469,9 +482,10 @@ export default function AdminFormsPage() {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
+      </InternalPanel>
 
         {/* Delete Confirmation Dialog */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
@@ -696,7 +710,6 @@ export default function AdminFormsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    </Layout>
+    </InternalPageShell>
   );
 }
