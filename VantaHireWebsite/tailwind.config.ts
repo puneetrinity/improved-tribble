@@ -6,10 +6,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        dm: ['"DM Sans"', "-apple-system", "sans-serif"],
-        satoshi: ["Satoshi", "sans-serif"],
-        mono: ['"JetBrains Mono"', "monospace"],
-        outfit: ["Outfit", "sans-serif"],
+        dm: ["var(--font-dm)", "-apple-system", "sans-serif"],
+        satoshi: ["var(--font-satoshi)", "sans-serif"],
+        mono: ["var(--font-mono)"],
+        outfit: ["var(--font-outfit)", "sans-serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -537,4 +537,3 @@ export default function RecruiterAuth() {
     </div>
   );
 }
-

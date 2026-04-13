@@ -447,7 +447,7 @@ export function StageFunnel({
     <Card className={cn(DASHBOARD_PANEL, "rounded-[28px] bg-white/95")}>
       <CardHeader className="pb-2">
         <p className={cn(DASHBOARD_EYEBROW, "mb-3")}>{recruiterDashboardCopy.funnel.eyebrow}</p>
-        <CardTitle className={cn(DASHBOARD_TITLE, "text-xl leading-tight")}>
+        <CardTitle className={cn(DASHBOARD_TITLE, "text-[22px] leading-tight")}>
           {title}
         </CardTitle>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#6B7280]">
@@ -528,7 +528,7 @@ export function StageFunnel({
 
                         <div className="w-[72px] shrink-0 text-right md:w-[84px] xl:w-[96px]">
                           <div
-                            className="font-satoshi text-sm font-[700] leading-none text-[#111827]"
+                            className="font-satoshi text-[15px] font-[700] leading-none text-[#111827] md:text-[16px] xl:text-[17px]"
                           >
                             {formatCompactNumber(stage.count)}
                           </div>
@@ -570,7 +570,7 @@ export function StageFunnel({
                   </div>
 
                   <h3
-                    className="mt-9 min-h-[60px] font-satoshi text-base font-[700] leading-tight text-[#191C1E]"
+                    className="mt-9 min-h-[60px] font-satoshi text-[24px] font-[700] leading-tight text-[#191C1E]"
                   >
                     {hoveredStage ? `${hoveredStage.name} ${recruiterDashboardCopy.funnel.snapshotSuffix}` : recruiterDashboardCopy.funnel.overviewTitle}
                   </h3>
@@ -652,8 +652,3 @@ export function StageFunnel({
     </Card>
   );
 }
-
-
-
-
-

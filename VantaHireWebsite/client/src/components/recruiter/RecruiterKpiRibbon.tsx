@@ -689,10 +689,10 @@ function KpiCard({
 
         <div className="mt-3.5 flex items-end justify-between gap-4">
           <div className="min-w-0">
-            <div className="kpi-value text-2xl font-bold leading-none tracking-[-0.04em] text-slate-900  ">
+            <div className="kpi-value text-[24px] font-bold leading-none tracking-[-0.04em] text-slate-900 md:text-[28px] xl:text-[29px]">
               {fallbackText(card.displayValue)}
             </div>
-            <div className="mt-1.5 text-xs font-medium text-slate-500">{fallbackText(card.contextLine)}</div>
+            <div className="mt-1.5 text-[13px] font-medium text-slate-500">{fallbackText(card.contextLine)}</div>
           </div>
           {showTrend ? (
             <div className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", trend.className)}>
@@ -829,6 +829,3 @@ export function RecruiterKpiRibbon({ data, isLoading, className }: RecruiterKpiR
     </TooltipProvider>
   );
 }
-
-
-

@@ -49,4 +49,3 @@ export const legalInfoLabelCls =
 
 export const legalInfoDescCls =
   "text-[0.8rem] text-hr-text-secondary leading-[1.4]";
-

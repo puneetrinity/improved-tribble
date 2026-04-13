@@ -265,4 +265,3 @@ const FeaturesGrid = () => {
 };
 
 export default FeaturesGrid;
-

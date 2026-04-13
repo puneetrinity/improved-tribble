@@ -140,4 +140,3 @@ const HomepageNav = () => {
 };
 
 export default HomepageNav;
-

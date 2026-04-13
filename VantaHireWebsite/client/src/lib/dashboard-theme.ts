@@ -18,4 +18,3 @@ export const DASHBOARD_EYEBROW =
 
 export const DASHBOARD_TITLE =
   "font-satoshi text-[22px] font-extrabold tracking-[-0.03em] text-[#0F172A]";
-

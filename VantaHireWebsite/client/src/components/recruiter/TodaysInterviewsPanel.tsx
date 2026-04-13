@@ -338,4 +338,3 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
     </section>
   );
 }
-

@@ -185,7 +185,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
           <div className="space-y-2">
             <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.actionsPanel.eyebrow}</p>
             <div className="flex items-center gap-3">
-              <h2 className={cn(DASHBOARD_TITLE, "text-base leading-none")}>{recruiterDashboardCopy.actionsPanel.title}</h2>
+              <h2 className={cn(DASHBOARD_TITLE, "text-[20px] leading-none")}>{recruiterDashboardCopy.actionsPanel.title}</h2>
               <span className="inline-flex items-center rounded-[20px] bg-[#EEF0FF] px-2 py-1 font-inter text-xs font-semibold leading-none text-[#4D41DF]">
                 {totalCount}
               </span>
@@ -265,7 +265,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-manrope text-sm font-semibold leading-[1.25] text-[#191C1E]">
+                      <h3 className="truncate font-manrope text-[15px] font-semibold leading-[1.25] text-[#191C1E]">
                         {item.title}
                       </h3>
                       <p className="mt-1 truncate font-inter text-sm font-normal leading-[1.35] text-[#464555]">
@@ -325,6 +325,3 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
     </section>
   );
 }
-
-
-
