@@ -2,17 +2,22 @@ import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Eye, Users, Search, Sparkles, Brain, AlertCircle, MessageCircle } from "lucide-react";
-import Layout from "@/components/Layout";
 import { PageHeaderSkeleton, FilterBarSkeleton, ApplicationListSkeleton } from "@/components/skeletons";
 import { ResumePreviewModal } from "@/components/ResumePreviewModal";
 import { applicationsPageCopy } from "@/lib/internal-copy";
+import {
+  InternalEmptyState,
+  InternalHero,
+  InternalPageShell,
+  InternalPanel,
+  InternalSectionHeader,
+} from "@/components/internal";
 import type { Application, PipelineStage } from "@shared/schema";
 
 // Extended types for API responses with relations
@@ -218,142 +223,125 @@ export default function ApplicationsPage() {
 
   if (applicationsLoading) {
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="space-y-6 pt-8">
-            <PageHeaderSkeleton />
-            <FilterBarSkeleton />
-            <Card className="shadow-sm">
-              <CardHeader>
-                <CardTitle className="text-foreground text-lg">
-                  <div className="h-6 w-40 bg-muted rounded animate-pulse" />
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ApplicationListSkeleton count={5} />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </Layout>
+      <InternalPageShell>
+        <PageHeaderSkeleton />
+        <FilterBarSkeleton />
+        <InternalPanel className="p-5">
+          <ApplicationListSkeleton count={5} />
+        </InternalPanel>
+      </InternalPageShell>
     );
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-6 pt-8">
-          {/* Header */}
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">{applicationsPageCopy.header.title}</h1>
-            <p className="text-muted-foreground text-sm md:text-base">{applicationsPageCopy.header.subtitle}</p>
+    <InternalPageShell>
+      <InternalHero
+        eyebrow="Candidate Review"
+        title={applicationsPageCopy.header.title}
+        subtitle={applicationsPageCopy.header.subtitle}
+        icon={Users}
+        stats={[
+          { label: "Total Applications", value: applications.length },
+          { label: "Visible", value: filteredApplications.length },
+          {
+            label: "With Feedback",
+            value: applications.filter((app) => (app.feedbackCount ?? 0) > 0).length,
+            accentClassName: "text-[#4D41DF]",
+          },
+        ]}
+      />
+
+      <InternalPanel className="p-4 sm:p-5" data-tour="applications-filters">
+        <div className="space-y-4">
+          <div className="flex flex-col gap-4 md:flex-row">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8191]" />
+              <Input
+                placeholder={applicationsPageCopy.filters.searchPlaceholder}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] pl-10 font-outfit text-sm text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] placeholder:text-[#9CA3AF]"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] md:w-48">
+                <SelectValue placeholder={applicationsPageCopy.filters.statusPlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{applicationsPageCopy.filters.allStatus}</SelectItem>
+                <SelectItem value="submitted">{applicationsPageCopy.filters.submitted}</SelectItem>
+                <SelectItem value="shortlisted">{applicationsPageCopy.filters.shortlisted}</SelectItem>
+                <SelectItem value="rejected">{applicationsPageCopy.filters.rejected}</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Filters */}
-          <Card className="shadow-sm" data-tour="applications-filters">
-            <CardContent className="p-4">
-              <div className="space-y-4">
-                {/* Row 1: Search and Status */}
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="flex-1 relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                    <Input
-                      placeholder={applicationsPageCopy.filters.searchPlaceholder}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full md:w-48">
-                      <SelectValue placeholder={applicationsPageCopy.filters.statusPlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{applicationsPageCopy.filters.allStatus}</SelectItem>
-                      <SelectItem value="submitted">{applicationsPageCopy.filters.submitted}</SelectItem>
-                      <SelectItem value="shortlisted">{applicationsPageCopy.filters.shortlisted}</SelectItem>
-                      <SelectItem value="rejected">{applicationsPageCopy.filters.rejected}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+          <div className="flex flex-col gap-4 md:flex-row">
+            <Select value={stageFilter} onValueChange={setStageFilter}>
+              <SelectTrigger className="w-full rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] md:w-56">
+                <SelectValue placeholder={applicationsPageCopy.filters.stagePlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{applicationsPageCopy.filters.allStages}</SelectItem>
+                <SelectItem value="unassigned">{applicationsPageCopy.filters.unassigned}</SelectItem>
+                {pipelineStages.map((stage) => (
+                  <SelectItem key={stage.id} value={stage.id.toString()}>
+                    {stage.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-                {/* Row 2: Stage, Feedback, and Rating filters */}
-                <div className="flex flex-col md:flex-row gap-4">
-                  {/* Stage Filter */}
-                  <Select value={stageFilter} onValueChange={setStageFilter}>
-                    <SelectTrigger className="w-full md:w-56">
-                      <SelectValue placeholder={applicationsPageCopy.filters.stagePlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{applicationsPageCopy.filters.allStages}</SelectItem>
-                      <SelectItem value="unassigned">{applicationsPageCopy.filters.unassigned}</SelectItem>
-                      {pipelineStages.map((stage) => (
-                        <SelectItem key={stage.id} value={stage.id.toString()}>
-                          {stage.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+            <Select value={feedbackFilter} onValueChange={setFeedbackFilter}>
+              <SelectTrigger className="w-full rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] md:w-56">
+                <SelectValue placeholder={applicationsPageCopy.filters.feedbackPlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{applicationsPageCopy.filters.allApplications}</SelectItem>
+                <SelectItem value="with-feedback">{applicationsPageCopy.filters.withFeedback}</SelectItem>
+                <SelectItem value="without-feedback">{applicationsPageCopy.filters.withoutFeedback}</SelectItem>
+              </SelectContent>
+            </Select>
 
-                  {/* Feedback Filter */}
-                  <Select value={feedbackFilter} onValueChange={setFeedbackFilter}>
-                    <SelectTrigger className="w-full md:w-56">
-                      <SelectValue placeholder={applicationsPageCopy.filters.feedbackPlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">{applicationsPageCopy.filters.allApplications}</SelectItem>
-                      <SelectItem value="with-feedback">{applicationsPageCopy.filters.withFeedback}</SelectItem>
-                      <SelectItem value="without-feedback">{applicationsPageCopy.filters.withoutFeedback}</SelectItem>
-                    </SelectContent>
-                  </Select>
+            <Select value={minRating} onValueChange={setMinRating}>
+              <SelectTrigger className="w-full rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] md:w-48">
+                <SelectValue placeholder={applicationsPageCopy.filters.ratingPlaceholder} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">{applicationsPageCopy.filters.allRatings}</SelectItem>
+                <SelectItem value="1">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.onePlus}</SelectItem>
+                <SelectItem value="2">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.twoPlus}</SelectItem>
+                <SelectItem value="3">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.threePlus}</SelectItem>
+                <SelectItem value="4">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.fourPlus}</SelectItem>
+                <SelectItem value="5">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.five}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </InternalPanel>
 
-                  {/* Rating Filter */}
-                  <Select value={minRating} onValueChange={setMinRating}>
-                    <SelectTrigger className="w-full md:w-48">
-                      <SelectValue placeholder={applicationsPageCopy.filters.ratingPlaceholder} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">{applicationsPageCopy.filters.allRatings}</SelectItem>
-                      <SelectItem value="1">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.onePlus}</SelectItem>
-                      <SelectItem value="2">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.twoPlus}</SelectItem>
-                      <SelectItem value="3">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.threePlus}</SelectItem>
-                      <SelectItem value="4">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.fourPlus}</SelectItem>
-                      <SelectItem value="5">{applicationsPageCopy.filters.ratingsPrefix} {applicationsPageCopy.filters.five}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Applications List */}
-          <Card className="shadow-sm" data-tour="applications-list">
-            <CardHeader>
-              <CardTitle className="text-foreground text-lg">
-                {applicationsPageCopy.list.title} ({filteredApplications.length})
-              </CardTitle>
-              <CardDescription>
-                {applicationsPageCopy.list.description}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {filteredApplications.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Users className="h-12 w-12 text-muted-foreground/50 mx-auto mb-4" />
-                    <p className="text-muted-foreground">
-                      {searchQuery || statusFilter !== "all"
-                        ? applicationsPageCopy.list.emptyFiltered
-                        : applicationsPageCopy.list.emptyNone}
-                    </p>
-                  </div>
-                ) : (
-                  filteredApplications.map((application) => (
-                    <div
-                      key={application.id}
-                      className="p-4 rounded-lg bg-muted/50 border border-border space-y-3"
-                      data-testid="application-row"
-                    >
+      <InternalPanel className="p-5" data-tour="applications-list">
+        <InternalSectionHeader
+          title={`${applicationsPageCopy.list.title} (${filteredApplications.length})`}
+          description={applicationsPageCopy.list.description}
+        />
+        <div className="mt-5 space-y-4">
+          {filteredApplications.length === 0 ? (
+            <InternalEmptyState
+              icon={Users}
+              title={
+                searchQuery || statusFilter !== "all"
+                  ? applicationsPageCopy.list.emptyFiltered
+                  : applicationsPageCopy.list.emptyNone
+              }
+            />
+          ) : (
+            filteredApplications.map((application) => (
+              <div
+                key={application.id}
+                className="space-y-3 rounded-[20px] border border-[#EEF0F4] bg-[#F8F8FA] p-4 transition-all hover:bg-white hover:shadow-[0_14px_34px_rgba(15,23,42,0.07)]"
+                data-testid="application-row"
+              >
                       <div className="flex items-center justify-between">
                         <div className="space-y-1">
                           <h3 className="text-foreground font-medium">{application.name}</h3>
@@ -419,14 +407,11 @@ export default function ApplicationsPage() {
                           </div>
                         </div>
                       ) : null}
-                    </div>
-                  ))
-                )}
               </div>
-            </CardContent>
-          </Card>
+            ))
+          )}
         </div>
-      </div>
+      </InternalPanel>
 
       {/* Application Review Modal */}
       <ResumePreviewModal
@@ -468,6 +453,6 @@ export default function ApplicationsPage() {
           }
         }}
       />
-    </Layout>
+    </InternalPageShell>
   );
 }

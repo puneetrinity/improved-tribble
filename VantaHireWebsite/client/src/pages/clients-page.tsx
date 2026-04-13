@@ -1,17 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import type { Client } from "@shared/schema";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-} from "@/components/ui/card";
 import {
   Table,
   TableHeader,
@@ -34,6 +26,13 @@ import {
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { Building2, Mail, Plus, Loader2, Search } from "lucide-react";
 import { clientsPageCopy } from "@/lib/internal-copy";
+import {
+  InternalEmptyState,
+  InternalHero,
+  InternalPageShell,
+  InternalPanel,
+  InternalSectionHeader,
+} from "@/components/internal";
 
 export default function ClientsPage() {
   const { user } = useAuth();
@@ -205,64 +204,65 @@ export default function ClientsPage() {
   });
 
   return (
-    <Layout>
-      <div className="max-w-7xl mx-auto p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between pt-8">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground flex items-center gap-2">
-              <Building2 className="w-7 h-7 text-primary" />
-              {clientsPageCopy.header.title}
-            </h1>
-            <p className="text-muted-foreground text-sm md:text-base">
-              {clientsPageCopy.header.subtitle}
-            </p>
-          </div>
-          <Button onClick={openCreateDialog} data-tour="add-client-button">
-            <Plus className="w-4 h-4 mr-2" />
+    <InternalPageShell>
+      <InternalHero
+        eyebrow="Client Workspace"
+        title={clientsPageCopy.header.title}
+        subtitle={clientsPageCopy.header.subtitle}
+        icon={Building2}
+        actions={
+          <Button
+            onClick={openCreateDialog}
+            data-tour="add-client-button"
+            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+          >
+            <Plus className="mr-2 h-4 w-4" />
             {clientsPageCopy.header.addClient}
           </Button>
+        }
+        stats={[
+          { label: "Clients", value: clients.length },
+          { label: "Open Roles", value: clientMetrics.reduce((sum, metric) => sum + metric.rolesCount, 0) },
+          {
+            label: "Applications",
+            value: clientMetrics.reduce((sum, metric) => sum + metric.totalApplications, 0),
+            accentClassName: "text-[#4D41DF]",
+          },
+        ]}
+      />
+
+      <InternalPanel className="p-4 sm:p-5">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8191]" />
+          <Input
+            placeholder={clientsPageCopy.searchPlaceholder}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-11 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] pl-10 font-outfit text-sm text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] placeholder:text-[#9CA3AF]"
+          />
         </div>
+      </InternalPanel>
 
-        {/* Search / Filters */}
-        <Card className="shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder={clientsPageCopy.searchPlaceholder}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-card"
-                />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Clients Table */}
-        <Card className="shadow-sm" data-tour="clients-list">
-          <CardHeader>
-            <CardTitle className="text-foreground">{clientsPageCopy.list.title}</CardTitle>
-            <CardDescription className="text-muted-foreground">
-              {clientsPageCopy.list.description}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 text-primary animate-spin" />
-              </div>
-            ) : filteredClients.length === 0 ? (
-              <div className="text-center py-12">
-                <Building2 className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-2">{clientsPageCopy.list.emptyTitle}</p>
-                <p className="text-muted-foreground text-sm">
-                  {clientsPageCopy.list.emptyDescription}
-                </p>
-              </div>
-            ) : (
+      <InternalPanel className="p-5" data-tour="clients-list">
+        <InternalSectionHeader
+          title={clientsPageCopy.list.title}
+          description={clientsPageCopy.list.description}
+        />
+        <div className="mt-5">
+          {isLoading ? (
+            <InternalEmptyState
+              icon={Loader2}
+              title="Loading clients"
+              className="[&_svg]:animate-spin"
+            />
+          ) : filteredClients.length === 0 ? (
+            <InternalEmptyState
+              icon={Building2}
+              title={clientsPageCopy.list.emptyTitle}
+              description={clientsPageCopy.list.emptyDescription}
+            />
+          ) : (
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-border hover:bg-muted/50">
@@ -351,18 +351,19 @@ export default function ClientsPage() {
                   ))}
                 </TableBody>
               </Table>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
+      </InternalPanel>
 
-        {/* Create / Edit Dialog */}
-        <Dialog
-          open={showDialog}
-          onOpenChange={(open) => {
-            setShowDialog(open);
-            if (!open) resetForm();
-          }}
-        >
+      {/* Create / Edit Dialog */}
+      <Dialog
+        open={showDialog}
+        onOpenChange={(open) => {
+          setShowDialog(open);
+          if (!open) resetForm();
+        }}
+      >
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>
@@ -451,8 +452,7 @@ export default function ClientsPage() {
               </Button>
             </div>
           </DialogContent>
-        </Dialog>
-      </div>
-    </Layout>
+      </Dialog>
+    </InternalPageShell>
   );
 }
