@@ -1,10 +1,14 @@
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import { Card, CardContent } from "@/components/ui/card";
 import { Briefcase } from "lucide-react";
-import Layout from "@/components/Layout";
 import { JobPostingStepper } from "@/components/JobPostingStepper";
 import { jobPostPageCopy } from "@/lib/internal-copy";
+import {
+  InternalEmptyState,
+  InternalHero,
+  InternalPageShell,
+  InternalPanel,
+} from "@/components/internal";
 
 export default function JobPostPage() {
   const { user, isLoading } = useAuth();
@@ -12,11 +16,15 @@ export default function JobPostPage() {
   // Show loading state while checking auth
   if (isLoading) {
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16 flex justify-center">
-          <div className="animate-pulse text-muted-foreground">{jobPostPageCopy.loading}</div>
-        </div>
-      </Layout>
+      <InternalPageShell>
+        <InternalPanel>
+          <InternalEmptyState
+            icon={Briefcase}
+            title={jobPostPageCopy.loading}
+            className="animate-pulse"
+          />
+        </InternalPanel>
+      </InternalPageShell>
     );
   }
 
@@ -28,40 +36,37 @@ export default function JobPostPage() {
   // Check role permissions
   if (!['recruiter', 'super_admin'].includes(user.role)) {
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-16">
-          <Card className="max-w-md mx-auto shadow-sm">
-            <CardContent className="p-8 text-center">
-              <h1 className="text-xl font-semibold text-foreground mb-2">{jobPostPageCopy.deniedTitle}</h1>
-              <p className="text-muted-foreground">{jobPostPageCopy.deniedDescription}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </Layout>
+      <InternalPageShell>
+        <InternalPanel className="mx-auto w-full max-w-md">
+          <InternalEmptyState
+            icon={Briefcase}
+            title={jobPostPageCopy.deniedTitle}
+            description={jobPostPageCopy.deniedDescription}
+          />
+        </InternalPanel>
+      </InternalPageShell>
     );
   }
 
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8 pt-8">
-          <div className="flex items-center gap-3 mb-2">
-            <Briefcase className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-              {jobPostPageCopy.header.title}
-            </h1>
-          </div>
-          <p className="text-muted-foreground text-sm md:text-base">
-            {jobPostPageCopy.header.subtitle}
-          </p>
-        </div>
+    <InternalPageShell>
+      <InternalHero
+        eyebrow="Role Setup"
+        title={jobPostPageCopy.header.title}
+        subtitle={jobPostPageCopy.header.subtitle}
+        icon={Briefcase}
+        stats={[
+          { label: "Step 1", value: "Basics", helper: "Title, location, job type" },
+          { label: "Step 2", value: "Details", helper: "Description, skills, salary" },
+          { label: "Step 3+", value: "Workflow", helper: "Team, client, templates, pipeline" },
+        ]}
+      />
 
-        {/* Job Posting Stepper */}
-        <div className="max-w-3xl mx-auto">
+      <InternalPanel className="mx-auto w-full max-w-3xl p-4 sm:p-6">
+        <div className="[&_.shadow-sm]:shadow-none [&_.shadow-sm]:border-[#EEF0F4]">
           <JobPostingStepper />
         </div>
-      </div>
-    </Layout>
+      </InternalPanel>
+    </InternalPageShell>
   );
 }
