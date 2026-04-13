@@ -17,14 +17,19 @@ import {
   Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import Layout from "@/components/Layout";
 import { MoveCandidateToJobDialog } from "@/components/recruiter/MoveCandidateToJobDialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { talentSearchPageCopy } from "@/lib/internal-copy";
+import {
+  InternalEmptyState,
+  InternalHero,
+  InternalPageShell,
+  InternalPanel,
+  InternalSectionHeader,
+} from "@/components/internal";
 
 interface SemanticResult {
   applicationId: number;
@@ -160,319 +165,349 @@ export default function CandidatesPage() {
     "resume.pdf";
   const cleanDisplayFilename = previewDisplayFilename.split("?")[0] || "resume.pdf";
 
+  const hasSubmittedSearch = submittedQuery.trim().length > 0;
+  const resultCount = semanticSearchQuery.data?.count ?? semanticResults.length;
+
   return (
-    <Layout>
-      <div className="container mx-auto px-4 py-8 max-w-7xl">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <Sparkles className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
-              {talentSearchPageCopy.header.title}
-            </h1>
+    <InternalPageShell>
+      <InternalHero
+        eyebrow="Talent Intelligence"
+        title={talentSearchPageCopy.header.title}
+        subtitle={talentSearchPageCopy.header.subtitle}
+        icon={Sparkles}
+        badge="Powered by ActiveGraph"
+        actions={
+          <Button
+            onClick={handleSemanticSearch}
+            disabled={!semanticQuery.trim() || semanticSearchQuery.isFetching}
+            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+          >
+            {semanticSearchQuery.isFetching ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="mr-2 h-4 w-4" />
+            )}
+            {talentSearchPageCopy.search.buttonLabel}
+          </Button>
+        }
+        stats={[
+          {
+            label: "Search Mode",
+            value: "Semantic",
+            helper: "Keyword + meaning aware",
+          },
+          {
+            label: "Result Window",
+            value: "Top 10",
+            helper: "Ranked candidate matches",
+          },
+          {
+            label: "Last Result",
+            value: hasSubmittedSearch && semanticSearchQuery.isSuccess ? resultCount : "Ready",
+            helper: hasSubmittedSearch ? `For "${submittedQuery}"` : "Describe the ideal profile",
+            accentClassName: semanticSearchQuery.isSuccess ? "text-[#4D41DF]" : undefined,
+          },
+        ]}
+      />
+
+      <InternalPanel className="p-4 sm:p-5" data-tour="talent-search-input">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <div className="min-w-0 flex-1">
+            <div className="relative">
+              <Sparkles className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8191]" />
+              <Input
+                placeholder={talentSearchPageCopy.search.placeholder}
+                value={semanticQuery}
+                onChange={(e) => setSemanticQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSemanticSearch();
+                }}
+                className="h-11 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] pl-10 font-outfit text-sm text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] placeholder:text-[#9CA3AF]"
+              />
+            </div>
           </div>
-          <p className="text-muted-foreground text-sm md:text-base max-w-2xl">
-            {talentSearchPageCopy.header.subtitle}
-          </p>
+          <Button
+            onClick={handleSemanticSearch}
+            disabled={!semanticQuery.trim() || semanticSearchQuery.isFetching}
+            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+          >
+            {semanticSearchQuery.isFetching ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Search className="mr-2 h-4 w-4" />
+            )}
+            {talentSearchPageCopy.search.buttonLabel}
+          </Button>
         </div>
 
-        {/* Search Bar */}
-        <Card className="mb-6 shadow-sm" data-tour="talent-search-input">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <div className="relative">
-                  <Sparkles className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder={talentSearchPageCopy.search.placeholder}
-                    value={semanticQuery}
-                    onChange={(e) => setSemanticQuery(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleSemanticSearch();
-                    }}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <Button
-                onClick={handleSemanticSearch}
-                disabled={!semanticQuery.trim() || semanticSearchQuery.isFetching}
-              >
-                {semanticSearchQuery.isFetching ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4 mr-2" />
-                )}
-                {talentSearchPageCopy.search.buttonLabel}
-              </Button>
-            </div>
-            {submittedQuery && semanticSearchQuery.isSuccess && (
-              <div className="mt-2 space-y-1">
-                <p className="text-sm text-muted-foreground">
-                  {semanticResults.length} result{semanticResults.length !== 1 ? "s" : ""} for "{submittedQuery}"
-                </p>
-                {semanticScoreType === "rrf_fused" && semanticDisplayScoreType === "cosine" && (
-                  <p className="text-xs text-muted-foreground">
-                    {talentSearchPageCopy.search.hybridScoreHint}
-                  </p>
-                )}
-              </div>
+        {submittedQuery && semanticSearchQuery.isSuccess && (
+          <div className="mt-3 space-y-1 rounded-[18px] border border-[#EEF0F4] bg-[#F8F8FA] px-4 py-3">
+            <p className="font-dm text-sm text-[#687182]">
+              {semanticResults.length} result{semanticResults.length !== 1 ? "s" : ""} for "{submittedQuery}"
+            </p>
+            {semanticScoreType === "rrf_fused" && semanticDisplayScoreType === "cosine" && (
+              <p className="font-dm text-xs text-[#7B8191]">
+                {talentSearchPageCopy.search.hybridScoreHint}
+              </p>
             )}
-          </CardContent>
-        </Card>
-
-        {/* Semantic Results */}
-        {semanticSearchQuery.isFetching && (
-          <div className="text-center py-12">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <p className="text-muted-foreground mt-4">{talentSearchPageCopy.search.searchingLabel}</p>
           </div>
         )}
+      </InternalPanel>
 
-        {semanticSearchQuery.isError && (
-          <Card className="shadow-sm">
-            <CardContent className="p-6 text-center">
-              <AlertCircle className="h-12 w-12 text-destructive/50 mx-auto mb-3" />
-              <p className="text-muted-foreground">
-                {semanticSearchQuery.error?.message || talentSearchPageCopy.search.errorFallback}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+      {semanticSearchQuery.isFetching && (
+        <InternalPanel>
+          <InternalEmptyState
+            icon={Loader2}
+            title={talentSearchPageCopy.search.searchingLabel}
+            description="Scanning reusable candidate evidence and matching resumes against your query."
+            className="[&_svg]:animate-spin"
+          />
+        </InternalPanel>
+      )}
 
-        {semanticSearchQuery.isSuccess && semanticResults.length === 0 && (
-          <Card className="shadow-sm">
-            <CardContent className="p-6 text-center">
-              <Search className="h-16 w-16 text-muted-foreground/50 mx-auto mb-4" />
-              <p className="text-muted-foreground">{talentSearchPageCopy.search.noResultsTitle}</p>
-              <p className="text-muted-foreground text-sm mt-2">
-                {talentSearchPageCopy.search.noResultsHint}
-              </p>
-            </CardContent>
-          </Card>
-        )}
+      {semanticSearchQuery.isError && (
+        <InternalPanel>
+          <InternalEmptyState
+            icon={AlertCircle}
+            title={talentSearchPageCopy.search.errorFallback}
+            description={semanticSearchQuery.error?.message}
+          />
+        </InternalPanel>
+      )}
 
-        {semanticSearchQuery.isSuccess && semanticResults.length > 0 && (
-          <div className="space-y-3" data-tour="talent-search-results">
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              {talentSearchPageCopy.search.rankingHint}
+      {semanticSearchQuery.isSuccess && semanticResults.length === 0 && (
+        <InternalPanel>
+          <InternalEmptyState
+            icon={Search}
+            title={talentSearchPageCopy.search.noResultsTitle}
+            description={talentSearchPageCopy.search.noResultsHint}
+          />
+        </InternalPanel>
+      )}
+
+      {semanticSearchQuery.isSuccess && semanticResults.length > 0 && (
+        <section className="space-y-4" data-tour="talent-search-results">
+          <InternalSectionHeader
+            title="Matching Candidates"
+            description="Ranked by candidate evidence, resume meaning, and reusable talent intelligence from ActiveGraph."
+            actions={
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Info className="h-3.5 w-3.5 shrink-0 cursor-help" />
+                    <span className="inline-flex cursor-help items-center gap-1 rounded-full border border-[#E7E9F0] bg-white px-3 py-1.5 font-dm text-xs font-semibold text-[#687182] shadow-[0_8px_18px_rgba(15,23,42,0.04)]">
+                      <Info className="h-3.5 w-3.5" />
+                      Ranking logic
+                    </span>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-xs">
                     {talentSearchPageCopy.search.rankingTooltip}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-            </p>
+            }
+          />
+
+          <p className="flex items-center gap-1 font-dm text-xs text-[#7B8191]">
+            {talentSearchPageCopy.search.rankingHint}
+          </p>
+
+          <div className="space-y-3">
             {semanticResults.map((result) => (
-              <Card key={result.applicationId} className="shadow-sm hover:shadow-md transition-shadow" data-tour="talent-search-result-card">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-4">
-                    {/* Candidate Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className="font-semibold text-foreground truncate">
-                          {result.name}
-                        </h3>
-                        <Badge
-                          variant={semanticScoreIsPercent
-                            ? (result.matchScore >= 80 ? "default" : result.matchScore >= 50 ? "secondary" : "outline")
-                            : "outline"}
-                          className="font-mono text-xs shrink-0"
-                        >
-                          {semanticScoreIsPercent
-                            ? `${result.matchScore}% match`
-                            : `Relevance ${(result.matchScoreRaw ?? (result.matchScore / 100)).toFixed(4)}`}
+              <InternalPanel key={result.applicationId} className="p-4 transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]" data-tour="talent-search-result-card">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-2 flex flex-wrap items-center gap-3">
+                      <h3 className="truncate font-satoshi text-lg font-bold tracking-[-0.02em] text-[#111827]">
+                        {result.name}
+                      </h3>
+                      <Badge
+                        variant={semanticScoreIsPercent
+                          ? (result.matchScore >= 80 ? "default" : result.matchScore >= 50 ? "secondary" : "outline")
+                          : "outline"}
+                        className="shrink-0 rounded-full font-mono text-xs"
+                      >
+                        {semanticScoreIsPercent
+                          ? `${result.matchScore}% match`
+                          : `Relevance ${(result.matchScoreRaw ?? (result.matchScore / 100)).toFixed(4)}`}
+                      </Badge>
+                    </div>
+
+                    <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-dm text-sm text-[#687182]">
+                      <span className="flex items-center gap-1">
+                        <Mail className="h-3.5 w-3.5" />
+                        {result.email ?? talentSearchPageCopy.search.emailUnavailable}
+                      </span>
+                      {result.source && (
+                        <Badge variant="secondary" className="rounded-full text-xs">
+                          {result.source}
                         </Badge>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground mb-2">
-                        <span className="flex items-center gap-1">
-                          <Mail className="h-3.5 w-3.5" />
-                          {result.email ?? talentSearchPageCopy.search.emailUnavailable}
+                      )}
+                      {result.matchedChunks > 0 && (
+                        <span className="text-xs text-[#7B8191]">
+                          {result.matchedChunks} {result.matchedChunks > 1 ? talentSearchPageCopy.search.matchingResumeSectionsSuffixPlural : talentSearchPageCopy.search.matchingResumeSectionsSuffixSingle}
                         </span>
-                        {result.source && (
-                          <Badge variant="secondary" className="text-xs">
-                            {result.source}
-                          </Badge>
-                        )}
-                        {result.matchedChunks > 0 && (
-                          <span className="text-xs text-muted-foreground">
-                            {result.matchedChunks} {result.matchedChunks > 1 ? talentSearchPageCopy.search.matchingResumeSectionsSuffixPlural : talentSearchPageCopy.search.matchingResumeSectionsSuffixSingle}
-                          </span>
-                        )}
-                        {result.currentJobTitle && (
-                          <span className="flex items-center gap-1">
-                            <Briefcase className="h-3.5 w-3.5" />
-                            {result.currentJobTitle}
-                          </span>
-                        )}
-                        {result.currentStageName && (
-                          <Badge variant="outline" className="text-xs">
-                            {result.currentStageName}
-                          </Badge>
-                        )}
+                      )}
+                      {result.currentJobTitle && (
+                        <span className="flex items-center gap-1">
+                          <Briefcase className="h-3.5 w-3.5" />
+                          {result.currentJobTitle}
+                        </span>
+                      )}
+                      {result.currentStageName && (
+                        <Badge variant="outline" className="rounded-full text-xs">
+                          {result.currentStageName}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {result.highlights && result.highlights.length > 0 && (
+                      <div className="mt-3 space-y-2">
+                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7B8191]">
+                          {talentSearchPageCopy.search.whyMatched}
+                        </p>
+                        {result.highlights.slice(0, 3).map((highlight: string, idx: number) => (
+                          <div
+                            key={idx}
+                            className="rounded-[16px] border border-[#EEF0F4] bg-[#F8F8FA] px-3 py-2 font-outfit text-sm leading-relaxed text-[#5F6675]"
+                          >
+                            {highlight}
+                          </div>
+                        ))}
                       </div>
-
-                      {result.highlights && result.highlights.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          <p className="text-xs font-medium text-muted-foreground">
-                            {talentSearchPageCopy.search.whyMatched}
-                          </p>
-                          {result.highlights.slice(0, 3).map((highlight: string, idx: number) => (
-                            <div
-                              key={idx}
-                              className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
-                            >
-                              {highlight}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-2 shrink-0">
-                      {(result.canOpenResume ?? Boolean(result.resume.resumeFilename || result.resume.signedUrl)) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleOpenResume(result)}
-                        >
-                          <FileText className="h-4 w-4 mr-1" />
-                          {talentSearchPageCopy.search.resume}
-                        </Button>
-                      )}
-                      {result.canMoveToJob !== false && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleMoveClick(result)}
-                        >
-                          <ArrowRightLeft className="h-4 w-4 mr-1" />
-                          {talentSearchPageCopy.search.addToJob}
-                        </Button>
-                      )}
-                    </div>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
+
+                  <div className="flex shrink-0 flex-row gap-2 lg:flex-col">
+                    {(result.canOpenResume ?? Boolean(result.resume.resumeFilename || result.resume.signedUrl)) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenResume(result)}
+                        className="rounded-2xl border-[#D9DDEA] bg-white font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                      >
+                        <FileText className="mr-1 h-4 w-4" />
+                        {talentSearchPageCopy.search.resume}
+                      </Button>
+                    )}
+                    {result.canMoveToJob !== false && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleMoveClick(result)}
+                        className="rounded-2xl border-[#D9DDEA] bg-white font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                      >
+                        <ArrowRightLeft className="mr-1 h-4 w-4" />
+                        {talentSearchPageCopy.search.addToJob}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </InternalPanel>
             ))}
           </div>
-        )}
+        </section>
+      )}
 
-        {/* Empty state before any search */}
-        {!semanticSearchQuery.isFetching &&
-          !semanticSearchQuery.isSuccess &&
-          !semanticSearchQuery.isError && (
-          <Card className="shadow-sm" data-tour="talent-search-results">
-            <CardContent className="p-12 text-center">
-              <Sparkles className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-foreground mb-2">
-                {talentSearchPageCopy.search.emptyTitle}
-              </h3>
-              <p className="text-muted-foreground text-sm max-w-md mx-auto">
-                Search your candidate pool using natural language. Describe the skills,
-                experience, or qualifications you're looking for.
-              </p>
-            </CardContent>
-          </Card>
-        )}
+      {!semanticSearchQuery.isFetching &&
+        !semanticSearchQuery.isSuccess &&
+        !semanticSearchQuery.isError && (
+        <InternalPanel data-tour="talent-search-results">
+          <InternalEmptyState
+            icon={Sparkles}
+            title={talentSearchPageCopy.search.emptyTitle}
+            description="Search your candidate pool using natural language. Describe the skills, experience, or qualifications you're looking for."
+          />
+        </InternalPanel>
+      )}
 
-        {/* Move Dialog */}
-        <MoveCandidateToJobDialog
-          open={moveDialogOpen}
-          onOpenChange={setMoveDialogOpen}
-          candidate={moveCandidate}
-          searchQuery={submittedQuery}
-          onMoveSuccess={handleMoveSuccess}
-        />
+      <MoveCandidateToJobDialog
+        open={moveDialogOpen}
+        onOpenChange={setMoveDialogOpen}
+        candidate={moveCandidate}
+        searchQuery={submittedQuery}
+        onMoveSuccess={handleMoveSuccess}
+      />
 
-        <Dialog
-          open={Boolean(resumePreviewCandidate)}
-          onOpenChange={(nextOpen) => {
-            if (!nextOpen) setResumePreviewCandidate(null);
-          }}
-        >
-          <DialogContent className="max-w-5xl w-[95vw] h-[90vh] max-h-[90vh] p-0 gap-0 flex flex-col">
-            <DialogHeader className="px-6 py-4 border-b border-border shrink-0">
-              <DialogTitle className="text-xl font-semibold text-foreground">
-                {resumePreviewCandidate?.name ?? talentSearchPageCopy.search.resumePreviewFallback}
-              </DialogTitle>
-              {resumePreviewCandidate?.email && (
-                <p className="text-sm text-muted-foreground">{resumePreviewCandidate.email}</p>
-              )}
-            </DialogHeader>
+      <Dialog
+        open={Boolean(resumePreviewCandidate)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setResumePreviewCandidate(null);
+        }}
+      >
+        <DialogContent className="flex h-[90vh] max-h-[90vh] w-[95vw] max-w-5xl flex-col gap-0 p-0">
+          <DialogHeader className="shrink-0 border-b border-border px-6 py-4">
+            <DialogTitle className="text-xl font-semibold text-foreground">
+              {resumePreviewCandidate?.name ?? talentSearchPageCopy.search.resumePreviewFallback}
+            </DialogTitle>
+            {resumePreviewCandidate?.email && (
+              <p className="text-sm text-muted-foreground">{resumePreviewCandidate.email}</p>
+            )}
+          </DialogHeader>
 
-            <div className="h-full flex flex-col p-4">
-              <div className="flex items-center justify-between mb-4 shrink-0">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    {cleanDisplayFilename}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {previewIsPdf && resumePreviewUrl && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(resumePreviewUrl, "_blank", "noopener")}
-                    >
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      {talentSearchPageCopy.search.openInNewTab}
-                    </Button>
-                  )}
-                  {resumeDownloadUrl && (
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => window.open(resumeDownloadUrl, "_blank", "noopener")}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      {talentSearchPageCopy.search.download}
-                    </Button>
-                  )}
-                </div>
+          <div className="flex h-full flex-col p-4">
+            <div className="mb-4 flex shrink-0 items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">
+                  {cleanDisplayFilename}
+                </span>
               </div>
-
-              <div className="flex-1 border border-border rounded-lg overflow-hidden bg-muted/50">
-                {resumePreviewUrl ? (
-                  previewIsPdf ? (
-                    <iframe
-                      src={`${resumePreviewUrl}#toolbar=0&navpanes=0`}
-                      className="w-full h-full"
-                      title={talentSearchPageCopy.search.resumePreviewFrameTitle}
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                      <FileText className="h-16 w-16 text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground mb-4">
-                        {talentSearchPageCopy.search.unsupportedPreview}
-                      </p>
-                      {resumeDownloadUrl && (
-                        <Button onClick={() => window.open(resumeDownloadUrl, "_blank", "noopener")}>
-                          <Download className="h-4 w-4 mr-2" />
-                          {talentSearchPageCopy.search.downloadToView}
-                        </Button>
-                      )}
-                    </div>
-                  )
-                ) : (
-                  <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-                    <AlertCircle className="h-16 w-16 text-muted-foreground/50 mb-4" />
-                    <p className="text-muted-foreground">{talentSearchPageCopy.search.noResume}</p>
-                  </div>
+              <div className="flex items-center gap-2">
+                {previewIsPdf && resumePreviewUrl && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(resumePreviewUrl, "_blank", "noopener")}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    {talentSearchPageCopy.search.openInNewTab}
+                  </Button>
+                )}
+                {resumeDownloadUrl && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => window.open(resumeDownloadUrl, "_blank", "noopener")}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {talentSearchPageCopy.search.download}
+                  </Button>
                 )}
               </div>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </Layout>
+
+            <div className="flex-1 overflow-hidden rounded-lg border border-border bg-muted/50">
+              {resumePreviewUrl ? (
+                previewIsPdf ? (
+                  <iframe
+                    src={`${resumePreviewUrl}#toolbar=0&navpanes=0`}
+                    className="h-full w-full"
+                    title={talentSearchPageCopy.search.resumePreviewFrameTitle}
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                    <FileText className="mb-4 h-16 w-16 text-muted-foreground/50" />
+                    <p className="mb-4 text-muted-foreground">
+                      {talentSearchPageCopy.search.unsupportedPreview}
+                    </p>
+                    {resumeDownloadUrl && (
+                      <Button onClick={() => window.open(resumeDownloadUrl, "_blank", "noopener")}>
+                        <Download className="mr-2 h-4 w-4" />
+                        {talentSearchPageCopy.search.downloadToView}
+                      </Button>
+                    )}
+                  </div>
+                )
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                  <AlertCircle className="mb-4 h-16 w-16 text-muted-foreground/50" />
+                  <p className="text-muted-foreground">{talentSearchPageCopy.search.noResume}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </InternalPageShell>
   );
 }
