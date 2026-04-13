@@ -41,6 +41,54 @@ function injectSSR(html: string, ssrHtml: string): string {
   );
 }
 
+function normalizeRoutePath(pathOrUrl: string): string {
+  const pathOnly = pathOrUrl.split('?')[0] || '/';
+  return pathOnly.replace(/\/+$/, '') || '/';
+}
+
+function isPublicJobDetailRoute(path: string): boolean {
+  const match = path.match(/^\/jobs\/([^/]+)$/);
+  return Boolean(match?.[1] && !RESERVED_JOB_PATHS.has(match[1]));
+}
+
+function isPublicRecruiterProfileRoute(path: string): boolean {
+  return /^\/recruiters\/[^/]+$/.test(path);
+}
+
+function isPublicSsrRoute(path: string, marketingRoutes: Set<string>): boolean {
+  return (
+    marketingRoutes.has(path) ||
+    isPublicJobDetailRoute(path) ||
+    isPublicRecruiterProfileRoute(path)
+  );
+}
+
+function isProtectedAppRoute(path: string): boolean {
+  if (
+    path === '/onboarding' ||
+    path === '/my-dashboard' ||
+    path === '/recruiter-dashboard' ||
+    path === '/hiring-manager' ||
+    path === '/applications' ||
+    path === '/candidates' ||
+    path === '/my-jobs' ||
+    path === '/clients' ||
+    path === '/profile/settings' ||
+    path === '/analytics' ||
+    path === '/blocked/seat-removed'
+  ) {
+    return true;
+  }
+
+  return (
+    path === '/jobs/post' ||
+    /^\/jobs\/[^/]+\/(applications|edit|pipeline|analytics|sourcing|bulk-import)$/.test(path) ||
+    /^\/hiring-manager\/jobs\/[^/]+\/review$/.test(path) ||
+    /^\/admin(\/|$)/.test(path) ||
+    /^\/org\//.test(path)
+  );
+}
+
 export async function setupVite(app: Express, server: Server) {
   // Compute dirname in ESM
   const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -171,6 +219,7 @@ export async function setupVite(app: Express, server: Server) {
 
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
+    const routePath = normalizeRoutePath(url);
 
     try {
       const clientTemplate = path.resolve(
@@ -188,7 +237,7 @@ export async function setupVite(app: Express, server: Server) {
       );
 
       // Inject marketing page meta in dev mode
-      const pageMeta = MARKETING_PAGES_DEV[url];
+      const pageMeta = MARKETING_PAGES_DEV[routePath];
       if (pageMeta) {
         const baseUrl = (process.env.BASE_URL || 'https://vantahire.com').replace(/\/$/, '');
         template = upsertTitle(template, pageMeta.title);
@@ -216,12 +265,12 @@ export async function setupVite(app: Express, server: Server) {
         }
       }
 
-      // SSR body render for public routes (dev mode) — all users get pre-rendered content
-      const isSSRRoute = SSR_ROUTES.has(url) || url.startsWith('/jobs/') || url.startsWith('/recruiters/');
-      if (isSSRRoute) {
+      // SSR body render only for public routes. Protected app routes must stay
+      // client-rendered because the server intentionally has no auth context.
+      if (isPublicSsrRoute(routePath, SSR_ROUTES)) {
         try {
           const ssrModule = await vite.ssrLoadModule('/src/entry-server.tsx');
-          const { html: ssrHtml } = ssrModule.render(url);
+          const { html: ssrHtml } = ssrModule.render(routePath);
           if (ssrHtml) {
             template = injectSSR(template, ssrHtml);
           }
@@ -232,6 +281,10 @@ export async function setupVite(app: Express, server: Server) {
       }
 
       const page = await vite.transformIndexHtml(url, template);
+      if (isProtectedAppRoute(routePath)) {
+        res.setHeader('Cache-Control', 'no-store, private');
+        res.setHeader('X-SSR-Status', 'client-shell');
+      }
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
@@ -662,10 +715,15 @@ export async function serveStatic(app: Express) {
 
   // fall through to index.html if the file doesn't exist
   app.use("*", async (req, res) => {
-    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     // Use originalUrl (not req.path which may be '/' in app.use('*') context)
-    const routePath = (req.originalUrl.split('?')[0] ?? '/').replace(/\/+$/, '') || '/';
+    const routePath = normalizeRoutePath(req.originalUrl);
     const statusCode = isKnownRoute(routePath) ? 200 : 404;
+    if (isProtectedAppRoute(routePath)) {
+      res.setHeader('Cache-Control', 'no-store, private');
+      res.setHeader('X-SSR-Status', 'client-shell');
+    } else {
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    }
     // Read file and send with explicit status (sendFile overrides status to 200)
     const html = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
     res.status(statusCode).setHeader('Content-Type', 'text/html').send(html);
