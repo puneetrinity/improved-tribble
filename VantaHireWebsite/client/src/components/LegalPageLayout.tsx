@@ -32,7 +32,7 @@ const sectionIconBox =
 const sectionTitleCls =
   "font-satoshi text-[1.35rem] font-medium text-hr-text tracking-[-0.01em]";
 
-const sectionBodyCls = "text-hr-text-secondary text-[0.92rem] leading-[1.75] [&>p]:mb-3 [&>p:last-child]:mb-0";
+const sectionBodyCls = "text-hr-text-secondary text-sm leading-[1.75] [&>p]:mb-3 [&>p:last-child]:mb-0";
 
 export default function LegalPageLayout({
   sectionLabel,

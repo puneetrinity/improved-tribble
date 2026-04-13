@@ -14,7 +14,7 @@ export const DASHBOARD_PANEL_MUTED =
   "rounded-[18px] border border-[#EEF0F4] bg-[#F8F8FA]";
 
 export const DASHBOARD_EYEBROW =
-  "text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7B8191]";
+  "font-mono text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7B8191]";
 
 export const DASHBOARD_TITLE =
-  "font-manrope text-[22px] font-extrabold tracking-[-0.03em] text-[#0F172A]";
+  "font-satoshi text-[22px] font-extrabold tracking-[-0.03em] text-[#0F172A]";

@@ -142,7 +142,7 @@ export default function UseCasesPage() {
                   </div>
                   <h3 className="font-satoshi text-[1.35rem] font-medium text-hr-text tracking-[-0.01em] mb-1">{useCase.title}</h3>
                   <p className="font-dm text-[0.82rem] text-hr-accent-hover mb-3.5 font-medium">{useCase.subtitle}</p>
-                  <p className="text-[0.92rem] leading-[1.7] text-hr-text-secondary mb-5">{useCase.description}</p>
+                  <p className="text-sm leading-[1.7] text-hr-text-secondary mb-5">{useCase.description}</p>
                   <ul className="list-none p-0 m-0 flex flex-col gap-1.5 mt-auto">
                     {useCase.features.map((feature, featureIndex) => (
                       <li key={featureIndex} className="flex items-center gap-2.5 text-[0.82rem] text-hr-text-muted before:content-[''] before:w-1 before:h-1 before:rounded-full before:bg-hr-accent before:opacity-60 before:shrink-0">{feature}</li>
@@ -171,7 +171,7 @@ export default function UseCasesPage() {
                   <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-[rgba(124,58,237,0.1)] text-hr-accent-hover mb-3.5">
                     {industry.icon}
                   </div>
-                  <h3 className="font-satoshi text-[0.95rem] font-medium text-hr-text mb-2">{industry.name}</h3>
+                  <h3 className="font-satoshi text-sm font-medium text-hr-text mb-2">{industry.name}</h3>
                   <p className="text-[0.8rem] leading-[1.55] text-hr-text-muted">{industry.description}</p>
                 </div>
               ))}

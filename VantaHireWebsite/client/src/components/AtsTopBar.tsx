@@ -233,7 +233,7 @@ export function AtsTopBar({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B93A6]">
                   {currentRoute.section}
                 </div>
-                <div className="truncate text-[20px] font-extrabold tracking-[-0.03em] text-[#111827]">
+                <div className="truncate text-xl font-extrabold tracking-[-0.03em] text-[#111827]">
                   {currentRoute.label}
                 </div>
                 <div className="hidden truncate text-[13px] text-[#6C7486] md:block">

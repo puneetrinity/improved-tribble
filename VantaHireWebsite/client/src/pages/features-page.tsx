@@ -173,7 +173,7 @@ export default function FeaturesPage() {
                         </div>
                         <h2 className="font-satoshi text-[1.7rem] font-normal leading-[1.25] text-hr-text mb-2">{pillar.title}</h2>
                         <div className="text-[0.88rem] text-hr-accent-hover mb-4 leading-[1.5]">{pillar.label}</div>
-                        <p className="text-[0.9rem] leading-[1.7] text-hr-text-secondary">
+                        <p className="text-[0.875rem] leading-[1.7] text-hr-text-secondary">
                           <span className="text-hr-text font-medium">Outcome: </span>
                           {pillar.outcome}
                         </p>

@@ -266,8 +266,8 @@ function PipelineStatusDot({ color }: { color: string }) {
 function PipelineHoverSectionLabel({ children }: { children: string }) {
   return (
     <div
-      className="text-[10px] font-semibold uppercase leading-4"
-      style={{ color: "#9CA3AF", letterSpacing: "0.07em", fontFamily: "Inter, sans-serif" }}
+      className="font-mono text-[0.68rem] font-semibold uppercase leading-4"
+      style={{ color: "#9CA3AF", letterSpacing: "0.07em" }}
     >
       {children}
     </div>
@@ -283,8 +283,8 @@ function PipelineHoverTextLine({
 }) {
   return (
     <div
-      className="flex items-start gap-2 text-[12px] leading-[1.45]"
-      style={{ color: "#464555", fontFamily: "Inter, sans-serif" }}
+      className="flex items-start gap-2 font-outfit text-sm leading-[1.45]"
+      style={{ color: "#464555" }}
     >
       <PipelineStatusDot color={dotColor} />
       <div className="min-w-0">{children}</div>
@@ -338,8 +338,8 @@ function PipelineHealthDetailSection({ card, expanded = false }: { card: KpiInsi
               <PipelineHoverSectionLabel>MAIN BLOCKER</PipelineHoverSectionLabel>
               <div className="mt-1.5">
                 <div
-                  className="flex items-start gap-2 text-[12px] leading-[1.45]"
-                  style={{ color: "#191C1E", fontFamily: "Inter, sans-serif" }}
+                  className="flex items-start gap-2 font-outfit text-sm leading-[1.45]"
+                  style={{ color: "#191C1E" }}
                 >
                   <PipelineStatusDot color="#DC2626" />
                   <div className="min-w-0">{blockerText}</div>
@@ -386,8 +386,8 @@ function PipelineHealthDetailSection({ card, expanded = false }: { card: KpiInsi
               <PipelineHoverSectionLabel>QUICK WIN</PipelineHoverSectionLabel>
               <div className="mt-1.5">
                 <div
-                  className="text-[12px] leading-[1.45]"
-                  style={{ color: "#464555", fontFamily: "Inter, sans-serif" }}
+                  className="font-outfit text-sm leading-[1.45]"
+                  style={{ color: "#464555" }}
                 >
                   {quickWin.action} - could improve score by {quickWin.estimatedImpactPoints} points
                 </div>
@@ -395,8 +395,8 @@ function PipelineHealthDetailSection({ card, expanded = false }: { card: KpiInsi
                   <div className="mt-1.5">
                     <a
                       href={quickWin.ctaHref}
-                      className="text-[11px] font-semibold hover:underline"
-                      style={{ color: "#4D41DF", fontFamily: "Inter, sans-serif" }}
+                      className="font-dm text-xs font-semibold hover:underline"
+                      style={{ color: "#4D41DF" }}
                     >
                       {quickWin.ctaLabel}
                     </a>
@@ -588,14 +588,14 @@ function DetailSection({ card, expanded = false }: { card: KpiInsightCard; expan
     >
       <div className="space-y-1.5">
         {lines.map((line, index) => (
-          <div key={`${card.id}-${index}`} className={cn("flex items-start gap-2 text-[12.5px] leading-5 text-slate-600", line.className)}>
+          <div key={`${card.id}-${index}`} className={cn("flex items-start gap-2 text-sm leading-5 text-slate-600", line.className)}>
             <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-slate-300" />
             <div className="min-w-0">
               <span className="font-medium text-slate-700">{line.label}:</span>{" "}
               <span>{line.value}</span>
               {line.linkLabel && line.linkHref ? (
                 <div className="mt-1.5">
-                  <a href={line.linkHref} className="text-[11px] font-medium text-[#4D41DF] hover:underline">
+                  <a href={line.linkHref} className="text-xs font-medium text-[#4D41DF] hover:underline">
                     {line.linkLabel}
                   </a>
                 </div>
@@ -662,11 +662,11 @@ function KpiCard({
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-2">
-            <div className="kpi-label text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            <div className="kpi-label text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
               {card.label}
             </div>
             {showStatus ? (
-              <span className={cn("inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold", status.badge)}>
+              <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold", status.badge)}>
                 {status.label}
               </span>
             ) : null}

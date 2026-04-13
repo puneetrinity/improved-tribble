@@ -5,10 +5,10 @@
 
 /* ── Buttons ── */
 export const btnPrimary =
-  "bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center";
+  "bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center";
 
 export const btnSecondary =
-  "bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.9rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center";
+  "bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center";
 
 /* ── Section label (mono, uppercase, tracking) ── */
 export const sectionLabel =
@@ -18,10 +18,10 @@ export const sectionLabel =
 export const legalSubsectionCls = "mb-5 last:mb-0";
 
 export const legalH4Cls =
-  "font-satoshi text-[0.95rem] font-semibold text-hr-text mb-2";
+  "font-satoshi text-sm font-semibold text-hr-text mb-2";
 
 export const legalListCls =
-  "list-none p-0 mt-2 [&>li]:relative [&>li]:pl-[18px] [&>li]:mb-[6px] [&>li]:text-[0.9rem] [&>li]:text-hr-text-secondary [&>li]:leading-[1.6] [&>li>strong]:text-hr-text [&>li>strong]:font-medium [&>li]:before:content-[''] [&>li]:before:absolute [&>li]:before:left-0 [&>li]:before:top-[10px] [&>li]:before:w-[5px] [&>li]:before:h-[5px] [&>li]:before:rounded-full [&>li]:before:bg-hr-accent [&>li]:before:opacity-50";
+  "list-none p-0 mt-2 [&>li]:relative [&>li]:pl-[18px] [&>li]:mb-[6px] [&>li]:text-[0.875rem] [&>li]:text-hr-text-secondary [&>li]:leading-[1.6] [&>li>strong]:text-hr-text [&>li>strong]:font-medium [&>li]:before:content-[''] [&>li]:before:absolute [&>li]:before:left-0 [&>li]:before:top-[10px] [&>li]:before:w-[5px] [&>li]:before:h-[5px] [&>li]:before:rounded-full [&>li]:before:bg-hr-accent [&>li]:before:opacity-50";
 
 export const legalLinkCls =
   "text-hr-accent-hover no-underline transition-colors duration-200 border-b border-[rgba(167,139,250,0.3)] hover:text-hr-text hover:border-hr-text";

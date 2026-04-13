@@ -27,7 +27,7 @@ interface AuditLogEntry {
 }
 
 const emptyStateCls = "flex flex-col items-center justify-center min-h-[60vh] text-center py-[60px] px-5 gap-3 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-hr-text-muted [&>svg]:mb-2";
-const btnApplyCls = "bg-hr-accent text-white border-none py-3 px-8 rounded-none font-dm text-[0.9rem] font-medium cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-hr-accent-hover disabled:opacity-50 disabled:cursor-not-allowed";
+const btnApplyCls = "bg-hr-accent text-white border-none py-3 px-8 rounded-none font-dm text-[0.875rem] font-medium cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-hr-accent-hover disabled:opacity-50 disabled:cursor-not-allowed";
 const btnSecondaryCls = "flex items-center gap-1.5 bg-transparent border border-[rgba(255,255,255,0.08)] text-hr-text-secondary py-2 px-4 rounded-none font-dm text-[0.82rem] font-normal cursor-pointer transition-all duration-200 whitespace-nowrap [&>svg]:w-3.5 [&>svg]:h-3.5 hover:border-[rgba(255,255,255,0.12)] hover:text-hr-text max-md:flex-1 max-md:justify-center";
 const cardCls = "bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none mb-4 overflow-hidden";
 const cardHeaderCls = "flex items-center gap-2.5 py-4 px-5 border-b border-[rgba(255,255,255,0.08)] font-satoshi text-base font-medium text-hr-text [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:text-hr-accent-hover [&>svg]:shrink-0";
@@ -194,7 +194,7 @@ export default function JobDetailsPage() {
         <div className={emptyStateCls}>
           <Briefcase />
           <h2 className="font-satoshi text-2xl font-medium text-hr-text">Job Not Found</h2>
-          <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">The job you're looking for doesn't exist.</p>
+          <p className="text-sm text-hr-text-secondary max-w-[400px]">The job you're looking for doesn't exist.</p>
           <Link href="/jobs" className="bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-[0.82rem] font-medium cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover">Browse Jobs</Link>
         </div>
         <HomepageFooter />
@@ -209,7 +209,7 @@ export default function JobDetailsPage() {
         <GridOverlay />
         <div className={emptyStateCls}>
           <div className="w-9 h-9 border-[3px] border-[rgba(255,255,255,0.08)] border-t-hr-accent rounded-full animate-hr-spin" />
-          <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">Loading job details...</p>
+          <p className="text-sm text-hr-text-secondary max-w-[400px]">Loading job details...</p>
         </div>
         <HomepageFooter />
       </div>
@@ -232,7 +232,7 @@ export default function JobDetailsPage() {
               {typedError?.jobInfo?.title && (
                 <p className="text-hr-text-muted mb-1">"{typedError.jobInfo.title}"</p>
               )}
-              <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">
+              <p className="text-sm text-hr-text-secondary max-w-[400px]">
                 {typedError?.code === 'EXPIRED'
                   ? 'This job posting has expired and is no longer accepting applications.'
                   : 'This job is no longer active. It may have been filled or removed.'}
@@ -243,7 +243,7 @@ export default function JobDetailsPage() {
             <>
               <AlertTriangle style={{ color: '#EF4444', width: 48, height: 48 }} />
               <h2 className="font-satoshi text-2xl font-medium text-hr-text">Error</h2>
-              <p className="text-[0.92rem] text-hr-text-secondary max-w-[400px]">Failed to load job details. Please try again.</p>
+              <p className="text-sm text-hr-text-secondary max-w-[400px]">Failed to load job details. Please try again.</p>
             </>
           )}
         </div>
@@ -429,7 +429,7 @@ export default function JobDetailsPage() {
                       <FileText /> Job Description
                     </div>
                     <div className={cardBodyCls}>
-                      <p className="text-[0.92rem] leading-[1.75] text-hr-text-secondary whitespace-pre-wrap">{job.description}</p>
+                      <p className="text-sm leading-[1.75] text-hr-text-secondary whitespace-pre-wrap">{job.description}</p>
                     </div>
                   </section>
 
@@ -444,13 +444,13 @@ export default function JobDetailsPage() {
                           {job.educationRequirement && (
                             <div className="flex flex-col gap-1">
                               <span className="text-[0.78rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Education</span>
-                              <span className="text-[0.95rem] text-hr-text font-medium">{job.educationRequirement}</span>
+                              <span className="text-sm text-hr-text font-medium">{job.educationRequirement}</span>
                             </div>
                           )}
                           {job.experienceYears && (
                             <div className="flex flex-col gap-1">
                               <span className="text-[0.78rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Experience</span>
-                              <span className="text-[0.95rem] text-hr-text font-medium">{job.experienceYears}+ years</span>
+                              <span className="text-sm text-hr-text font-medium">{job.experienceYears}+ years</span>
                             </div>
                           )}
                         </div>

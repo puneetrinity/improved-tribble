@@ -52,7 +52,7 @@ const FeaturesGrid = () => {
         <div className="text-center mb-[60px]">
           <div className={sectionLabel}>Core Features</div>
           <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] max-sm:text-[1.6rem] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text">Everything You Need to<br />Recruit at Scale</h2>
-          <p className="text-base max-sm:text-[0.9rem] leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">Six powerful modules that cover every aspect of the recruitment lifecycle, from sourcing to placement.</p>
+          <p className="text-base max-sm:text-[0.875rem] leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto">Six powerful modules that cover every aspect of the recruitment lifecycle, from sourcing to placement.</p>
         </div>
 
         <div className="grid grid-cols-3 lg:grid-cols-3 md:grid-cols-2 max-md:grid-cols-1 gap-px max-md:gap-0 max-w-[1200px] mx-auto bg-[rgba(255,255,255,0.1)] border border-[rgba(255,255,255,0.1)]">
@@ -200,24 +200,24 @@ const FeaturesGrid = () => {
                 <div className="grid grid-cols-2 gap-1.5">
                   <div className={dashCell}>
                     <div className="text-[0.45rem] text-[#9ca3af] uppercase tracking-[0.04em] mb-[3px]">Placements MTD</div>
-                    <div className="text-[0.95rem] font-bold text-[#1a1a2e]">7</div>
+                    <div className="text-sm font-bold text-[#1a1a2e]">7</div>
                     <div className="flex items-end gap-0.5 h-[18px] mt-1">
                       <div className="flex-1 bg-hr-accent rounded-[1px] opacity-45" style={{ height: '40%' }}></div><div className="flex-1 bg-hr-accent rounded-[1px] opacity-45" style={{ height: '60%' }}></div><div className="flex-1 bg-hr-accent rounded-[1px] opacity-45" style={{ height: '30%' }}></div><div className="flex-1 bg-hr-accent rounded-[1px] opacity-45" style={{ height: '80%' }}></div><div className="flex-1 bg-hr-accent rounded-[1px] opacity-45" style={{ height: '55%' }}></div><div className="flex-1 bg-hr-accent rounded-[1px] opacity-45" style={{ height: '90%' }}></div><div className="flex-1 bg-hr-accent rounded-[1px] opacity-70" style={{ height: '100%' }}></div>
                     </div>
                   </div>
                   <div className={dashCell}>
                     <div className="text-[0.45rem] text-[#9ca3af] uppercase tracking-[0.04em] mb-[3px]">Revenue</div>
-                    <div className="text-[0.95rem] font-bold text-[#1a1a2e]">₹4.2L</div>
+                    <div className="text-sm font-bold text-[#1a1a2e]">₹4.2L</div>
                     <div className="text-[0.4rem] text-hr-green mt-[3px]">↑ 18% vs target</div>
                   </div>
                   <div className={dashCell}>
                     <div className="text-[0.45rem] text-[#9ca3af] uppercase tracking-[0.04em] mb-[3px]">Active Candidates</div>
-                    <div className="text-[0.95rem] font-bold text-[#1a1a2e]">42</div>
+                    <div className="text-sm font-bold text-[#1a1a2e]">42</div>
                     <div className={miniNote}>12 in interview stage</div>
                   </div>
                   <div className={dashCell}>
                     <div className="text-[0.45rem] text-[#9ca3af] uppercase tracking-[0.04em] mb-[3px]">Response Rate</div>
-                    <div className="text-[0.95rem] font-bold text-[#1a1a2e]">74%</div>
+                    <div className="text-sm font-bold text-[#1a1a2e]">74%</div>
                     <div className={miniProgressTrack}>
                       <div className={`${miniProgressBar} w-[74%] bg-hr-accent`}></div>
                     </div>

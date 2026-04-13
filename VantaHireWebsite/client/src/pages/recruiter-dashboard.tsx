@@ -309,7 +309,7 @@ export default function RecruiterDashboard() {
                     <Button
                       size="sm"
                       onClick={() => setLocation("/jobs/post")}
-                      className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[13px] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+                      className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Post New Job
@@ -319,7 +319,7 @@ export default function RecruiterDashboard() {
                       size="sm"
                       onClick={() => setShowInviteHMDialog(true)}
                       data-tour="invite-hiring-manager-btn"
-                      className="h-11 rounded-2xl border-[#D9DDEA] bg-white px-5 text-[13px] font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                      className="h-11 rounded-2xl border-[#D9DDEA] bg-white px-5 text-[0.875rem] font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       {recruiterDashboardCopy.header.inviteHiringManager}
