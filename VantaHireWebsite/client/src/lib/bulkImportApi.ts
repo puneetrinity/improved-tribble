@@ -1,4 +1,4 @@
-import { getCsrfToken } from './csrf';
+import { fetchWithCsrf } from './csrf';
 import { apiRequest } from './queryClient';
 
 // ---------------------------------------------------------------------------
@@ -92,16 +92,13 @@ export const bulkImportQueryKeys = {
 export const bulkImportApi = {
   /** Upload resume files. Uses raw fetch because apiRequest forces Content-Type: application/json. */
   async upload(jobId: number, files: File[]): Promise<UploadResponse> {
-    const csrfToken = await getCsrfToken();
     const formData = new FormData();
     for (const file of files) {
       formData.append('resumes', file);
     }
-    const res = await fetch(`/api/jobs/${jobId}/bulk-resume-import`, {
+    const res = await fetchWithCsrf(`/api/jobs/${jobId}/bulk-resume-import`, {
       method: 'POST',
-      headers: { 'x-csrf-token': csrfToken },
       body: formData,
-      credentials: 'include',
     });
     if (!res.ok) {
       const text = await res.text().catch(() => res.statusText);
