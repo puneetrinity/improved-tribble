@@ -171,25 +171,11 @@ export default function CandidatesPage() {
   return (
     <InternalPageShell>
       <InternalHero
-        eyebrow="Talent Intelligence"
+        eyebrow="Talent Search"
         title={talentSearchPageCopy.header.title}
         subtitle={talentSearchPageCopy.header.subtitle}
         icon={Sparkles}
         badge="Powered by ActiveGraph"
-        actions={
-          <Button
-            onClick={handleSemanticSearch}
-            disabled={!semanticQuery.trim() || semanticSearchQuery.isFetching}
-            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
-          >
-            {semanticSearchQuery.isFetching ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Search className="mr-2 h-4 w-4" />
-            )}
-            {talentSearchPageCopy.search.buttonLabel}
-          </Button>
-        }
         stats={[
           {
             label: "Search Mode",
