@@ -1,5 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
-import { getCsrfToken, clearCsrfToken } from "./csrf";
+import { fetchWithCsrf } from "./csrf";
 import { captureFrontendException, shouldCaptureClientError } from "@/lib/monitoring";
 
 // Rate limit info returned from 429 responses
@@ -129,38 +129,15 @@ export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
-  _retryCount = 0,
 ): Promise<Response> {
   try {
-    // Build headers with CSRF token for mutating requests
     const headers: HeadersInit = data ? { "Content-Type": "application/json" } : {};
 
-    // Add CSRF token for state-changing operations
-    const mutatingMethods = ['POST', 'PATCH', 'DELETE', 'PUT'];
-    const isMutating = mutatingMethods.includes(method.toUpperCase());
-    if (isMutating) {
-      try {
-        const csrfToken = await getCsrfToken();
-        headers['x-csrf-token'] = csrfToken;
-      } catch (error) {
-        console.error('Failed to get CSRF token:', error);
-        throw new Error('CSRF token unavailable');
-      }
-    }
-
-    const res = await fetch(url, {
+    const res = await fetchWithCsrf(url, {
       method,
       headers,
       ...(data !== undefined && { body: JSON.stringify(data) }),
-      credentials: "include",
     });
-
-    // Retry once on 403 for mutating requests (likely stale CSRF token)
-    if (res.status === 403 && isMutating && _retryCount === 0) {
-      clearCsrfToken();
-      // Retry with fresh token
-      return apiRequest(method, url, data, 1);
-    }
 
     await throwIfResNotOk(res);
     return res;
@@ -183,21 +160,15 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     try {
-      const doFetch = async (isRetry = false): Promise<Response> => {
-        const res = await fetch(queryKey[0] as string, {
+      const res = await fetchWithCsrf(
+        queryKey[0] as string,
+        {
           credentials: "include",
-        });
-
-        // Handle 403 with one retry (clear stale CSRF token state)
-        if (res.status === 403 && !isRetry) {
-          clearCsrfToken();
-          return doFetch(true);
-        }
-
-        return res;
-      };
-
-      const res = await doFetch();
+        },
+        {
+          retryOn403: true,
+        },
+      );
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
         return null;
