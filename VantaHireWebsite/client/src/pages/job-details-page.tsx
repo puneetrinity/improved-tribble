@@ -6,7 +6,7 @@ import { MapPin, Clock, Calendar, Users, FileText, Upload, Briefcase, Star, Shar
 import { useToast } from "@/hooks/use-toast";
 import { Job, insertApplicationSchema } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getCsrfToken } from "@/lib/csrf";
+import { fetchWithCsrf } from "@/lib/csrf";
 import { z } from "zod";
 import { differenceInDays, format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
@@ -125,10 +125,8 @@ export default function JobDetailsPage() {
 
   const applicationMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const csrfToken = await getCsrfToken();
-      const response = await fetch(`/api/jobs/${job?.id}/apply`, {
+      const response = await fetchWithCsrf(`/api/jobs/${job?.id}/apply`, {
         method: "POST",
-        headers: { 'x-csrf-token': csrfToken },
         body: data,
       });
       if (!response.ok) {

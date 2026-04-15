@@ -42,6 +42,7 @@ import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import { sectionLabel } from "@/lib/shared-styles";
+import { apiRequest } from "@/lib/queryClient";
 
 const planBtnBase = "block w-full py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
 const planBtnPrimary = `${planBtnBase} bg-hr-accent text-white border-none hover:bg-hr-accent-hover`;
@@ -127,20 +128,7 @@ export default function PricingPage() {
   // Mutation for create-org checkout (requires CSRF token since it's authenticated)
   const createOrgCheckout = useMutation({
     mutationFn: async (data: { orgName: string; planId: number; seats: number; billingCycle: 'monthly' | 'annual'; gstin?: string }) => {
-      // Fetch CSRF token first
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const csrfData = await csrfRes.json();
-      const csrfToken = csrfData.token;
-
-      const res = await fetch('/api/subscription/checkout-create-org', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': csrfToken,
-        },
-        credentials: 'include',
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/subscription/checkout-create-org', data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to create checkout');

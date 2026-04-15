@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { getCsrfToken } from "@/lib/csrf";
+import { fetchWithCsrf } from "@/lib/csrf";
 import type { PipelineStage } from "@shared/schema";
 import {
   User,
@@ -140,7 +140,6 @@ export function CandidateIntakeForm({
         throw new Error("Please upload a resume in the Documents section");
       }
 
-      const csrf = await getCsrfToken();
       const multipart = new FormData();
 
       // Build name from first + last
@@ -174,11 +173,9 @@ export function CandidateIntakeForm({
         multipart.append("resume", formData.documents.resumeFile);
       }
 
-      const res = await fetch(`/api/jobs/${jobId}/applications/recruiter-add`, {
+      const res = await fetchWithCsrf(`/api/jobs/${jobId}/applications/recruiter-add`, {
         method: "POST",
-        headers: { "x-csrf-token": csrf },
         body: multipart,
-        credentials: "include",
       });
 
       if (!res.ok) {

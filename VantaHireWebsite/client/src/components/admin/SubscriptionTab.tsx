@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, CreditCard, Calendar, Users, AlertTriangle } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface SubscriptionPlan {
   id: number;
@@ -75,18 +76,7 @@ export default function SubscriptionTab({
       extendDays?: number;
       reason: string;
     }) => {
-      const csrfRes = await fetch("/api/csrf-token", { credentials: "include" });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/admin/subscriptions/${subscription?.id}/override`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest("POST", `/api/admin/subscriptions/${subscription?.id}/override`, data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to update subscription");

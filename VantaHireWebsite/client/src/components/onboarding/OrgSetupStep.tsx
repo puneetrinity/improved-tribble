@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { apiRequest } from "@/lib/queryClient";
 import { Building2, Globe, Loader2, Info } from "lucide-react";
 import {
   Collapsible,
@@ -58,18 +59,7 @@ export default function OrgSetupStep({ onComplete, userEmail }: OrgSetupStepProp
 
         if (domainRegex.test(normalizedDomain) && !PUBLIC_DOMAINS.includes(normalizedDomain)) {
           try {
-            const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-            const { token } = await csrfRes.json();
-
-            await fetch('/api/organizations/domain/request', {
-              method: 'POST',
-              credentials: 'include',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-csrf-token': token,
-              },
-              body: JSON.stringify({ domain: normalizedDomain }),
-            });
+            await apiRequest('POST', '/api/organizations/domain/request', { domain: normalizedDomain });
 
             toast({
               title: "Organization created",

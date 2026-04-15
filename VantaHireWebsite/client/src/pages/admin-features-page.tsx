@@ -41,6 +41,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface FeatureInfo {
   key: string;
@@ -161,20 +162,9 @@ export default function AdminFeaturesPage() {
 
   const updateFeatureMutation = useMutation({
     mutationFn: async ({ orgId, featureKey, value }: { orgId: number; featureKey: string; value: boolean | null }) => {
-      const csrfRes = await fetch("/api/csrf-token", { credentials: "include" });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/admin/organizations/${orgId}/features`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": token,
-        },
-        body: JSON.stringify({
-          overrides: { [featureKey]: value },
-          reason: changeReason.trim(),
-        }),
+      const res = await apiRequest("POST", `/api/admin/organizations/${orgId}/features`, {
+        overrides: { [featureKey]: value },
+        reason: changeReason.trim(),
       });
       if (!res.ok) {
         const data = await res.json();

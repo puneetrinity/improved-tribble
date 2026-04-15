@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 interface UseOrganizationOptions {
   enabled?: boolean;
@@ -154,18 +155,7 @@ export function useCreateOrganization() {
 
   return useMutation({
     mutationFn: async (data: { name: string }) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/organizations', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/organizations', data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to create organization');
@@ -183,18 +173,7 @@ export function useUpdateOrganization() {
 
   return useMutation({
     mutationFn: async (data: Partial<Organization>) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/organizations/current', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('PATCH', '/api/organizations/current', data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to update organization');
@@ -213,18 +192,7 @@ export function useInviteMember() {
   return useMutation({
     // Role is optional - backend always assigns 'member' (owner can promote after join)
     mutationFn: async (data: { email: string }) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/organizations/members/invite', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/organizations/members/invite', data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to invite member');
@@ -242,16 +210,7 @@ export function useCancelInvite() {
 
   return useMutation({
     mutationFn: async (inviteId: number) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/organizations/invites/${inviteId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('DELETE', `/api/organizations/invites/${inviteId}`);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to cancel invite');
@@ -269,16 +228,7 @@ export function useRemoveMember() {
 
   return useMutation({
     mutationFn: async (memberId: number) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/organizations/members/${memberId}`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('DELETE', `/api/organizations/members/${memberId}`);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to remove member');
@@ -296,18 +246,11 @@ export function useRespondToJoinRequest() {
 
   return useMutation({
     mutationFn: async (data: { requestId: number; status: 'approved' | 'rejected'; rejectionReason?: string }) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/organizations/join-requests/${data.requestId}/respond`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify({ status: data.status, rejectionReason: data.rejectionReason }),
-      });
+      const res = await apiRequest(
+        'POST',
+        `/api/organizations/join-requests/${data.requestId}/respond`,
+        { status: data.status, rejectionReason: data.rejectionReason },
+      );
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to respond to join request');
@@ -326,16 +269,7 @@ export function useLeaveOrganization() {
 
   return useMutation({
     mutationFn: async () => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/organizations/members/leave', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('POST', '/api/organizations/members/leave');
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to leave organization');
@@ -376,18 +310,11 @@ export function useReassignJobs() {
 
   return useMutation({
     mutationFn: async (data: { fromMemberId: number; toUserId: number }) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/organizations/members/${data.fromMemberId}/reassign`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify({ toUserId: data.toUserId }),
-      });
+      const res = await apiRequest(
+        'POST',
+        `/api/organizations/members/${data.fromMemberId}/reassign`,
+        { toUserId: data.toUserId },
+      );
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to reassign jobs');

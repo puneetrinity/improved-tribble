@@ -22,6 +22,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface FeatureInfo {
   key: string;
@@ -86,20 +87,9 @@ export default function FeaturesTab({
 
   const updateFeatureMutation = useMutation({
     mutationFn: async ({ orgId, featureKey, value }: { orgId: number; featureKey: string; value: boolean | null }) => {
-      const csrfRes = await fetch("/api/csrf-token", { credentials: "include" });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/admin/organizations/${orgId}/features`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": token,
-        },
-        body: JSON.stringify({
-          overrides: { [featureKey]: value },
-          reason: changeReason.trim() || "Admin override",
-        }),
+      const res = await apiRequest("POST", `/api/admin/organizations/${orgId}/features`, {
+        overrides: { [featureKey]: value },
+        reason: changeReason.trim() || "Admin override",
       });
       if (!res.ok) {
         const data = await res.json();
