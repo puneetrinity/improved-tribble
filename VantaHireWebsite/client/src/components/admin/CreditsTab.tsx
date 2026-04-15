@@ -17,6 +17,7 @@ import {
 import { Loader2, Sparkles, Gift, Settings, AlertTriangle, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CreditDetails {
   organizationId: number;
@@ -90,18 +91,7 @@ export default function CreditsTab({ orgId, planName }: CreditsTabProps) {
 
   const grantBonusMutation = useMutation({
     mutationFn: async (data: { amount: number; reason: string }) => {
-      const csrfRes = await fetch("/api/csrf-token", { credentials: "include" });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/admin/organizations/${orgId}/credits/bonus`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest("POST", `/api/admin/organizations/${orgId}/credits/bonus`, data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to grant bonus credits");
@@ -129,18 +119,7 @@ export default function CreditsTab({ orgId, planName }: CreditsTabProps) {
 
   const setCustomLimitMutation = useMutation({
     mutationFn: async (data: { customLimit: number | null; reason: string }) => {
-      const csrfRes = await fetch("/api/csrf-token", { credentials: "include" });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/admin/organizations/${orgId}/credits/custom-limit`, {
-        method: "POST",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest("POST", `/api/admin/organizations/${orgId}/credits/custom-limit`, data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || "Failed to set custom limit");
@@ -168,17 +147,8 @@ export default function CreditsTab({ orgId, planName }: CreditsTabProps) {
 
   const clearBonusMutation = useMutation({
     mutationFn: async () => {
-      const csrfRes = await fetch("/api/csrf-token", { credentials: "include" });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/admin/organizations/${orgId}/credits/bonus`, {
-        method: "DELETE",
-        credentials: "include",
-        headers: {
-          "Content-Type": "application/json",
-          "x-csrf-token": token,
-        },
-        body: JSON.stringify({ reason: "Admin cleared bonus credits" }),
+      const res = await apiRequest("DELETE", `/api/admin/organizations/${orgId}/credits/bonus`, {
+        reason: "Admin cleared bonus credits",
       });
       if (!res.ok) {
         const error = await res.json();

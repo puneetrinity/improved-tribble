@@ -42,7 +42,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { UserProfile, Application, Job } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { getCsrfToken } from "@/lib/csrf";
+import { fetchWithCsrf } from "@/lib/csrf";
 import Layout from "@/components/Layout";
 import { KpiCard } from "@/components/dashboards/KpiCard";
 import { CandidateTimeline } from "@/components/dashboards/CandidateTimeline";
@@ -422,16 +422,13 @@ export default function CandidateDashboard() {
 
     setUploadingResume(true);
     try {
-      const csrf = await getCsrfToken();
       const formData = new FormData();
       formData.append('label', resumeLabel);
       if (resumeIsDefault) formData.append('isDefault', 'true');
       formData.append('resume', resumeFile);
 
-      const response = await fetch('/api/ai/resume', {
+      const response = await fetchWithCsrf('/api/ai/resume', {
         method: 'POST',
-        headers: { 'x-csrf-token': csrf },
-        credentials: 'include',
         body: formData,
       });
 

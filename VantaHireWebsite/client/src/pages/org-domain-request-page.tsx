@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { orgDomainRequestPageCopy } from "@/lib/internal-copy";
+import { apiRequest } from "@/lib/queryClient";
 
 // List of public email domains that cannot be claimed
 const PUBLIC_DOMAINS = [
@@ -78,22 +79,7 @@ export default function OrgDomainRequestPage() {
     setIsSubmitting(true);
 
     try {
-      // Get CSRF token
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      if (!csrfRes.ok) {
-        throw new Error(orgDomainRequestPageCopy.toasts.submitFailed);
-      }
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/organizations/domain/request', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify({ domain: normalizedDomain }),
-      });
+      const res = await apiRequest('POST', '/api/organizations/domain/request', { domain: normalizedDomain });
 
       if (!res.ok) {
         const error = await res.json();

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Building2, Users, Link2, Loader2, UserPlus, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface DomainOrgMatch {
   id: number;
@@ -158,20 +159,7 @@ export default function OrgChoicePage() {
 
     setJoiningInvite(true);
     try {
-      // Get CSRF token
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      if (!csrfRes.ok) {
-        throw new Error('Failed to initialize secure request');
-      }
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/invites/${inviteCode.trim()}/accept`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('POST', `/api/invites/${inviteCode.trim()}/accept`);
 
       if (!res.ok) {
         const error = await res.json();
@@ -200,19 +188,7 @@ export default function OrgChoicePage() {
 
     setRequestingJoin(true);
     try {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      if (!csrfRes.ok) {
-        throw new Error('Failed to initialize secure request');
-      }
-      const { token } = await csrfRes.json();
-
-      const res = await fetch(`/api/organizations/request-join/${domainOrg.id}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('POST', `/api/organizations/request-join/${domainOrg.id}`);
 
       if (!res.ok) {
         const error = await res.json();

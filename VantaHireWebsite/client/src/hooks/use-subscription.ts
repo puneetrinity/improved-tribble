@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 // Types
 export interface SubscriptionPlan {
@@ -256,18 +257,7 @@ export function calculateTotalWithTax(amount: number, gstRate: number): number {
 export function useCreateCheckout() {
   return useMutation({
     mutationFn: async (data: { planId: number; seats: number; billingCycle: 'monthly' | 'annual' }) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/checkout', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/subscription/checkout', data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to create checkout');
@@ -280,18 +270,7 @@ export function useCreateCheckout() {
 export function useCreateCreditPackCheckout() {
   return useMutation({
     mutationFn: async (data: { quantity: number }) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/credit-packs/checkout', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/subscription/credit-packs/checkout', data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to create credit pack checkout');
@@ -306,18 +285,7 @@ export function useAddSeats() {
 
   return useMutation({
     mutationFn: async (additionalSeats: number) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/seats', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify({ additionalSeats }),
-      });
+      const res = await apiRequest('POST', '/api/subscription/seats', { additionalSeats });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to add seats');
@@ -335,18 +303,7 @@ export function useReduceSeats() {
 
   return useMutation({
     mutationFn: async (data: { newSeatCount: number; memberIdsToKeep: number[] }) => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/seats/reduce', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify(data),
-      });
+      const res = await apiRequest('POST', '/api/subscription/seats/reduce', data);
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to reduce seats');
@@ -365,16 +322,7 @@ export function useCancelSubscription() {
 
   return useMutation({
     mutationFn: async () => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/cancel', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('POST', '/api/subscription/cancel');
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to cancel subscription');
@@ -392,16 +340,7 @@ export function useReactivateSubscription() {
 
   return useMutation({
     mutationFn: async () => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/reactivate', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('POST', '/api/subscription/reactivate');
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to reactivate subscription');
@@ -422,18 +361,7 @@ export function useChangeBillingCycle() {
 
   return useMutation({
     mutationFn: async (billingCycle: 'monthly' | 'annual') => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/billing-cycle', {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-csrf-token': token,
-        },
-        body: JSON.stringify({ billingCycle }),
-      });
+      const res = await apiRequest('PATCH', '/api/subscription/billing-cycle', { billingCycle });
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to change billing cycle');
@@ -454,16 +382,7 @@ export function useCancelBillingCycleChange() {
 
   return useMutation({
     mutationFn: async () => {
-      const csrfRes = await fetch('/api/csrf-token', { credentials: 'include' });
-      const { token } = await csrfRes.json();
-
-      const res = await fetch('/api/subscription/billing-cycle', {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'x-csrf-token': token,
-        },
-      });
+      const res = await apiRequest('DELETE', '/api/subscription/billing-cycle');
       if (!res.ok) {
         const error = await res.json();
         throw new Error(error.error || 'Failed to cancel billing cycle change');
