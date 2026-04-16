@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Copy, RefreshCw } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { addCsrfHeader } from "@/lib/csrf";
+import { apiRequest } from "@/lib/queryClient";
 
 interface JdAiAnalysisDrawerProps {
   open: boolean;
@@ -44,12 +44,7 @@ export function JdAiAnalysisDrawer({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/ai/analyze-job-description", {
-        method: "POST",
-        headers: await addCsrfHeader({ "Content-Type": "application/json" }),
-        credentials: "include",
-        body: JSON.stringify({ title, description }),
-      });
+      const res = await apiRequest("POST", "/api/ai/analyze-job-description", { title, description });
       if (!res.ok) throw new Error("AI analysis unavailable");
       const data = await res.json();
       // Use server-provided AI rewrite, with fallback template if not available
