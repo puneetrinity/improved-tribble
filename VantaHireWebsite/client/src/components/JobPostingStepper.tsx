@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { insertJobSchema, type Client, type Job, type EmailTemplate, type PipelineStage } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCsrfToken } from "@/lib/csrf";
 import {
   Plus,
   X,
@@ -65,6 +66,9 @@ const step2Schema = z.object({
     .refine((value) => countWords(value) >= MIN_DESCRIPTION_WORDS, {
       message: `Description must be at least ${MIN_DESCRIPTION_WORDS} words`,
     }),
+});
+
+const step3Schema = z.object({
   skills: z.array(z.string()).optional(),
   goodToHaveSkills: z.array(z.string()).optional(),
   salaryMin: z.string().optional(),
@@ -74,7 +78,7 @@ const step2Schema = z.object({
   experienceYears: z.string().optional(),
 });
 
-const step3Schema = z.object({
+const step4Schema = z.object({
   hiringManagerId: z.number().optional(),
   clientId: z.number().optional(),
 });
@@ -90,9 +94,10 @@ interface FieldError {
 
 const STEPS = [
   { id: 1, title: "Basics", description: "Job title, location & type" },
-  { id: 2, title: "Details", description: "Skills & description" },
-  { id: 3, title: "Team", description: "Hiring manager & client" },
-  { id: 4, title: "Setup", description: "Templates & pipeline" },
+  { id: 2, title: "Job Description", description: "Original JD and keyword extraction" },
+  { id: 3, title: "Details", description: "Skills & requirements" },
+  { id: 4, title: "Team", description: "Hiring manager & client" },
+  { id: 5, title: "Setup", description: "Templates & pipeline" },
 ];
 
 const DEFAULT_STAGES = [
@@ -115,6 +120,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     location: string;
     type: "full-time" | "part-time" | "contract" | "remote";
     description: string;
+    optimizedDescription?: string;
     deadline: string;
     salaryMin: string;
     salaryMax: string;
@@ -126,6 +132,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     location: "",
     type: "full-time",
     description: "",
+    optimizedDescription: "",
     deadline: "",
     salaryMin: "",
     salaryMax: "",
@@ -139,6 +146,8 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const [newGoodToHaveSkill, setNewGoodToHaveSkill] = useState("");
   const [hiringManagerId, setHiringManagerId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
   const [showAiDrawer, setShowAiDrawer] = useState(false);
   const descriptionWordCount = countWords(formData.description);
   const descriptionWordsRemaining = Math.max(0, MIN_DESCRIPTION_WORDS - descriptionWordCount);
@@ -149,6 +158,101 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const [useDefaultPipeline, setUseDefaultPipeline] = useState(true);
   const [customStages, setCustomStages] = useState<{ name: string; color: string }[]>([]);
   const [newStageName, setNewStageName] = useState("");
+  const [streamBuffer, setStreamBuffer] = useState("");
+  const [displayText, setDisplayText] = useState(formData.optimizedDescription ?? "");
+  const streamBufferRef = useRef("");
+  const displayTextRef = useRef(formData.optimizedDescription ?? "");
+  const streamCompleteRef = useRef(false);
+  const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const setOptimizedDescriptionText = (text: string) => {
+    displayTextRef.current = text;
+    setDisplayText(text);
+    setFormData((prev) => ({
+      ...prev,
+      optimizedDescription: text,
+    }));
+  };
+
+  const appendOptimizedDescription = (text: string) => {
+    if (!text) return;
+
+    setOptimizedDescriptionText(`${displayTextRef.current}${text}`);
+  };
+
+  const takeTypingSlice = (text: string, isStreamComplete: boolean): { nextText: string; remainingText: string } => {
+    const nextLength = text.startsWith("\n") ? 1 : isStreamComplete ? 4 : 2;
+    const nextText = text.slice(0, nextLength);
+    return {
+      nextText,
+      remainingText: text.slice(nextText.length),
+    };
+  };
+
+  const stopTypingLoop = () => {
+    if (typingIntervalRef.current) {
+      clearInterval(typingIntervalRef.current);
+      typingIntervalRef.current = null;
+    }
+  };
+
+  const startTypingLoop = () => {
+    if (typingIntervalRef.current) return;
+
+    typingIntervalRef.current = setInterval(() => {
+      const currentBuffer = streamBufferRef.current;
+
+      if (!currentBuffer) {
+        if (streamCompleteRef.current) {
+          stopTypingLoop();
+        }
+        return;
+      }
+
+      const { nextText, remainingText } = takeTypingSlice(currentBuffer, streamCompleteRef.current);
+      appendOptimizedDescription(nextText);
+      streamBufferRef.current = remainingText;
+      setStreamBuffer(remainingText);
+    }, 25);
+  };
+
+  useEffect(() => {
+    streamBufferRef.current = streamBuffer;
+  }, [streamBuffer]);
+
+  useEffect(() => {
+    if (!isExtracting) {
+      const nextDisplayText = formData.optimizedDescription ?? "";
+      displayTextRef.current = nextDisplayText;
+      setDisplayText(nextDisplayText);
+    }
+  }, [formData.optimizedDescription, isExtracting]);
+
+  useEffect(() => {
+    if (streamBuffer && !typingIntervalRef.current) {
+      startTypingLoop();
+    }
+  }, [streamBuffer]);
+
+  useEffect(() => {
+    if (streamCompleteRef.current && !streamBuffer && typingIntervalRef.current) {
+      stopTypingLoop();
+    }
+  }, [streamBuffer]);
+
+  const resetStreamingState = () => {
+    streamCompleteRef.current = false;
+    streamBufferRef.current = "";
+    setStreamBuffer("");
+    stopTypingLoop();
+  };
+
+  useEffect(() => {
+    return () => {
+      resetStreamingState();
+      stopTypingLoop();
+    };
+  }, []);
 
   // Fetch hiring managers
   const { data: hiringManagers = [] } = useQuery<
@@ -160,7 +264,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (!response.ok) throw new Error("Failed to fetch hiring managers");
       return response.json();
     },
-    enabled: currentStep >= 3,
+    enabled: currentStep >= 4,
   });
 
   // Fetch clients
@@ -171,7 +275,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (!response.ok) throw new Error("Failed to fetch clients");
       return response.json();
     },
-    enabled: currentStep >= 3,
+    enabled: currentStep >= 4,
   });
 
   // Fetch existing jobs for template cloning
@@ -182,7 +286,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (!response.ok) throw new Error("Failed to fetch jobs");
       return response.json();
     },
-    enabled: currentStep >= 4,
+    enabled: currentStep >= 5,
   });
 
   // Fetch email templates
@@ -193,7 +297,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (!response.ok) throw new Error("Failed to fetch templates");
       return response.json();
     },
-    enabled: currentStep >= 4,
+    enabled: currentStep >= 5,
   });
 
   // Fetch existing pipeline stages
@@ -204,7 +308,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (!response.ok) throw new Error("Failed to fetch stages");
       return response.json();
     },
-    enabled: currentStep >= 4,
+    enabled: currentStep >= 5,
   });
 
   // Clone prefill - when a job is selected, prefill form fields
@@ -220,6 +324,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       location: sourceJob.location,
       type: sourceJob.type as "full-time" | "part-time" | "contract" | "remote",
       description: sourceJob.description,
+      optimizedDescription: "",
       deadline: "",
       salaryMin: sourceJob.salaryMin ? sourceJob.salaryMin.toString() : "",
       salaryMax: sourceJob.salaryMax ? sourceJob.salaryMax.toString() : "",
@@ -344,6 +449,10 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       } else if (step === 2) {
         step2Schema.parse({
           description: formData.description,
+        });
+      } else if (step === 3) {
+        step3Schema.parse({
+          description: formData.description,
           skills,
           goodToHaveSkills,
           salaryMin: formData.salaryMin || undefined,
@@ -352,13 +461,13 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
           educationRequirement: formData.educationRequirement || undefined,
           experienceYears: formData.experienceYears || undefined,
         });
-      } else if (step === 3) {
-        step3Schema.parse({
+      } else if (step === 4) {
+        step4Schema.parse({
           hiringManagerId: hiringManagerId ? Number(hiringManagerId) : undefined,
           clientId: clientId ? Number(clientId) : undefined,
         });
       }
-      // Step 4 has no required validation
+      // Step 5 has no required validation
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -377,7 +486,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   // Handle next step
   const handleNext = () => {
     if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 4));
+      setCurrentStep((prev) => Math.min(prev + 1, 5));
     }
   };
 
@@ -388,7 +497,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
 
   // Handle submit
   const handleSubmit = () => {
-    if (!validateStep(4)) return;
+    if (!validateStep(5)) return;
 
     try {
       const jobData = {
@@ -396,6 +505,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         location: formData.location,
         type: formData.type,
         description: formData.description,
+        optimizedDescription: formData.optimizedDescription || undefined,
         skills,
         goodToHaveSkills: goodToHaveSkills.length > 0 ? goodToHaveSkills : undefined,
         deadline: formData.deadline || undefined,
@@ -444,6 +554,71 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         ? prev.filter(id => id !== templateId)
         : [...prev, templateId]
     );
+  };
+
+  const handleExtractKeywords = async () => {
+    if (!validateStep(2) || isExtracting) return;
+
+    try {
+      setIsExtracting(true);
+      setExtractionError(null);
+      resetStreamingState();
+      setOptimizedDescriptionText("");
+
+      const response = await fetch("/api/jobs/extract-keywords", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": await getCsrfToken(),
+        },
+        body: JSON.stringify({ description: formData.description }),
+      });
+
+      if (!response.ok) {
+        let message = "Failed to extract keywords";
+        try {
+          const payload = await response.json();
+          message = payload?.error || payload?.message || message;
+        } catch {
+          const text = await response.text();
+          message = text || message;
+        }
+        throw new Error(message);
+      }
+
+      if (!response.body) {
+        throw new Error("Streaming response is not available");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          if (!chunk) continue;
+
+          setStreamBuffer((prev) => `${prev}${chunk}`);
+        }
+
+        const finalChunk = decoder.decode();
+        if (finalChunk) {
+          setStreamBuffer((prev) => `${prev}${finalChunk}`);
+        }
+        streamCompleteRef.current = true;
+      } finally {
+        reader.releaseLock();
+      }
+    } catch (error) {
+      streamCompleteRef.current = true;
+      setExtractionError(error instanceof Error ? error.message : "Failed to extract keywords");
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   // Render field with inline error
@@ -613,8 +788,100 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
             </div>
           )}
 
-          {/* Step 2: Details */}
+          {/* Step 2: Job Description */}
           {currentStep === 2 && (
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="description" className="flex items-center gap-2">
+                    Job Description *
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>A detailed job description improves AI candidate matching. Include responsibilities, team culture, and specific requirements for best results.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
+                      Analyze JD (AI)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleExtractKeywords}
+                      disabled={isExtracting}
+                    >
+                      {isExtracting ? "Extracting..." : "Extract Keywords"}
+                    </Button>
+                  </div>
+                </div>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => {
+                    setFormData({ ...formData, description: e.target.value });
+                    setExtractionError(null);
+                  }}
+                  placeholder="Describe the role, responsibilities, and what makes this opportunity exciting..."
+                  className={cn("min-h-[200px]", getFieldError("description") && "border-destructive")}
+                />
+                <div className="flex justify-between mt-1">
+                  {renderFieldError("description") || (
+                    <p className="text-sm text-muted-foreground">
+                      {descriptionWordCount}/{MIN_DESCRIPTION_WORDS} words
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {descriptionWordsRemaining > 0 ? `${descriptionWordsRemaining} more words needed` : ""}
+                  </p>
+                </div>
+                {descriptionWordCount > 0 && descriptionWordCount < MIN_DESCRIPTION_WORDS && (
+                  <div className="flex items-start gap-2 mt-2 p-2 bg-warning/10 border border-warning/30 rounded text-sm">
+                    <AlertCircle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+                    <p className="text-warning-foreground">
+                      <strong>SEO tip:</strong> Descriptions under {MIN_DESCRIPTION_WORDS} words may not appear in Google Jobs search results.
+                      Add {descriptionWordsRemaining} more words for better visibility.
+                    </p>
+                  </div>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">Clear, inclusive descriptions improve apply rates.</p>
+              </div>
+
+              <div>
+                <Label htmlFor="optimizedDescription" className="mb-2 block">
+                  Optimized JD (used for sourcing)
+                </Label>
+                <Textarea
+                  id="optimizedDescription"
+                  value={displayText}
+                  onChange={(e) => setOptimizedDescriptionText(e.target.value)}
+                  placeholder="Structured, keyword-focused JD will stream here..."
+                  className="min-h-[220px]"
+                />
+                {isExtracting && (
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Streaming optimized JD from Grok...
+                  </p>
+                )}
+                {extractionError && (
+                  <p className="text-sm text-destructive mt-2 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    {extractionError}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Review and edit this before continuing. It stays in frontend state only for Phase 1.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Details */}
+          {currentStep === 3 && (
             <div className="space-y-5">
               {/* Salary Section */}
               <div>
@@ -817,59 +1084,11 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   className="w-32"
                 />
               </div>
-
-              {/* Job Description */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="description" className="flex items-center gap-2">
-                    Job Description *
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>A detailed job description improves AI candidate matching. Include responsibilities, team culture, and specific requirements for best results.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
-                    Analyze JD (AI)
-                  </Button>
-                </div>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe the role, responsibilities, and what makes this opportunity exciting..."
-                  className={cn("min-h-[200px]", getFieldError("description") && "border-destructive")}
-                />
-                <div className="flex justify-between mt-1">
-                  {renderFieldError("description") || (
-                    <p className="text-sm text-muted-foreground">
-                      {descriptionWordCount}/{MIN_DESCRIPTION_WORDS} words
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {descriptionWordsRemaining > 0 ? `${descriptionWordsRemaining} more words needed` : ""}
-                  </p>
-                </div>
-                {/* SEO warning for short descriptions */}
-                {descriptionWordCount > 0 && descriptionWordCount < MIN_DESCRIPTION_WORDS && (
-                  <div className="flex items-start gap-2 mt-2 p-2 bg-warning/10 border border-warning/30 rounded text-sm">
-                    <AlertCircle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
-                    <p className="text-warning-foreground">
-                      <strong>SEO tip:</strong> Descriptions under {MIN_DESCRIPTION_WORDS} words may not appear in Google Jobs search results.
-                      Add {descriptionWordsRemaining} more words for better visibility.
-                    </p>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">Clear, inclusive descriptions improve apply rates.</p>
-              </div>
             </div>
           )}
 
-          {/* Step 3: Team */}
-          {currentStep === 3 && (
+          {/* Step 4: Team */}
+          {currentStep === 4 && (
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -924,8 +1143,8 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
             </div>
           )}
 
-          {/* Step 4: Setup (Templates & Pipeline) */}
-          {currentStep === 4 && (
+          {/* Step 5: Setup (Templates & Pipeline) */}
+          {currentStep === 5 && (
             <div className="space-y-6">
               {/* Clone from existing job */}
               {existingJobs.length > 0 && (
@@ -1246,7 +1465,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
               {currentStep === 1 ? "Cancel" : "Previous"}
             </Button>
 
-            {currentStep < 4 ? (
+            {currentStep < 5 ? (
               <Button type="button" onClick={handleNext}>
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />

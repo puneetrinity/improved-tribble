@@ -102,7 +102,7 @@ export default function JobEditPage() {
     if (job) {
       setFormData({
         title: job.title,
-        description: job.description,
+        description: job.original_JD ?? job.description,
         location: job.location,
         type: job.type,
         skills: job.skills || [],

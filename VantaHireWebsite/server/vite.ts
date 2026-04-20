@@ -615,15 +615,16 @@ export async function serveStatic(app: Express) {
       const baseUrl = process.env.BASE_URL || 'https://vantahire.com';
       const jobUrl = job.slug ? `${baseUrl}/jobs/${job.slug}` : `${baseUrl}/jobs/${job.id}`;
       const pageTitle = `${job.title} | VantaHire`;
+      const displayDescription = job.original_JD ?? job.description;
       const metaDescription = truncateText(
-        `Apply for ${job.title} at ${job.location}. ${stripHtml(job.description)}`,
+        `Apply for ${job.title} at ${job.location}. ${stripHtml(displayDescription)}`,
         155
       );
 
       const jsonLd = generateJobPostingSchema({
         id: job.id,
         title: job.title,
-        description: job.description,
+        description: displayDescription,
         location: job.location,
         type: job.type,
         skills: job.skills as string[] | null,

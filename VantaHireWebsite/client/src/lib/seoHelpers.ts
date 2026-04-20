@@ -6,6 +6,10 @@ import { Job } from "@shared/schema";
 
 export const DEFAULT_SITE_URL = "https://vantahire.com";
 
+function getDisplayJobDescription(job: Pick<Job, "description" | "original_JD">): string {
+  return job.original_JD ?? job.description;
+}
+
 /**
  * Strip HTML tags and normalize whitespace for meta descriptions.
  * Uses regex instead of DOM to work in both browser and SSR contexts.
@@ -49,7 +53,7 @@ export function truncateText(text: string, maxLength: number): string {
  * Generate meta description from job description
  */
 export function generateJobMetaDescription(job: Job): string {
-  const plainText = stripHtml(job.description);
+  const plainText = stripHtml(getDisplayJobDescription(job));
   const description = `Apply for ${job.title} at ${job.location}. ${plainText}`;
   return truncateText(description, 155); // SEO optimal length
 }
@@ -179,8 +183,9 @@ export function generateJobPostingJsonLd(job: JobWithClientData, baseUrl: string
   }
 
   // Sanitize description
-  const plainDescription = stripHtml(job.description);
-  const htmlDescription = sanitizeDescriptionHtml(job.description);
+  const displayDescription = getDisplayJobDescription(job);
+  const plainDescription = stripHtml(displayDescription);
+  const htmlDescription = sanitizeDescriptionHtml(displayDescription);
 
   // Map employment type
   const employmentTypeMap: Record<string, string> = {

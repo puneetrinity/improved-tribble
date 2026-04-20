@@ -427,7 +427,7 @@ export default function JobDetailsPage() {
                       <FileText /> Job Description
                     </div>
                     <div className={cardBodyCls}>
-                      <p className="text-sm leading-[1.75] text-hr-text-secondary whitespace-pre-wrap">{job.description}</p>
+                      <p className="text-sm leading-[1.75] text-hr-text-secondary whitespace-pre-wrap">{job.original_JD ?? job.description}</p>
                     </div>
                   </section>
 
