@@ -56,9 +56,9 @@ export default function JobPostPage() {
         subtitle={jobPostPageCopy.header.subtitle}
         icon={Briefcase}
         stats={[
-          { label: "Step 1", value: "Basics", helper: "Title, location, job type" },
-          { label: "Step 2", value: "Details", helper: "Description, skills, salary" },
-          { label: "Step 3+", value: "Workflow", helper: "Team, client, templates, pipeline" },
+          { label: "Step 1", value: "Job Description", helper: "Paste the original job description" },
+          { label: "Step 2", value: "Details", helper: "Auto-fill and edit details" },
+          { label: "Step 3", value: "Review & Post", helper: "Review and confirm before posting" },
         ]}
       />
 

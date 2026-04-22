@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { z } from "zod";
@@ -9,9 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { insertJobSchema, type Client, type Job, type EmailTemplate, type PipelineStage } from "@shared/schema";
+import { insertJobSchema, type Client, type Job } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { getCsrfToken } from "@/lib/csrf";
 import {
@@ -19,7 +18,6 @@ import {
   X,
   Briefcase,
   MapPin,
-  Calendar,
   FileText,
   Tag,
   Users,
@@ -27,11 +25,7 @@ import {
   ChevronLeft,
   Check,
   AlertCircle,
-  Mail,
-  GitBranch,
-  Copy,
   Info,
-  Trash2,
   IndianRupee,
   GraduationCap,
   Sparkles,
@@ -45,22 +39,15 @@ import {
 import { JdAiAnalysisDrawer } from "@/components/jd/JdAiAnalysisDrawer";
 
 const MIN_DESCRIPTION_WORDS = 200;
+
 const countWords = (value: string): number =>
   value
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<[^>]+>/g, " ")
     .trim()
     .split(/\s+/)
     .filter(Boolean).length;
 
-// Step validation schemas
 const step1Schema = z.object({
-  title: z.string().min(3, "Job title must be at least 3 characters"),
-  location: z.string().min(2, "Location is required"),
-  type: z.enum(["full-time", "part-time", "contract", "remote"]),
-  deadline: z.string().optional(),
-});
-
-const step2Schema = z.object({
   description: z.string()
     .min(10, "Description is required")
     .refine((value) => countWords(value) >= MIN_DESCRIPTION_WORDS, {
@@ -68,17 +55,20 @@ const step2Schema = z.object({
     }),
 });
 
-const step3Schema = z.object({
+const step2Schema = z.object({
+  title: z.string().min(3, "Job title must be at least 3 characters"),
+  location: z.string().min(2, "Location is required"),
+  type: z.enum(["full-time", "part-time", "contract", "remote"]),
   skills: z.array(z.string()).optional(),
   goodToHaveSkills: z.array(z.string()).optional(),
   salaryMin: z.string().optional(),
   salaryMax: z.string().optional(),
   salaryPeriod: z.enum(["per_month", "per_year"]).optional(),
   educationRequirement: z.string().max(500).optional(),
-  experienceYears: z.string().optional(),
+  experienceYears: z.string().min(1, "Experience is required"),
 });
 
-const step4Schema = z.object({
+const step3Schema = z.object({
   hiringManagerId: z.number().optional(),
   clientId: z.number().optional(),
 });
@@ -92,35 +82,181 @@ interface FieldError {
   message: string;
 }
 
+interface ExtractedDetails {
+  title: string;
+  location: string;
+  type: "full-time" | "part-time" | "contract" | "remote";
+  experienceYears: string;
+  salaryMin: string;
+  salaryMax: string;
+  salaryPeriod: "per_month" | "per_year";
+  educationRequirement: string;
+  skills: string[];
+  goodToHaveSkills: string[];
+  keywords: string[];
+}
+
 const STEPS = [
-  { id: 1, title: "Basics", description: "Job title, location & type" },
-  { id: 2, title: "Job Description", description: "Original JD and keyword extraction" },
-  { id: 3, title: "Details", description: "Skills & requirements" },
-  { id: 4, title: "Team", description: "Hiring manager & client" },
-  { id: 5, title: "Setup", description: "Templates & pipeline" },
+  { id: 1, title: "Job Description", description: "Paste the original job description" },
+  { id: 2, title: "Details", description: "Review and edit the original details layout" },
+  { id: 3, title: "Team", description: "Hiring manager & client" },
+  { id: 4, title: "Review & Post", description: "Review and confirm all job details before posting" },
 ];
 
-const DEFAULT_STAGES = [
-  { name: "Applied", order: 1, color: "#6b7280" },
-  { name: "Screening", order: 2, color: "#3b82f6" },
-  { name: "Interview", order: 3, color: "#10b981" },
-  { name: "Offer", order: 4, color: "#f59e0b" },
-  { name: "Hired", order: 5, color: "#22c55e" },
-];
+const dedupeStrings = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  values.forEach((value) => {
+    const trimmed = value.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    result.push(trimmed);
+  });
+
+  return result;
+};
+
+const splitList = (value: string): string[] =>
+  dedupeStrings(
+    value
+      .replace(/\r?\n-\s*/g, "\n")
+      .split(/\r?\n|,|;|\u2022/)
+      .map((item) => item.replace(/^\-\s*/, "").replace(/^[\s:]+|[\s:]+$/g, ""))
+      .filter(Boolean),
+  );
+
+const normalizeJobType = (value: string): "full-time" | "part-time" | "contract" | "remote" => {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized.includes("part")) return "part-time";
+  if (normalized.includes("contract")) return "contract";
+  if (normalized.includes("remote")) return "remote";
+  return "full-time";
+};
+
+const parseExperienceYears = (value: string): string => {
+  const match = value.match(/\d+/);
+  return match ? match[0] : "";
+};
+
+const parseSalary = (value: string): Pick<ExtractedDetails, "salaryMin" | "salaryMax" | "salaryPeriod"> => {
+  const cleaned = value.trim();
+  const normalized = cleaned.toLowerCase();
+  const matches = cleaned.match(/\d+(?:[\d,.]*\d)?/g) ?? [];
+  const multiplier = normalized.includes("lpa") ? 100000 : 1;
+  const numbers = matches
+    .map((item) => {
+      const parsed = Number(item.replace(/,/g, ""));
+      if (!Number.isFinite(parsed)) {
+        return "";
+      }
+      return String(Math.round(parsed * multiplier));
+    })
+    .filter(Boolean);
+
+  return {
+    salaryMin: numbers[0] ?? "",
+    salaryMax: numbers[1] ?? "",
+    salaryPeriod: normalized.includes("month") ? "per_month" : "per_year",
+  };
+};
+
+const parseStructuredExtraction = (rawText: string): ExtractedDetails => {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const map = new Map<string, string>();
+
+  lines.forEach((line) => {
+    const separatorIndex = line.indexOf(":");
+    if (separatorIndex === -1) return;
+
+    const key = line.slice(0, separatorIndex).trim().toLowerCase();
+    const value = line.slice(separatorIndex + 1).trim();
+    map.set(key, value);
+  });
+
+  const salary = parseSalary(map.get("salary") ?? "");
+  const requiredSkills = splitList(map.get("required skills") ?? "");
+  const goodToHaveSkills = splitList(map.get("good to have skills") ?? "");
+  const explicitKeywords = splitList(map.get("keywords") ?? "");
+
+  return {
+    title: map.get("job title") ?? "",
+    location: map.get("location") ?? "",
+    type: normalizeJobType(map.get("job type") ?? ""),
+    experienceYears: parseExperienceYears(map.get("experience") ?? ""),
+    salaryMin: salary.salaryMin,
+    salaryMax: salary.salaryMax,
+    salaryPeriod: salary.salaryPeriod,
+    educationRequirement: map.get("education") ?? "",
+    skills: requiredSkills,
+    goodToHaveSkills,
+    keywords: dedupeStrings([...explicitKeywords, ...requiredSkills, ...goodToHaveSkills]),
+  };
+};
+
+const formatSalary = (salaryMin: string, salaryMax: string, salaryPeriod: "per_month" | "per_year"): string => {
+  if (!salaryMin && !salaryMax) {
+    return "";
+  }
+
+  const formatAmount = (value: string) => `INR ${Number(value).toLocaleString("en-IN")}`;
+  const periodLabel = salaryPeriod === "per_month" ? "per month" : "per year";
+
+  if (salaryMin && salaryMax) {
+    return `${formatAmount(salaryMin)} - ${formatAmount(salaryMax)} ${periodLabel}`;
+  }
+
+  if (salaryMin) {
+    return `${formatAmount(salaryMin)}+ ${periodLabel}`;
+  }
+
+  return `Up to ${formatAmount(salaryMax)} ${periodLabel}`;
+};
+
+const generateOptimizedJD = (input: {
+  title: string;
+  location: string;
+  experienceYears: string;
+  salaryMin: string;
+  salaryMax: string;
+  salaryPeriod: "per_month" | "per_year";
+  skills: string[];
+  keywords: string[];
+}): string => {
+  const requiredSkills = dedupeStrings(input.skills);
+  const keywords = dedupeStrings([...input.keywords, ...requiredSkills]);
+
+  return [
+    `Job Title: ${input.title.trim()}`,
+    `Location: ${input.location.trim()}`,
+    `Experience: ${input.experienceYears ? `${input.experienceYears}+ years` : ""}`,
+    `Salary: ${formatSalary(input.salaryMin, input.salaryMax, input.salaryPeriod)}`,
+    `Required Skills: ${requiredSkills.join(", ")}`,
+    `Keywords: ${keywords.join(", ")}`,
+  ].join("\n");
+};
 
 export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isEditing, setIsEditing] = useState(false);
   const [errors, setErrors] = useState<FieldError[]>([]);
-
-  // Form state
   const [formData, setFormData] = useState<{
     title: string;
     location: string;
     type: "full-time" | "part-time" | "contract" | "remote";
     description: string;
-    optimizedDescription?: string;
+    optimizedDescription: string;
     deadline: string;
     salaryMin: string;
     salaryMax: string;
@@ -144,117 +280,16 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const [newSkill, setNewSkill] = useState("");
   const [goodToHaveSkills, setGoodToHaveSkills] = useState<string[]>([]);
   const [newGoodToHaveSkill, setNewGoodToHaveSkill] = useState("");
+  const [keywords, setKeywords] = useState<string[]>([]);
   const [hiringManagerId, setHiringManagerId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [hasExtractedDetails, setHasExtractedDetails] = useState(false);
   const [showAiDrawer, setShowAiDrawer] = useState(false);
   const descriptionWordCount = countWords(formData.description);
   const descriptionWordsRemaining = Math.max(0, MIN_DESCRIPTION_WORDS - descriptionWordCount);
 
-  // Setup step state
-  const [cloneFromJobId, setCloneFromJobId] = useState<string>("");
-  const [selectedTemplateIds, setSelectedTemplateIds] = useState<number[]>([]);
-  const [useDefaultPipeline, setUseDefaultPipeline] = useState(true);
-  const [customStages, setCustomStages] = useState<{ name: string; color: string }[]>([]);
-  const [newStageName, setNewStageName] = useState("");
-  const [streamBuffer, setStreamBuffer] = useState("");
-  const [displayText, setDisplayText] = useState(formData.optimizedDescription ?? "");
-  const streamBufferRef = useRef("");
-  const displayTextRef = useRef(formData.optimizedDescription ?? "");
-  const streamCompleteRef = useRef(false);
-  const typingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const setOptimizedDescriptionText = (text: string) => {
-    displayTextRef.current = text;
-    setDisplayText(text);
-    setFormData((prev) => ({
-      ...prev,
-      optimizedDescription: text,
-    }));
-  };
-
-  const appendOptimizedDescription = (text: string) => {
-    if (!text) return;
-
-    setOptimizedDescriptionText(`${displayTextRef.current}${text}`);
-  };
-
-  const takeTypingSlice = (text: string, isStreamComplete: boolean): { nextText: string; remainingText: string } => {
-    const nextLength = text.startsWith("\n") ? 1 : isStreamComplete ? 4 : 2;
-    const nextText = text.slice(0, nextLength);
-    return {
-      nextText,
-      remainingText: text.slice(nextText.length),
-    };
-  };
-
-  const stopTypingLoop = () => {
-    if (typingIntervalRef.current) {
-      clearInterval(typingIntervalRef.current);
-      typingIntervalRef.current = null;
-    }
-  };
-
-  const startTypingLoop = () => {
-    if (typingIntervalRef.current) return;
-
-    typingIntervalRef.current = setInterval(() => {
-      const currentBuffer = streamBufferRef.current;
-
-      if (!currentBuffer) {
-        if (streamCompleteRef.current) {
-          stopTypingLoop();
-        }
-        return;
-      }
-
-      const { nextText, remainingText } = takeTypingSlice(currentBuffer, streamCompleteRef.current);
-      appendOptimizedDescription(nextText);
-      streamBufferRef.current = remainingText;
-      setStreamBuffer(remainingText);
-    }, 25);
-  };
-
-  useEffect(() => {
-    streamBufferRef.current = streamBuffer;
-  }, [streamBuffer]);
-
-  useEffect(() => {
-    if (!isExtracting) {
-      const nextDisplayText = formData.optimizedDescription ?? "";
-      displayTextRef.current = nextDisplayText;
-      setDisplayText(nextDisplayText);
-    }
-  }, [formData.optimizedDescription, isExtracting]);
-
-  useEffect(() => {
-    if (streamBuffer && !typingIntervalRef.current) {
-      startTypingLoop();
-    }
-  }, [streamBuffer]);
-
-  useEffect(() => {
-    if (streamCompleteRef.current && !streamBuffer && typingIntervalRef.current) {
-      stopTypingLoop();
-    }
-  }, [streamBuffer]);
-
-  const resetStreamingState = () => {
-    streamCompleteRef.current = false;
-    streamBufferRef.current = "";
-    setStreamBuffer("");
-    stopTypingLoop();
-  };
-
-  useEffect(() => {
-    return () => {
-      resetStreamingState();
-      stopTypingLoop();
-    };
-  }, []);
-
-  // Fetch hiring managers
   const { data: hiringManagers = [] } = useQuery<
     Array<{ id: number; username: string; firstName: string | null; lastName: string | null }>
   >({
@@ -264,10 +299,9 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (!response.ok) throw new Error("Failed to fetch hiring managers");
       return response.json();
     },
-    enabled: currentStep >= 4,
+    enabled: currentStep >= 3,
   });
 
-  // Fetch clients
   const { data: clients = [] } = useQuery<Client[]>({
     queryKey: ["/api/clients"],
     queryFn: async () => {
@@ -275,144 +309,21 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (!response.ok) throw new Error("Failed to fetch clients");
       return response.json();
     },
-    enabled: currentStep >= 4,
+    enabled: currentStep >= 3,
   });
 
-  // Fetch existing jobs for template cloning
-  const { data: existingJobs = [] } = useQuery<Job[]>({
-    queryKey: ["/api/my-jobs"],
-    queryFn: async () => {
-      const response = await fetch("/api/my-jobs", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch jobs");
-      return response.json();
-    },
-    enabled: currentStep >= 5,
-  });
-
-  // Fetch email templates
-  const { data: emailTemplates = [] } = useQuery<EmailTemplate[]>({
-    queryKey: ["/api/email-templates"],
-    queryFn: async () => {
-      const response = await fetch("/api/email-templates", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch templates");
-      return response.json();
-    },
-    enabled: currentStep >= 5,
-  });
-
-  // Fetch existing pipeline stages
-  const { data: pipelineStages = [] } = useQuery<PipelineStage[]>({
-    queryKey: ["/api/pipeline/stages"],
-    queryFn: async () => {
-      const response = await fetch("/api/pipeline/stages", { credentials: "include" });
-      if (!response.ok) throw new Error("Failed to fetch stages");
-      return response.json();
-    },
-    enabled: currentStep >= 5,
-  });
-
-  // Clone prefill - when a job is selected, prefill form fields
-  useEffect(() => {
-    if (!cloneFromJobId) return;
-
-    const sourceJob = existingJobs.find(j => j.id.toString() === cloneFromJobId);
-    if (!sourceJob) return;
-
-    // Prefill form data with "(Copy)" suffix on title
-    setFormData({
-      title: `${sourceJob.title} (Copy)`,
-      location: sourceJob.location,
-      type: sourceJob.type as "full-time" | "part-time" | "contract" | "remote",
-      description: sourceJob.description,
-      optimizedDescription: "",
-      deadline: "",
-      salaryMin: sourceJob.salaryMin ? sourceJob.salaryMin.toString() : "",
-      salaryMax: sourceJob.salaryMax ? sourceJob.salaryMax.toString() : "",
-      salaryPeriod: (sourceJob.salaryPeriod as "per_month" | "per_year") || "per_month",
-      educationRequirement: sourceJob.educationRequirement || "",
-      experienceYears: sourceJob.experienceYears ? sourceJob.experienceYears.toString() : "",
-    });
-
-    // Prefill skills
-    if (sourceJob.skills && sourceJob.skills.length > 0) {
-      setSkills(sourceJob.skills);
-    }
-
-    // Prefill good-to-have skills
-    if (sourceJob.goodToHaveSkills && sourceJob.goodToHaveSkills.length > 0) {
-      setGoodToHaveSkills(sourceJob.goodToHaveSkills);
-    }
-
-    // Prefill hiring manager and client if set
-    if (sourceJob.hiringManagerId) {
-      setHiringManagerId(sourceJob.hiringManagerId.toString());
-    }
-    if (sourceJob.clientId) {
-      setClientId(sourceJob.clientId.toString());
-    }
-
-    toast({
-      title: "Job cloned",
-      description: `Prefilled from "${sourceJob.title}". Review and customize as needed.`,
-    });
-  }, [cloneFromJobId, existingJobs]);
-
-  // Submit mutation with Step 4 setup
   const jobMutation = useMutation({
-    mutationFn: async (data: typeof formData & { skills: string[] }) => {
-      // Create the job first
+    mutationFn: async (data: Record<string, unknown>) => {
       const response = await apiRequest("POST", "/api/jobs", data);
-      const job = await response.json();
-
-      // Handle pipeline stage creation
-      if (pipelineStages.length === 0) {
-        // No stages exist - create either default or custom
-        const stagesToCreate = useDefaultPipeline
-          ? DEFAULT_STAGES
-          : customStages.map((s, i) => ({ name: s.name, color: s.color, order: i + 1 }));
-
-        if (stagesToCreate.length > 0) {
-          try {
-            for (const stage of stagesToCreate) {
-              await apiRequest("POST", "/api/pipeline/stages", stage);
-            }
-          } catch (e) {
-            console.error("Failed to create pipeline stages:", e);
-          }
-        }
-      } else if (!useDefaultPipeline && customStages.length > 0) {
-        // Stages exist but user defined custom ones - add the new custom stages
-        try {
-          const maxOrder = Math.max(...pipelineStages.map(s => s.order), 0);
-          for (const stage of customStages) {
-            await apiRequest("POST", "/api/pipeline/stages", {
-              name: stage.name,
-              color: stage.color,
-              order: maxOrder + customStages.indexOf(stage) + 1,
-            });
-          }
-        } catch (e) {
-          console.error("Failed to create custom pipeline stages:", e);
-        }
-      }
-
-      // Link selected email templates to the job (if API supports it)
-      // Note: Templates are organization-wide recommendations
-      if (selectedTemplateIds.length > 0) {
-        console.log("Recommended templates for job:", selectedTemplateIds);
-      }
-
-      return job;
+      return response.json();
     },
-    onSuccess: (job) => {
-      const stagesCreated = pipelineStages.length === 0 || (!useDefaultPipeline && customStages.length > 0);
+    onSuccess: (job: Job) => {
       toast({
         title: "Job posted successfully!",
-        description: `${job.title} has been created${stagesCreated ? " with pipeline stages" : ""}.`,
+        description: `${job.title} has been created.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/pipeline/stages"] });
       if (onSuccess) {
         onSuccess();
       } else {
@@ -428,31 +339,45 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     },
   });
 
-  // Get error for a specific field
-  const getFieldError = (field: string): string | undefined => {
-    return errors.find((e) => e.field === field)?.message;
+  const getFieldError = (field: string): string | undefined =>
+    errors.find((error) => error.field === field)?.message;
+
+  const renderFieldError = (field: string) => {
+    const error = getFieldError(field);
+    if (!error) return null;
+
+    return (
+      <p className="mt-1 flex items-center gap-1 text-sm text-destructive">
+        <AlertCircle className="h-3 w-3" />
+        {error}
+      </p>
+    );
   };
 
-  // Validate current step
+  const clearGeneratedState = () => {
+    setHasExtractedDetails(false);
+    setExtractionError(null);
+    setKeywords([]);
+    setFormData((prev) => ({
+      ...prev,
+      optimizedDescription: "",
+    }));
+  };
+
   const validateStep = (step: number): boolean => {
     setErrors([]);
-    const newErrors: FieldError[] = [];
+    const nextErrors: FieldError[] = [];
 
     try {
       if (step === 1) {
         step1Schema.parse({
-          title: formData.title,
-          location: formData.location,
-          type: formData.type,
-          deadline: formData.deadline || undefined,
+          description: formData.description,
         });
       } else if (step === 2) {
         step2Schema.parse({
-          description: formData.description,
-        });
-      } else if (step === 3) {
-        step3Schema.parse({
-          description: formData.description,
+          title: formData.title,
+          location: formData.location,
+          type: formData.type,
           skills,
           goodToHaveSkills,
           salaryMin: formData.salaryMin || undefined,
@@ -461,51 +386,64 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
           educationRequirement: formData.educationRequirement || undefined,
           experienceYears: formData.experienceYears || undefined,
         });
-      } else if (step === 4) {
-        step4Schema.parse({
+      } else if (step === 3) {
+        step3Schema.parse({
           hiringManagerId: hiringManagerId ? Number(hiringManagerId) : undefined,
           clientId: clientId ? Number(clientId) : undefined,
         });
       }
-      // Step 5 has no required validation
+
       return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        error.errors.forEach((err) => {
-          newErrors.push({
-            field: err.path[0] as string,
-            message: err.message,
+        error.errors.forEach((issue) => {
+          nextErrors.push({
+            field: issue.path[0] as string,
+            message: issue.message,
           });
         });
-        setErrors(newErrors);
       }
+      setErrors(nextErrors);
       return false;
     }
   };
 
-  // Handle next step
-  const handleNext = () => {
-    if (validateStep(currentStep)) {
-      setCurrentStep((prev) => Math.min(prev + 1, 5));
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      await handleExtractDetails();
+      return;
     }
+
+    if (!validateStep(currentStep)) return;
+
+    setCurrentStep((prev) => Math.min(prev + 1, 4));
   };
 
-  // Handle previous step
   const handlePrevious = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  // Handle submit
   const handleSubmit = () => {
-    if (!validateStep(5)) return;
+    if (!validateStep(4)) return;
 
     try {
+      const optimizedJD = generateOptimizedJD({
+        title: formData.title,
+        location: formData.location,
+        experienceYears: formData.experienceYears,
+        salaryMin: formData.salaryMin,
+        salaryMax: formData.salaryMax,
+        salaryPeriod: formData.salaryPeriod,
+        skills,
+        keywords,
+      });
+
       const jobData = {
         title: formData.title,
         location: formData.location,
         type: formData.type,
-        description: formData.description,
-        optimizedDescription: formData.optimizedDescription || undefined,
+        description: optimizedJD,
+        original_JD: formData.description,
         skills,
         goodToHaveSkills: goodToHaveSkills.length > 0 ? goodToHaveSkills : undefined,
         deadline: formData.deadline || undefined,
@@ -518,8 +456,11 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         experienceYears: formData.experienceYears ? Number(formData.experienceYears) : undefined,
       };
 
-      insertJobSchema.parse(jobData);
-      jobMutation.mutate(jobData as any);
+      insertJobSchema.parse({
+        ...jobData,
+        description: formData.description,
+      });
+      jobMutation.mutate(jobData);
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast({
@@ -531,39 +472,31 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     }
   };
 
-  // Handle skill add
   const handleAddSkill = () => {
-    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
-      setSkills([...skills, newSkill.trim()]);
-      setNewSkill("");
-    }
+    if (!newSkill.trim()) return;
+    setSkills((prev) => dedupeStrings([...prev, newSkill]));
+    setKeywords((prev) => dedupeStrings([...prev, newSkill]));
+    setNewSkill("");
   };
 
-  // Handle good-to-have skill add
   const handleAddGoodToHaveSkill = () => {
-    if (newGoodToHaveSkill.trim() && !goodToHaveSkills.includes(newGoodToHaveSkill.trim())) {
-      setGoodToHaveSkills([...goodToHaveSkills, newGoodToHaveSkill.trim()]);
-      setNewGoodToHaveSkill("");
-    }
+    if (!newGoodToHaveSkill.trim()) return;
+    setGoodToHaveSkills((prev) => dedupeStrings([...prev, newGoodToHaveSkill]));
+    setKeywords((prev) => dedupeStrings([...prev, newGoodToHaveSkill]));
+    setNewGoodToHaveSkill("");
   };
 
-  // Handle template selection toggle
-  const toggleTemplate = (templateId: number) => {
-    setSelectedTemplateIds(prev =>
-      prev.includes(templateId)
-        ? prev.filter(id => id !== templateId)
-        : [...prev, templateId]
-    );
+  const removeKeywordValue = (value: string) => {
+    const key = value.trim().toLowerCase();
+    setKeywords((prev) => prev.filter((item) => item.trim().toLowerCase() !== key));
   };
 
-  const handleExtractKeywords = async () => {
-    if (!validateStep(2) || isExtracting) return;
+  const handleExtractDetails = async () => {
+    if (!validateStep(1) || isExtracting) return;
 
     try {
       setIsExtracting(true);
       setExtractionError(null);
-      resetStreamingState();
-      setOptimizedDescriptionText("");
 
       const response = await fetch("/api/jobs/extract-keywords", {
         method: "POST",
@@ -576,7 +509,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       });
 
       if (!response.ok) {
-        let message = "Failed to extract keywords";
+        let message = "Failed to extract details";
         try {
           const payload = await response.json();
           message = payload?.error || payload?.message || message;
@@ -587,63 +520,35 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         throw new Error(message);
       }
 
-      if (!response.body) {
-        throw new Error("Streaming response is not available");
-      }
+      const extractedText = await response.text();
+      const parsed = parseStructuredExtraction(extractedText);
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          if (!chunk) continue;
-
-          setStreamBuffer((prev) => `${prev}${chunk}`);
-        }
-
-        const finalChunk = decoder.decode();
-        if (finalChunk) {
-          setStreamBuffer((prev) => `${prev}${finalChunk}`);
-        }
-        streamCompleteRef.current = true;
-      } finally {
-        reader.releaseLock();
-      }
+      setFormData((prev) => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        location: parsed.location || prev.location,
+        type: parsed.type || prev.type,
+        salaryMin: parsed.salaryMin || prev.salaryMin,
+        salaryMax: parsed.salaryMax || prev.salaryMax,
+        salaryPeriod: parsed.salaryPeriod || prev.salaryPeriod,
+        educationRequirement: parsed.educationRequirement || prev.educationRequirement,
+        experienceYears: parsed.experienceYears || prev.experienceYears,
+      }));
+      setSkills(parsed.skills);
+      setGoodToHaveSkills(parsed.goodToHaveSkills);
+      setKeywords(parsed.keywords);
+      setHasExtractedDetails(true);
+      setCurrentStep(2);
     } catch (error) {
-      streamCompleteRef.current = true;
-      setExtractionError(error instanceof Error ? error.message : "Failed to extract keywords");
+      setHasExtractedDetails(false);
+      setExtractionError(error instanceof Error ? error.message : "Failed to extract details");
     } finally {
       setIsExtracting(false);
     }
   };
 
-  // Render field with inline error
-  const renderFieldError = (field: string) => {
-    const error = getFieldError(field);
-    if (!error) return null;
-    return (
-      <p className="text-sm text-destructive mt-1 flex items-center gap-1">
-        <AlertCircle className="h-3 w-3" />
-        {error}
-      </p>
-    );
-  };
-
-  // Group templates by type
-  const templatesByType = emailTemplates.reduce((acc, tpl) => {
-    const type = tpl.templateType || 'custom';
-    if (!acc[type]) acc[type] = [];
-    acc[type].push(tpl);
-    return acc;
-  }, {} as Record<string, EmailTemplate[]>);
-
   return (
     <div className="space-y-6">
-      {/* Step Indicator */}
       <div className="flex items-center justify-center">
         <div className="flex items-center gap-1">
           {STEPS.map((step, index) => (
@@ -655,38 +560,34 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   }
                 }}
                 className={cn(
-                  "flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all text-sm",
+                  "flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition-all",
                   currentStep === step.id
                     ? "bg-primary text-white"
                     : step.id < currentStep
-                    ? "bg-success/20 text-success-foreground hover:bg-green-200 cursor-pointer"
-                    : "bg-muted text-muted-foreground"
+                      ? "cursor-pointer bg-success/20 text-success-foreground hover:bg-green-200"
+                      : "bg-muted text-muted-foreground",
                 )}
                 disabled={step.id > currentStep}
               >
                 <span
                   className={cn(
-                    "flex items-center justify-center w-5 h-5 rounded-full text-xs font-medium",
+                    "flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium",
                     currentStep === step.id
                       ? "bg-white/20"
                       : step.id < currentStep
-                      ? "bg-green-200"
-                      : "bg-muted"
+                        ? "bg-green-200"
+                        : "bg-muted",
                   )}
                 >
-                  {step.id < currentStep ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    step.id
-                  )}
+                  {step.id < currentStep ? <Check className="h-3 w-3" /> : step.id}
                 </span>
-                <span className="hidden md:block font-medium">{step.title}</span>
+                <span className="hidden font-medium md:block">{step.title}</span>
               </button>
               {index < STEPS.length - 1 && (
                 <ChevronRight
                   className={cn(
-                    "h-4 w-4 mx-1",
-                    step.id < currentStep ? "text-success" : "text-muted-foreground/50"
+                    "mx-1 h-4 w-4",
+                    step.id < currentStep ? "text-success" : "text-muted-foreground/50",
                   )}
                 />
               )}
@@ -695,37 +596,93 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         </div>
       </div>
 
-      {/* Step Content */}
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-foreground text-lg">
+          <CardTitle className="text-lg text-foreground">
             {STEPS[currentStep - 1]?.title}
           </CardTitle>
           <CardDescription>{STEPS[currentStep - 1]?.description}</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Step 1: Basics */}
           {currentStep === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <Label htmlFor="title" className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  Job Title *
-                </Label>
-                <Input
-                  id="title"
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g. Senior Software Engineer"
-                  className={cn(getFieldError("title") && "border-destructive")}
+                <div className="mb-2 flex items-center justify-between">
+                  <Label htmlFor="description" className="flex items-center gap-2">
+                    Original Job Description *
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 cursor-help text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>A detailed job description improves extraction quality and sourcing accuracy.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
+                    Analyze JD (AI)
+                  </Button>
+                </div>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, description: e.target.value }));
+                    clearGeneratedState();
+                  }}
+                  placeholder="Paste the original job description here..."
+                  className={cn("min-h-[220px]", getFieldError("description") && "border-destructive")}
                 />
-                {renderFieldError("title")}
+                <div className="mt-1 flex justify-between">
+                  {renderFieldError("description") || (
+                    <p className="text-sm text-muted-foreground">
+                      {descriptionWordCount}/{MIN_DESCRIPTION_WORDS} words
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {descriptionWordsRemaining > 0 ? `${descriptionWordsRemaining} more words needed` : ""}
+                  </p>
+                </div>
+                {descriptionWordCount > 0 && descriptionWordCount < MIN_DESCRIPTION_WORDS && (
+                  <div className="mt-2 flex items-start gap-2 rounded border border-warning/30 bg-warning/10 p-2 text-sm">
+                    <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-warning" />
+                    <p className="text-warning-foreground">
+                      <strong>SEO tip:</strong> Descriptions under {MIN_DESCRIPTION_WORDS} words may not appear in Google Jobs search results.
+                      Add {descriptionWordsRemaining} more words for better visibility.
+                    </p>
+                  </div>
+                )}
+                {extractionError && (
+                  <p className="mt-2 flex items-center gap-1 text-sm text-destructive">
+                    <AlertCircle className="h-3 w-3" />
+                    {extractionError}
+                  </p>
+                )}
               </div>
+            </div>
+          )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {currentStep === 2 && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <Label htmlFor="location" className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="title" className="mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Job Title *
+                  </Label>
+                  <Input
+                    id="title"
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                    placeholder="e.g. Senior Software Engineer"
+                    className={cn(getFieldError("title") && "border-destructive")}
+                  />
+                  {renderFieldError("title")}
+                </div>
+
+                <div>
+                  <Label htmlFor="location" className="mb-2 flex items-center gap-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
                     Location *
                   </Label>
@@ -733,8 +690,8 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                     id="location"
                     type="text"
                     value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="e.g. San Francisco, CA"
+                    onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
+                    placeholder="e.g. Bangalore"
                     className={cn(getFieldError("location") && "border-destructive")}
                   />
                   {renderFieldError("location")}
@@ -746,20 +703,11 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   </Label>
                   <Select
                     value={formData.type}
-                    onValueChange={(value: any) =>
-                      setFormData((prev) => {
-                        const nextType = value as typeof prev.type;
-                        let nextLocation = prev.location;
-                        if (nextType === "remote" && !nextLocation.trim()) {
-                          nextLocation = "Remote";
-                        } else if (prev.type === "remote" && nextType !== "remote" && nextLocation.trim().toLowerCase() === "remote") {
-                          nextLocation = "";
-                        }
-                        return { ...prev, type: nextType, location: nextLocation };
-                      })
+                    onValueChange={(value: "full-time" | "part-time" | "contract" | "remote") =>
+                      setFormData((prev) => ({ ...prev, type: value }))
                     }
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={cn(getFieldError("type") && "border-destructive")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -769,140 +717,39 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                       <SelectItem value="remote">Remote</SelectItem>
                     </SelectContent>
                   </Select>
+                  {renderFieldError("type")}
                 </div>
-              </div>
 
-              <div>
-                <Label htmlFor="deadline" className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  Application Deadline (Optional)
-                </Label>
-                <Input
-                  id="deadline"
-                  type="date"
-                  value={formData.deadline}
-                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                  min={new Date().toISOString().split("T")[0]}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Step 2: Job Description */}
-          {currentStep === 2 && (
-            <div className="space-y-5">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="description" className="flex items-center gap-2">
-                    Job Description *
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>A detailed job description improves AI candidate matching. Include responsibilities, team culture, and specific requirements for best results.</p>
-                      </TooltipContent>
-                    </Tooltip>
+                <div>
+                  <Label htmlFor="experienceYearsTop" className="mb-2 flex items-center gap-2">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    Experience *
                   </Label>
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
-                      Analyze JD (AI)
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleExtractKeywords}
-                      disabled={isExtracting}
-                    >
-                      {isExtracting ? "Extracting..." : "Extract Keywords"}
-                    </Button>
-                  </div>
+                  <Input
+                    id="experienceYearsTop"
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={formData.experienceYears}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, experienceYears: e.target.value }))}
+                    placeholder="e.g. 3"
+                    className={cn("w-full", getFieldError("experienceYears") && "border-destructive")}
+                  />
+                  {renderFieldError("experienceYears")}
                 </div>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => {
-                    setFormData({ ...formData, description: e.target.value });
-                    setExtractionError(null);
-                  }}
-                  placeholder="Describe the role, responsibilities, and what makes this opportunity exciting..."
-                  className={cn("min-h-[200px]", getFieldError("description") && "border-destructive")}
-                />
-                <div className="flex justify-between mt-1">
-                  {renderFieldError("description") || (
-                    <p className="text-sm text-muted-foreground">
-                      {descriptionWordCount}/{MIN_DESCRIPTION_WORDS} words
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {descriptionWordsRemaining > 0 ? `${descriptionWordsRemaining} more words needed` : ""}
-                  </p>
-                </div>
-                {descriptionWordCount > 0 && descriptionWordCount < MIN_DESCRIPTION_WORDS && (
-                  <div className="flex items-start gap-2 mt-2 p-2 bg-warning/10 border border-warning/30 rounded text-sm">
-                    <AlertCircle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
-                    <p className="text-warning-foreground">
-                      <strong>SEO tip:</strong> Descriptions under {MIN_DESCRIPTION_WORDS} words may not appear in Google Jobs search results.
-                      Add {descriptionWordsRemaining} more words for better visibility.
-                    </p>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">Clear, inclusive descriptions improve apply rates.</p>
               </div>
 
               <div>
-                <Label htmlFor="optimizedDescription" className="mb-2 block">
-                  Optimized JD (used for sourcing)
-                </Label>
-                <Textarea
-                  id="optimizedDescription"
-                  value={displayText}
-                  onChange={(e) => setOptimizedDescriptionText(e.target.value)}
-                  placeholder="Structured, keyword-focused JD will stream here..."
-                  className="min-h-[220px]"
-                />
-                {isExtracting && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Streaming optimized JD from Grok...
-                  </p>
-                )}
-                {extractionError && (
-                  <p className="text-sm text-destructive mt-2 flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3" />
-                    {extractionError}
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Review and edit this before continuing. It stays in frontend state only for Phase 1.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Step 3: Details */}
-          {currentStep === 3 && (
-            <div className="space-y-5">
-              {/* Salary Section */}
-              <div>
-                <Label className="flex items-center gap-2 mb-2">
+                <Label className="mb-2 flex items-center gap-2">
                   <IndianRupee className="h-4 w-4 text-muted-foreground" />
                   Salary / Pay (Optional - won't be visible to candidate if left blank)
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Providing salary range helps attract candidates with matching expectations. This remains private unless you choose to share it.</p>
-                    </TooltipContent>
-                  </Tooltip>
                 </Label>
                 <div className="flex gap-3">
                   <div className="flex-1">
                     <Input
                       type="number"
                       value={formData.salaryMin}
-                      onChange={(e) => setFormData({ ...formData, salaryMin: e.target.value })}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, salaryMin: e.target.value }))}
                       placeholder="Min (e.g., 500000)"
                       min="0"
                     />
@@ -912,7 +759,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                     <Input
                       type="number"
                       value={formData.salaryMax}
-                      onChange={(e) => setFormData({ ...formData, salaryMax: e.target.value })}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, salaryMax: e.target.value }))}
                       placeholder="Max (e.g., 800000)"
                       min="0"
                     />
@@ -920,7 +767,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   <Select
                     value={formData.salaryPeriod}
                     onValueChange={(value: "per_month" | "per_year") =>
-                      setFormData({ ...formData, salaryPeriod: value })
+                      setFormData((prev) => ({ ...prev, salaryPeriod: value }))
                     }
                   >
                     <SelectTrigger className="w-32">
@@ -934,28 +781,24 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 </div>
               </div>
 
-              {/* Required Skills Section */}
               <div>
-                <Label className="flex items-center gap-2 mb-2">
+                <Label className="mb-2 flex items-center gap-2">
                   <Tag className="h-4 w-4 text-muted-foreground" />
                   Required Skills (Non-negotiable)
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>AI will recommend "hold" or "reject" for candidates missing these skills. Only add truly non-negotiable skills here.</p>
-                    </TooltipContent>
-                  </Tooltip>
                 </Label>
-                <div className="flex gap-2 mb-3">
+                <div className="mb-3 flex gap-2">
                   <Input
                     type="text"
                     value={newSkill}
                     onChange={(e) => setNewSkill(e.target.value)}
                     placeholder="Add a required skill..."
                     className="flex-1"
-                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSkill())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddSkill();
+                      }
+                    }}
                   />
                   <Button type="button" onClick={handleAddSkill} size="icon" aria-label="Add required skill">
                     <Plus className="h-4 w-4" />
@@ -967,16 +810,19 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                       <Badge
                         key={`${skill}-${index}`}
                         variant="secondary"
-                        className="bg-destructive/10 text-destructive border-destructive/20 pl-3 pr-1 py-1"
+                        className="border-destructive/20 bg-destructive/10 py-1 pl-3 pr-1 text-destructive"
                       >
                         {skill}
                         <Button
                           type="button"
-                          onClick={() => setSkills(skills.filter((s) => s !== skill))}
+                          onClick={() => {
+                            setSkills((prev) => prev.filter((item) => item !== skill));
+                            removeKeywordValue(skill);
+                          }}
                           variant="ghost"
                           size="icon"
                           aria-label={`Remove required skill ${skill}`}
-                          className="ml-2 p-0 h-4 w-4 hover:bg-destructive/20"
+                          className="ml-2 h-4 w-4 p-0 hover:bg-destructive/20"
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -986,28 +832,24 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 )}
               </div>
 
-              {/* Good to Have Skills Section */}
               <div>
-                <Label className="flex items-center gap-2 mb-2">
+                <Label className="mb-2 flex items-center gap-2">
                   <Sparkles className="h-4 w-4 text-muted-foreground" />
                   Good to Have Skills (Optional)
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>These give candidates bonus points but won't disqualify them. Great for nice-to-have technologies or soft skills.</p>
-                    </TooltipContent>
-                  </Tooltip>
                 </Label>
-                <div className="flex gap-2 mb-3">
+                <div className="mb-3 flex gap-2">
                   <Input
                     type="text"
                     value={newGoodToHaveSkill}
                     onChange={(e) => setNewGoodToHaveSkill(e.target.value)}
                     placeholder="Add a nice-to-have skill..."
                     className="flex-1"
-                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddGoodToHaveSkill())}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleAddGoodToHaveSkill();
+                      }
+                    }}
                   />
                   <Button type="button" onClick={handleAddGoodToHaveSkill} size="icon" aria-label="Add preferred skill">
                     <Plus className="h-4 w-4" />
@@ -1019,16 +861,19 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                       <Badge
                         key={`${skill}-${index}`}
                         variant="secondary"
-                        className="bg-green-500/10 text-green-600 border-green-500/20 pl-3 pr-1 py-1"
+                        className="border-green-500/20 bg-green-500/10 py-1 pl-3 pr-1 text-green-600"
                       >
                         {skill}
                         <Button
                           type="button"
-                          onClick={() => setGoodToHaveSkills(goodToHaveSkills.filter((s) => s !== skill))}
+                          onClick={() => {
+                            setGoodToHaveSkills((prev) => prev.filter((item) => item !== skill));
+                            removeKeywordValue(skill);
+                          }}
                           variant="ghost"
                           size="icon"
                           aria-label={`Remove preferred skill ${skill}`}
-                          className="ml-2 p-0 h-4 w-4 hover:bg-green-500/20"
+                          className="ml-2 h-4 w-4 p-0 hover:bg-green-500/20"
                         >
                           <X className="h-3 w-3" />
                         </Button>
@@ -1038,61 +883,26 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 )}
               </div>
 
-              {/* Education Requirement */}
               <div>
-                <Label className="flex items-center gap-2 mb-2">
+                <Label className="mb-2 flex items-center gap-2">
                   <GraduationCap className="h-4 w-4 text-muted-foreground" />
                   Education Requirement (Optional)
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>Specify education requirements to help AI assess candidate qualifications more accurately.</p>
-                    </TooltipContent>
-                  </Tooltip>
                 </Label>
                 <Input
                   type="text"
                   value={formData.educationRequirement}
-                  onChange={(e) => setFormData({ ...formData, educationRequirement: e.target.value })}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, educationRequirement: e.target.value }))}
                   placeholder="e.g., Bachelor's in Computer Science or equivalent"
-                />
-              </div>
-
-              {/* Experience Years */}
-              <div>
-                <Label className="flex items-center gap-2 mb-2">
-                  <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  Preferred Experience (Years)
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p>AI uses experience requirements to match candidates at the right seniority level for this role.</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="50"
-                  value={formData.experienceYears}
-                  onChange={(e) => setFormData({ ...formData, experienceYears: e.target.value })}
-                  placeholder="e.g., 3"
-                  className="w-32"
                 />
               </div>
             </div>
           )}
 
-          {/* Step 4: Team */}
-          {currentStep === 4 && (
+          {currentStep === 3 && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <Label htmlFor="hiringManager" className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="hiringManager" className="mb-2 flex items-center gap-2">
                     <Users className="h-4 w-4 text-muted-foreground" />
                     Hiring Manager (Optional)
                   </Label>
@@ -1117,7 +927,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 </div>
 
                 <div>
-                  <Label htmlFor="client" className="flex items-center gap-2 mb-2">
+                  <Label htmlFor="client" className="mb-2 flex items-center gap-2">
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                     Client (Optional)
                   </Label>
@@ -1143,332 +953,481 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
             </div>
           )}
 
-          {/* Step 5: Setup (Templates & Pipeline) */}
-          {currentStep === 5 && (
-            <div className="space-y-6">
-              {/* Clone from existing job */}
-              {existingJobs.length > 0 && (
-                <div>
-                  <Label className="flex items-center gap-2 mb-2">
-                    <Copy className="h-4 w-4 text-muted-foreground" />
-                    Clone Settings From (Optional)
-                  </Label>
-                  <Select
-                    value={cloneFromJobId || "__none__"}
-                    onValueChange={(val) => setCloneFromJobId(val === "__none__" ? "" : val)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Start fresh" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Start fresh</SelectItem>
-                      {existingJobs.map((job) => (
-                        <SelectItem key={job.id} value={job.id.toString()}>
-                          {job.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Clone email templates and pipeline configuration from an existing job
-                  </p>
-                </div>
-              )}
-
-              {/* Email Templates */}
-              <div>
-                <Label className="flex items-center gap-2 mb-3">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  Email Templates
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-xs">
-                      <p className="text-sm">
-                        Templates are organization-wide and can be used across all jobs.
-                        Select the ones you plan to use for this position.
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </Label>
-                <div className="space-y-3">
-                  {Object.entries(templatesByType).map(([type, templates]) => (
-                    <div key={type} className="bg-muted/50 rounded-lg p-3">
-                      <p className="text-xs font-medium text-muted-foreground uppercase mb-2">
-                        {type.replace(/_/g, ' ')}
-                      </p>
-                      <div className="space-y-2">
-                        {templates.map((tpl) => (
-                          <div
-                            key={tpl.id}
-                            className="flex items-center gap-3 bg-white rounded p-2 border border-border"
-                          >
-                            <Checkbox
-                              checked={selectedTemplateIds.includes(tpl.id)}
-                              onCheckedChange={() => toggleTemplate(tpl.id)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-foreground truncate">
-                                {tpl.name}
-                              </p>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {tpl.subject}
-                              </p>
-                            </div>
-                            {tpl.isDefault && (
-                              <Badge variant="secondary" className="text-xs">
-                                Default
-                              </Badge>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                  {emailTemplates.length === 0 && (
-                    <p className="text-sm text-muted-foreground italic">
-                      No email templates available. You can create them later in Settings.
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Pipeline Stages */}
-              <div>
-                <Label className="flex items-center gap-2 mb-3">
-                  <GitBranch className="h-4 w-4 text-muted-foreground" />
-                  Pipeline Stages
-                </Label>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={useDefaultPipeline}
-                      onCheckedChange={(checked) => setUseDefaultPipeline(!!checked)}
-                    />
-                    <span className="text-sm text-foreground">
-                      {pipelineStages.length > 0
-                        ? `Use existing pipeline stages (${pipelineStages.length} stages)`
-                        : "Use default pipeline stages"}
-                    </span>
+          {currentStep === 4 && (
+            <div className="space-y-5">
+              <div className="rounded-xl border border-[#EEF0F4] bg-[#FAFBFC] p-4 sm:p-5">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground">Job Overview</h4>
                   </div>
 
-                  {useDefaultPipeline && pipelineStages.length > 0 && (
-                    <div className="flex flex-wrap gap-2 ml-7">
-                      {[...pipelineStages].sort((a, b) => (a.order - b.order) || (a.id - b.id)).map((stage) => (
-                        <Badge
-                          key={stage.id}
-                          variant="outline"
-                          className="text-xs"
-                          style={{ borderColor: stage.color || '#6b7280' }}
-                        >
-                          <div
-                            className="w-2 h-2 rounded-full mr-1.5"
-                            style={{ backgroundColor: stage.color || '#6b7280' }}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <Label className="mb-2 flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground" />
+                        Job Title
+                      </Label>
+                      {isEditing ? (
+                        <>
+                          <Input
+                            id="reviewTitle"
+                            type="text"
+                            value={formData.title}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                            placeholder="e.g. Senior Software Engineer"
+                            className={cn("border-[#E6EAF0] bg-white shadow-none", getFieldError("title") && "border-destructive")}
                           />
-                          {stage.name}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  {pipelineStages.length === 0 && useDefaultPipeline && (
-                    <div className="ml-7 p-3 bg-warning/10 rounded border border-warning/30">
-                      <p className="text-sm text-amber-800">
-                        No pipeline stages exist yet. Default stages will be created:
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {DEFAULT_STAGES.map((stage) => (
-                          <Badge
-                            key={stage.name}
-                            variant="outline"
-                            className="text-xs"
-                            style={{ borderColor: stage.color }}
-                          >
-                            <div
-                              className="w-2 h-2 rounded-full mr-1.5"
-                              style={{ backgroundColor: stage.color }}
-                            />
-                            {stage.name}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Custom stages UI when default pipeline unchecked */}
-                  {!useDefaultPipeline && (
-                    <div className="ml-7 space-y-3">
-                      <p className="text-sm text-muted-foreground">
-                        {pipelineStages.length > 0
-                          ? "Add custom stages to extend your existing pipeline:"
-                          : "Define your custom pipeline stages:"}
-                      </p>
-
-                      {/* Existing custom stages list */}
-                      {customStages.length > 0 && (
-                        <div className="space-y-2">
-                          {customStages.map((stage, index) => (
-                            <div
-                              key={`${stage.name}-${stage.color}-${index}`}
-                              className="flex items-center gap-3 bg-white rounded p-2 border border-border"
-                            >
-                              <div
-                                className="w-4 h-4 rounded-full border-2"
-                                style={{ backgroundColor: stage.color, borderColor: stage.color }}
-                              />
-                              <span className="flex-1 text-sm font-medium text-foreground">
-                                {stage.name}
-                              </span>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                aria-label={`Remove stage ${stage.name}`}
-                                className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => setCustomStages(prev => prev.filter((_, i) => i !== index))}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ))}
+                          {renderFieldError("title")}
+                        </>
+                      ) : (
+                        <div
+                          className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          {formData.title || "-"}
                         </div>
                       )}
+                    </div>
 
-                      {/* Add new stage input */}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value="#3b82f6"
-                          onChange={(e) => {
-                            const colorInput = e.target;
-                            colorInput.dataset.color = e.target.value;
-                          }}
-                          className="w-8 h-8 rounded border border-border cursor-pointer"
-                          id="newStageColor"
-                        />
-                        <Input
-                          type="text"
-                          value={newStageName}
-                          onChange={(e) => setNewStageName(e.target.value)}
-                          placeholder="Stage name (e.g., Technical Interview)"
-                          className="flex-1"
-                          onKeyPress={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              if (newStageName.trim()) {
-                                const colorInput = document.getElementById("newStageColor") as HTMLInputElement;
-                                const color = colorInput?.dataset.color || colorInput?.value || "#3b82f6";
-                                setCustomStages(prev => [...prev, { name: newStageName.trim(), color }]);
-                                setNewStageName("");
-                              }
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          aria-label="Add custom pipeline stage"
-                          onClick={() => {
-                            if (newStageName.trim()) {
-                              const colorInput = document.getElementById("newStageColor") as HTMLInputElement;
-                              const color = colorInput?.dataset.color || colorInput?.value || "#3b82f6";
-                              setCustomStages(prev => [...prev, { name: newStageName.trim(), color }]);
-                              setNewStageName("");
-                            }
-                          }}
+                    <div>
+                      <Label className="mb-2 flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        Location
+                      </Label>
+                      {isEditing ? (
+                        <>
+                          <Input
+                            id="reviewLocation"
+                            type="text"
+                            value={formData.location}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, location: e.target.value }))}
+                            placeholder="e.g. Bangalore"
+                            className={cn("border-[#E6EAF0] bg-white shadow-none", getFieldError("location") && "border-destructive")}
+                          />
+                          {renderFieldError("location")}
+                        </>
+                      ) : (
+                        <div
+                          className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                          onClick={() => setIsEditing(true)}
                         >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-
-                      {customStages.length === 0 && pipelineStages.length === 0 && (
-                        <p className="text-xs text-warning">
-                          Add at least one stage or switch back to use default pipeline.
-                        </p>
+                          {formData.location || "-"}
+                        </div>
                       )}
                     </div>
-                  )}
+
+                    <div>
+                      <Label className="mb-2 block">Job Type</Label>
+                      {isEditing ? (
+                        <>
+                          <Select
+                            value={formData.type}
+                            onValueChange={(value: "full-time" | "part-time" | "contract" | "remote") =>
+                              setFormData((prev) => ({ ...prev, type: value }))
+                            }
+                          >
+                            <SelectTrigger className={cn("border-[#E6EAF0] bg-white shadow-none", getFieldError("type") && "border-destructive")}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="full-time">Full-time</SelectItem>
+                              <SelectItem value="part-time">Part-time</SelectItem>
+                              <SelectItem value="contract">Contract</SelectItem>
+                              <SelectItem value="remote">Remote</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {renderFieldError("type")}
+                        </>
+                      ) : (
+                        <div
+                          className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          {formData.type || "-"}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label className="mb-2 flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        Experience
+                      </Label>
+                      {isEditing ? (
+                        <Input
+                          id="reviewExperienceYears"
+                          type="number"
+                          min="0"
+                          max="50"
+                          value={formData.experienceYears}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, experienceYears: e.target.value }))}
+                          placeholder="e.g. 3"
+                          className="w-full border-[#E6EAF0] bg-white shadow-none"
+                        />
+                      ) : (
+                        <div
+                          className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          {formData.experienceYears ? `${formData.experienceYears} years` : "-"}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* Review Summary */}
-              <div className="bg-muted/50 rounded-lg p-4 border border-border">
-                <h4 className="font-medium text-foreground mb-3">Review Your Job Posting</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Title:</span>
-                    <span className="text-foreground font-medium">{formData.title || "-"}</span>
+              <div className="border-t border-border pt-2" />
+
+              <div className="rounded-xl border border-[#EEF0F4] bg-[#FAFBFC] p-4 sm:p-5">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground">Compensation & Skills</h4>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Location:</span>
-                    <span className="text-foreground">{formData.location || "-"}</span>
+
+                  <div>
+                    <Label className="mb-2 flex items-center gap-2">
+                      <IndianRupee className="h-4 w-4 text-muted-foreground" />
+                      Salary / Pay
+                    </Label>
+                    {isEditing ? (
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <Input
+                            type="number"
+                            value={formData.salaryMin}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, salaryMin: e.target.value }))}
+                            placeholder="Min (e.g., 500000)"
+                            min="0"
+                            className="border-[#E6EAF0] bg-white shadow-none"
+                          />
+                        </div>
+                        <span className="flex items-center text-muted-foreground">to</span>
+                        <div className="flex-1">
+                          <Input
+                            type="number"
+                            value={formData.salaryMax}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, salaryMax: e.target.value }))}
+                            placeholder="Max (e.g., 800000)"
+                            min="0"
+                            className="border-[#E6EAF0] bg-white shadow-none"
+                          />
+                        </div>
+                        <Select
+                          value={formData.salaryPeriod}
+                          onValueChange={(value: "per_month" | "per_year") =>
+                            setFormData((prev) => ({ ...prev, salaryPeriod: value }))
+                          }
+                        >
+                          <SelectTrigger className="w-32 border-[#E6EAF0] bg-white shadow-none">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="per_month">Per Month</SelectItem>
+                            <SelectItem value="per_year">Per Year</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <div
+                        className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        {formatSalary(formData.salaryMin, formData.salaryMax, formData.salaryPeriod) || "-"}
+                      </div>
+                    )}
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Type:</span>
-                    <span className="text-foreground capitalize">{formData.type}</span>
+
+                  <div>
+                    <Label className="mb-2 flex items-center gap-2">
+                      <Tag className="h-4 w-4 text-muted-foreground" />
+                      Required Skills
+                    </Label>
+                    {isEditing ? (
+                      <div>
+                        <div className="mb-3 flex gap-2">
+                          <Input
+                            type="text"
+                            value={newSkill}
+                            onChange={(e) => setNewSkill(e.target.value)}
+                            placeholder="Add a required skill..."
+                            className="flex-1 border-[#E6EAF0] bg-white shadow-none"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddSkill();
+                              }
+                            }}
+                          />
+                          <Button type="button" onClick={handleAddSkill} size="icon" aria-label="Add required skill">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="rounded-lg border border-[#E6EAF0] bg-white px-3 py-2">
+                          {skills.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {skills.map((skill, index) => (
+                                <Badge
+                                  key={`${skill}-${index}`}
+                                  variant="secondary"
+                                  className="border-destructive/20 bg-destructive/10 py-1 pl-3 pr-1 text-destructive"
+                                >
+                                  {skill}
+                                  <Button
+                                    type="button"
+                                    onClick={() => {
+                                      setSkills((prev) => prev.filter((item) => item !== skill));
+                                      removeKeywordValue(skill);
+                                    }}
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Remove required skill ${skill}`}
+                                    className="ml-2 h-4 w-4 p-0 hover:bg-destructive/20"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-foreground">-</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        {skills.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {skills.map((skill, index) => (
+                              <Badge
+                                key={`${skill}-${index}`}
+                                variant="secondary"
+                                className="border-destructive/20 bg-destructive/10 py-1 pl-3 pr-3 text-destructive"
+                              >
+                                {skill}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-foreground">-</div>
+                        )}
+                      </div>
+                    )}
                   </div>
-                  {(formData.salaryMin || formData.salaryMax) && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Salary:</span>
-                      <span className="text-foreground">
-                        {formData.salaryMin && formData.salaryMax
-                          ? `₹${Number(formData.salaryMin).toLocaleString('en-IN')} - ₹${Number(formData.salaryMax).toLocaleString('en-IN')}`
-                          : formData.salaryMin
-                          ? `₹${Number(formData.salaryMin).toLocaleString('en-IN')}+`
-                          : `Up to ₹${Number(formData.salaryMax).toLocaleString('en-IN')}`}
-                        {formData.salaryPeriod === 'per_month' ? '/month' : '/year'}
-                      </span>
+
+                  <div>
+                    <Label className="mb-2 flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-muted-foreground" />
+                      Good to Have Skills
+                    </Label>
+                    {isEditing ? (
+                      <div>
+                        <div className="mb-3 flex gap-2">
+                          <Input
+                            type="text"
+                            value={newGoodToHaveSkill}
+                            onChange={(e) => setNewGoodToHaveSkill(e.target.value)}
+                            placeholder="Add a nice-to-have skill..."
+                            className="flex-1 border-[#E6EAF0] bg-white shadow-none"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleAddGoodToHaveSkill();
+                              }
+                            }}
+                          />
+                          <Button type="button" onClick={handleAddGoodToHaveSkill} size="icon" aria-label="Add preferred skill">
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="rounded-lg border border-[#E6EAF0] bg-white px-3 py-2">
+                          {goodToHaveSkills.length > 0 ? (
+                            <div className="flex flex-wrap gap-2">
+                              {goodToHaveSkills.map((skill, index) => (
+                                <Badge
+                                  key={`${skill}-${index}`}
+                                  variant="secondary"
+                                  className="border-green-500/20 bg-green-500/10 py-1 pl-3 pr-1 text-green-600"
+                                >
+                                  {skill}
+                                  <Button
+                                    type="button"
+                                    onClick={() => {
+                                      setGoodToHaveSkills((prev) => prev.filter((item) => item !== skill));
+                                      removeKeywordValue(skill);
+                                    }}
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={`Remove preferred skill ${skill}`}
+                                    className="ml-2 h-4 w-4 p-0 hover:bg-green-500/20"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </Button>
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-sm text-foreground">-</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div
+                        className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        {goodToHaveSkills.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {goodToHaveSkills.map((skill, index) => (
+                              <Badge
+                                key={`${skill}-${index}`}
+                                variant="secondary"
+                                className="border-green-500/20 bg-green-500/10 py-1 pl-3 pr-3 text-green-600"
+                              >
+                                {skill}
+                              </Badge>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-foreground">-</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-border pt-2" />
+
+              <div className="rounded-xl border border-[#EEF0F4] bg-[#FAFBFC] p-4 sm:p-5">
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-sm font-medium text-foreground">Additional Info</h4>
+                  </div>
+
+                  <div>
+                    <Label className="mb-2 flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-muted-foreground" />
+                      Education
+                    </Label>
+                    {isEditing ? (
+                      <Input
+                        type="text"
+                        value={formData.educationRequirement}
+                        onChange={(e) => setFormData((prev) => ({ ...prev, educationRequirement: e.target.value }))}
+                        placeholder="e.g., Bachelor's in Computer Science or equivalent"
+                        className="border-[#E6EAF0] bg-white shadow-none"
+                      />
+                    ) : (
+                      <div
+                        className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                        onClick={() => setIsEditing(true)}
+                      >
+                        {formData.educationRequirement || "-"}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <Label className="mb-2 flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        Hiring Manager
+                      </Label>
+                      {isEditing ? (
+                        <Select
+                          value={hiringManagerId || "__none__"}
+                          onValueChange={(val) => setHiringManagerId(val === "__none__" ? "" : val)}
+                        >
+                          <SelectTrigger className="border-[#E6EAF0] bg-white shadow-none">
+                            <SelectValue placeholder="Select a hiring manager..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">None</SelectItem>
+                            {hiringManagers.map((hm) => (
+                              <SelectItem key={hm.id} value={hm.id.toString()}>
+                                {hm.firstName && hm.lastName
+                                  ? `${hm.firstName} ${hm.lastName} (${hm.username})`
+                                  : hm.username}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div
+                          className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          {hiringManagers.find((hm) => hm.id.toString() === hiringManagerId)?.firstName && hiringManagers.find((hm) => hm.id.toString() === hiringManagerId)?.lastName
+                            ? `${hiringManagers.find((hm) => hm.id.toString() === hiringManagerId)?.firstName} ${hiringManagers.find((hm) => hm.id.toString() === hiringManagerId)?.lastName} (${hiringManagers.find((hm) => hm.id.toString() === hiringManagerId)?.username})`
+                            : hiringManagers.find((hm) => hm.id.toString() === hiringManagerId)?.username || "-"}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {skills.length > 0 && (
-                    <div className="flex justify-between items-start">
-                      <span className="text-muted-foreground">Required Skills:</span>
-                      <span className="text-foreground">{skills.length} added</span>
+
+                    <div>
+                      <Label className="mb-2 flex items-center gap-2">
+                        <Briefcase className="h-4 w-4 text-muted-foreground" />
+                        Client
+                      </Label>
+                      {isEditing ? (
+                        <Select
+                          value={clientId || "__none__"}
+                          onValueChange={(val) => setClientId(val === "__none__" ? "" : val)}
+                        >
+                          <SelectTrigger className="border-[#E6EAF0] bg-white shadow-none">
+                            <SelectValue placeholder="Internal role / no client" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__">Internal / No client</SelectItem>
+                            {clients.map((client) => (
+                              <SelectItem key={client.id} value={client.id.toString()}>
+                                {client.name}
+                                {client.domain ? ` (${client.domain})` : ""}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div
+                          className="cursor-pointer rounded-lg border border-[#E6EAF0] bg-white px-3 py-2 text-sm text-foreground"
+                          onClick={() => setIsEditing(true)}
+                        >
+                          {clients.find((client) => client.id.toString() === clientId)?.name || "-"}
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {goodToHaveSkills.length > 0 && (
-                    <div className="flex justify-between items-start">
-                      <span className="text-muted-foreground">Good to Have:</span>
-                      <span className="text-foreground">{goodToHaveSkills.length} added</span>
-                    </div>
-                  )}
-                  {formData.educationRequirement && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Education:</span>
-                      <span className="text-foreground truncate max-w-[200px]">{formData.educationRequirement}</span>
-                    </div>
-                  )}
-                  {formData.experienceYears && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Experience:</span>
-                      <span className="text-foreground">{formData.experienceYears}+ years</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Templates:</span>
-                    <span className="text-foreground">{selectedTemplateIds.length} selected</span>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Navigation Buttons */}
-          <div className="flex justify-between mt-6 pt-4 border-t border-border">
+          <div className="mt-6 flex justify-between border-t border-border pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={currentStep === 1 ? () => setLocation("/my-jobs") : handlePrevious}
+              onClick={
+                currentStep === 1
+                  ? () => setLocation("/my-jobs")
+                  : currentStep === 4
+                    ? isEditing
+                      ? () => setIsEditing(false)
+                      : handlePrevious
+                    : handlePrevious
+              }
             >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              {currentStep === 1 ? "Cancel" : "Previous"}
+              <ChevronLeft className="mr-2 h-4 w-4" />
+              {currentStep === 1 ? "Cancel" : currentStep === 4 && isEditing ? "Save Changes" : "Previous"}
             </Button>
 
-            {currentStep < 5 ? (
-              <Button type="button" onClick={handleNext}>
-                Next
-                <ChevronRight className="h-4 w-4 ml-2" />
+            {currentStep < 4 ? (
+              <Button type="button" onClick={() => void handleNext()} disabled={isExtracting}>
+                {currentStep === 1 && isExtracting ? "Extracting..." : "Next"}
+                <ChevronRight className="ml-2 h-4 w-4" />
               </Button>
             ) : (
               <Button
@@ -1478,23 +1437,24 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 className="bg-success hover:bg-success/80"
               >
                 {jobMutation.isPending ? "Posting..." : "Post Job"}
-                <Check className="h-4 w-4 ml-2" />
+                <Check className="ml-2 h-4 w-4" />
               </Button>
             )}
           </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
 
-    <JdAiAnalysisDrawer
-      open={showAiDrawer}
-      onOpenChange={setShowAiDrawer}
-      title={formData.title}
-      description={formData.description}
-      onReplaceDescription={(text) => {
-        setFormData((prev) => ({ ...prev, description: text }));
-        setShowAiDrawer(false);
-      }}
-    />
-  </div>
-);
+      <JdAiAnalysisDrawer
+        open={showAiDrawer}
+        onOpenChange={setShowAiDrawer}
+        title={formData.title}
+        description={formData.description}
+        onReplaceDescription={(text) => {
+          setFormData((prev) => ({ ...prev, description: text }));
+          clearGeneratedState();
+          setShowAiDrawer(false);
+        }}
+      />
+    </div>
+  );
 }
