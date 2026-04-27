@@ -80,8 +80,10 @@ function isRetryableError(error: unknown): boolean {
  * 5. Ensure chunk nodes
  * 6. Ensure DERIVED_FROM edges
  * 7. Mark success
+ *
+ * Exported for unit testing.
  */
-async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
+export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
   // Defensive guard: dead-letter jobs with missing critical fields
   if (!job.applicationId || !job.activekgTenantId || !job.effectiveRecruiterId) {
     const missing = [
@@ -185,8 +187,11 @@ async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
           application_id: application.id,
           job_id: application.jobId,
           org_id: application.organizationId,
+          resume_id: application.resumeId || null,
           effective_recruiter_id: job.effectiveRecruiterId,
+          created_by_user_id: application.createdByUserId || null,
           gcs_path: application.resumeUrl || null,
+          resume_gcp_url: application.resumeUrl || null,
           resume_source: 'application',
         },
         metadata: {
@@ -196,6 +201,7 @@ async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
           application_id: application.id,
           resume_id: application.resumeId || null,
           gcs_path: application.resumeUrl || null,
+          resume_gcp_url: application.resumeUrl || null,
           resume_source: 'application',
           effective_recruiter_id: job.effectiveRecruiterId,
           submitted_by_recruiter: application.submittedByRecruiter || false,
@@ -246,14 +252,25 @@ async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
             application_id: application.id,
             job_id: application.jobId,
             org_id: application.organizationId,
+            resume_id: application.resumeId || null,
             effective_recruiter_id: job.effectiveRecruiterId,
+            created_by_user_id: application.createdByUserId || null,
+            resume_source: 'application',
+            linkedin_url: resumeLinks.linkedinUrl,
+            github_url: resumeLinks.githubUrl,
+            medium_url: resumeLinks.mediumUrl,
+            other_links: resumeLinks.otherLinks,
+            gcs_path: application.resumeUrl || null,
+            resume_gcp_url: application.resumeUrl || null,
           },
           metadata: {
             source: 'vantahire',
             org_id: application.organizationId,
             job_id: application.jobId,
             application_id: application.id,
+            resume_id: application.resumeId || null,
             gcs_path: application.resumeUrl || null,
+            resume_gcp_url: application.resumeUrl || null,
             resume_source: 'application',
             effective_recruiter_id: job.effectiveRecruiterId,
             submitted_by_recruiter: application.submittedByRecruiter || false,
