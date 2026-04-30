@@ -4,7 +4,7 @@ import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startJobScheduler } from "./jobScheduler";
-import { createAdminUser, createTestRecruiter, syncAdminPasswordIfEnv } from "./createAdminUser";
+import { createAdminUser, createTestRecruiter } from "./createAdminUser";
 import { createTestJobs } from "./createTestJobs";
 import { seedAllATSDefaults } from "./seedATSDefaults";
 import { ensureAtsSchema } from "./bootstrapSchema";
@@ -141,9 +141,8 @@ app.use((req, res, next) => {
       // 1. Ensure ATS tables exist (creates them if missing)
       await ensureAtsSchema();
 
-      // 2. Create/sync admin user (production-safe)
+      // 2. Ensure admin user exists (no-op if already present)
       await createAdminUser();
-      await syncAdminPasswordIfEnv();
 
       // 3. Seed WhatsApp templates (runs in all environments)
       await seedDefaultWhatsAppTemplates();

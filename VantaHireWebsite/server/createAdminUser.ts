@@ -30,12 +30,9 @@ export async function createAdminUser() {
       return existingAdmin;
     }
 
-    // Use env variable or generate secure random password
-    const adminPassword = process.env.ADMIN_PASSWORD || generateSecurePassword(24);
-    const wasGenerated = !process.env.ADMIN_PASSWORD;
-
-    // Create admin user
-    const hashedPassword = await hashPassword(adminPassword);
+    // First-time bootstrap only: create admin with a random password.
+    // The operator is expected to reset it via psql before first login.
+    const hashedPassword = await hashPassword(generateSecurePassword(24));
     const adminUser = await storage.createUser({
       username: 'admin@vantahire.local',
       password: hashedPassword,
@@ -44,11 +41,7 @@ export async function createAdminUser() {
       role: 'super_admin'
     });
 
-    // Security: Never log passwords (even in development)
-    console.log('✅ Super Admin user created/verified successfully');
-    if (wasGenerated && process.env.NODE_ENV !== 'production') {
-      console.log('⚠️  Auto-generated admin password - set ADMIN_PASSWORD env variable for custom password');
-    }
+    console.log('✅ Super Admin user created with a random password. Reset it via psql before first login.');
 
     return adminUser;
   } catch (error) {
@@ -88,34 +81,3 @@ export async function createTestRecruiter() {
   }
 }
 
-// Ensure admin password matches ADMIN_PASSWORD if provided via env.
-export async function syncAdminPasswordIfEnv() {
-  try {
-    const newPassword = process.env.ADMIN_PASSWORD;
-    if (!newPassword) return;
-
-    // Check both old and new format
-    const existingAdmin = await storage.getUserByUsername('admin@vantahire.local')
-                       || await storage.getUserByUsername('admin');
-    const hashedPassword = await hashPassword(newPassword);
-
-    if (existingAdmin) {
-      // Update password
-      await storage.updateUserPassword(existingAdmin.id, hashedPassword);
-      console.log('✓ Admin password synchronized from ADMIN_PASSWORD');
-      return;
-    }
-
-    // Create super admin if missing
-    await storage.createUser({
-      username: 'admin@vantahire.local',
-      password: hashedPassword,
-      firstName: 'System',
-      lastName: 'Administrator',
-      role: 'super_admin'
-    });
-    console.log('✓ Super Admin created from ADMIN_PASSWORD');
-  } catch (error) {
-    console.error('Error syncing admin password:', error);
-  }
-}

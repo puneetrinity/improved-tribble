@@ -34,8 +34,6 @@
     "db:migrate": "node dist/migrate.js",
     "seed:ats": "tsx server/seedATSDefaults.ts",
     "seed:forms": "tsx server/seedForms.ts",
-    "admin:reset": "tsx server/scripts/resetAdminPassword.ts",
-    "admin:diagnose": "tsx server/scripts/diagnoseAdminLogin.ts",
     "lint:colors": "bash scripts/lint-colors.sh"
   },
   "dependencies": {
