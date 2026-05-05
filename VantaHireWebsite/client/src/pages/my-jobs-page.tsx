@@ -241,7 +241,7 @@ export default function MyJobsPage() {
                   </div>
                 </div>
 
-                <p className="mb-3 line-clamp-2 font-outfit text-sm leading-relaxed text-[#5F6675]">{job.description}</p>
+                <p className="mb-3 line-clamp-2 font-outfit text-sm leading-relaxed text-[#5F6675]">{job.original_JD ?? job.description}</p>
 
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <span className="font-dm text-sm text-[#687182]">

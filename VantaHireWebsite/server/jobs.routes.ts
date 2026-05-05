@@ -37,6 +37,166 @@ const countWords = (value: string): number =>
     .split(/\s+/)
     .filter(Boolean).length;
 
+const extractKeywordsSchema = z.object({
+  description: z.string().min(10, 'Description is required').max(20000, 'Description is too long'),
+});
+
+const getMappedJobDescriptions = (rawDescription: string, optimizedDescription?: string | null) => {
+  const trimmedRawDescription = rawDescription.trim();
+  const trimmedOptimizedDescription = typeof optimizedDescription === 'string' ? optimizedDescription.trim() : '';
+
+  return {
+    description: trimmedOptimizedDescription || trimmedRawDescription,
+    original_JD: trimmedRawDescription,
+  };
+};
+
+const KEYWORD_EXTRACTION_SYSTEM_PROMPT = `Transform the raw job description into structured, keyword-focused sourcing output.
+
+Return ONLY the following format exactly:
+Job Title: ...
+Location: ...
+Job Type: ...
+Experience: ...
+Salary: ...
+Required Skills: ...
+Good to Have Skills: ...
+Responsibilities: ...
+Education: ...
+Keywords: ...
+
+Rules:
+- Keep it concise and keyword-dense
+- Remove fluff, company marketing, and long paragraphs
+- Extract only sourcing-relevant info
+- If data is missing, leave the field empty
+- No extra commentary`;
+
+function getGroqApiConfig(): { apiKey: string; baseUrl: string; model: string } {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    throw new Error('Groq API is not configured. Set GROQ_API_KEY in your environment.');
+  }
+
+  return {
+    apiKey,
+    baseUrl: 'https://api.groq.com/openai/v1',
+    model: 'llama-3.3-70b-versatile',
+  };
+}
+
+function extractTextDelta(chunkPayload: unknown): string {
+  if (!chunkPayload || typeof chunkPayload !== 'object') return '';
+
+  const payload = chunkPayload as {
+    choices?: Array<{
+      delta?: {
+        content?: string | Array<{ type?: string; text?: string }>;
+      };
+    }>;
+  };
+
+  const content = payload.choices?.[0]?.delta?.content;
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => (item?.type === 'text' && typeof item.text === 'string' ? item.text : ''))
+      .join('');
+  }
+
+  return '';
+}
+
+async function streamGroqKeywordExtraction(description: string, res: Response): Promise<void> {
+  const { apiKey, baseUrl, model } = getGroqApiConfig();
+
+  const groqResponse = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      stream: true,
+      temperature: 0.2,
+      messages: [
+        { role: 'system', content: KEYWORD_EXTRACTION_SYSTEM_PROMPT },
+        { role: 'user', content: description },
+      ],
+    }),
+  });
+
+  if (!groqResponse.ok) {
+    const errorText = await groqResponse.text();
+    throw new Error(errorText || `Groq API request failed with status ${groqResponse.status}`);
+  }
+
+  if (!groqResponse.body) {
+    throw new Error('Groq API returned an empty stream');
+  }
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+
+  const reader = groqResponse.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      let boundaryMatch = buffer.match(/\r?\n\r?\n/);
+      while (boundaryMatch && boundaryMatch.index !== undefined) {
+        const separatorLength = boundaryMatch[0].length;
+        const eventBlock = buffer.slice(0, boundaryMatch.index);
+        buffer = buffer.slice(boundaryMatch.index + separatorLength);
+
+        const dataLines = eventBlock
+          .split(/\r?\n/)
+          .filter((line) => line.startsWith('data:'))
+          .map((line) => line.slice(5).trim());
+
+        for (const dataLine of dataLines) {
+          if (!dataLine || dataLine === '[DONE]') {
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(dataLine);
+            const delta = extractTextDelta(parsed);
+            if (delta) {
+              res.write(delta);
+            }
+          } catch (error) {
+            console.warn('[Groq extract-keywords] Failed to parse stream chunk', error);
+          }
+        }
+
+        boundaryMatch = buffer.match(/\r?\n\r?\n/);
+      }
+    }
+
+    const trailingChunk = decoder.decode();
+    if (trailingChunk) {
+      buffer += trailingChunk;
+    }
+  } finally {
+    reader.releaseLock();
+    res.end();
+  }
+}
+
 /** Check if a string is a numeric ID */
 function isNumericId(id: string): boolean {
   return /^\d+$/.test(id);
@@ -95,9 +255,25 @@ export function registerJobsRoutes(
       // Update member activity
       await updateMemberActivity(req.user!.id);
 
-      const jobData = insertJobSchema.parse(req.body);
+      const rawDescription = typeof req.body?.original_JD === 'string'
+        ? req.body.original_JD
+        : typeof req.body?.description === 'string'
+          ? req.body.description
+          : '';
+      const optimizedDescription = typeof req.body?.original_JD === 'string'
+        ? (typeof req.body?.description === 'string' ? req.body.description : undefined)
+        : typeof req.body?.optimizedDescription === 'string'
+          ? req.body.optimizedDescription
+          : undefined;
+      console.log("Optimized JD:", req.body.description);
+      const jobData = insertJobSchema.parse({
+        ...req.body,
+        description: rawDescription,
+      });
+      const mappedDescriptions = getMappedJobDescriptions(rawDescription, optimizedDescription);
       const job = await storage.createJob({
         ...jobData,
+        ...mappedDescriptions,
         postedBy: req.user!.id,
         organizationId,
       });
@@ -298,12 +474,13 @@ export function registerJobsRoutes(
 
       // Validate and extract allowed fields
       const {
-        title, description, location, type, skills, hiringManagerId, clientId,
+        title, description, optimizedDescription, location, type, skills, hiringManagerId, clientId,
         salaryMin, salaryMax, salaryPeriod, goodToHaveSkills, educationRequirement, experienceYears
       } = req.body;
       const updates: Partial<{
         title: string;
         description: string;
+        original_JD: string | null;
         location: string;
         type: string;
         skills: string[];
@@ -334,7 +511,12 @@ export function registerJobsRoutes(
           res.status(400).json({ error: 'Description must be at least 200 words' });
           return;
         }
-        updates.description = description;
+        const mappedDescriptions = getMappedJobDescriptions(description, typeof optimizedDescription === 'string' ? optimizedDescription : undefined);
+        updates.description = mappedDescriptions.description;
+        updates.original_JD = mappedDescriptions.original_JD;
+      } else if (optimizedDescription !== undefined) {
+        res.status(400).json({ error: 'Description is required when optimizedDescription is provided' });
+        return;
       }
 
       if (location !== undefined) {
@@ -1588,6 +1770,36 @@ export function registerJobsRoutes(
   });
 
   // ============= AI JOB ANALYSIS ROUTES =============
+
+  app.post("/api/jobs/extract-keywords", aiAnalysisRateLimit, csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), requireFeatureAccess(FEATURES.AI_CONTENT), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { description } = extractKeywordsSchema.parse(req.body);
+      await streamGroqKeywordExtraction(description, res);
+      return;
+    } catch (error) {
+      console.error('[Groq extract-keywords] error:', error);
+
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: error.errors[0]?.message || 'Invalid request body',
+        });
+        return;
+      }
+
+      if (error instanceof Error && error.message.includes('Groq API is not configured')) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+
+      if (!res.headersSent) {
+        res.status(502).json({ error: error instanceof Error ? error.message : 'Keyword extraction failed' });
+        return;
+      }
+
+      res.end();
+      return;
+    }
+  });
 
   // AI-powered job description analysis
   // Note: CSRF removed - endpoint is auth-protected, role-protected, rate-limited, and read-only

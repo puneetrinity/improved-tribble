@@ -145,7 +145,10 @@ export interface IStorage {
     status?: string;
   }): Promise<{ jobs: (Job & { postedByName?: string; postedById?: number | string; isRecruiterProfilePublic?: boolean })[]; total: number }>;
   updateJobStatus(id: number, isActive: boolean, reason?: string, performedBy?: number): Promise<Job | undefined>;
-  updateJob(id: number, updates: Partial<Pick<Job, 'title' | 'description' | 'location' | 'type' | 'skills' | 'hiringManagerId' | 'clientId'>>): Promise<Job | undefined>;
+  updateJob(
+    id: number,
+    updates: Partial<Pick<Job, 'title' | 'description' | 'original_JD' | 'location' | 'type' | 'skills' | 'hiringManagerId' | 'clientId' | 'salaryMin' | 'salaryMax' | 'salaryPeriod' | 'goodToHaveSkills' | 'educationRequirement' | 'experienceYears'>>
+  ): Promise<Job | undefined>;
   logJobAction(data: { jobId: number; action: string; performedBy: number; reason?: string; metadata?: any }): Promise<JobAuditLog>;
   getJobsByUser(userId: number, organizationId?: number | null): Promise<(Job & { applicationCount: number; hiringManager?: { id: number; firstName: string | null; lastName: string | null; username: string } })[]>;
   reviewJob(id: number, status: string, reviewComments?: string, reviewedBy?: number): Promise<Job | undefined>;
@@ -1109,7 +1112,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateJob(
     id: number,
-    updates: Partial<Pick<Job, 'title' | 'description' | 'location' | 'type' | 'skills' | 'hiringManagerId' | 'clientId'>>
+    updates: Partial<Pick<Job, 'title' | 'description' | 'original_JD' | 'location' | 'type' | 'skills' | 'hiringManagerId' | 'clientId' | 'salaryMin' | 'salaryMax' | 'salaryPeriod' | 'goodToHaveSkills' | 'educationRequirement' | 'experienceYears'>>
   ): Promise<Job | undefined> {
     const currentJob = await this.getJob(id);
     if (!currentJob) return undefined;
@@ -1590,6 +1593,7 @@ export class DatabaseStorage implements IStorage {
           location: jobs.location,
           type: jobs.type,
           description: jobs.description,
+          original_JD: jobs.original_JD,
           skills: jobs.skills,
           deadline: jobs.deadline,
           postedBy: jobs.postedBy,
@@ -1659,6 +1663,7 @@ export class DatabaseStorage implements IStorage {
           location: jobs.location,
           type: jobs.type,
           description: jobs.description,
+          original_JD: jobs.original_JD,
           skills: jobs.skills,
           deadline: jobs.deadline,
           postedBy: jobs.postedBy,
@@ -1750,6 +1755,7 @@ export class DatabaseStorage implements IStorage {
           location: jobs.location,
           type: jobs.type,
           description: jobs.description,
+          original_JD: jobs.original_JD,
           skills: jobs.skills,
           deadline: jobs.deadline,
           postedBy: jobs.postedBy,
@@ -1966,6 +1972,7 @@ export class DatabaseStorage implements IStorage {
         location: jobs.location,
         type: jobs.type,
         description: jobs.description,
+        original_JD: jobs.original_JD,
         status: jobs.status,
         isActive: jobs.isActive,
         createdAt: jobs.createdAt,
@@ -2319,6 +2326,7 @@ export class DatabaseStorage implements IStorage {
         location: jobs.location,
         type: jobs.type,
         description: jobs.description,
+        original_JD: jobs.original_JD,
         skills: jobs.skills,
         deadline: jobs.deadline,
         createdAt: jobs.createdAt,

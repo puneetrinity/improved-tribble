@@ -509,7 +509,7 @@ export default function CandidateDashboard() {
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-muted-foreground mb-3 line-clamp-2">{application.job.description}</p>
+        <p className="text-muted-foreground mb-3 line-clamp-2">{application.job.original_JD ?? application.job.description}</p>
 
         {/* AI Fit Analysis */}
         {fitScoring && application.aiFitScore !== null && application.aiFitReasons && Array.isArray(application.aiFitReasons) ? (

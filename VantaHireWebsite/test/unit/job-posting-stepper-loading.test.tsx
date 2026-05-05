@@ -72,6 +72,7 @@ describe('JobPostingStepper loading boundaries', () => {
       target: { value: makeDescription() },
     });
     await user.click(screen.getByRole('button', { name: /^next$/i }));
+    await user.click(screen.getByRole('button', { name: /^next$/i }));
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith('/api/users?role=hiring_manager', { credentials: 'include' });

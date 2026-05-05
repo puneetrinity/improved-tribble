@@ -471,7 +471,7 @@ export default function JobsPage() {
                                 </div>
 
                                 <p className="text-[0.875rem] text-hr-text-secondary leading-[1.6] mb-4 line-clamp-2">
-                                  {job.description.substring(0, 200)}...
+                                  {(job.original_JD ?? job.description).substring(0, 200)}...
                                 </p>
 
                                 <div className="flex justify-between items-center max-md:flex-col max-md:items-start max-md:gap-3">

@@ -59,6 +59,7 @@ export async function ensureAtsSchema(): Promise<void> {
         location TEXT NOT NULL,
         type TEXT NOT NULL,
         description TEXT NOT NULL,
+        original_jd TEXT,
         skills TEXT[],
         deadline DATE,
         posted_by INTEGER NOT NULL REFERENCES users(id),
@@ -274,6 +275,7 @@ export async function ensureAtsSchema(): Promise<void> {
   console.log('  Adding SEO columns to jobs table...');
   await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS slug TEXT;`);
   await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW() NOT NULL;`);
+  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS original_jd TEXT;`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS jobs_slug_idx ON jobs(slug);`);
 
   // Phase 7 (Job Lifecycle): Add deactivation/reactivation tracking columns
