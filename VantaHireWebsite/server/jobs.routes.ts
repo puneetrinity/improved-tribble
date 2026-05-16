@@ -95,7 +95,23 @@ export function registerJobsRoutes(
       // Update member activity
       await updateMemberActivity(req.user!.id);
 
-      const jobData = insertJobSchema.parse(req.body);
+      const rawDescription = typeof req.body?.original_JD === 'string'
+        ? req.body.original_JD
+        : typeof req.body?.description === 'string'
+          ? req.body.description
+          : '';
+      const optimizedDescription = typeof req.body?.original_JD === 'string'
+        ? (typeof req.body?.description === 'string' ? req.body.description : undefined)
+        : typeof req.body?.optimizedDescription === 'string'
+          ? req.body.optimizedDescription
+          : undefined;
+      const optimizedJD = typeof req.body?.description === 'string' ? req.body.description : '';
+      console.log("Optimized JD:", optimizedJD);
+      const jobData = insertJobSchema.parse({
+        ...req.body,
+        description: rawDescription,
+      });
+      const mappedDescriptions = getMappedJobDescriptions(rawDescription, optimizedDescription);
       const job = await storage.createJob({
         ...jobData,
         postedBy: req.user!.id,

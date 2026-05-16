@@ -138,8 +138,13 @@ app.use((req, res, next) => {
 
     // Initialize database: Create schema, sync admin, seed data
     try {
-      // 1. Ensure ATS tables exist (creates them if missing)
-      await ensureAtsSchema();
+      // 1. Ensure ATS tables exist (creates them if missing) when explicitly enabled
+      if (process.env.ENABLE_BOOTSTRAP === "true") {
+        console.log("🔧 Running DB bootstrap...");
+        await ensureAtsSchema();
+      } else {
+        console.log("⚡ Skipping DB bootstrap (fast startup)");
+      }
 
       // 2. Ensure admin user exists (no-op if already present)
       await createAdminUser();

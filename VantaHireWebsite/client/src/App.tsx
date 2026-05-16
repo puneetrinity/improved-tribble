@@ -6,10 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import FullPageLoader from "@/components/FullPageLoader";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
-import React, { lazy, Suspense } from "react";
+import React, { lazy, Suspense, useEffect, useState } from "react";
 
 const RecruiterAuth = lazy(() => import("@/pages/recruiter-auth"));
 const CandidateAuth = lazy(() => import("@/pages/candidate-auth"));
@@ -171,12 +172,27 @@ function Router() {
 
 function RouteScopedBoundary() {
   const [location] = useLocation();
+  const [isNavigating, setIsNavigating] = useState(true);
+
+  useEffect(() => {
+    setIsNavigating(true);
+    const timeoutId = window.setTimeout(() => {
+      setIsNavigating(false);
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [location]);
 
   return (
     <ErrorBoundary key={location}>
-      <Suspense fallback={null}>
+      <Suspense fallback={<FullPageLoader />}>
         <Router />
       </Suspense>
+      {isNavigating ? (
+        <div className="fixed inset-0 z-50">
+          <FullPageLoader />
+        </div>
+      ) : null}
     </ErrorBoundary>
   );
 }
@@ -186,7 +202,7 @@ function AuthenticatedTours({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <>{children}</>;
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<FullPageLoader />}>
       <TourProvider>
         {children}
         <TourLauncher />
