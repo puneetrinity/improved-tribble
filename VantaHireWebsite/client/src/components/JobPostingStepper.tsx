@@ -95,6 +95,154 @@ const STEPS = [
   { id: 4, title: "Setup", description: "Templates & pipeline" },
 ];
 
+const dedupeStrings = (values: string[]): string[] => {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  values.forEach((value) => {
+    const trimmed = value.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    result.push(trimmed);
+  });
+
+  return result;
+};
+
+const splitList = (value: string): string[] =>
+  dedupeStrings(
+    value
+      .replace(/\r?\n-\s*/g, "\n")
+      .split(/\r?\n|,|;|\u2022/)
+      .map((item) => item.replace(/^\-\s*/, "").replace(/^[\s:]+|[\s:]+$/g, ""))
+      .filter(Boolean),
+  );
+
+const normalizeJobType = (value: string): "full-time" | "part-time" | "contract" | "remote" => {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized.includes("part")) return "part-time";
+  if (normalized.includes("contract")) return "contract";
+  if (normalized.includes("remote")) return "remote";
+  return "full-time";
+};
+
+const parseExperienceYears = (value: string): string => {
+  const match = value.match(/\d+/);
+  return match ? match[0] : "";
+};
+
+const parseSalary = (value: string): Pick<ExtractedDetails, "salaryMin" | "salaryMax" | "salaryPeriod"> => {
+  const cleaned = value.trim();
+  const normalized = cleaned.toLowerCase();
+  const matches = cleaned.match(/\d+(?:[\d,.]*\d)?/g) ?? [];
+  const multiplier = normalized.includes("lpa") ? 100000 : 1;
+  const numbers = matches
+    .map((item) => {
+      const parsed = Number(item.replace(/,/g, ""));
+      if (!Number.isFinite(parsed)) {
+        return "";
+      }
+      return String(Math.round(parsed * multiplier));
+    })
+    .filter(Boolean);
+
+  return {
+    salaryMin: numbers[0] ?? "",
+    salaryMax: numbers[1] ?? "",
+    salaryPeriod: normalized.includes("month") ? "per_month" : "per_year",
+  };
+};
+
+const parseStructuredExtraction = (rawText: string): ExtractedDetails => {
+  const lines = rawText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const map = new Map<string, string>();
+
+  lines.forEach((line) => {
+    const separatorIndex = line.indexOf(":");
+    if (separatorIndex === -1) return;
+
+    const key = line.slice(0, separatorIndex).trim().toLowerCase();
+    const value = line.slice(separatorIndex + 1).trim();
+    map.set(key, value);
+  });
+
+  const salary = parseSalary(map.get("salary") ?? "");
+  const requiredSkills = splitList(map.get("required skills") ?? "");
+  const goodToHaveSkills = splitList(map.get("good to have skills") ?? "");
+  const explicitKeywords = splitList(map.get("keywords") ?? "");
+
+  return {
+    title: map.get("job title") ?? "",
+    location: map.get("location") ?? "",
+    type: normalizeJobType(map.get("job type") ?? ""),
+    experienceYears: parseExperienceYears(map.get("experience") ?? ""),
+    salaryMin: salary.salaryMin,
+    salaryMax: salary.salaryMax,
+    salaryPeriod: salary.salaryPeriod,
+    educationRequirement: map.get("education") ?? "",
+    skills: requiredSkills,
+    goodToHaveSkills,
+    keywords: dedupeStrings([...explicitKeywords, ...requiredSkills, ...goodToHaveSkills]),
+  };
+};
+
+const formatSalary = (salaryMin: string, salaryMax: string, salaryPeriod: "per_month" | "per_year"): string => {
+  if (!salaryMin && !salaryMax) {
+    return "";
+  }
+
+  const formatAmount = (value: string) => `INR ${Number(value).toLocaleString("en-IN")}`;
+  const periodLabel = salaryPeriod === "per_month" ? "per month" : "per year";
+
+  if (salaryMin && salaryMax) {
+    return `${formatAmount(salaryMin)} - ${formatAmount(salaryMax)} ${periodLabel}`;
+  }
+
+  if (salaryMin) {
+    return `${formatAmount(salaryMin)}+ ${periodLabel}`;
+  }
+
+  return `Up to ${formatAmount(salaryMax)} ${periodLabel}`;
+};
+
+const generateOptimizedJD = (input: {
+  title: string;
+  location: string;
+  experienceYears: string;
+  salaryMin: string;
+  salaryMax: string;
+  salaryPeriod: "per_month" | "per_year";
+  skills: string[];
+  goodToHaveSkills: string[];
+  keywords: string[];
+}): string => {
+  const requiredSkills = dedupeStrings(input.skills);
+  const keywordTerms = dedupeStrings([
+    ...requiredSkills,
+    ...input.goodToHaveSkills,
+    ...input.keywords,
+  ]);
+
+  return [
+    `Job Title: ${input.title.trim()}`,
+    `Location: ${input.location.trim()}`,
+    `Experience: ${input.experienceYears ? `${input.experienceYears}+ years` : ""}`,
+    `Salary: ${formatSalary(input.salaryMin, input.salaryMax, input.salaryPeriod)}`,
+    `Required Skills: ${requiredSkills.join(", ")}`,
+    "",
+    `Keywords:`,
+    keywordTerms.join(", "),
+  ].join("\n");
+};
 const DEFAULT_STAGES = [
   { name: "Applied", order: 1, color: "#6b7280" },
   { name: "Screening", order: 2, color: "#3b82f6" },
@@ -391,6 +539,17 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     if (!validateStep(4)) return;
 
     try {
+      const optimizedJD = generateOptimizedJD({
+        title: formData.title,
+        location: formData.location,
+        experienceYears: formData.experienceYears,
+        salaryMin: formData.salaryMin,
+        salaryMax: formData.salaryMax,
+        salaryPeriod: formData.salaryPeriod,
+        skills,
+        keywords,
+      });
+
       const jobData = {
         title: formData.title,
         location: formData.location,
