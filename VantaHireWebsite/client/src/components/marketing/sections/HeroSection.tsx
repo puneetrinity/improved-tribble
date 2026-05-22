@@ -1,0 +1,220 @@
+// @charset "utf-8"
+import { motion } from "framer-motion";
+
+interface MothSVGProps {
+  size?: number;
+}
+
+const MothSVG = ({ size = 110 }: MothSVGProps) => (
+  <motion.div
+    style={{ position: "relative", width: size, height: size * 1.1 }}
+    animate={{ y: [0, -10, 0] }}
+    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+  >
+    <div
+      style={{
+        position: "absolute",
+        inset: -size * 0.4,
+        borderRadius: "50%",
+        background:
+          "radial-gradient(circle, rgba(75,142,240,0.18) 0%, rgba(52,209,122,0.08) 40%, transparent 70%)",
+        filter: `blur(${size * 0.3}px)`,
+        pointerEvents: "none",
+      }}
+    />
+    <svg width={size} height={size * 1.1} viewBox="0 0 120 132" fill="none">
+      <motion.path
+        d="M60 52 C50 28,18 18,8 38 C0 54,18 72,60 70 Z"
+        fill="#4B8EF0"
+        opacity={0.95}
+        animate={{ scaleX: [1, 0.87, 1] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+        style={{ transformOrigin: "right center" }}
+      />
+      <motion.path
+        d="M60 70 C38 76,16 85,20 98 C24 108,46 100,60 86 Z"
+        fill="#4B8EF0"
+        opacity={0.5}
+        animate={{ scaleX: [1, 0.84, 1] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
+        style={{ transformOrigin: "right center" }}
+      />
+      <motion.path
+        d="M60 52 C70 28,102 18,112 38 C120 54,102 72,60 70 Z"
+        fill="#34D17A"
+        opacity={0.95}
+        animate={{ scaleX: [1, 0.87, 1] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.15 }}
+        style={{ transformOrigin: "left center" }}
+      />
+      <motion.path
+        d="M60 70 C82 76,104 85,100 98 C96 108,74 100,60 86 Z"
+        fill="#34D17A"
+        opacity={0.5}
+        animate={{ scaleX: [1, 0.84, 1] }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.25 }}
+        style={{ transformOrigin: "left center" }}
+      />
+      <ellipse cx="60" cy="68" rx="4" ry="20" fill="#0D0F1E" />
+      <circle cx="60" cy="60" r="4.5" fill="#F5C842" />
+      <circle cx="60" cy="60" r="2" fill="rgba(255,255,255,0.5)" />
+      <path d="M58 50 C55 38,46 30,40 22" stroke="#3D4460" strokeWidth="1" strokeLinecap="round" fill="none" />
+      <path d="M62 50 C65 38,74 30,80 22" stroke="#3D4460" strokeWidth="1" strokeLinecap="round" fill="none" />
+      <circle cx="40" cy="22" r="2" fill="#3D4460" />
+      <circle cx="80" cy="22" r="2" fill="#3D4460" />
+    </svg>
+  </motion.div>
+);
+
+const words = ["Cut", "the", "noise.", "Find", "the"];
+
+export function HeroSection() {
+  return (
+    <section
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden text-center"
+      style={{ paddingTop: 64 }}
+    >
+      <div className="absolute inset-0 pointer-events-none">
+        <div
+          style={{
+            position: "absolute",
+            top: "-15%",
+            left: "-10%",
+            width: 700,
+            height: 600,
+            background: "radial-gradient(circle, rgba(27,54,130,0.32) 0%, transparent 65%)",
+            filter: "blur(80px)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "5%",
+            right: "-10%",
+            width: 500,
+            height: 500,
+            background: "radial-gradient(circle, rgba(18,72,46,0.26) 0%, transparent 65%)",
+            filter: "blur(80px)",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px)",
+            backgroundSize: "28px 28px",
+          }}
+        />
+      </div>
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8, y: 16 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1] }}
+        className="relative z-10 mb-8"
+      >
+        <MothSVG size={110} />
+      </motion.div>
+
+      <motion.div
+        initial="hidden"
+        animate="visible"
+        variants={{ visible: { transition: { staggerChildren: 0.09, delayChildren: 0.35 } } }}
+        className="relative z-10 mb-6 flex flex-wrap justify-center gap-x-[0.25em]"
+        style={{
+          fontFamily: "'Outfit', sans-serif",
+          fontSize: "clamp(3.2rem, 6.5vw, 5.8rem)",
+          lineHeight: 1.08,
+          letterSpacing: "-0.025em",
+          color: "#F4F5FA",
+        }}
+      >
+        {words.map((word) => (
+          <motion.span
+            key={word}
+            variants={{
+              hidden: { y: 30, opacity: 0 },
+              visible: {
+                y: 0,
+                opacity: 1,
+                transition: { duration: 0.65, ease: [0.25, 0.1, 0.25, 1] },
+              },
+            }}
+          >
+            {word}
+          </motion.span>
+        ))}
+        <motion.span
+          variants={{
+            hidden: { y: 30, opacity: 0 },
+            visible: {
+              y: 0,
+              opacity: 1,
+              transition: { duration: 0.65, ease: [0.25, 0.1, 0.25, 1] },
+            },
+          }}
+          style={{
+            fontStyle: "italic",
+            background: "linear-gradient(135deg, #4B8EF0 0%, #34D17A 100%)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+          }}
+        >
+          signal.
+        </motion.span>
+      </motion.div>
+
+      <motion.p
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 1.0 }}
+        className="relative z-10 mb-8 max-w-lg font-body leading-relaxed text-e-text2"
+        style={{ fontSize: "1.05rem", fontWeight: 300 }}
+      >
+        ealana finds candidates others miss, remembers every hiring decision, and executes outreach
+        — all in one place.
+      </motion.p>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 1.15 }}
+        className="relative z-10 mb-6 flex items-center gap-3"
+      >
+        <motion.button
+          whileHover={{ scale: 1.03, boxShadow: "0 8px 40px rgba(75,142,240,0.5)" }}
+          whileTap={{ scale: 0.97 }}
+          className="font-body rounded-xl px-7 py-3 text-sm font-medium text-white"
+          style={{ background: "#4B8EF0", boxShadow: "0 0 28px rgba(75,142,240,0.35)" }}
+        >
+          Get Started →
+        </motion.button>
+        <motion.button
+          whileHover={{ borderColor: "rgba(255,255,255,0.18)", color: "#F4F5FA" }}
+          className="font-body rounded-xl px-6 py-3 text-sm text-e-text2 transition-all duration-200"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            backdropFilter: "blur(12px) saturate(150%)",
+            WebkitBackdropFilter: "blur(12px) saturate(150%)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
+          }}
+        >
+          See how it works
+        </motion.button>
+      </motion.div>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.4 }}
+        className="relative z-10 font-body text-e-text3"
+        style={{ fontSize: "0.75rem" }}
+      >
+        Free to start · No credit card · Made in India
+      </motion.p>
+    </section>
+  );
+}
+
+export default HeroSection;
