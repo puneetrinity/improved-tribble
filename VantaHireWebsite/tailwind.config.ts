@@ -8,8 +8,10 @@ export default {
       fontFamily: {
         dm: ["var(--font-dm)", "-apple-system", "sans-serif"],
         satoshi: ["var(--font-satoshi)", "sans-serif"],
-        mono: ["var(--font-mono)"],
         outfit: ["var(--font-outfit)", "sans-serif"],
+        display: ["'Outfit'", "sans-serif"],
+        ui: ["'DM Sans'", "sans-serif"],
+        mono: ["'JetBrains Mono'", "monospace"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -17,6 +19,15 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       colors: {
+        "e-bg": "#080A14",
+        "e-bg2": "#0D0F1E",
+        "e-bg3": "#111326",
+        "e-blue": "#4B8EF0",
+        "e-green": "#34D17A",
+        "e-amber": "#F5C842",
+        "e-text": "#F4F5FA",
+        "e-text2": "#8891AA",
+        "e-text3": "#3D4460",
         "hr-bg": "#0C0C10",
         "hr-bg-card": "#111116",
         "hr-bg-elevated": "#18181E",

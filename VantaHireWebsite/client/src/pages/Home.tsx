@@ -1,10 +1,13 @@
+// @charset "utf-8"
 import HomepageNav from "@/components/HomepageNav";
-import Hero from "@/components/Hero";
-import ThreeLayers from "@/components/ThreeLayers";
-import FeaturesGrid from "@/components/FeaturesGrid";
-import Cta from "@/components/Cta";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
+import CTA from "@/components/marketing/sections/CTA";
+import HowItWorks from "@/components/marketing/sections/HowItWorks";
+import HeroSection from "@/components/marketing/sections/HeroSection";
+import Platform from "@/components/marketing/sections/Platform";
+import ProblemSection from "@/components/marketing/sections/ProblemSection";
+import Stats from "@/components/marketing/sections/Stats";
 import { Helmet } from "react-helmet-async";
 
 const Home = () => {
@@ -24,14 +27,16 @@ const Home = () => {
         <meta name="twitter:description" content="The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free." />
         <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
       </Helmet>
-      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
+      <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme min-h-screen">
         <GridOverlay />
         <div className="relative z-10">
           <HomepageNav />
-          <Hero />
-          <ThreeLayers />
-          <FeaturesGrid />
-          <Cta />
+          <HeroSection />
+          <ProblemSection />
+          <HowItWorks />
+          <Platform />
+          <Stats />
+          <CTA />
           <HomepageFooter />
         </div>
       </div>

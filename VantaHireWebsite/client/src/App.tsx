@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import FullPageLoader from "@/components/FullPageLoader";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
+import UseCasesPage from "@/pages/use-cases-page";
 import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
 import React, { lazy, Suspense, useEffect, useState } from "react";
 
@@ -74,10 +75,8 @@ const SeatRemovedPage = lazy(() => import("@/pages/seat-removed-page"));
 const OnboardingPage = lazy(() => import("@/pages/onboarding-page"));
 
 // Marketing pages
-const FeaturesPage = lazy(() => import("@/pages/features-page"));
 const PricingPage = lazy(() => import("@/pages/pricing-page"));
 const ClaimPage = lazy(() => import("@/pages/claim-page"));
-const UseCasesPage = lazy(() => import("@/pages/use-cases-page"));
 
 // Dev-only UI gallery (lazy loaded, tree-shaken in production)
 const DevUIGallery = import.meta.env.DEV
@@ -90,7 +89,6 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      <Route path="/features" component={FeaturesPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/claim/:token" component={ClaimPage} />
       <Route path="/solutions" component={UseCasesPage} />
