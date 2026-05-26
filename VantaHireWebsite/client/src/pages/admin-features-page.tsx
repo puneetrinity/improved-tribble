@@ -107,7 +107,7 @@ async function fetchAuditLog(): Promise<AuditLogEntry[]> {
 function getCategoryIcon(category: string) {
   switch (category) {
     case "ai":
-      return <Sparkles className="h-4 w-4 text-purple-500" />;
+      return <Sparkles className="h-4 w-4 text-[#4B8EF0]" />;
     case "advanced":
       return <Zap className="h-4 w-4 text-blue-500" />;
     case "enterprise":
@@ -120,7 +120,7 @@ function getCategoryIcon(category: string) {
 function getCategoryBadge(category: string) {
   switch (category) {
     case "ai":
-      return <Badge className="bg-purple-500">AI</Badge>;
+      return <Badge className="bg-[#4B8EF0]">AI</Badge>;
     case "advanced":
       return <Badge className="bg-blue-500">Advanced</Badge>;
     case "enterprise":

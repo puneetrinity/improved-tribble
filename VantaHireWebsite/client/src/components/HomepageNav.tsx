@@ -1,8 +1,9 @@
-import { useEffect, useState, type MouseEvent } from "react";
+﻿import { useEffect, useState, type MouseEvent } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
+import ealanaMoth from "@/assets/ealana-moth (1).svg";
 
 const linkStyle = {
   fontFamily: '"DM Sans", sans-serif',
@@ -50,6 +51,49 @@ const pillButtonStyle = {
   fontSize: "0.8rem",
 } as const;
 
+function BrandMark({ compact = false }: { compact?: boolean }) {
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: compact ? "0.55rem" : "0.7rem" }}>
+      <span
+        style={{
+          position: "relative",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: compact ? 34 : 38,
+          height: compact ? 34 : 38,
+          borderRadius: 14,
+          overflow: "hidden",
+          border: "1px solid rgba(255,255,255,0.08)",
+          background:
+            "radial-gradient(circle at 30% 30%, rgba(75,142,240,0.24), transparent 58%), radial-gradient(circle at 70% 70%, rgba(52,209,122,0.18), transparent 62%), rgba(255,255,255,0.03)",
+          boxShadow: "0 0 32px rgba(75,142,240,0.14)",
+        }}
+      >
+        <motion.img
+          src={ealanaMoth}
+          alt="ealana moth"
+          style={{ width: compact ? 21 : 24, height: compact ? 21 : 24, position: "relative", zIndex: 1 }}
+          animate={{ y: [0, -1.5, 0], rotate: [0, -2, 2, 0] }}
+          transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </span>
+      <span
+        style={{
+          fontFamily: "Outfit, sans-serif",
+          fontSize: compact ? "1.02rem" : "1.08rem",
+          fontWeight: 600,
+          letterSpacing: "-0.03em",
+          color: "#F4F5FA",
+          textShadow: "0 0 24px rgba(75,142,240,0.18)",
+        }}
+      >
+        ealana
+      </span>
+    </span>
+  );
+}
+
 export default function HomepageNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [floated, setFloated] = useState(false);
@@ -86,17 +130,7 @@ export default function HomepageNav() {
           }}
         >
           <Link href="/" style={{ textDecoration: "none" }}>
-            <span
-              style={{
-                fontFamily: "Outfit, sans-serif",
-                fontStyle: "italic",
-                fontSize: "1.2rem",
-                color: "#F4F5FA",
-                textShadow: "0 0 30px rgba(75,142,240,0.35)",
-              }}
-            >
-              ealana
-            </span>
+            <BrandMark />
           </Link>
 
           <button
@@ -139,7 +173,7 @@ export default function HomepageNav() {
             Jobs
           </Link>
           <a
-            href="https://cal.com/vantahire/quick-connect"
+            href="https://cal.com/ealana/quick-connect"
             target="_blank"
             rel="noopener noreferrer"
             style={{ ...ghostButtonStyle, display: "block", textAlign: "center" }}
@@ -186,17 +220,7 @@ export default function HomepageNav() {
         }}
       >
         <Link href="/" style={{ textDecoration: "none" }}>
-          <span
-            style={{
-              fontFamily: "Outfit, sans-serif",
-              fontStyle: "italic",
-              fontSize: "1.2rem",
-              color: "#F4F5FA",
-              textShadow: "0 0 30px rgba(75,142,240,0.35)",
-            }}
-          >
-            ealana
-          </span>
+          <BrandMark />
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
@@ -237,7 +261,7 @@ export default function HomepageNav() {
             Jobs
           </Link>
           <a
-            href="https://cal.com/vantahire/quick-connect"
+            href="https://cal.com/ealana/quick-connect"
             target="_blank"
             rel="noopener noreferrer"
             style={ghostButtonStyle}
@@ -290,17 +314,7 @@ export default function HomepageNav() {
           }}
         >
           <Link href="/" style={{ textDecoration: "none", flexShrink: 0 }}>
-            <span
-              style={{
-                fontFamily: "Outfit, sans-serif",
-                fontStyle: "italic",
-                fontSize: "1.05rem",
-                color: "#F4F5FA",
-                textShadow: "0 0 30px rgba(75,142,240,0.35)",
-              }}
-            >
-              ealana
-            </span>
+            <BrandMark compact />
           </Link>
 
           <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>

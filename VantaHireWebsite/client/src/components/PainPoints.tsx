@@ -1,4 +1,4 @@
-import { Clock, Shuffle, Search, UserX, ArrowRight } from "lucide-react";
+﻿import { Clock, Shuffle, Search, UserX, ArrowRight } from "lucide-react";
 
 const painPoints = [
   {
@@ -7,7 +7,7 @@ const painPoints = [
   },
   {
     icon: <Shuffle className="w-6 h-6 text-red-400" />,
-    text: "Switching between tools — ATS, sourcing platform, outreach tool, spreadsheets"
+    text: "Switching between tools â€” ATS, sourcing platform, outreach tool, spreadsheets"
   },
   {
     icon: <Clock className="w-6 h-6 text-red-400" />,
@@ -55,7 +55,7 @@ const PainPoints = () => {
               onClick={(e) => { e.preventDefault(); window.location.href = '/features'; }}
             >
               <ArrowRight className="w-6 h-6 text-primary" />
-              <span className="gradient-text-purple">See how VantaHire fixes this.</span>
+              <span className="gradient-text-purple">See how ealana fixes this.</span>
             </a>
           </div>
         </div>

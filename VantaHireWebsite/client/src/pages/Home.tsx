@@ -1,4 +1,4 @@
-// @charset "utf-8"
+﻿// @charset "utf-8"
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
@@ -14,18 +14,18 @@ const Home = () => {
   return (
     <>
       <Helmet>
-        <title>VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration</title>
+        <title>ealana | Discover, Memory, Flow</title>
         <meta name="description" content="The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free." />
-        <link rel="canonical" href="https://vantahire.com/" />
-        <meta property="og:title" content="VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration" />
+        <link rel="canonical" href="https://ealana.com/" />
+        <meta property="og:title" content="ealana | Discover, Memory, Flow" />
         <meta property="og:description" content="The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free." />
-        <meta property="og:url" content="https://vantahire.com/" />
+        <meta property="og:url" content="https://ealana.com/" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
+        <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration" />
+        <meta name="twitter:title" content="ealana | Discover, Memory, Flow" />
         <meta name="twitter:description" content="The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free." />
-        <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
+        <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
       </Helmet>
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme min-h-screen">
         <GridOverlay />

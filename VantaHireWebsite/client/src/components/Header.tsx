@@ -5,7 +5,7 @@ import { trackEvent } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
-import vantahireLogo from "@/assets/vantahire-logo.png";
+import ealanaLogo from "@/assets/ealana_logo.svg";
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -43,7 +43,7 @@ const Header = () => {
 
   const openConsultation = () => {
     trackEvent("cta_click", { location: "site_header", action: "schedule_consultation" });
-    window.open('https://cal.com/vantahire/quick-connect', '_blank');
+    window.open('https://cal.com/ealana/quick-connect', '_blank');
   };
 
   const scrollToSection = (id: string) => {
@@ -83,13 +83,13 @@ const Header = () => {
           }}
         >
           <img
-            src={vantahireLogo}
-            alt="VantaHire"
+            src={ealanaLogo}
+            alt="ealana"
             width={40}
             height={40}
             className="h-10 w-auto transition-transform duration-300 group-hover:scale-105"
           />
-          <span className="text-xl font-bold gradient-text-mixed hidden sm:inline">VantaHire</span>
+          <span className="text-xl font-bold gradient-text-mixed hidden sm:inline">ealana</span>
         </Link>
         
         {/* Enhanced desktop menu */}
@@ -256,11 +256,11 @@ const Header = () => {
             }}
           >
             <img
-              src={vantahireLogo}
-              alt="VantaHire"
+              src={ealanaLogo}
+              alt="ealana"
               className="h-10 w-auto"
             />
-            <span className="text-xl font-bold gradient-text-mixed">VantaHire</span>
+            <span className="text-xl font-bold gradient-text-mixed">ealana</span>
           </Link>
           <button
             className="text-white hover:bg-white/10 p-2 rounded-full transition-all"

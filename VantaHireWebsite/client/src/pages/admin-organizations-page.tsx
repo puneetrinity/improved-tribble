@@ -122,7 +122,7 @@ export default function AdminOrganizationsPage() {
       return <Badge variant="outline">{planName}</Badge>;
     }
     if (planName.includes('Growth') || planName.includes('Pro')) {
-      return <Badge variant="default" className="bg-purple-500">{planName}</Badge>;
+      return <Badge variant="default" className="bg-[#4B8EF0]">{planName}</Badge>;
     }
     return <Badge variant="secondary">{planName}</Badge>;
   };
@@ -175,8 +175,8 @@ export default function AdminOrganizationsPage() {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <Crown className="h-5 w-5 text-purple-600" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#EEF5FF]">
+                  <Crown className="h-5 w-5 text-[#4B8EF0]" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">

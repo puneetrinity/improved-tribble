@@ -954,14 +954,14 @@ export default function AdminSuperDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-primary/30">
+                  <Card className="border-primary/30 bg-gradient-to-br from-[#EEF5FF] to-[#EAFBF2]">
                     <CardContent className="pt-6">
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm text-primary font-medium">In Pipeline</p>
-                          <p className="text-3xl font-bold text-purple-900">{opsSummary?.kpis?.inPipeline ?? 0}</p>
+                          <p className="text-3xl font-bold text-[#1F4E8C]">{opsSummary?.kpis?.inPipeline ?? 0}</p>
                         </div>
-                        <div className="p-3 bg-purple-200 rounded-full">
+                        <div className="rounded-full bg-[#DCEBFF] p-3">
                           <Users className="w-6 h-6 text-primary" />
                         </div>
                       </div>
@@ -2370,7 +2370,7 @@ export default function AdminSuperDashboard() {
               </div>
 
               {/* Summary Stats */}
-              <Card className="shadow-sm bg-gradient-to-r from-blue-50 to-purple-50 border-info/20">
+              <Card className="border-info/20 bg-gradient-to-r from-blue-50 to-[#EEF5FF] shadow-sm">
                 <CardContent className="py-6">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
                     <div>

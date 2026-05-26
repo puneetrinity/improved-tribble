@@ -1,9 +1,9 @@
 export const atsShellCopy = {
   brand: {
-    name: "VantaHire",
-    badge: "ATS",
+    name: "ealana",
+    badge: "Flow",
     recruiterWorkspaceFallback: "Recruiter Workspace",
-    atsWorkspaceFallback: "ATS Workspace",
+    atsWorkspaceFallback: "Flow Workspace",
   },
   sections: {
     workspace: "Workspace",
@@ -14,7 +14,7 @@ export const atsShellCopy = {
   quickJump: {
     title: "Quick jump",
     buttonLabel: "Jump to pages, workflows, and settings…",
-    inputPlaceholder: "Search pages, settings, and ATS workflows…",
+    inputPlaceholder: "Search pages, settings, and Flow workflows…",
     emptyState: "No matching routes.",
   },
   primaryActionLabel: "Post New Job",
@@ -30,8 +30,8 @@ export const atsShellCopy = {
       section: "Workspace",
     },
     talentSearch: {
-      label: "Talent Search",
-      description: "Search your talent pool and rediscover candidates",
+      label: "Discover",
+      description: "Find the signal others miss across your talent pool",
       section: "Workspace",
     },
     myJobs: {
@@ -298,8 +298,8 @@ export const myJobsPageCopy = {
 
 export const talentSearchPageCopy = {
   header: {
-    title: "Talent Search",
-    subtitle: "Search your candidate pool using natural language. Describe the skills, experience, or qualifications you're looking for.",
+    title: "Discover",
+    subtitle: "Find the signal others miss using natural language. Describe the skills, experience, or qualifications you're looking for.",
   },
   search: {
     placeholder: "Describe the candidate you're looking for, e.g. 'React developer with 3+ years experience'...",
@@ -318,7 +318,7 @@ export const talentSearchPageCopy = {
     whyMatched: "Why this matched",
     addToJob: "Add to Job",
     resume: "Resume",
-    emptyTitle: "Talent Search",
+    emptyTitle: "Discover",
     resumePreviewFallback: "Resume Preview",
     resumePreviewFrameTitle: "Resume Preview",
     openInNewTab: "Open in New Tab",
@@ -765,7 +765,7 @@ export const orgDomainRequestPageCopy = {
     useThis: "Use this",
     nextTitle: "What happens next?",
     nextSteps: [
-      "Your request will be reviewed by a VantaHire administrator",
+      "Your request will be reviewed by an ealana administrator",
       "We may contact you to verify domain ownership",
       "Once approved, users with your company email can request to join",
       "You'll be able to approve or reject join requests",
@@ -973,7 +973,7 @@ export const onboardingPageCopy = {
     retry: "Try Again",
   },
   header: {
-    title: "Welcome to VantaHire",
+    title: "Welcome to ealana",
     subtitle: "Let's get you set up in just a few steps",
   },
 } as const;
@@ -983,7 +983,7 @@ export const candidateAuthPageCopy = {
   accessDeniedDescription: "This login is for candidates only. Please use the recruiter login.",
   hero: {
     title: "Find Your Dream Job",
-    subtitle: "Join thousands of professionals who have found their perfect career match through VantaHire's advanced job platform.",
+    subtitle: "Join thousands of professionals who have found their perfect career match through ealana's advanced job platform.",
     features: [
       {
         title: "Smart Job Search",
@@ -1053,7 +1053,7 @@ export const recruiterAuthPageCopy = {
   verification: {
     checkEmailTitle: "Check Your Email",
     checkEmailDescriptionPrefix: "We've sent a verification link to",
-    checkEmailHint: "Click the link in the email to verify your account and start using VantaHire.",
+    checkEmailHint: "Click the link in the email to verify your account and start using ealana.",
     verifyTitle: "Verify Your Email",
     verifyDescription: "Please verify your email address before signing in.",
     verifyHintPrefix: "Check your inbox at",

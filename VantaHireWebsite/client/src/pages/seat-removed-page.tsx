@@ -1,4 +1,4 @@
-import { useAuth } from "@/hooks/use-auth";
+﻿import { useAuth } from "@/hooks/use-auth";
 import { useOrganization } from "@/hooks/use-organization";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +30,7 @@ export default function SeatRemovedPage() {
   return (
     <Layout>
       <Helmet>
-        <title>Seat Removed | VantaHire</title>
+        <title>Seat Removed | ealana</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">

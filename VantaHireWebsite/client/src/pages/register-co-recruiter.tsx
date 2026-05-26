@@ -10,6 +10,7 @@ import { Loader2, XCircle, Mail, Users, Briefcase, FileText } from "lucide-react
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { apiRequest } from "@/lib/queryClient";
+import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 
 interface InvitationValidation {
   valid: boolean;
@@ -120,10 +121,7 @@ export default function RegisterCoRecruiter() {
       <div className="public-theme min-h-screen bg-background text-foreground">
         <Header />
         <main className="container mx-auto px-4 py-16">
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-            <p className="text-muted-foreground">Validating your invitation...</p>
-          </div>
+          <BrandedLoadingScreen label="Validating your invitation..." />
         </main>
         <Footer />
       </div>

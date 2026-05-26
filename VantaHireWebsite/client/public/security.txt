@@ -1,5 +1,5 @@
-Contact: mailto:security@vantahire.com
-Policy: https://vantahire.com/security
+﻿Contact: mailto:security@ealana.com
+Policy: https://ealana.com/security
 Preferred-Languages: en
-Hiring: https://vantahire.com/careers
+Hiring: https://ealana.com/careers
 Expires: 2026-12-31T00:00:00.000Z

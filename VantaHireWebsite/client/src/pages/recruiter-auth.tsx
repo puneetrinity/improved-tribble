@@ -270,7 +270,7 @@ export default function RecruiterAuth() {
             We've sent a verification link to <span className="text-hr-text font-medium">{verificationEmail}</span>
           </div>
           <p className="text-[0.82rem] text-hr-text-muted leading-[1.6]">
-            Click the link in the email to verify your account and start using VantaHire.
+            Click the link in the email to verify your account and start using ealana.
           </p>
           <div className="flex flex-col gap-2 w-full max-w-[280px] mt-2">
             <button className={secondaryCls} onClick={handleResendVerification} disabled={resendLoading}>

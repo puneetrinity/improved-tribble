@@ -72,7 +72,7 @@ export const tourConfigs: TourConfig[] = [
       {
         target: '[data-tour="applications-filters"]',
         content:
-          "Filter candidates by stage, status, application date, and match signals so you can focus on the right group.",
+          "Filter candidates by stage, status, application date, and discover signals so you can focus on the right group.",
         tourId: "candidate-pipeline",
       },
       {
@@ -91,8 +91,8 @@ export const tourConfigs: TourConfig[] = [
   },
   {
     id: "talent-search",
-    title: "Talent Search",
-    description: "Find reusable candidates with Active Graph",
+    title: "Discover",
+    description: "Find reusable candidates with Memory",
     roles: ["recruiter"],
     steps: [
       {
@@ -106,7 +106,7 @@ export const tourConfigs: TourConfig[] = [
       {
         target: '[data-tour="talent-search-results"]',
         content:
-          "Active Graph ranks candidates using stored resume evidence, match signals, and prior pipeline context so strong existing candidates are easier to reuse.",
+          "Memory ranks candidates using stored resume evidence, discovered signals, and prior pipeline context so strong existing candidates are easier to reuse.",
         route: "/candidates",
         tourId: "talent-search",
       },

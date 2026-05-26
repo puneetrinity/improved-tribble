@@ -1,4 +1,4 @@
-<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
+﻿<svg width="1080" height="1080" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bgGrad3" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" style="stop-color:#0D0D1A"/>
@@ -66,5 +66,5 @@
   </g>
 
   <!-- Website -->
-  <text x="540" y="1010" font-family="Arial, sans-serif" font-size="24" fill="#71717A" text-anchor="middle">vantahire.com</text>
+  <text x="540" y="1010" font-family="Arial, sans-serif" font-size="24" fill="#71717A" text-anchor="middle">ealana.com</text>
 </svg>

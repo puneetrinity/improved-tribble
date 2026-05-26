@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+﻿import { useState, useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -148,7 +148,7 @@ export default function JobsPage() {
       const typeLabel = type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
       title += ` - ${typeLabel}`;
     }
-    title += " | VantaHire";
+    title += " | ealana";
     let description = `Browse ${count} open roles across IT, Telecom, Automotive, Fintech, Healthcare.`;
     if (location) description += ` Find opportunities in ${location}.`;
     if (search) description += ` Search: ${search}.`;
@@ -164,9 +164,9 @@ export default function JobsPage() {
 
   const formatSalary = (min?: number | null, max?: number | null, period?: string | null) => {
     if (!min && !max) return null;
-    const currency = "₹";
+    const currency = "â‚¹";
     const p = period === "per_year" ? "/yr" : period === "per_month" ? "/mo" : "";
-    if (min && max) return `${currency}${min.toLocaleString()} – ${currency}${max.toLocaleString()}${p}`;
+    if (min && max) return `${currency}${min.toLocaleString()} â€“ ${currency}${max.toLocaleString()}${p}`;
     if (min) return `From ${currency}${min.toLocaleString()}${p}`;
     if (max) return `Up to ${currency}${max.toLocaleString()}${p}`;
     return null;
@@ -233,7 +233,7 @@ export default function JobsPage() {
             onChange={(e) => setMinSalary(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleApplyFilters()}
           />
-          <span className="text-hr-text-muted text-[0.8rem]">–</span>
+          <span className="text-hr-text-muted text-[0.8rem]">â€“</span>
           <input
             className={filterInputCls}
             placeholder="Max"
@@ -390,13 +390,13 @@ export default function JobsPage() {
                         )}
                         {minSalary && (
                           <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
-                            Min: ₹{Number(minSalary).toLocaleString()}
+                            Min: â‚¹{Number(minSalary).toLocaleString()}
                             <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setMinSalary("")}><X size={12} /></button>
                           </span>
                         )}
                         {maxSalary && (
                           <span className="inline-flex items-center gap-1.5 py-1 px-3 rounded-full bg-[rgba(124,58,237,0.12)] text-hr-accent-hover font-dm text-[0.75rem] font-medium border-none">
-                            Max: ₹{Number(maxSalary).toLocaleString()}
+                            Max: â‚¹{Number(maxSalary).toLocaleString()}
                             <button className="bg-transparent border-none text-hr-accent-hover cursor-pointer p-0 flex items-center opacity-70 transition-opacity duration-200 hover:opacity-100" onClick={() => setMaxSalary("")}><X size={12} /></button>
                           </span>
                         )}

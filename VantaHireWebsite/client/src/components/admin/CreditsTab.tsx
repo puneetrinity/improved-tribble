@@ -281,7 +281,7 @@ export default function CreditsTab({ orgId, planName }: CreditsTabProps) {
               </div>
               <div className="bg-muted/50 p-4 rounded-lg">
                 <p className="text-sm text-muted-foreground">Bonus Credits</p>
-                <p className="text-2xl font-bold text-purple-500">
+                <p className="text-2xl font-bold text-[#4B8EF0]">
                   +{credits.bonusCredits.toLocaleString()}
                 </p>
               </div>

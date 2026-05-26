@@ -1,4 +1,4 @@
-import { Button } from "@/components/ui/button";
+﻿import { Button } from "@/components/ui/button";
 import Planet from "@/components/illustrations/Planet";
 import { Mail, Phone, MapPin, Calendar, ChevronRight, AlertCircle } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
@@ -317,7 +317,7 @@ const Contact = () => {
             </h2>
 
             <p className="text-lg text-white/90 max-w-2xl mx-auto leading-relaxed">
-              Experience ≈40% faster hiring and 60% fewer mis-hires. Book a free consultation or send us a message to get started.
+              Experience â‰ˆ40% faster hiring and 60% fewer mis-hires. Book a free consultation or send us a message to get started.
             </p>
           </div>
           
@@ -350,7 +350,7 @@ const Contact = () => {
                     variant="gradient"
                     size="xl"
                     className="rounded-full premium-card hover:scale-105 transform transition-all duration-300 group w-full shadow-lg"
-                    onClick={() => window.open('https://calendly.com/vantahire/30min', '_blank')}
+                    onClick={() => window.open('https://calendly.com/ealana/30min', '_blank')}
                   >
                     <Calendar className="w-5 h-5 mr-2 group-hover:animate-pulse" />
                     <span className="group-hover:tracking-wide transition-all duration-300">Book Your Free Call Now</span>
@@ -368,10 +368,10 @@ const Contact = () => {
                         <Mail className="h-5 w-5 text-white" />
                       </div>
                       <a
-                        href="mailto:hello@vantahire.com"
+                        href="mailto:hello@ealana.com"
                         className="font-medium text-white/90 hover:text-[#FF5BA8] transition-all duration-300 group-hover:tracking-wide"
                       >
-                        hello@vantahire.com
+                        hello@ealana.com
                       </a>
                     </div>
                     <div className="flex items-center group transition-all duration-300 hover:translate-x-2">

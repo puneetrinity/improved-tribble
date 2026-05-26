@@ -1,70 +1,6 @@
 // @charset "utf-8"
 import { motion } from "framer-motion";
-
-interface MothSVGProps {
-  size?: number;
-}
-
-const MothSVG = ({ size = 110 }: MothSVGProps) => (
-  <motion.div
-    style={{ position: "relative", width: size, height: size * 1.1 }}
-    animate={{ y: [0, -10, 0] }}
-    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-  >
-    <div
-      style={{
-        position: "absolute",
-        inset: -size * 0.4,
-        borderRadius: "50%",
-        background:
-          "radial-gradient(circle, rgba(75,142,240,0.18) 0%, rgba(52,209,122,0.08) 40%, transparent 70%)",
-        filter: `blur(${size * 0.3}px)`,
-        pointerEvents: "none",
-      }}
-    />
-    <svg width={size} height={size * 1.1} viewBox="0 0 120 132" fill="none">
-      <motion.path
-        d="M60 52 C50 28,18 18,8 38 C0 54,18 72,60 70 Z"
-        fill="#4B8EF0"
-        opacity={0.95}
-        animate={{ scaleX: [1, 0.87, 1] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-        style={{ transformOrigin: "right center" }}
-      />
-      <motion.path
-        d="M60 70 C38 76,16 85,20 98 C24 108,46 100,60 86 Z"
-        fill="#4B8EF0"
-        opacity={0.5}
-        animate={{ scaleX: [1, 0.84, 1] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
-        style={{ transformOrigin: "right center" }}
-      />
-      <motion.path
-        d="M60 52 C70 28,102 18,112 38 C120 54,102 72,60 70 Z"
-        fill="#34D17A"
-        opacity={0.95}
-        animate={{ scaleX: [1, 0.87, 1] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.15 }}
-        style={{ transformOrigin: "left center" }}
-      />
-      <motion.path
-        d="M60 70 C82 76,104 85,100 98 C96 108,74 100,60 86 Z"
-        fill="#34D17A"
-        opacity={0.5}
-        animate={{ scaleX: [1, 0.84, 1] }}
-        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.25 }}
-        style={{ transformOrigin: "left center" }}
-      />
-      <ellipse cx="60" cy="68" rx="4" ry="20" fill="#0D0F1E" />
-      <circle cx="60" cy="60" r="4.5" fill="#F5C842" />
-      <circle cx="60" cy="60" r="2" fill="rgba(255,255,255,0.5)" />
-      <path d="M58 50 C55 38,46 30,40 22" stroke="#3D4460" strokeWidth="1" strokeLinecap="round" fill="none" />
-      <path d="M62 50 C65 38,74 30,80 22" stroke="#3D4460" strokeWidth="1" strokeLinecap="round" fill="none" />
-      <circle cx="40" cy="22" r="2" fill="#3D4460" />
-      <circle cx="80" cy="22" r="2" fill="#3D4460" />
-    </svg>
-  </motion.div>
-);
+import ealanaMoth from "@/assets/ealana-moth (1).svg";
 
 const words = ["Cut", "the", "noise.", "Find", "the"];
 
@@ -113,7 +49,26 @@ export function HeroSection() {
         transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1] }}
         className="relative z-10 mb-8"
       >
-        <MothSVG size={110} />
+        <div style={{ position: "relative", width: 110, height: 121 }}>
+          <div
+            style={{
+              position: "absolute",
+              inset: -44,
+              borderRadius: "50%",
+              background:
+                "radial-gradient(circle, rgba(75,142,240,0.18) 0%, rgba(52,209,122,0.08) 40%, transparent 70%)",
+              filter: "blur(33px)",
+              pointerEvents: "none",
+            }}
+          />
+          <motion.img
+            src={ealanaMoth}
+            alt="ealana moth"
+            style={{ position: "relative", zIndex: 1, width: 110, height: 121 }}
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
       </motion.div>
 
       <motion.div
@@ -171,8 +126,7 @@ export function HeroSection() {
         className="relative z-10 mb-8 max-w-lg font-body leading-relaxed text-e-text2"
         style={{ fontSize: "1.05rem", fontWeight: 300 }}
       >
-        ealana finds candidates others miss, remembers every hiring decision, and executes outreach
-        — all in one place.
+        ealana finds candidates others miss, remembers every hiring decision, and executes outreach — all in one place.
       </motion.p>
 
       <motion.div

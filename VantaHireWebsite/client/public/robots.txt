@@ -1,4 +1,4 @@
-# VantaHire Robots.txt
+﻿# ealana Robots.txt
 # https://www.robotstxt.org/robotstxt.html
 
 User-agent: *
@@ -56,5 +56,5 @@ Disallow: /client-shortlist/
 Disallow: /consultants
 
 # Sitemap locations
-Sitemap: https://vantahire.com/sitemap.xml
-Sitemap: https://vantahire.com/sitemap-jobs.xml
+Sitemap: https://ealana.com/sitemap.xml
+Sitemap: https://ealana.com/sitemap-jobs.xml

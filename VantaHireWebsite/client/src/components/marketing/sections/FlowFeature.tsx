@@ -4,6 +4,10 @@ import { AnimatePresence, motion } from "framer-motion";
 
 const TABS = ["Outreach", "Pipeline", "Schedule", "Feedback"] as const;
 type TabName = (typeof TABS)[number];
+type StageCardStyle = {
+  borderColor?: string;
+  background?: string;
+};
 
 const bullets = [
   "WhatsApp + email outreach with delivery tracking",
@@ -69,7 +73,7 @@ function OutreachTab() {
 
 function PipelineTab() {
   const stages = [
-    { label: "SOURCED", cards: [{ name: "Karthik R.", role: "ML Engineer", style: {} }, { name: "Meera I.", role: "Product Manager", style: {} }] },
+    { label: "SOURCED", cards: [{ name: "Karthik R.", role: "ML Engineer", style: {} as StageCardStyle }, { name: "Meera I.", role: "Product Manager", style: {} as StageCardStyle }] },
     { label: "CONTACTED", cards: [{ name: "Sneha P.", role: "Growth Marketer", style: { borderColor: "rgba(75,142,240,0.2)" } }] },
     { label: "INTERVIEWING", cards: [{ name: "Arjun K.", role: "Sr. Backend", style: { borderColor: "rgba(245,200,66,0.2)" } }] },
     { label: "OFFER", cards: [{ name: "Priya V.", role: "Backend Dev", style: { borderColor: "rgba(52,209,122,0.3)", background: "rgba(52,209,122,0.04)" } }] },

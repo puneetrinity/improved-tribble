@@ -84,7 +84,7 @@ export default function AdminDashboard() {
             </h1>
           </div>
           <p className="text-muted-foreground text-sm md:text-base max-w-2xl">
-            Monitor platform performance and manage the VantaHire ecosystem
+            Monitor platform performance and manage the ealana ecosystem
           </p>
         </div>
 

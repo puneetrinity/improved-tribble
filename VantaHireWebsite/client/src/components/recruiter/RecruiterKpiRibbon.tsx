@@ -233,7 +233,7 @@ function getPipelineHealthDetailLines(card: KpiInsightCard): DetailLine[] {
         const quickWinLine: DetailLine = {
           label: "Quick win",
           value: `💡 ${quickWin.action} — could improve score by ${quickWin.estimatedImpactPoints} points`,
-          className: "text-[#4D41DF] font-semibold",
+          className: "text-[#4B8EF0] font-semibold",
         };
         if (quickWin.ctaLabel && quickWin.ctaHref) {
           quickWinLine.linkLabel = quickWin.ctaLabel;
@@ -325,11 +325,11 @@ function PipelineHealthDetailSection({ card, expanded = false }: { card: KpiInsi
             .pipeline-health-hover-scroll::-webkit-scrollbar { width: 4px; }
             .pipeline-health-hover-scroll::-webkit-scrollbar-track { background: transparent; }
             .pipeline-health-hover-scroll::-webkit-scrollbar-thumb { background: transparent; border-radius: 999px; }
-            .pipeline-health-hover-scroll:hover { scrollbar-color: #C4C0FF transparent; }
-            .pipeline-health-hover-scroll:hover::-webkit-scrollbar-thumb { background: #C4C0FF; }
-            .pipeline-health-hover-scroll:focus-within { scrollbar-color: #C4C0FF transparent; }
-            .pipeline-health-hover-scroll:focus-within::-webkit-scrollbar-thumb { background: #C4C0FF; }
-            .pipeline-health-hover-scroll::-webkit-scrollbar-thumb:hover { background: #6C63FF; }
+            .pipeline-health-hover-scroll:hover { scrollbar-color: #B8D5FF transparent; }
+            .pipeline-health-hover-scroll:hover::-webkit-scrollbar-thumb { background: #B8D5FF; }
+            .pipeline-health-hover-scroll:focus-within { scrollbar-color: #B8D5FF transparent; }
+            .pipeline-health-hover-scroll:focus-within::-webkit-scrollbar-thumb { background: #B8D5FF; }
+            .pipeline-health-hover-scroll::-webkit-scrollbar-thumb:hover { background: #4B8EF0; }
           `}
         </style>
         <div className={cn(expanded ? "" : "overflow-hidden")}>
@@ -396,7 +396,7 @@ function PipelineHealthDetailSection({ card, expanded = false }: { card: KpiInsi
                     <a
                       href={quickWin.ctaHref}
                       className="font-dm text-xs font-semibold hover:underline"
-                      style={{ color: "#4D41DF" }}
+                      style={{ color: "#4B8EF0" }}
                     >
                       {quickWin.ctaLabel}
                     </a>
@@ -595,7 +595,7 @@ function DetailSection({ card, expanded = false }: { card: KpiInsightCard; expan
               <span>{line.value}</span>
               {line.linkLabel && line.linkHref ? (
                 <div className="mt-1.5">
-                  <a href={line.linkHref} className="text-xs font-medium text-[#4D41DF] hover:underline">
+                  <a href={line.linkHref} className="text-xs font-medium text-[#4B8EF0] hover:underline">
                     {line.linkLabel}
                   </a>
                 </div>

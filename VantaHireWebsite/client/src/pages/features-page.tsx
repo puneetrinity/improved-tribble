@@ -1,4 +1,4 @@
-import CTA from "@/components/marketing/sections/CTA";
+﻿import CTA from "@/components/marketing/sections/CTA";
 import DiscoverFeature from "@/components/marketing/sections/DiscoverFeature";
 import FlowFeature from "@/components/marketing/sections/FlowFeature";
 import MemoryFeature from "@/components/marketing/sections/MemoryFeature";
@@ -12,8 +12,8 @@ const breadcrumbJsonLd = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   itemListElement: [
-    { "@type": "ListItem", position: 1, name: "Home", item: "https://vantahire.com/" },
-    { "@type": "ListItem", position: 2, name: "Features", item: "https://vantahire.com/features" },
+    { "@type": "ListItem", position: 1, name: "Home", item: "https://ealana.com/" },
+    { "@type": "ListItem", position: 2, name: "Features", item: "https://ealana.com/features" },
   ],
 });
 
@@ -33,18 +33,18 @@ export default function FeaturesPage() {
   return (
     <>
       <Helmet>
-        <title>Features | VantaHire - Six Pillars of AI-Native Recruiting</title>
+        <title>Features | ealana - Six Pillars of AI-Native Recruiting</title>
         <meta name="description" content="Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center. All the capabilities recruiters need." />
-        <link rel="canonical" href="https://vantahire.com/features" />
-        <meta property="og:title" content="Features | VantaHire - Six Pillars of AI-Native Recruiting" />
-        <meta property="og:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center — every capability recruiters need." />
-        <meta property="og:url" content="https://vantahire.com/features" />
+        <link rel="canonical" href="https://ealana.com/features" />
+        <meta property="og:title" content="Features | ealana - Six Pillars of AI-Native Recruiting" />
+        <meta property="og:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center â€” every capability recruiters need." />
+        <meta property="og:url" content="https://ealana.com/features" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
+        <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Features | VantaHire - Six Pillars of AI-Native Recruiting" />
+        <meta name="twitter:title" content="Features | ealana - Six Pillars of AI-Native Recruiting" />
         <meta name="twitter:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center." />
-        <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
+        <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
         <script type="application/ld+json">{breadcrumbJsonLd}</script>
       </Helmet>
 

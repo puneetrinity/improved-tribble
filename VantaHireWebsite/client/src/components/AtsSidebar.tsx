@@ -50,7 +50,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import vantahireLogo from "@/assets/vantahire-logo.png";
+import ealanaLogo from "@/assets/ealana_logo.svg";
 import { atsShellCopy } from "@/lib/internal-copy";
 
 type NavItem = {
@@ -247,6 +247,7 @@ export default function AtsSidebar({
   const currentPlanName = subscription?.plan?.displayName || "Free";
   const planName = subscription?.plan?.name?.toLowerCase();
   const shouldShowUpgradePlan = !planName || planName === "free";
+  const organizationName = organizationData?.organization?.name?.replace(/VantaHire/gi, "ealana");
 
   return (
     <Sidebar
@@ -254,23 +255,24 @@ export default function AtsSidebar({
       className="border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[0_18px_50px_rgba(0,0,0,0.22)]"
     >
       <SidebarHeader className="gap-3 border-b border-sidebar-border bg-sidebar px-3 py-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-3">
-        <div className="flex items-start justify-between gap-2 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
+        <div className="flex items-center justify-between gap-2 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:justify-center">
           <button
             type="button"
             onClick={() => navigate("/")}
-            className="flex min-w-0 flex-1 items-start gap-3 rounded-2xl text-left transition-opacity hover:opacity-90 group-data-[collapsible=icon]:hidden"
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl text-left transition-opacity hover:opacity-90 group-data-[collapsible=icon]:hidden"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sidebar-accent shadow-[0_12px_28px_rgba(123,56,251,0.16)]">
-              <img src={vantahireLogo} alt="VantaHire" className="h-8 w-auto shrink-0" />
-            </div>
-            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+            <img
+              src={ealanaLogo}
+              alt="ealana"
+              className="h-12 w-auto shrink-0 rounded-[18px] object-contain shadow-[0_16px_34px_rgba(0,0,0,0.22)]"
+            />
+            <div className="min-w-0 space-y-1 group-data-[collapsible=icon]:hidden">
               <div className="flex items-center gap-2">
-                <div className="truncate text-[18px] font-semibold leading-none text-sidebar-foreground">{atsShellCopy.brand.name}</div>
-                <div className="rounded-full bg-sidebar-accent px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sidebar-primary">{atsShellCopy.brand.badge}</div>
+                <div className="rounded-full border border-sidebar-border bg-[rgba(75,142,240,0.12)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-primary">{atsShellCopy.brand.badge}</div>
               </div>
-              {organizationData?.organization?.name && (
-                <div className="mt-1 truncate text-xs font-medium text-sidebar-foreground/60">
-                  {organizationData.organization.name}
+              {organizationName && (
+                <div className="truncate text-[12px] font-medium text-sidebar-foreground/70">
+                  {organizationName}
                 </div>
               )}
             </div>
@@ -316,7 +318,7 @@ export default function AtsSidebar({
                         <span>{item.label}</span>
                         {item.path === "/candidates" && (
                           <span className="ml-0.5 text-[7px] font-semibold uppercase tracking-normal text-sidebar-primary/65">
-                            by ActiveGraph
+                            by Memory
                           </span>
                         )}
                       </span>

@@ -226,14 +226,14 @@ export function TourProvider({ children }: TourProviderProps) {
     [currentTourId, steps, location, setLocation, markTourCompleted, stopTour]
   );
 
-  // Custom tooltip styles matching VantaHire theme
+  // Custom tooltip styles matching ealana theme
   const joyrideStyles = {
     options: {
-      arrowColor: "#1e1e2e",
-      backgroundColor: "#1e1e2e",
+      arrowColor: "#111326",
+      backgroundColor: "#111326",
       overlayColor: "rgba(0, 0, 0, 0.7)",
-      primaryColor: "#7B38FB",
-      spotlightShadow: "0 0 30px rgba(123, 56, 251, 0.5)",
+      primaryColor: "#4B8EF0",
+      spotlightShadow: "0 0 30px rgba(75, 142, 240, 0.36)",
       textColor: "#fff",
       zIndex: 10000,
     },
@@ -254,7 +254,7 @@ export function TourProvider({ children }: TourProviderProps) {
       lineHeight: 1.6,
     },
     buttonNext: {
-      backgroundColor: "#7B38FB",
+      backgroundColor: "#4B8EF0",
       borderRadius: 8,
       fontSize: 14,
       padding: "10px 20px",

@@ -1,21 +1,21 @@
-# VantaHire
+﻿# ealana
 
 > AI-native recruiting platform for startups and recruiting agencies.
 
-VantaHire is an AI-native recruiting platform that helps teams find, rank, and engage the right candidates faster. It combines AI sourcing, pipeline management, WhatsApp outreach, and client collaboration in one platform.
+ealana is an AI-native recruiting platform that helps teams find, rank, and engage the right candidates faster. It combines AI sourcing, pipeline management, WhatsApp outreach, and client collaboration in one platform.
 
 ## Core Capabilities
 
 - **AI Candidate Discovery**: AI sourcing engine that returns ranked candidates with fit scores, skill breakdowns, and identity confidence.
-- **Resume Knowledge Graph**: Semantic knowledge graph that indexes every resume — past candidates become searchable and reusable for new roles.
+- **Resume Knowledge Graph**: Semantic knowledge graph that indexes every resume â€” past candidates become searchable and reusable for new roles.
 - **WhatsApp + Email Outreach**: Native email and WhatsApp outreach with templates, stage-based automation, and compliance audit trail.
-- **Client Feedback Portal**: Shareable shortlists with structured client feedback — no spreadsheets, no email chains.
+- **Client Feedback Portal**: Shareable shortlists with structured client feedback â€” no spreadsheets, no email chains.
 - **Recruiter Dashboard**: Pipeline velocity, source performance, and recruiter productivity metrics in one view.
 - **Job Command Center**: Kanban pipeline per job with bulk actions, automation triggers, and stale candidate alerts.
 
 ## Architecture
 
-Three layers power VantaHire:
+Three layers power ealana:
 
 1. **Intelligence Layer**: AI sourcing, fit scoring, skill breakdowns, resume parsing, knowledge graph.
 2. **Outreach Layer**: WhatsApp Cloud API, email templates, stage-based triggers, audit trail.
@@ -23,37 +23,37 @@ Three layers power VantaHire:
 
 ## Pricing
 
-- **Free**: $0/mo — up to limited active jobs, AI sourcing, talent search, email outreach, basic analytics.
-- **Growth**: ₹1,999/seat/mo + taxes — unlimited jobs, unlimited AI sourcing, WhatsApp outreach, client portal, advanced analytics.
-- **Enterprise**: Custom pricing — SSO/SAML, API access, custom integrations, dedicated account manager.
+- **Free**: $0/mo â€” up to limited active jobs, AI sourcing, talent search, email outreach, basic analytics.
+- **Growth**: â‚¹1,999/seat/mo + taxes â€” unlimited jobs, unlimited AI sourcing, WhatsApp outreach, client portal, advanced analytics.
+- **Enterprise**: Custom pricing â€” SSO/SAML, API access, custom integrations, dedicated account manager.
 
 ## Geographic Focus
 
 Headquartered in Bangalore, India. Serving companies across India and the Asia-Pacific (APAC) region including Singapore, Malaysia, Indonesia, Thailand, Philippines, Vietnam, and Australia.
 
-## What Makes VantaHire Different
+## What Makes ealana Different
 
 - **AI-native, not AI-bolted-on**: AI is the foundation, not an add-on. Every workflow is designed around intelligent automation.
-- **Recruiter-first design**: Built for how recruiters actually work — pipeline-centric, not form-centric.
+- **Recruiter-first design**: Built for how recruiters actually work â€” pipeline-centric, not form-centric.
 - **One platform replaces many**: AI sourcing + ATS + outreach + client portal + analytics in a single login.
-- **Privacy by design**: Three-tier privacy model — your data stays yours. Only opt-in candidates are discoverable.
+- **Privacy by design**: Three-tier privacy model â€” your data stays yours. Only opt-in candidates are discoverable.
 
 ## Website Sections
 
-- `/` — Homepage: "Human decisions. AI acceleration."
-- `/product` — Three-layer architecture overview
-- `/features` — Six pillars of AI-native recruiting
-- `/pricing` — Free, Growth, and Enterprise plans
-- `/jobs` — Public job board with AI-powered search
-- `/compare` — Comparison with legacy ATS platforms
-- `/use-cases` — Solutions for startups, agencies, and enterprise
-- `/about` — Company mission and team
+- `/` â€” Homepage: "Human decisions. AI acceleration."
+- `/product` â€” Three-layer architecture overview
+- `/features` â€” Six pillars of AI-native recruiting
+- `/pricing` â€” Free, Growth, and Enterprise plans
+- `/jobs` â€” Public job board with AI-powered search
+- `/compare` â€” Comparison with legacy ATS platforms
+- `/use-cases` â€” Solutions for startups, agencies, and enterprise
+- `/about` â€” Company mission and team
 
 ## Contact Information
 
-- Website: https://vantahire.com
-- Email: hello@vantahire.com
+- Website: https://ealana.com
+- Email: hello@ealana.com
 - Phone: +91-9742944825
-- LinkedIn: https://www.linkedin.com/company/vantahire/
+- LinkedIn: https://www.linkedin.com/company/ealana/
 - Location: Bangalore, Karnataka, India
 - Founded: 2024

@@ -1,4 +1,4 @@
-import { Database, Search, MessageSquare, Users, LayoutDashboard, Target, ArrowRight } from "lucide-react";
+﻿import { Database, Search, MessageSquare, Users, LayoutDashboard, Target, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const pillars = [
@@ -9,7 +9,7 @@ const pillars = [
     iconColor: "text-primary",
     title: "Resume Intelligence",
     subtitle: "Your talent pool grows with every resume",
-    description: "Search candidates using natural language — past applicants become findable and reusable for new roles.",
+    description: "Search candidates using natural language â€” past applicants become findable and reusable for new roles.",
     anchor: "pillar-1"
   },
   {
@@ -39,7 +39,7 @@ const pillars = [
     iconColor: "text-blue-400",
     title: "Client Feedback Portal",
     subtitle: "Client feedback in hours, not days",
-    description: "Share a shortlist via link. Clients review and respond with structured feedback — same day, not same week.",
+    description: "Share a shortlist via link. Clients review and respond with structured feedback â€” same day, not same week.",
     anchor: "pillar-4"
   },
   {
@@ -74,7 +74,7 @@ const Services = () => {
             Everything recruiters need. One platform.
           </h2>
           <p className="text-[var(--text-secondary)] text-lg max-w-2xl mx-auto mb-2">
-            VantaHire brings AI sourcing, recruiter workflow, candidate outreach, and client collaboration into one operating system.
+            ealana brings AI sourcing, recruiter workflow, candidate outreach, and client collaboration into one operating system.
           </p>
           <p className="text-[var(--text-muted)] text-base max-w-xl mx-auto">
             Stop juggling tools. Start closing roles.
@@ -96,11 +96,11 @@ const Services = () => {
         {/* Section Header */}
         <div className="text-center mb-12">
           <h3 className="text-2xl md:text-3xl font-bold text-white mb-4">
-            The VantaHire Platform
+            The ealana Platform
           </h3>
         </div>
 
-        {/* Pillars Grid — 6 cards */}
+        {/* Pillars Grid â€” 6 cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {pillars.map((pillar, index) => (
             <div key={index} className="service-card relative">

@@ -171,11 +171,11 @@ export default function CandidatesPage() {
   return (
     <InternalPageShell>
       <InternalHero
-        eyebrow="Talent Search"
+        eyebrow="Discover"
         title={talentSearchPageCopy.header.title}
         subtitle={talentSearchPageCopy.header.subtitle}
         icon={Sparkles}
-        badge="Powered by ActiveGraph"
+        badge="Powered by Memory"
         stats={[
           {
             label: "Search Mode",
@@ -191,7 +191,7 @@ export default function CandidatesPage() {
             label: "Last Result",
             value: hasSubmittedSearch && semanticSearchQuery.isSuccess ? resultCount : "Ready",
             helper: hasSubmittedSearch ? `For "${submittedQuery}"` : "Describe the ideal profile",
-            accentClassName: semanticSearchQuery.isSuccess ? "text-[#4D41DF]" : undefined,
+            accentClassName: semanticSearchQuery.isSuccess ? "text-[#4B8EF0]" : undefined,
           },
         ]}
       />
@@ -215,7 +215,7 @@ export default function CandidatesPage() {
           <Button
             onClick={handleSemanticSearch}
             disabled={!semanticQuery.trim() || semanticSearchQuery.isFetching}
-            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+            className="h-11 rounded-2xl bg-[#4B8EF0] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
           >
             {semanticSearchQuery.isFetching ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -275,7 +275,7 @@ export default function CandidatesPage() {
         <section className="space-y-4" data-tour="talent-search-results">
           <InternalSectionHeader
             title="Matching Candidates"
-            description="Ranked by candidate evidence, resume meaning, and reusable talent intelligence from ActiveGraph."
+            description="Ranked by candidate evidence, resume meaning, and reusable talent intelligence from Memory."
             actions={
               <TooltipProvider>
                 <Tooltip>

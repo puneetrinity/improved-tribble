@@ -21,7 +21,7 @@ export function InternalEmptyState({
   return (
     <div className={cn("flex flex-col items-center justify-center px-6 py-12 text-center", className)}>
       {Icon ? (
-        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-[#EEF0FF] text-[#5B4FF7]">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-[#EEF5FF] text-[#4B8EF0]">
           <Icon className="h-7 w-7" />
         </div>
       ) : null}

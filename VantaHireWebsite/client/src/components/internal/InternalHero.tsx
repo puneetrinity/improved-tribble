@@ -39,21 +39,21 @@ export function InternalHero({
 }: InternalHeroProps) {
   return (
     <section className={cn(INTERNAL_HERO, "relative px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-8", className)}>
-      <div className="pointer-events-none absolute -right-16 -top-24 h-52 w-52 rounded-full bg-[#C4C0FF]/45 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-28 left-1/3 h-48 w-48 rounded-full bg-[#C4ECFF]/45 blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 -top-24 h-52 w-52 rounded-full bg-[rgba(75,142,240,0.18)] blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-28 left-1/3 h-48 w-48 rounded-full bg-[rgba(52,209,122,0.14)] blur-3xl" />
 
       <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-3xl space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             {Icon ? (
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EEF0FF] text-[#4D41DF] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EEF5FF] text-[#4B8EF0] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                 <Icon className="h-5 w-5" />
               </div>
             ) : null}
             <div>
               <p className={INTERNAL_EYEBROW}>{eyebrow}</p>
               {badge ? (
-                <div className="mt-2 inline-flex rounded-full border border-[#DDDFFF] bg-[#F4F5FF] px-3 py-1 font-dm text-xs font-semibold text-[#5B4FF7]">
+                <div className="mt-2 inline-flex rounded-full border border-[#D4E7FF] bg-[#EEF5FF] px-3 py-1 font-dm text-xs font-semibold text-[#4B8EF0]">
                   {badge}
                 </div>
               ) : null}

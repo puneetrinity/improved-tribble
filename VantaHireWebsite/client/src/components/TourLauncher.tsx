@@ -86,7 +86,7 @@ export function TourLauncher() {
       {/* Welcome Prompt for First-Time Users */}
       {showWelcomePrompt && (
         <div className="fixed bottom-20 right-6 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-300">
-          <div className="bg-[#1e1e2e] border border-primary/30 rounded-xl shadow-2xl shadow-purple-500/20 p-5 max-w-sm">
+          <div className="rounded-xl border border-[rgba(75,142,240,0.24)] bg-[#111326] p-5 shadow-2xl shadow-[rgba(75,142,240,0.18)] max-w-sm">
             <button
               onClick={handleDismissWelcome}
               className="absolute top-3 right-3 text-muted-foreground hover:text-white transition-colors"
@@ -95,12 +95,12 @@ export function TourLauncher() {
             </button>
 
             <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)]">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
                 <h3 className="text-white font-semibold text-base mb-1">
-                  Welcome to VantaHire!
+                  Welcome to ealana!
                 </h3>
                 <p className="text-muted-foreground text-sm mb-4">
                   Take a short guided setup tour focused on the actions you will use first.
@@ -127,7 +127,7 @@ export function TourLauncher() {
             </div>
           </div>
           {/* Arrow pointer */}
-          <div className="absolute -bottom-2 right-8 w-4 h-4 bg-[#1e1e2e] border-r border-b border-primary/30 transform rotate-45" />
+          <div className="absolute -bottom-2 right-8 h-4 w-4 rotate-45 border-b border-r border-[rgba(75,142,240,0.24)] bg-[#111326]" />
         </div>
       )}
 
@@ -137,9 +137,9 @@ export function TourLauncher() {
           <Button
             className={cn(
               "fixed bottom-6 right-6 z-[9998] rounded-full px-4 h-11 shadow-lg transition-all duration-300",
-              "bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600",
-              "border border-primary/30 hover:border-primary/50",
-              "hover:scale-105 hover:shadow-purple-500/30 hover:shadow-xl",
+              "bg-[linear-gradient(135deg,#4B8EF0_0%,#3679DB_100%)] hover:bg-[linear-gradient(135deg,#5B9AF5_0%,#4B8EF0_100%)]",
+              "border border-[rgba(75,142,240,0.26)] hover:border-[rgba(75,142,240,0.4)]",
+              "hover:scale-105 hover:shadow-[0_16px_36px_rgba(75,142,240,0.26)]",
               "flex items-center gap-2"
             )}
             aria-label="Open help guide"
@@ -153,7 +153,7 @@ export function TourLauncher() {
           align="end"
           alignOffset={-8}
           sideOffset={12}
-          className="w-72 bg-[#1e1e2e] border-primary/30 text-white"
+          className="w-72 border-[rgba(75,142,240,0.24)] bg-[#111326] text-white"
         >
           <DropdownMenuLabel className="flex items-center justify-between py-3 px-4">
             <span className="text-base font-semibold">Help & Tours</span>
@@ -170,7 +170,7 @@ export function TourLauncher() {
             className="py-3 px-4 cursor-pointer hover:bg-primary/20 focus:bg-primary/20"
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)]">
                 <Play className="h-4 w-4 text-white" />
               </div>
               <div className="flex-1 min-w-0">

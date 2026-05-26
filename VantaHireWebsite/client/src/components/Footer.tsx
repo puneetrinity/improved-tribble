@@ -1,19 +1,19 @@
 import { Link } from "wouter";
-import vantahireLogo from "@/assets/vantahire-logo.png";
+import ealanaLogo from "@/assets/ealana_logo.svg";
 
 interface FooterProps {
   minimal?: boolean;
 }
 
 const Footer = ({ minimal = false }: FooterProps) => {
-  // Minimal footer for ATS pages
+  // Minimal footer for internal Flow pages
   if (minimal) {
     return (
       <footer className="bg-[#0d0d1a] border-t border-primary/20 py-6 relative z-10">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-white/50 text-sm">
-              © 2026 VantaHire. All rights reserved.
+              © 2026 ealana. All rights reserved.
             </p>
             <div className="flex flex-wrap gap-6 justify-center">
               <button
@@ -43,10 +43,10 @@ const Footer = ({ minimal = false }: FooterProps) => {
                 Cookie Policy
               </Link>
               <a
-                href="mailto:hello@vantahire.com"
+                href="mailto:hello@ealana.com"
                 className="text-white/70 text-sm hover:text-warning transition-colors"
               >
-                hello@vantahire.com
+                hello@ealana.com
               </a>
             </div>
           </div>
@@ -63,8 +63,8 @@ const Footer = ({ minimal = false }: FooterProps) => {
           {/* Brand Column */}
           <div className="lg:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-4">
-              <img src={vantahireLogo} alt="VantaHire" width={36} height={36} className="h-9 w-auto" />
-              <span className="text-xl font-bold gradient-text-mixed">VantaHire</span>
+              <img src={ealanaLogo} alt="ealana" width={36} height={36} className="h-9 w-auto" />
+              <span className="text-xl font-bold gradient-text-mixed">ealana</span>
             </Link>
             <p className="text-[var(--text-muted)] text-sm leading-relaxed max-w-xs">
               AI + Human Expertise for Faster, Fairer Hiring. Serving startups and enterprises across India and APAC.
@@ -133,7 +133,7 @@ const Footer = ({ minimal = false }: FooterProps) => {
         <div className="border-t border-[var(--border-subtle)] pt-8 max-w-6xl mx-auto">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-[var(--text-muted)] text-sm">
-              © 2026 VantaHire. All rights reserved.
+              © 2026 ealana. All rights reserved.
             </p>
             <div className="flex flex-wrap gap-6 justify-center">
               <button
@@ -163,10 +163,10 @@ const Footer = ({ minimal = false }: FooterProps) => {
                 Cookie Policy
               </Link>
               <a
-                href="mailto:hello@vantahire.com"
+                href="mailto:hello@ealana.com"
                 className="text-[var(--text-secondary)] text-sm hover:text-warning transition-colors"
               >
-                hello@vantahire.com
+                hello@ealana.com
               </a>
             </div>
           </div>
