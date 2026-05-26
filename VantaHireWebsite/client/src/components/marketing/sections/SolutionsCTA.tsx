@@ -1,10 +1,10 @@
-import { motion } from "framer-motion";
+﻿import { motion } from "framer-motion";
 import { trackEvent } from "@/lib/analytics";
 
 const pills = [
-  { label: "🏢 Agencies" },
-  { label: "👥 Staffing" },
-  { label: "🏠 In-House" },
+  { label: "ðŸ¢ Agencies" },
+  { label: "ðŸ‘¥ Staffing" },
+  { label: "ðŸ  In-House" },
 ];
 
 export default function SolutionsCTA() {
@@ -36,7 +36,7 @@ export default function SolutionsCTA() {
           transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
           style={{ fontFamily: "var(--font-body)", fontSize: "1.05rem", color: "#8891AA", fontWeight: 300, maxWidth: 460, margin: "0 auto 2.5rem", lineHeight: 1.75 }}
         >
-          ealana adapts to how your team recruits — agency, staffing, or in-house. Same platform. Different superpower.
+          ealana adapts to how your team recruits â€” agency, staffing, or in-house. Same platform. Different superpower.
         </motion.p>
 
         <motion.div
@@ -71,10 +71,10 @@ export default function SolutionsCTA() {
             style={{ background: "#4B8EF0", color: "white", border: "none", padding: "14px 36px", borderRadius: 10, fontFamily: "var(--font-body)", fontSize: "0.95rem", fontWeight: 500, boxShadow: "0 0 40px rgba(75,142,240,0.35)", cursor: "pointer", textDecoration: "none" }}
             onClick={() => trackEvent("cta_click", { location: "solutions_cta", action: "get_started" })}
           >
-            Get Started →
+            Get Started â†’
           </motion.a>
           <motion.a
-            href="https://cal.com/vantahire/quick-connect"
+            href="https://cal.com/ealana/quick-connect"
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ borderColor: "rgba(255,255,255,0.2)", color: "#F4F5FA" }}
@@ -86,7 +86,7 @@ export default function SolutionsCTA() {
         </motion.div>
 
         <div style={{ marginTop: "1.5rem", fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "#3D4460" }}>
-          Free to start · No credit card · Made in India
+          Free to start Â· No credit card Â· Made in India
         </div>
       </div>
     </section>

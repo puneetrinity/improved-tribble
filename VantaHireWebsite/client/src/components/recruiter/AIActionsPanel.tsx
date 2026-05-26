@@ -179,14 +179,14 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
     >
       <div className="flex items-center justify-between gap-4 px-4 pb-5 pt-6 sm:px-6 md:px-6 xl:px-8 xl:pt-7">
         <div className="flex items-center gap-4">
-          <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#4D41DF_0%,#6F64FF_100%)] shadow-[0_12px_24px_rgba(77,65,223,0.24)]">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[16px] bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] shadow-[0_12px_24px_rgba(75,142,240,0.22)]">
             <Zap className="h-[22px] w-[22px] fill-white text-white" />
           </div>
           <div className="space-y-2">
             <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.actionsPanel.eyebrow}</p>
             <div className="flex items-center gap-3">
               <h2 className={cn(DASHBOARD_TITLE, "text-[20px] leading-none")}>{recruiterDashboardCopy.actionsPanel.title}</h2>
-              <span className="inline-flex items-center rounded-[20px] bg-[#EEF0FF] px-2 py-1 font-inter text-xs font-semibold leading-none text-[#4D41DF]">
+              <span className="inline-flex items-center rounded-[20px] bg-[#EEF5FF] px-2 py-1 font-inter text-xs font-semibold leading-none text-[#4B8EF0]">
                 {totalCount}
               </span>
             </div>
@@ -194,7 +194,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
         </div>
 
         <div className="flex items-center gap-2 font-inter text-xs font-normal leading-none text-[#9CA3AF]">
-          {isFetching && !isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#C4C0FF]" /> : null}
+          {isFetching && !isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin text-[#B8D5FF]" /> : null}
           <span>{updatedLabel ? `Updated ${updatedLabel}` : recruiterDashboardCopy.actionsPanel.updatedFallback}</span>
         </div>
       </div>
@@ -214,7 +214,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                 className={cn(
                   "nav-label relative -mb-px border-b-2 pb-5 font-inter text-sm font-medium leading-none transition-colors",
                   isActive
-                    ? "border-[#4D41DF] text-[#4D41DF]"
+                    ? "border-[#4B8EF0] text-[#4B8EF0]"
                     : "border-transparent text-[#9CA3AF] hover:text-[#6B7280]",
                 )}
               >
@@ -246,7 +246,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
             <p className="font-inter text-sm text-[#9CA3AF]">{activeSection.emptyMessage}</p>
           </div>
         ) : (
-          <div className="actions-list flex-1 space-y-3 overflow-y-auto pr-1 transition-[overflow] duration-150 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#C4C0FF] [&::-webkit-scrollbar-thumb:hover]:bg-[#6C63FF] [&::-webkit-scrollbar-track]:bg-transparent md:overflow-y-hidden md:hover:[scrollbar-color:#C4C0FF_transparent] md:[.actions-panel:hover_&]:overflow-y-auto">
+          <div className="actions-list flex-1 space-y-3 overflow-y-auto pr-1 transition-[overflow] duration-150 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#B8D5FF] [&::-webkit-scrollbar-thumb:hover]:bg-[#4B8EF0] [&::-webkit-scrollbar-track]:bg-transparent md:overflow-y-hidden md:hover:[scrollbar-color:#B8D5FF_transparent] md:[.actions-panel:hover_&]:overflow-y-auto">
             {activeSection.items.map((item, index) => {
               const fitKey = item.badge?.trim().toLowerCase() ?? "";
               const fitBadgeClass = FIT_BADGE_STYLES[fitKey] ?? "bg-[#F3F4F6] text-[#6B7280]";
@@ -277,7 +277,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
                           event.stopPropagation();
                           setLocation(item.ctaHref);
                         }}
-                        className="mt-5 inline-flex items-center gap-2 rounded-[12px] bg-[#FFFFFF] px-5 py-3 font-inter text-[0.875rem] font-medium leading-none text-[#4D41DF] shadow-[0_2px_8px_rgba(77,65,223,0.08)] transition-colors hover:bg-[#EEF0FF]"
+                        className="mt-5 inline-flex items-center gap-2 rounded-[12px] bg-[#FFFFFF] px-5 py-3 font-inter text-[0.875rem] font-medium leading-none text-[#4B8EF0] shadow-[0_2px_8px_rgba(75,142,240,0.08)] transition-colors hover:bg-[#EEF5FF]"
                       >
                         <span>{item.ctaLabel}</span>
                         <ArrowRight className="h-4 w-4" />

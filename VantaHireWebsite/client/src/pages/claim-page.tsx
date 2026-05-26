@@ -72,7 +72,7 @@ export default function ClaimPage() {
     },
     onSuccess: (data) => {
       toast({
-        title: "Welcome to VantaHire!",
+        title: "Welcome to ealana!",
         description: "Your subscription has been activated.",
       });
       setLocation(data.redirectUrl || "/recruiter-dashboard");
@@ -173,7 +173,7 @@ export default function ClaimPage() {
             </div>
             <CardTitle className="text-2xl">Complete Your Setup</CardTitle>
             <CardDescription>
-              Your payment was successful! Set up your account to start using VantaHire.
+              Your payment was successful! Set up your account to start using ealana.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

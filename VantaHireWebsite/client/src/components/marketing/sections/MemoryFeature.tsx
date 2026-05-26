@@ -43,6 +43,8 @@ const bullets = [
 export function MemoryPanel() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const panelTimeline = TIMELINE.slice(0, 4);
+  const selectedTimeline = selectedIndex !== null ? TIMELINE[selectedIndex] : null;
+  const selectedResurfaced = selectedIndex !== null ? RESURFACED[selectedIndex] : null;
 
   return (
     <motion.div
@@ -125,7 +127,7 @@ export function MemoryPanel() {
                   Click a candidate to see why they resurfaced
                 </div>
               </motion.div>
-            ) : (
+            ) : selectedTimeline && selectedResurfaced ? (
               <motion.div
                 key={selectedIndex}
                 initial={{ opacity: 0, y: 8 }}
@@ -138,23 +140,23 @@ export function MemoryPanel() {
                 </div>
 
                 <div style={{ background: "rgba(52,209,122,0.08)", border: "1px solid rgba(52,209,122,0.2)", borderRadius: 10, padding: "1rem", marginBottom: "0.75rem" }}>
-                  <div style={{ fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, color: "#111827" }}>{TIMELINE[selectedIndex].name}</div>
-                  <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.65rem", color: "#34D17A", marginTop: 3 }}>{RESURFACED[selectedIndex].score}</div>
+                  <div style={{ fontFamily: "var(--font-body)", fontSize: "0.85rem", fontWeight: 500, color: "#111827" }}>{selectedTimeline.name}</div>
+                  <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.65rem", color: "#34D17A", marginTop: 3 }}>{selectedResurfaced.score}</div>
                 </div>
 
                 <div style={{ background: "#FFFFFF", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 8, padding: "0.75rem" }}>
                   <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.55rem", color: "#9CA3AF", letterSpacing: "0.1em", marginBottom: 6 }}>
                     WHY NOW
                   </div>
-                  <div style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "#4B5563", lineHeight: 1.6 }}>{RESURFACED[selectedIndex].reason}</div>
+                  <div style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "#4B5563", lineHeight: 1.6 }}>{selectedResurfaced.reason}</div>
                 </div>
 
                 <div style={{ marginTop: "0.75rem", background: "rgba(75,142,240,0.08)", border: "1px solid rgba(75,142,240,0.2)", borderRadius: 8, padding: "0.6rem 0.875rem" }}>
                   <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.55rem", color: "#4B8EF0", marginBottom: 3 }}>MATCHED ROLE</div>
-                  <div style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "#111827" }}>{RESURFACED[selectedIndex].matchedRole}</div>
+                  <div style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", color: "#111827" }}>{selectedResurfaced.matchedRole}</div>
                 </div>
               </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
       </div>

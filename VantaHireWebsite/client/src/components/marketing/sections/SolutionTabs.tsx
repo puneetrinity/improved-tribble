@@ -92,6 +92,9 @@ function MetricCell({ num, label, animKey }: MetricCellProps) {
 
 export default function SolutionTabs() {
   const [activeTab, setActiveTab] = useState(0);
+  const beforeItems = BEFORE[activeTab] ?? [];
+  const afterItems = AFTER[activeTab] ?? [];
+  const metrics = METRICS[activeTab] ?? [];
 
   return (
     <section style={{ padding: "80px 4rem 120px" }}>
@@ -148,7 +151,7 @@ export default function SolutionTabs() {
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 8px rgba(239,68,68,0.5)", flexShrink: 0 }} />
                   <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#EF4444", letterSpacing: "0.12em" }}>BEFORE EALANA</span>
                 </div>
-                {BEFORE[activeTab].map((text) => (
+                {beforeItems.map((text) => (
                   <div key={text} style={{ display: "flex", gap: 10, marginBottom: 14 }}>
                     <span style={{ color: "#EF4444", fontSize: "0.8rem", flexShrink: 0, marginTop: 2 }}>✕</span>
                     <span style={{ fontFamily: "var(--font-body)", fontSize: "0.875rem", color: "#8891AA", lineHeight: 1.6 }}>{text}</span>
@@ -161,7 +164,7 @@ export default function SolutionTabs() {
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34D17A", boxShadow: "0 0 8px rgba(52,209,122,0.5)", flexShrink: 0 }} />
                   <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#34D17A", letterSpacing: "0.12em" }}>WITH EALANA</span>
                 </div>
-                {AFTER[activeTab].map((text) => (
+                {afterItems.map((text) => (
                   <div key={text} style={{ display: "flex", gap: 10, marginBottom: 14 }}>
                     <span style={{ color: "#34D17A", fontSize: "0.8rem", flexShrink: 0, marginTop: 2 }}>✓</span>
                     <span style={{ fontFamily: "var(--font-body)", fontSize: "0.875rem", color: "#8891AA", lineHeight: 1.6 }}>{text}</span>
@@ -171,7 +174,7 @@ export default function SolutionTabs() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, marginTop: "2rem", background: "rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
-              {METRICS[activeTab].map(({ num, label }) => (
+              {metrics.map(({ num, label }) => (
                 <MetricCell key={num + label} num={num} label={label} animKey={activeTab} />
               ))}
             </div>

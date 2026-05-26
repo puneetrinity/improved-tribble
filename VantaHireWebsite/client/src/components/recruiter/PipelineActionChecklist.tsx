@@ -578,7 +578,7 @@ export function PipelineActionChecklist({
             <div className="flex items-center gap-3">
               <div
                 className={cn(
-                  "flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-purple-600"
+                  "flex items-center justify-center w-12 h-12 rounded-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)]"
                 )}
               >
                 <Sparkles className="h-6 w-6 text-white" />
@@ -646,7 +646,7 @@ export function PipelineActionChecklist({
           <div className="flex items-center gap-3">
             <div
               className={cn(
-                "flex items-center justify-center w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-purple-600"
+                "flex items-center justify-center w-12 h-12 rounded-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)]"
               )}
             >
               <Sparkles className="h-6 w-6 text-white" />
@@ -732,7 +732,7 @@ export function PipelineActionChecklist({
 
         {/* AI insights or explanation */}
         <div
-          className="flex items-start gap-2 p-3 rounded-lg bg-primary/10 border border-purple-100"
+          className="flex items-start gap-2 rounded-lg border border-[rgba(75,142,240,0.16)] bg-primary/10 p-3"
           data-testid="pipeline-ai-insights"
         >
           <Sparkles className={cn("h-4 w-4 text-primary mt-0.5 shrink-0", isEnhancing && "animate-pulse")} />
@@ -743,7 +743,7 @@ export function PipelineActionChecklist({
               </p>
             ) : aiInsights.length > 0 ? (
               <div className="space-y-1">
-                <p className="text-xs font-medium text-purple-800">AI Insights:</p>
+                <p className="text-xs font-medium text-[#1F4E8C]">AI Insights:</p>
                 {aiInsights.map((insight, i) => (
                   <p key={i} className="text-xs text-primary">
                     • {insight}

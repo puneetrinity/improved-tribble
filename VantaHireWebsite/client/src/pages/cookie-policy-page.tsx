@@ -1,4 +1,4 @@
-import { Helmet } from "react-helmet-async";
+﻿import { Helmet } from "react-helmet-async";
 import { Cookie, Settings, BarChart3, Shield, Trash2, Clock, Globe, Mail } from "lucide-react";
 import LegalPageLayout, { type LegalSection } from "@/components/LegalPageLayout";
 import {
@@ -34,7 +34,7 @@ const sections: LegalSection[] = [
           They are widely used to make websites work more efficiently and provide a better user experience.
         </p>
         <p>
-          VantaHire uses cookies and similar tracking technologies to enhance your experience,
+          ealana uses cookies and similar tracking technologies to enhance your experience,
           analyse usage, and provide personalised features.
         </p>
       </>
@@ -185,9 +185,9 @@ const sections: LegalSection[] = [
           </div>
         </div>
         <ul className={listCls}>
-          <li><strong>Analytics cookies</strong> — Up to 2 years</li>
-          <li><strong>Preference cookies</strong> — Up to 1 year</li>
-          <li><strong>Consent cookies</strong> — Up to 1 year</li>
+          <li><strong>Analytics cookies</strong> â€” Up to 2 years</li>
+          <li><strong>Preference cookies</strong> â€” Up to 1 year</li>
+          <li><strong>Consent cookies</strong> â€” Up to 1 year</li>
         </ul>
       </>
     ),
@@ -202,7 +202,7 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Cookie Consent Banner</h4>
           <p>
-            When you first visit VantaHire, you will see a cookie consent banner. You can choose
+            When you first visit ealana, you will see a cookie consent banner. You can choose
             to accept or decline optional cookies. Essential cookies cannot be disabled as they
             are necessary for the site to function.
           </p>
@@ -229,7 +229,7 @@ const sections: LegalSection[] = [
             <li>Set exceptions for specific websites</li>
           </ul>
           <p className={noteCls}>
-            Note: Blocking essential cookies may prevent you from using VantaHire.
+            Note: Blocking essential cookies may prevent you from using ealana.
           </p>
         </div>
 
@@ -237,25 +237,25 @@ const sections: LegalSection[] = [
           <h4 className={h4Cls}>Browser-Specific Instructions</h4>
           <ul className={listCls}>
             <li>
-              <strong>Chrome</strong> —{" "}
+              <strong>Chrome</strong> â€”{" "}
               <a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Chrome
               </a>
             </li>
             <li>
-              <strong>Firefox</strong> —{" "}
+              <strong>Firefox</strong> â€”{" "}
               <a href="https://support.mozilla.org/en-US/kb/cookies-information-websites-store-on-your-computer" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Firefox
               </a>
             </li>
             <li>
-              <strong>Safari</strong> —{" "}
+              <strong>Safari</strong> â€”{" "}
               <a href="https://support.apple.com/guide/safari/manage-cookies-sfri11471/mac" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Safari
               </a>
             </li>
             <li>
-              <strong>Edge</strong> —{" "}
+              <strong>Edge</strong> â€”{" "}
               <a href="https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Edge
               </a>
@@ -292,7 +292,7 @@ const sections: LegalSection[] = [
     content: (
       <p>
         Some browsers include a "Do Not Track" (DNT) feature. Currently, there is no industry
-        standard for responding to DNT signals. VantaHire does not currently respond to DNT
+        standard for responding to DNT signals. ealana does not currently respond to DNT
         signals, but you can manage your cookie preferences through our consent banner.
       </p>
     ),
@@ -326,7 +326,7 @@ const sections: LegalSection[] = [
           </div>
           <div className={contactRowCls}>
             <Mail size={13} />
-            <span>privacy@vantahire.com</span>
+            <span>privacy@ealana.com</span>
           </div>
           <div className={contactSubjectCls}>Subject: Cookie Policy Inquiry</div>
         </div>
@@ -339,18 +339,18 @@ export default function CookiePolicyPage() {
   return (
     <>
       <Helmet>
-        <title>Cookie Policy | VantaHire</title>
-        <meta name="description" content="VantaHire Cookie Policy. Learn about the cookies we use and how to manage your preferences." />
-        <link rel="canonical" href="https://vantahire.com/cookie-policy" />
-        <meta property="og:title" content="Cookie Policy | VantaHire" />
-        <meta property="og:description" content="Learn about cookies used on VantaHire and manage your preferences." />
-        <meta property="og:url" content="https://vantahire.com/cookie-policy" />
+        <title>Cookie Policy | ealana</title>
+        <meta name="description" content="ealana Cookie Policy. Learn about the cookies we use and how to manage your preferences." />
+        <link rel="canonical" href="https://ealana.com/cookie-policy" />
+        <meta property="og:title" content="Cookie Policy | ealana" />
+        <meta property="og:description" content="Learn about cookies used on ealana and manage your preferences." />
+        <meta property="og:url" content="https://ealana.com/cookie-policy" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
+        <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Cookie Policy | VantaHire" />
-        <meta name="twitter:description" content="Learn about cookies used on VantaHire and manage your preferences." />
-        <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
+        <meta name="twitter:title" content="Cookie Policy | ealana" />
+        <meta name="twitter:description" content="Learn about cookies used on ealana and manage your preferences." />
+        <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
       </Helmet>
 
       <LegalPageLayout

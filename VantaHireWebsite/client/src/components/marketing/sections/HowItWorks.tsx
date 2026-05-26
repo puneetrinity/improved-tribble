@@ -63,7 +63,7 @@ const TABS: TabConfig[] = [
 
 export default function HowItWorks() {
   const [activeTab, setActiveTab] = useState(0);
-  const active = TABS[activeTab];
+  const active = (TABS[activeTab] ?? TABS[0])!;
 
   return (
     <section id="features" style={{ padding: "120px 4rem" }}>

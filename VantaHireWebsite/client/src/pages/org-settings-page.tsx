@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { orgSettingsPageCopy } from "@/lib/internal-copy";
+import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 
 export default function OrgSettingsPage() {
   const { data: orgData, isLoading } = useOrganization();
@@ -129,8 +130,8 @@ export default function OrgSettingsPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="max-w-7xl mx-auto p-6 flex justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="mx-auto max-w-7xl p-6">
+          <BrandedLoadingScreen label="Loading organization settings..." />
         </div>
       </Layout>
     );

@@ -707,7 +707,7 @@ export default function OrgBillingPage() {
                     "1 seat (fixed)",
                     `${formatMetric(freePlan?.rateLimits?.monthlyCredits)} AI credits/month`,
                     `${formatMetric(freePlan?.rateLimits?.dailyRateLimit)} AI analyses/day`,
-                    "Basic ATS features",
+                    "Basic Flow features",
                   ]).slice(0, 4).map((highlight) => (
                     <li key={highlight} className="flex items-center gap-2">
                       <Check className="h-4 w-4 text-green-500" />

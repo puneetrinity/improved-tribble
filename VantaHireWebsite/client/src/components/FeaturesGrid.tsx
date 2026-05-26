@@ -1,4 +1,4 @@
-import { sectionLabel } from "@/lib/shared-styles";
+﻿import { sectionLabel } from "@/lib/shared-styles";
 
 // Shared class strings for mini UI elements
 const miniTag = "text-[0.45rem] px-[5px] py-px rounded-[3px] font-semibold inline-block";
@@ -72,7 +72,7 @@ const FeaturesGrid = () => {
                       <span className={`${miniTag} ${tagCyan}`}>Docker</span>
                     </div>
                     <div className={`mt-1.5 ${miniSubtext}`}>EXPERIENCE</div>
-                    <div className="text-[0.5rem] text-[#4a5568] mt-0.5">6 years · 3 companies</div>
+                    <div className="text-[0.5rem] text-[#4a5568] mt-0.5">6 years Â· 3 companies</div>
                   </div>
                   <div className={`flex-1 ${miniPanel}`}>
                     <div className={miniLabel}>Match Score</div>
@@ -95,21 +95,21 @@ const FeaturesGrid = () => {
           <div className="p-0 overflow-hidden bg-hr-bg">
             <div className={featScreenshot}>
               <div className={featScreenshotInner}>
-                <div className="flex items-center gap-1.5 py-1.5 px-2.5 bg-[#f1f3f5] border border-[rgba(0,0,0,0.08)] rounded-[5px] mb-2 text-[0.55rem] text-[#9ca3af]">🔍 Search: &quot;Senior React Developer, Bengaluru, 5+ yrs&quot;</div>
-                <div className={`${miniSubtext} mb-[5px]`}>AI-DISCOVERED · 48 results</div>
+                <div className="flex items-center gap-1.5 py-1.5 px-2.5 bg-[#f1f3f5] border border-[rgba(0,0,0,0.08)] rounded-[5px] mb-2 text-[0.55rem] text-[#9ca3af]">ðŸ” Search: &quot;Senior React Developer, Bengaluru, 5+ yrs&quot;</div>
+                <div className={`${miniSubtext} mb-[5px]`}>AI-DISCOVERED Â· 48 results</div>
                 <div className={miniRow}>
                   <span className={`${miniAvatar} ${avatarPurple}`}>PK</span>
-                  <div className="flex-1"><div className={miniName}>Priya Krishnan</div><div className={miniSubtext}>Lead Engineer · Flipkart</div></div>
+                  <div className="flex-1"><div className={miniName}>Priya Krishnan</div><div className={miniSubtext}>Lead Engineer Â· Flipkart</div></div>
                   <span className={`${miniTag} ${tagGreen}`}>97%</span>
                 </div>
                 <div className={miniRow}>
                   <span className={`${miniAvatar} ${avatarViolet}`}>AM</span>
-                  <div className="flex-1"><div className={miniName}>Arjun Mehta</div><div className={miniSubtext}>Sr. Developer · Razorpay</div></div>
+                  <div className="flex-1"><div className={miniName}>Arjun Mehta</div><div className={miniSubtext}>Sr. Developer Â· Razorpay</div></div>
                   <span className={`${miniTag} ${tagGreen}`}>92%</span>
                 </div>
                 <div className={miniRow}>
                   <span className={`${miniAvatar} ${avatarAmber}`}>SG</span>
-                  <div className="flex-1"><div className={miniName}>Sneha Gupta</div><div className={miniSubtext}>Full Stack · PhonePe</div></div>
+                  <div className="flex-1"><div className={miniName}>Sneha Gupta</div><div className={miniSubtext}>Full Stack Â· PhonePe</div></div>
                   <span className={`${miniTag} ${tagAmber}`}>85%</span>
                 </div>
               </div>
@@ -126,22 +126,22 @@ const FeaturesGrid = () => {
               <div className={featScreenshotInner}>
                 <div className="flex gap-2 h-full">
                   <div className="flex-1">
-                    <div className={`${miniSubtext} mb-[5px] flex items-center gap-[3px]`}><span className="text-hr-green">●</span> WhatsApp</div>
+                    <div className={`${miniSubtext} mb-[5px] flex items-center gap-[3px]`}><span className="text-hr-green">â—</span> WhatsApp</div>
                     <div className="flex flex-col">
-                      <div className={miniMsgSent}>Hi Rahul! We have an exciting Sr. Frontend role. Interested?<div className="text-[0.4rem] text-[rgba(0,0,0,0.4)] mt-0.5">10:30 AM ✓✓</div></div>
+                      <div className={miniMsgSent}>Hi Rahul! We have an exciting Sr. Frontend role. Interested?<div className="text-[0.4rem] text-[rgba(0,0,0,0.4)] mt-0.5">10:30 AM âœ“âœ“</div></div>
                       <div className={miniMsgRcvd}>Hey! Yes, sounds interesting. Share more?<div className="text-[0.4rem] text-[#9ca3af] mt-0.5">10:45 AM</div></div>
-                      <div className={miniMsgSent}>Great! JD sent to email. CTC: ₹28-35L 🙌<div className="text-[0.4rem] text-[rgba(0,0,0,0.4)] mt-0.5">10:47 AM ✓✓</div></div>
+                      <div className={miniMsgSent}>Great! JD sent to email. CTC: â‚¹28-35L ðŸ™Œ<div className="text-[0.4rem] text-[rgba(0,0,0,0.4)] mt-0.5">10:47 AM âœ“âœ“</div></div>
                     </div>
                   </div>
                   <div className="w-px bg-[rgba(0,0,0,0.08)]"></div>
                   <div className="flex-1">
-                    <div className={`${miniSubtext} mb-[5px] flex items-center gap-[3px]`}><span className="text-hr-accent-hover">●</span> Email</div>
+                    <div className={`${miniSubtext} mb-[5px] flex items-center gap-[3px]`}><span className="text-hr-accent-hover">â—</span> Email</div>
                     <div className="bg-[#f1f3f5] border border-[rgba(0,0,0,0.08)] rounded p-1.5">
-                      <div className="text-[0.45rem] font-semibold text-[#4a5568] mb-[3px]">Sr. Frontend Dev — Opportunity</div>
+                      <div className="text-[0.45rem] font-semibold text-[#4a5568] mb-[3px]">Sr. Frontend Dev â€” Opportunity</div>
                       <div className="text-[0.38rem] text-[#9ca3af] mb-1">To: rahul.patel@email.com</div>
-                      <div className="text-[0.38rem] text-[#9ca3af] leading-[1.5]">Hi Rahul,<br /><br />Following up on our WhatsApp chat. Attached is the detailed JD...<br /><br />Best,<br />VantaHire Team</div>
+                      <div className="text-[0.38rem] text-[#9ca3af] leading-[1.5]">Hi Rahul,<br /><br />Following up on our WhatsApp chat. Attached is the detailed JD...<br /><br />Best,<br />ealana Team</div>
                     </div>
-                    <div className="text-[0.4rem] text-hr-green mt-1">✓ Opened · 2 min ago</div>
+                    <div className="text-[0.4rem] text-hr-green mt-1">âœ“ Opened Â· 2 min ago</div>
                   </div>
                 </div>
               </div>
@@ -156,12 +156,12 @@ const FeaturesGrid = () => {
           <div className="p-0 overflow-hidden bg-hr-bg">
             <div className={featScreenshot}>
               <div className={featScreenshotInner}>
-                <div className={miniSectionTitle}>Client Review — TechCorp India</div>
+                <div className={miniSectionTitle}>Client Review â€” TechCorp India</div>
                 <div className={fbItem}>
                   <span className={`${fbAvatar} ${avatarPurple}`}>RP</span>
                   <div className="flex-1">
-                    <div className={miniName}>Rahul Patel — Sr. Frontend</div>
-                    <div className="text-[0.5rem] text-hr-yellow tracking-[1px]">★★★★★</div>
+                    <div className={miniName}>Rahul Patel â€” Sr. Frontend</div>
+                    <div className="text-[0.5rem] text-hr-yellow tracking-[1px]">â˜…â˜…â˜…â˜…â˜…</div>
                     <div className={`${miniSubtext} mt-0.5`}>&quot;Excellent fit. Strong React skills.&quot;</div>
                   </div>
                   <span className={`${miniTag} ${tagGreen}`}>Shortlisted</span>
@@ -169,8 +169,8 @@ const FeaturesGrid = () => {
                 <div className={fbItem}>
                   <span className={`${fbAvatar} ${avatarAmber}`}>AS</span>
                   <div className="flex-1">
-                    <div className={miniName}>Ananya Sharma — Lead Eng</div>
-                    <div className="text-[0.5rem] text-hr-yellow tracking-[1px]">★★★★<span className="text-[#9ca3af]">★</span></div>
+                    <div className={miniName}>Ananya Sharma â€” Lead Eng</div>
+                    <div className="text-[0.5rem] text-hr-yellow tracking-[1px]">â˜…â˜…â˜…â˜…<span className="text-[#9ca3af]">â˜…</span></div>
                     <div className={`${miniSubtext} mt-0.5`}>&quot;Good but overqualified for role.&quot;</div>
                   </div>
                   <span className={`${miniTag} ${tagAmber}`}>On Hold</span>
@@ -178,8 +178,8 @@ const FeaturesGrid = () => {
                 <div className={fbItem}>
                   <span className={`${fbAvatar} ${avatarRed}`}>VK</span>
                   <div className="flex-1">
-                    <div className={miniName}>Vikram Kumar — Full Stack</div>
-                    <div className="text-[0.5rem] text-hr-yellow tracking-[1px]">★★★<span className="text-[#9ca3af]">★★</span></div>
+                    <div className={miniName}>Vikram Kumar â€” Full Stack</div>
+                    <div className="text-[0.5rem] text-hr-yellow tracking-[1px]">â˜…â˜…â˜…<span className="text-[#9ca3af]">â˜…â˜…</span></div>
                     <div className={`${miniSubtext} mt-0.5`}>&quot;Needs more system design exp.&quot;</div>
                   </div>
                   <span className={`${miniTag} ${tagRed}`}>Rejected</span>
@@ -196,7 +196,7 @@ const FeaturesGrid = () => {
           <div className="p-0 overflow-hidden bg-hr-bg">
             <div className={featScreenshot}>
               <div className={featScreenshotInner}>
-                <div className={miniSectionTitle}>My Dashboard — Priya</div>
+                <div className={miniSectionTitle}>My Dashboard â€” Priya</div>
                 <div className="grid grid-cols-2 gap-1.5">
                   <div className={dashCell}>
                     <div className="text-[0.45rem] text-[#9ca3af] uppercase tracking-[0.04em] mb-[3px]">Placements MTD</div>
@@ -207,8 +207,8 @@ const FeaturesGrid = () => {
                   </div>
                   <div className={dashCell}>
                     <div className="text-[0.45rem] text-[#9ca3af] uppercase tracking-[0.04em] mb-[3px]">Revenue</div>
-                    <div className="text-sm font-bold text-[#1a1a2e]">₹4.2L</div>
-                    <div className="text-[0.4rem] text-hr-green mt-[3px]">↑ 18% vs target</div>
+                    <div className="text-sm font-bold text-[#1a1a2e]">â‚¹4.2L</div>
+                    <div className="text-[0.4rem] text-hr-green mt-[3px]">â†‘ 18% vs target</div>
                   </div>
                   <div className={dashCell}>
                     <div className="text-[0.45rem] text-[#9ca3af] uppercase tracking-[0.04em] mb-[3px]">Active Candidates</div>
@@ -225,9 +225,9 @@ const FeaturesGrid = () => {
                 </div>
                 <div className={`${miniPanel} mt-1.5 px-1.5 py-[5px] rounded`}>
                   <div className="text-[0.42rem] text-[#9ca3af] mb-[3px] uppercase">Today&apos;s Tasks</div>
-                  <div className="text-[0.42rem] text-[#4a5568] mb-0.5 flex gap-1"><span className="text-hr-green">✓</span> Follow up with 3 candidates</div>
-                  <div className="text-[0.42rem] text-[#4a5568] mb-0.5 flex gap-1"><span className="text-hr-yellow">○</span> Schedule 2 client interviews</div>
-                  <div className="text-[0.42rem] text-[#4a5568] flex gap-1"><span className="text-hr-yellow">○</span> Send weekly report to TechCorp</div>
+                  <div className="text-[0.42rem] text-[#4a5568] mb-0.5 flex gap-1"><span className="text-hr-green">âœ“</span> Follow up with 3 candidates</div>
+                  <div className="text-[0.42rem] text-[#4a5568] mb-0.5 flex gap-1"><span className="text-hr-yellow">â—‹</span> Schedule 2 client interviews</div>
+                  <div className="text-[0.42rem] text-[#4a5568] flex gap-1"><span className="text-hr-yellow">â—‹</span> Send weekly report to TechCorp</div>
                 </div>
               </div>
             </div>
@@ -245,11 +245,11 @@ const FeaturesGrid = () => {
                   <div className="text-[0.58rem] font-semibold text-[#4a5568]">Job Command Center</div>
                   <span className={`${miniTag} ${tagPurple}`}>12 Active</span>
                 </div>
-                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-red"></span><span className="flex-1 text-[#4a5568] font-medium">Sr. Frontend Engineer</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">👤 24</span><span className={`${jobStatusTag} ${tagPurple}`}>Sourcing</span></div>
-                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-yellow"></span><span className="flex-1 text-[#4a5568] font-medium">Data Scientist</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">👤 18</span><span className={`${jobStatusTag} ${tagGreen}`}>Interview</span></div>
-                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-green"></span><span className="flex-1 text-[#4a5568] font-medium">Product Manager</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">👤 31</span><span className={`${jobStatusTag} ${tagViolet}`}>Offer</span></div>
-                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-red"></span><span className="flex-1 text-[#4a5568] font-medium">DevOps Engineer</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">👤 9</span><span className={`${jobStatusTag} ${tagAmber}`}>Urgent</span></div>
-                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-cyan"></span><span className="flex-1 text-[#4a5568] font-medium">UI/UX Designer</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">👤 15</span><span className={`${jobStatusTag} ${tagPurple}`}>Sourcing</span></div>
+                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-red"></span><span className="flex-1 text-[#4a5568] font-medium">Sr. Frontend Engineer</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">ðŸ‘¤ 24</span><span className={`${jobStatusTag} ${tagPurple}`}>Sourcing</span></div>
+                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-yellow"></span><span className="flex-1 text-[#4a5568] font-medium">Data Scientist</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">ðŸ‘¤ 18</span><span className={`${jobStatusTag} ${tagGreen}`}>Interview</span></div>
+                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-green"></span><span className="flex-1 text-[#4a5568] font-medium">Product Manager</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">ðŸ‘¤ 31</span><span className={`${jobStatusTag} ${tagViolet}`}>Offer</span></div>
+                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-red"></span><span className="flex-1 text-[#4a5568] font-medium">DevOps Engineer</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">ðŸ‘¤ 9</span><span className={`${jobStatusTag} ${tagAmber}`}>Urgent</span></div>
+                <div className={jobItem}><span className="w-[5px] h-[5px] rounded-full shrink-0 bg-hr-cyan"></span><span className="flex-1 text-[#4a5568] font-medium">UI/UX Designer</span><span className="text-[#9ca3af] font-mono text-[0.48rem]">ðŸ‘¤ 15</span><span className={`${jobStatusTag} ${tagPurple}`}>Sourcing</span></div>
               </div>
             </div>
             <div className={featInfo}>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -152,18 +152,18 @@ export default function RecruiterProfilePage() {
   return (
     <Layout>
       <Helmet>
-        <title>{profile.displayName} - Recruiter | VantaHire</title>
-        <meta name="description" content={`${profile.displayName}${profile.company ? ` at ${profile.company}` : ''}${profile.location ? ` in ${profile.location}` : ''}. View profile and job listings on VantaHire.`} />
-        <link rel="canonical" href={`https://vantahire.com/recruiters/${recruiterIdOrPublicId}`} />
-        <meta property="og:title" content={`${profile.displayName} - Recruiter | VantaHire`} />
-        <meta property="og:description" content={profile.bio || `View ${profile.displayName}'s recruiter profile and job listings on VantaHire.`} />
-        <meta property="og:url" content={`https://vantahire.com/recruiters/${recruiterIdOrPublicId}`} />
+        <title>{profile.displayName} - Recruiter | ealana</title>
+        <meta name="description" content={`${profile.displayName}${profile.company ? ` at ${profile.company}` : ''}${profile.location ? ` in ${profile.location}` : ''}. View profile and job listings on ealana.`} />
+        <link rel="canonical" href={`https://ealana.com/recruiters/${recruiterIdOrPublicId}`} />
+        <meta property="og:title" content={`${profile.displayName} - Recruiter | ealana`} />
+        <meta property="og:description" content={profile.bio || `View ${profile.displayName}'s recruiter profile and job listings on ealana.`} />
+        <meta property="og:url" content={`https://ealana.com/recruiters/${recruiterIdOrPublicId}`} />
         <meta property="og:type" content="profile" />
-        <meta property="og:image" content={profile.photoUrl || "https://vantahire.com/og-image.jpg"} />
+        <meta property="og:image" content={profile.photoUrl || "https://ealana.com/og-image.jpg"} />
         <meta name="twitter:card" content="summary" />
-        <meta name="twitter:title" content={`${profile.displayName} - Recruiter | VantaHire`} />
+        <meta name="twitter:title" content={`${profile.displayName} - Recruiter | ealana`} />
         <meta name="twitter:description" content={profile.bio || `View ${profile.displayName}'s recruiter profile and job listings.`} />
-        <meta name="twitter:image" content={profile.photoUrl || "https://vantahire.com/twitter-image.jpg"} />
+        <meta name="twitter:image" content={profile.photoUrl || "https://ealana.com/twitter-image.jpg"} />
 
         {/* BreadcrumbList JSON-LD */}
         <script type="application/ld+json">
@@ -175,19 +175,19 @@ export default function RecruiterProfilePage() {
                 "@type": "ListItem",
                 "position": 1,
                 "name": "Home",
-                "item": "https://vantahire.com"
+                "item": "https://ealana.com"
               },
               {
                 "@type": "ListItem",
                 "position": 2,
                 "name": "Recruiters",
-                "item": "https://vantahire.com/recruiters"
+                "item": "https://ealana.com/recruiters"
               },
               {
                 "@type": "ListItem",
                 "position": 3,
                 "name": profile.displayName,
-                "item": `https://vantahire.com/recruiters/${recruiterIdOrPublicId}`
+                "item": `https://ealana.com/recruiters/${recruiterIdOrPublicId}`
               }
             ]
           })}

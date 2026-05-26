@@ -1,4 +1,4 @@
-import { Card, CardContent } from "@/components/ui/card";
+﻿import { Card, CardContent } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
 import Footer from "@/components/Footer";
 import { Helmet } from "react-helmet-async";
@@ -7,7 +7,7 @@ export default function NotFound() {
   return (
     <>
       <Helmet>
-        <title>Page Not Found | VantaHire</title>
+        <title>Page Not Found | ealana</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="public-theme min-h-screen bg-background text-foreground w-full flex flex-col">

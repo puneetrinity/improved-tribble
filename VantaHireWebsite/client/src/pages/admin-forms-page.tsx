@@ -330,7 +330,7 @@ export default function AdminFormsPage() {
           <Button
             onClick={handleCreateNew}
             data-tour="create-form-button"
-            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+            className="h-11 rounded-2xl bg-[#4B8EF0] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
           >
             <Plus className="mr-2 h-4 w-4" />
             Create Template

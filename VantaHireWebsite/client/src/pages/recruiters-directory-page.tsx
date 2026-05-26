@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { User, Building, MapPin, Briefcase, Search } from "lucide-react";
@@ -23,8 +23,8 @@ const breadcrumbJsonLd = JSON.stringify({
   "@context": "https://schema.org",
   "@type": "BreadcrumbList",
   "itemListElement": [
-    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" },
-    { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://vantahire.com/recruiters" }
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" },
+    { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://ealana.com/recruiters" }
   ]
 });
 
@@ -57,18 +57,18 @@ export default function RecruitersDirectoryPage() {
   return (
     <>
       <Helmet>
-        <title>Recruiters Directory | VantaHire — Find Specialist Recruiters</title>
-        <meta name="description" content="Meet VantaHire's specialist recruiters. Industry experts in IT, telecom, automotive, fintech, and healthcare hiring across India and APAC." />
-        <link rel="canonical" href="https://vantahire.com/recruiters" />
-        <meta property="og:title" content="Recruiters Directory | VantaHire — Find Specialist Recruiters" />
-        <meta property="og:description" content="Meet VantaHire's specialist recruiters. Industry experts across India and APAC." />
-        <meta property="og:url" content="https://vantahire.com/recruiters" />
+        <title>Recruiters Directory | ealana â€” Find Specialist Recruiters</title>
+        <meta name="description" content="Meet ealana's specialist recruiters. Industry experts in IT, telecom, automotive, fintech, and healthcare hiring across India and APAC." />
+        <link rel="canonical" href="https://ealana.com/recruiters" />
+        <meta property="og:title" content="Recruiters Directory | ealana â€” Find Specialist Recruiters" />
+        <meta property="og:description" content="Meet ealana's specialist recruiters. Industry experts across India and APAC." />
+        <meta property="og:url" content="https://ealana.com/recruiters" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
+        <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Recruiters Directory | VantaHire — Find Specialist Recruiters" />
-        <meta name="twitter:description" content="Meet VantaHire's specialist recruiters. Industry experts across India and APAC." />
-        <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
+        <meta name="twitter:title" content="Recruiters Directory | ealana â€” Find Specialist Recruiters" />
+        <meta name="twitter:description" content="Meet ealana's specialist recruiters. Industry experts across India and APAC." />
+        <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
         <script type="application/ld+json">
           {breadcrumbJsonLd}
         </script>
@@ -193,7 +193,7 @@ export default function RecruitersDirectoryPage() {
                           {recruiter.jobCount} active {recruiter.jobCount === 1 ? "job" : "jobs"}
                         </span>
                         <span className="text-[0.78rem] text-hr-accent-hover opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          View Profile →
+                          View Profile â†’
                         </span>
                       </div>
                     </div>

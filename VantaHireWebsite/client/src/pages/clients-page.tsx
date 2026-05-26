@@ -214,7 +214,7 @@ export default function ClientsPage() {
           <Button
             onClick={openCreateDialog}
             data-tour="add-client-button"
-            className="h-11 rounded-2xl bg-[#5B4FF7] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+            className="h-11 rounded-2xl bg-[#4B8EF0] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
           >
             <Plus className="mr-2 h-4 w-4" />
             {clientsPageCopy.header.addClient}
@@ -226,7 +226,7 @@ export default function ClientsPage() {
           {
             label: "Applications",
             value: clientMetrics.reduce((sum, metric) => sum + metric.totalApplications, 0),
-            accentClassName: "text-[#4D41DF]",
+            accentClassName: "text-[#4B8EF0]",
           },
         ]}
       />

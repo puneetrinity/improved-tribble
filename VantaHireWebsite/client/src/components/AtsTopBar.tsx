@@ -58,7 +58,7 @@ type RouteMeta = {
   match: (location: string) => boolean;
 };
 
-const ATS_ROUTES: RouteMeta[] = [
+const FLOW_ROUTES: RouteMeta[] = [
   {
     path: "/recruiter-dashboard",
     label: atsShellCopy.routes.dashboard.label,
@@ -190,12 +190,12 @@ export function AtsTopBar({
 }: AtsTopBarProps) {
   const [commandOpen, setCommandOpen] = React.useState(false);
   const currentRoute =
-    ATS_ROUTES.find((route) => route.match(location)) ??
-    ATS_ROUTES.find((route) => route.path === "/recruiter-dashboard")!;
+    FLOW_ROUTES.find((route) => route.match(location)) ??
+    FLOW_ROUTES.find((route) => route.path === "/recruiter-dashboard")!;
 
   const quickRoutes = React.useMemo(
     () =>
-      ATS_ROUTES.filter((route) => {
+      FLOW_ROUTES.filter((route) => {
         if (route.path.startsWith("/org/") && !isOrgOwnerOrAdmin) return false;
         if (route.path === "/admin" && !isAdmin) return false;
         return true;
@@ -226,7 +226,7 @@ export function AtsTopBar({
     <>
       <header className="sticky top-0 z-20 overflow-x-hidden border-b border-[#E6E9F2] bg-[rgba(248,249,252,0.82)] backdrop-blur-xl">
         <div className="relative">
-          <div className="absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_top_left,_rgba(196,192,255,0.26),_transparent_35%),radial-gradient(circle_at_top_right,_rgba(196,236,255,0.18),_transparent_32%)]" />
+          <div className="absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_top_left,_rgba(75,142,240,0.16),_transparent_35%),radial-gradient(circle_at_top_right,_rgba(52,209,122,0.12),_transparent_32%)]" />
           <div className="relative flex h-[76px] min-w-0 items-center justify-between gap-4 px-4 md:px-6">
             <div className="flex min-w-0 items-center gap-3 md:gap-4">
               <div className="min-w-0">
@@ -267,7 +267,7 @@ export function AtsTopBar({
               {primaryAction ? (
                 <Button
                   onClick={() => navigate(primaryAction.path)}
-                  className="hidden rounded-[18px] bg-[linear-gradient(135deg,#4D41DF_0%,#675DF9_100%)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(77,65,223,0.26)] hover:opacity-95 lg:inline-flex"
+                  className="hidden rounded-[18px] bg-[linear-gradient(135deg,#4B8EF0_0%,#3679DB_100%)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(75,142,240,0.22)] hover:opacity-95 lg:inline-flex"
                 >
                   {primaryAction.label}
                 </Button>
@@ -279,7 +279,7 @@ export function AtsTopBar({
                     type="button"
                     className="flex items-center gap-3 rounded-[18px] border border-[#E6E9F2] bg-white/92 px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)] hover:bg-[#FCFCFE]"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#DCD8FF_0%,#BFC7FF_100%)] text-sm font-semibold text-[#4338CA]">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#D8E8FF_0%,#BFE7D1_100%)] text-sm font-semibold text-[#1F4E8C]">
                       {initialsForUser(user)}
                     </div>
                     <div className="hidden min-w-0 text-left lg:block">
@@ -298,7 +298,7 @@ export function AtsTopBar({
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => navigate("/profile/settings")}
-                    className="cursor-pointer rounded-xl px-3 py-2.5 text-sm font-medium text-[#4A5568] focus:bg-[#F3F4F8] focus:text-[#4338CA]"
+                    className="cursor-pointer rounded-xl px-3 py-2.5 text-sm font-medium text-[#4A5568] focus:bg-[#EEF5FF] focus:text-[#1F4E8C]"
                   >
                     <UserCircle2 className="mr-2 h-4 w-4" />
                     {atsShellCopy.routes.profileSettings.label}
@@ -306,7 +306,7 @@ export function AtsTopBar({
                   {isOrgOwnerOrAdmin ? (
                     <DropdownMenuItem
                       onClick={() => navigate("/org/settings")}
-                      className="cursor-pointer rounded-xl px-3 py-2.5 text-sm font-medium text-[#4A5568] focus:bg-[#F3F4F8] focus:text-[#4338CA]"
+                      className="cursor-pointer rounded-xl px-3 py-2.5 text-sm font-medium text-[#4A5568] focus:bg-[#EEF5FF] focus:text-[#1F4E8C]"
                     >
                       <Settings className="mr-2 h-4 w-4" />
                       {atsShellCopy.menu.organizationSettings}
@@ -345,7 +345,7 @@ export function AtsTopBar({
                   }}
                   className="rounded-xl px-3 py-3"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F3F4F8] text-[#5B4FF7]">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#EEF5FF] text-[#4B8EF0]">
                     <Icon className="h-4 w-4" />
                   </div>
                   <div className="flex flex-col">

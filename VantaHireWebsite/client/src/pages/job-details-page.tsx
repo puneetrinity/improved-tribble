@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { Helmet } from "react-helmet-async";
@@ -261,17 +261,17 @@ export default function JobDetailsPage() {
   return (
     <>
       <Helmet>
-        <title>{job.title} | VantaHire</title>
+        <title>{job.title} | ealana</title>
         <meta name="description" content={metaDescription} />
         <link rel="canonical" href={canonicalUrl} />
-        <meta property="og:title" content={`${job.title} - VantaHire`} />
+        <meta property="og:title" content={`${job.title} - ealana`} />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:url" content={canonicalUrl} />
         <meta property="og:type" content="website" />
         <meta property="og:image" content={`${DEFAULT_SITE_URL}/og-image.jpg`} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
-        <meta name="twitter:title" content={`${job.title} - VantaHire`} />
+        <meta name="twitter:title" content={`${job.title} - ealana`} />
         <meta name="twitter:description" content={metaDescription} />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:image" content={`${DEFAULT_SITE_URL}/twitter-image.jpg`} />
@@ -418,7 +418,7 @@ export default function JobDetailsPage() {
                 className="grid grid-cols-[1fr_320px] gap-8 pb-20 max-lg:grid-cols-[1fr_280px] max-lg:gap-6 max-md:grid-cols-1 max-md:gap-6"
                 style={{ animation: 'hr-fade-up 0.7s ease-out 0.15s both' }}
               >
-                {/* Left column — details */}
+                {/* Left column â€” details */}
                 <main>
 
                   {/* Description */}
@@ -498,10 +498,10 @@ export default function JobDetailsPage() {
                         <div className="flex items-baseline gap-2">
                           <span className="font-satoshi text-2xl font-semibold text-hr-text">
                             {job.salaryMin && job.salaryMax
-                              ? `₹${job.salaryMin.toLocaleString('en-IN')} – ₹${job.salaryMax.toLocaleString('en-IN')}`
+                              ? `â‚¹${job.salaryMin.toLocaleString('en-IN')} â€“ â‚¹${job.salaryMax.toLocaleString('en-IN')}`
                               : job.salaryMin
-                              ? `₹${job.salaryMin.toLocaleString('en-IN')}+`
-                              : `Up to ₹${job.salaryMax?.toLocaleString('en-IN')}`}
+                              ? `â‚¹${job.salaryMin.toLocaleString('en-IN')}+`
+                              : `Up to â‚¹${job.salaryMax?.toLocaleString('en-IN')}`}
                           </span>
                           <span className="text-[0.85rem] text-hr-text-muted">
                             {job.salaryPeriod === 'per_month' ? '/month' : '/year'}
@@ -550,7 +550,7 @@ export default function JobDetailsPage() {
                   )}
                 </main>
 
-                {/* Right column — sidebar */}
+                {/* Right column â€” sidebar */}
                 <aside className="sticky top-20 self-start flex flex-col gap-4 max-md:static" id="hr-jd-apply-section">
                   {/* Job summary card */}
                   <div className={sidebarCardCls}>
@@ -593,10 +593,10 @@ export default function JobDetailsPage() {
                             <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Salary</span>
                             <span className="text-[0.88rem] text-hr-text font-medium">
                               {job.salaryMin && job.salaryMax
-                                ? `₹${job.salaryMin.toLocaleString('en-IN')} – ₹${job.salaryMax.toLocaleString('en-IN')}`
+                                ? `â‚¹${job.salaryMin.toLocaleString('en-IN')} â€“ â‚¹${job.salaryMax.toLocaleString('en-IN')}`
                                 : job.salaryMin
-                                ? `₹${job.salaryMin.toLocaleString('en-IN')}+`
-                                : `Up to ₹${job.salaryMax?.toLocaleString('en-IN')}`}
+                                ? `â‚¹${job.salaryMin.toLocaleString('en-IN')}+`
+                                : `Up to â‚¹${job.salaryMax?.toLocaleString('en-IN')}`}
                               <span className="text-hr-text-muted font-normal text-[0.72rem] ml-1">
                                 {job.salaryPeriod === 'per_month' ? '/mo' : '/yr'}
                               </span>

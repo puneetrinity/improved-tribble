@@ -73,7 +73,7 @@ export default function CandidateAuth() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="flex items-start space-x-4">
                 <div className="flex-shrink-0">
-                  <Search className="h-8 w-8 text-[#7B38FB]" />
+                  <Search className="h-8 w-8 text-[#4B8EF0]" />
                 </div>
                 <div>
                   <h3 className="text-foreground font-semibold mb-2">{candidateAuthPageCopy.hero.features[0].title}</h3>
@@ -114,7 +114,7 @@ export default function CandidateAuth() {
 
             <div className="pt-4">
               <p className="text-muted-foreground text-sm">
-                {candidateAuthPageCopy.hero.recruiterPrompt} <Button variant="link" className="text-[#7B38FB] p-0 h-auto" onClick={() => setLocation("/recruiter-auth")}>
+                {candidateAuthPageCopy.hero.recruiterPrompt} <Button variant="link" className="h-auto p-0 text-[#4B8EF0]" onClick={() => setLocation("/recruiter-auth")}>
                   {candidateAuthPageCopy.hero.recruiterLink}
                 </Button>
               </p>
@@ -170,7 +170,7 @@ export default function CandidateAuth() {
                       </div>
                       <Button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] hover:opacity-90"
+                        className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95"
                         disabled={loginMutation.isPending}
                       >
                         {loginMutation.isPending ? candidateAuthPageCopy.card.signingIn : candidateAuthPageCopy.card.signIn}
@@ -233,7 +233,7 @@ export default function CandidateAuth() {
                       </div>
                       <Button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] hover:opacity-90"
+                        className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95"
                         disabled={registerMutation.isPending}
                       >
                         {registerMutation.isPending ? candidateAuthPageCopy.card.creatingAccount : candidateAuthPageCopy.card.createAccount}

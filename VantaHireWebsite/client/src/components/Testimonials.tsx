@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+﻿import { useState, useRef } from "react";
 import { ArrowLeft, ArrowRight, Star } from "lucide-react";
 
 interface TestimonialCardProps {
@@ -147,7 +147,7 @@ const Testimonials = () => {
   
   const testimonials = [
     {
-      quote: "VantaHire helped us close 10 niche engineering roles in record time! Their industry expertise and vast network gave us access to pre-qualified candidates that perfectly matched our technical requirements and company culture.",
+      quote: "ealana helped us close 10 niche engineering roles in record time! Their industry expertise and vast network gave us access to pre-qualified candidates that perfectly matched our technical requirements and company culture.",
       name: "Sarah Chen",
       role: "Senior Product Manager",
       company: "TechStream",
@@ -163,7 +163,7 @@ const Testimonials = () => {
       dotColor: "bg-[#2D81FF]"
     },
     {
-      quote: "The campus recruitment program VantaHire organized connected our computer science students with cutting-edge startups. Thanks to this partnership, our placement rate increased by 30% this year!",
+      quote: "The campus recruitment program ealana organized connected our computer science students with cutting-edge startups. Thanks to this partnership, our placement rate increased by 30% this year!",
       name: "Dr. Emily Patel",
       role: "Department Chair",
       company: "Tech Institute",
@@ -210,7 +210,7 @@ const Testimonials = () => {
           <p className="text-lg text-white/80 max-w-2xl mx-auto leading-relaxed animate-slide-up" 
              style={{ animationDelay: '0.5s' }}>
             Don't just take our word for it - hear from the businesses and individuals 
-            who've transformed their hiring process with VantaHire.
+            who've transformed their hiring process with ealana.
           </p>
         </div>
         

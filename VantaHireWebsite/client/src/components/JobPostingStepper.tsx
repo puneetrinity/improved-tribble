@@ -88,6 +88,20 @@ interface FieldError {
   message: string;
 }
 
+interface ExtractedDetails {
+  title: string;
+  location: string;
+  type: "full-time" | "part-time" | "contract" | "remote";
+  experienceYears: string;
+  salaryMin: string;
+  salaryMax: string;
+  salaryPeriod: "per_month" | "per_year";
+  educationRequirement: string;
+  skills: string[];
+  goodToHaveSkills: string[];
+  keywords: string[];
+}
+
 const STEPS = [
   { id: 1, title: "Basics", description: "Job title, location & type" },
   { id: 2, title: "Details", description: "Skills & description" },
@@ -285,6 +299,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const [newSkill, setNewSkill] = useState("");
   const [goodToHaveSkills, setGoodToHaveSkills] = useState<string[]>([]);
   const [newGoodToHaveSkill, setNewGoodToHaveSkill] = useState("");
+  const keywords = dedupeStrings([...skills, ...goodToHaveSkills]);
   const [hiringManagerId, setHiringManagerId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
   const [showAiDrawer, setShowAiDrawer] = useState(false);
@@ -547,6 +562,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         salaryMax: formData.salaryMax,
         salaryPeriod: formData.salaryPeriod,
         skills,
+        goodToHaveSkills,
         keywords,
       });
 

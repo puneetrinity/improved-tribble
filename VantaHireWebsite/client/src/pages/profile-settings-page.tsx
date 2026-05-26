@@ -13,6 +13,7 @@ import { User, Building, MapPin, Linkedin, Globe, Save, X, Phone } from "lucide-
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { profileSettingsPageCopy } from "@/lib/internal-copy";
 import Layout from "@/components/Layout";
+import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 
 interface UserProfile {
   displayName: string | null;
@@ -134,9 +135,7 @@ export default function ProfileSettingsPage() {
     return (
       <Layout>
         <div className="container mx-auto px-4 py-16">
-          <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">{profileSettingsPageCopy.loading}</div>
-          </div>
+          <BrandedLoadingScreen label={profileSettingsPageCopy.loading} />
         </div>
       </Layout>
     );
@@ -303,7 +302,7 @@ export default function ProfileSettingsPage() {
                           type="button"
                           onClick={() => removeSkill(skill)}
                           aria-label={`Remove ${skill}`}
-                          className="ml-2 hover:bg-purple-200 rounded p-0.5"
+                          className="ml-2 rounded p-0.5 hover:bg-[#DCEBFF]"
                         >
                           <X className="h-3 w-3" />
                         </button>

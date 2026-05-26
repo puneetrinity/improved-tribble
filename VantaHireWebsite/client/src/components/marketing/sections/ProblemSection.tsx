@@ -1,6 +1,7 @@
 // @charset "utf-8"
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import ealanaMoth from "@/assets/ealana-moth (1).svg";
 
 interface Candidate {
   name: string;
@@ -61,7 +62,9 @@ export function ProblemSection() {
     };
 
     const observer = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
         if (entry.isIntersecting && phase === "idle") {
           document.body.style.overflow = "hidden";
           let count = 0;
@@ -644,19 +647,7 @@ export function ProblemSection() {
                           filter: "blur(16px)",
                         }}
                       />
-                      <svg width="56" height="62" viewBox="0 0 120 132" fill="none">
-                        <path d="M60 52 C50 28,18 18,8 38 C0 54,18 72,60 70 Z" fill="#4B8EF0" opacity={0.95} />
-                        <path d="M60 70 C38 76,16 85,20 98 C24 108,46 100,60 86 Z" fill="#4B8EF0" opacity={0.5} />
-                        <path d="M60 52 C70 28,102 18,112 38 C120 54,102 72,60 70 Z" fill="#34D17A" opacity={0.95} />
-                        <path d="M60 70 C82 76,104 85,100 98 C96 108,74 100,60 86 Z" fill="#34D17A" opacity={0.5} />
-                        <ellipse cx="60" cy="68" rx="4" ry="20" fill="#0D0F1E" />
-                        <circle cx="60" cy="60" r="4.5" fill="#F5C842" />
-                        <circle cx="60" cy="60" r="2" fill="rgba(255,255,255,0.5)" />
-                        <path d="M58 50 C55 38,46 30,40 22" stroke="#3D4460" strokeWidth="1" strokeLinecap="round" fill="none" />
-                        <path d="M62 50 C65 38,74 30,80 22" stroke="#3D4460" strokeWidth="1" strokeLinecap="round" fill="none" />
-                        <circle cx="40" cy="22" r="2" fill="#3D4460" />
-                        <circle cx="80" cy="22" r="2" fill="#3D4460" />
-                      </svg>
+                      <img src={ealanaMoth} alt="ealana moth" width="56" height="62" />
                     </div>
                   </motion.div>
 

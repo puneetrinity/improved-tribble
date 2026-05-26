@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { orgDomainRequestPageCopy } from "@/lib/internal-copy";
 import { apiRequest } from "@/lib/queryClient";
+import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 
 // List of public email domains that cannot be claimed
 const PUBLIC_DOMAINS = [
@@ -106,8 +107,8 @@ export default function OrgDomainRequestPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="max-w-7xl mx-auto p-6 flex justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="mx-auto max-w-7xl p-6">
+          <BrandedLoadingScreen label="Loading domain request details..." />
         </div>
       </Layout>
     );

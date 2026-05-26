@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Building2, Users, Link2, Loader2, UserPlus, CheckCircle, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 
 interface DomainOrgMatch {
   id: number;
@@ -212,8 +213,8 @@ export default function OrgChoicePage() {
 
   if (orgLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="p-4">
+        <BrandedLoadingScreen fullScreen label="Preparing your ealana workspace..." />
       </div>
     );
   }
@@ -222,7 +223,7 @@ export default function OrgChoicePage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center p-4">
       <div className="max-w-2xl w-full space-y-6">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Welcome to VantaHire!</h1>
+          <h1 className="text-3xl font-bold">Welcome to ealana!</h1>
           <p className="text-muted-foreground mt-2">
             {mode === 'choice' ? "Let's get you set up. Choose how you'd like to get started." : null}
             {mode === 'create' ? "Create a new workspace for your team." : null}
@@ -336,7 +337,7 @@ export default function OrgChoicePage() {
                     Organization for @{domainOrg.domain} exists
                   </p>
                   <p className="text-sm text-amber-700 mt-1">
-                    {domainOrg.name} is already using VantaHire. You can request to join them.
+                    {domainOrg.name} is already using ealana. You can request to join them.
                   </p>
                   <p className="text-xs text-amber-600 mt-2">
                     Note: Your existing jobs and clients will be moved to this organization if approved.

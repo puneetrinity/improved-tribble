@@ -1,4 +1,4 @@
-import Cube from "@/components/illustrations/Cube";
+﻿import Cube from "@/components/illustrations/Cube";
 import { useState, useEffect, useRef } from "react";
 import { Check, Trophy, Users, Building, Star, Award, Gem, TrendingUp } from "lucide-react";
 
@@ -80,7 +80,7 @@ const About = () => {
       <ul className="space-y-3 mt-4">
         {[
           "Recruiter-first, not afterthought: If it adds clicks, it doesn't ship.",
-          "Velocity over bureaucracy: Built for teams that move fast—not approval chains.",
+          "Velocity over bureaucracy: Built for teams that move fastâ€”not approval chains.",
           "Clarity over complexity: Answers at a glance, not buried in reports.",
           "Human decisions, AI acceleration: Smart algorithms surface candidates; you make the calls."
         ].map((item, i) => (
@@ -131,11 +131,11 @@ const About = () => {
                style={{ animationDelay: '0.3s' }}></div>
 
           <h2 className="text-4xl md:text-5xl font-bold mb-6 animate-gradient-text inline-block">
-            Why VantaHire?
+            Why ealana?
           </h2>
 
           <p className="text-lg text-white/80 max-w-2xl mx-auto animate-slide-up" style={{ animationDelay: '0.6s' }}>
-            We built VantaHire because your ATS wasn't built for you. Discover our recruiter-first approach.
+            We built ealana because your ATS wasn't built for you. Discover our recruiter-first approach.
           </p>
         </div>
 

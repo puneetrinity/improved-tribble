@@ -1,4 +1,4 @@
-import { Helmet } from "react-helmet-async";
+﻿import { Helmet } from "react-helmet-async";
 import { FileText, Scale, Users, Shield, AlertTriangle, Ban, Briefcase, CreditCard, Gavel, Puzzle, Mail } from "lucide-react";
 import LegalPageLayout, { type LegalSection } from "@/components/LegalPageLayout";
 import {
@@ -31,12 +31,12 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          These Terms of Service ("Terms") govern your access to and use of VantaHire, an applicant
+          These Terms of Service ("Terms") govern your access to and use of ealana, an applicant
           tracking system and recruitment platform operated by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a>
-          {" "}("VantaHire," "we," "us," or "our").
+          {" "}("ealana," "we," "us," or "our").
         </p>
         <p>
-          By accessing or using VantaHire, you agree to be bound by these Terms. If you do not agree
+          By accessing or using ealana, you agree to be bound by these Terms. If you do not agree
           to these Terms, you may not access or use our services.
         </p>
         <p>
@@ -55,7 +55,7 @@ const sections: LegalSection[] = [
       <>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Account Types</h4>
-          <p>VantaHire offers different account types:</p>
+          <p>ealana offers different account types:</p>
           <div className={rolesGridCls}>
             {[
               { role: "Candidates", desc: "Individuals seeking employment who can apply to job postings" },
@@ -71,7 +71,7 @@ const sections: LegalSection[] = [
         </div>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Account Registration</h4>
-          <p>To use VantaHire, you must:</p>
+          <p>To use ealana, you must:</p>
           <ul className={listCls}>
             <li>Be at least 18 years of age</li>
             <li>Provide accurate and complete registration information</li>
@@ -97,7 +97,7 @@ const sections: LegalSection[] = [
     title: "Acceptable Use",
     content: (
       <>
-        <p>You agree to use VantaHire only for lawful purposes. You may not:</p>
+        <p>You agree to use ealana only for lawful purposes. You may not:</p>
         <ul className={listCls}>
           <li>Violate any applicable laws or regulations</li>
           <li>Infringe on intellectual property rights of others</li>
@@ -123,7 +123,7 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Your Content</h4>
           <p>
-            You retain ownership of content you submit to VantaHire (resumes, applications, job postings, etc.).
+            You retain ownership of content you submit to ealana (resumes, applications, job postings, etc.).
             By submitting content, you grant us a non-exclusive, worldwide, royalty-free license to use,
             store, and display your content for the purpose of providing our services.
           </p>
@@ -131,7 +131,7 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Our Content</h4>
           <p>
-            VantaHire's platform, design, features, and functionality are owned by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> and are protected by copyright, trademark, and other intellectual
+            ealana's platform, design, features, and functionality are owned by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> and are protected by copyright, trademark, and other intellectual
             property laws. You may not copy, modify, or distribute our content without permission.
           </p>
         </div>
@@ -160,7 +160,7 @@ const sections: LegalSection[] = [
             <li>You may not post discriminatory job listings</li>
             <li>You are responsible for reviewing applications and making hiring decisions</li>
             <li>You must handle candidate data in compliance with privacy laws</li>
-            <li>You may not use VantaHire for unlawful recruitment practices</li>
+            <li>You may not use ealana for unlawful recruitment practices</li>
           </ul>
         </div>
         <div className={subsectionCls}>
@@ -183,7 +183,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          VantaHire may offer paid features or subscription plans in the future. If you purchase
+          ealana may offer paid features or subscription plans in the future. If you purchase
           a subscription:
         </p>
         <ul className={listCls}>
@@ -205,7 +205,7 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>No Warranty</h4>
           <p>
-            VantaHire is provided "as is" without warranties of any kind, either express or implied.
+            ealana is provided "as is" without warranties of any kind, either express or implied.
             We do not guarantee that our services will be uninterrupted, error-free, or secure.
           </p>
         </div>
@@ -214,19 +214,19 @@ const sections: LegalSection[] = [
           <p>
             To the maximum extent permitted by law, <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> shall
             not be liable for any indirect, incidental, special, consequential, or punitive damages
-            arising from your use of VantaHire.
+            arising from your use of ealana.
           </p>
         </div>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Third-Party Services</h4>
           <p>
-            VantaHire may integrate with third-party services (Google Cloud, OpenAI, etc.).
+            ealana may integrate with third-party services (Google Cloud, OpenAI, etc.).
             We are not responsible for the availability or content of third-party services.
           </p>
         </div>
         <div className={highlightBoxPurple}>
           <AlertTriangle size={14} />
-          <span>Use of VantaHire's AI features is subject to these limitations. Always exercise independent judgement in hiring decisions.</span>
+          <span>Use of ealana's AI features is subject to these limitations. Always exercise independent judgement in hiring decisions.</span>
         </div>
       </>
     ),
@@ -247,7 +247,7 @@ const sections: LegalSection[] = [
           <li>Your violation of these Terms</li>
           <li>Your violation of any law or regulation</li>
           <li>Your infringement of third-party rights</li>
-          <li>Your use of VantaHire</li>
+          <li>Your use of ealana</li>
         </ul>
       </>
     ),
@@ -261,7 +261,7 @@ const sections: LegalSection[] = [
       <>
         <p>
           These Terms are governed by the laws of India. Any disputes arising from these Terms or
-          your use of VantaHire shall be resolved through binding arbitration in accordance with
+          your use of ealana shall be resolved through binding arbitration in accordance with
           Indian arbitration laws.
         </p>
         <p>
@@ -299,7 +299,7 @@ const sections: LegalSection[] = [
           </div>
           <div className={contactRowCls}>
             <Mail size={13} />
-            <span>legal@vantahire.com</span>
+            <span>legal@ealana.com</span>
           </div>
           <div className={contactSubjectCls}>Subject: Terms of Service Inquiry</div>
         </div>
@@ -312,24 +312,24 @@ export default function TermsOfServicePage() {
   return (
     <>
       <Helmet>
-        <title>Terms of Service | VantaHire</title>
-        <meta name="description" content="VantaHire Terms of Service. Read our terms and conditions for using our recruiter-first ATS platform." />
-        <link rel="canonical" href="https://vantahire.com/terms-of-service" />
-        <meta property="og:title" content="Terms of Service | VantaHire" />
-        <meta property="og:description" content="Terms and conditions for using VantaHire ATS platform." />
-        <meta property="og:url" content="https://vantahire.com/terms-of-service" />
+        <title>Terms of Service | ealana</title>
+        <meta name="description" content="ealana Terms of Service. Read our terms and conditions for using our recruiter-first ATS platform." />
+        <link rel="canonical" href="https://ealana.com/terms-of-service" />
+        <meta property="og:title" content="Terms of Service | ealana" />
+        <meta property="og:description" content="Terms and conditions for using ealana ATS platform." />
+        <meta property="og:url" content="https://ealana.com/terms-of-service" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
+        <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Terms of Service | VantaHire" />
-        <meta name="twitter:description" content="Terms and conditions for using VantaHire ATS platform." />
-        <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
+        <meta name="twitter:title" content="Terms of Service | ealana" />
+        <meta name="twitter:description" content="Terms and conditions for using ealana ATS platform." />
+        <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
       </Helmet>
 
       <LegalPageLayout
         sectionLabel="Terms of Service"
         heroTitle="Fair terms, clear expectations."
-        heroDesc="Please read these terms carefully before using VantaHire. They outline your rights, responsibilities, and the rules that govern our platform."
+        heroDesc="Please read these terms carefully before using ealana. They outline your rights, responsibilities, and the rules that govern our platform."
         lastUpdated="Last Updated: January 2025"
         sections={sections}
       />

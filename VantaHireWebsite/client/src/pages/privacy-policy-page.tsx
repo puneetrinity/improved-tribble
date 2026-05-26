@@ -1,4 +1,4 @@
-import { Helmet } from "react-helmet-async";
+﻿import { Helmet } from "react-helmet-async";
 import { Shield, Database, Eye, Lock, Mail, UserCheck, Clock, Cookie, Baby, FileText } from "lucide-react";
 import LegalPageLayout, { type LegalSection } from "@/components/LegalPageLayout";
 import {
@@ -40,13 +40,13 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          VantaHire, a brand of <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> ("we," "our," or "us"),
+          ealana, a brand of <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> ("we," "our," or "us"),
           is committed to protecting your privacy. This Privacy Policy explains how we collect,
           use, disclose, and safeguard your information when you use our applicant tracking system
           and recruitment platform.
         </p>
         <p>
-          By using VantaHire, you agree to the collection and use of information in accordance
+          By using ealana, you agree to the collection and use of information in accordance
           with this policy. If you do not agree with our policies and practices, please do not use our services.
         </p>
       </>
@@ -224,10 +224,10 @@ const sections: LegalSection[] = [
           comply with legal obligations. Specifically:
         </p>
         <ul className={listCls}>
-          <li><strong>Active accounts</strong> — Data retained while your account is active</li>
-          <li><strong>Inactive accounts</strong> — May be deleted after 2 years of inactivity</li>
-          <li><strong>Application data</strong> — Retained as long as the job posting is active plus 1 year</li>
-          <li><strong>Legal requirements</strong> — Data may be retained longer if required by law</li>
+          <li><strong>Active accounts</strong> â€” Data retained while your account is active</li>
+          <li><strong>Inactive accounts</strong> â€” May be deleted after 2 years of inactivity</li>
+          <li><strong>Application data</strong> â€” Retained as long as the job posting is active plus 1 year</li>
+          <li><strong>Legal requirements</strong> â€” Data may be retained longer if required by law</li>
         </ul>
       </>
     ),
@@ -257,7 +257,7 @@ const sections: LegalSection[] = [
     title: "Children's Privacy",
     content: (
       <p>
-        VantaHire is not intended for individuals under the age of 18. We do not knowingly collect
+        ealana is not intended for individuals under the age of 18. We do not knowingly collect
         personal information from children. If we become aware that we have collected data from a
         child, we will take steps to delete such information.
       </p>
@@ -275,7 +275,7 @@ const sections: LegalSection[] = [
           changes by posting the new policy on this page and updating the "Last Updated" date.
         </p>
         <p>
-          Your continued use of VantaHire after changes are posted constitutes acceptance of the updated policy.
+          Your continued use of ealana after changes are posted constitutes acceptance of the updated policy.
         </p>
       </>
     ),
@@ -296,7 +296,7 @@ const sections: LegalSection[] = [
           </div>
           <div className={contactRowCls}>
             <Mail size={13} />
-            <span>privacy@vantahire.com</span>
+            <span>privacy@ealana.com</span>
           </div>
           <div className={contactSubjectCls}>Subject: Privacy Policy Inquiry</div>
         </div>
@@ -309,18 +309,18 @@ export default function PrivacyPolicyPage() {
   return (
     <>
       <Helmet>
-        <title>Privacy Policy | VantaHire</title>
-        <meta name="description" content="VantaHire Privacy Policy. Learn how we collect, use, and protect your personal information when using our recruiter-first ATS platform." />
-        <link rel="canonical" href="https://vantahire.com/privacy-policy" />
-        <meta property="og:title" content="Privacy Policy | VantaHire" />
-        <meta property="og:description" content="Learn how VantaHire protects your privacy and handles your data." />
-        <meta property="og:url" content="https://vantahire.com/privacy-policy" />
+        <title>Privacy Policy | ealana</title>
+        <meta name="description" content="ealana Privacy Policy. Learn how we collect, use, and protect your personal information when using our recruiter-first ATS platform." />
+        <link rel="canonical" href="https://ealana.com/privacy-policy" />
+        <meta property="og:title" content="Privacy Policy | ealana" />
+        <meta property="og:description" content="Learn how ealana protects your privacy and handles your data." />
+        <meta property="og:url" content="https://ealana.com/privacy-policy" />
         <meta property="og:type" content="website" />
-        <meta property="og:image" content="https://vantahire.com/og-image.jpg" />
+        <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Privacy Policy | VantaHire" />
-        <meta name="twitter:description" content="Learn how VantaHire protects your privacy and handles your data." />
-        <meta name="twitter:image" content="https://vantahire.com/twitter-image.jpg" />
+        <meta name="twitter:title" content="Privacy Policy | ealana" />
+        <meta name="twitter:description" content="Learn how ealana protects your privacy and handles your data." />
+        <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
       </Helmet>
 
       <LegalPageLayout

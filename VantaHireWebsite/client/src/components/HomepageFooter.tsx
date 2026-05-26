@@ -1,5 +1,5 @@
-import { Link } from "wouter";
-import vantahireLogo from "@/assets/vantahire-logo.png";
+﻿import { Link } from "wouter";
+import ealanaMoth from "@/assets/ealana-moth (1).svg";
 
 const HomepageFooter = () => {
   const openCookiePreferences = () => {
@@ -13,9 +13,11 @@ const HomepageFooter = () => {
         <footer className="pt-14 px-12 pb-7 max-md:pt-10 max-md:px-5 max-md:pb-5 border-t-0">
           <div className="grid grid-cols-[2fr_repeat(3,1fr)] gap-10 max-w-[1100px] mx-auto mb-10 max-md:grid-cols-2 max-md:gap-6 max-sm:grid-cols-1 max-sm:gap-5">
             <div>
-              <div className="flex items-center gap-2 font-bold text-base text-hr-text mb-3 no-underline">
-                <img src={vantahireLogo} alt="VantaHire" width={24} height={24} className="h-6 w-auto" />
-                <span className="font-outfit bg-gradient-to-br from-[#a78bfa] to-[#fbbf24] bg-clip-text [-webkit-background-clip:text] [-webkit-text-fill-color:transparent]">VantaHire</span>
+              <div className="flex items-center gap-2.5 font-bold text-base text-hr-text mb-3 no-underline">
+                <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[radial-gradient(circle_at_30%_30%,rgba(75,142,240,0.22),transparent_58%),radial-gradient(circle_at_70%_70%,rgba(52,209,122,0.18),transparent_62%),rgba(255,255,255,0.03)] shadow-[0_0_30px_rgba(75,142,240,0.12)]">
+                  <img src={ealanaMoth} alt="ealana moth" width={26} height={26} className="h-[26px] w-[26px]" />
+                </div>
+                <span className="font-outfit text-[1.02rem] font-semibold tracking-[-0.02em] text-hr-text">ealana</span>
               </div>
               <p className="text-[0.82rem] text-hr-text-muted leading-[1.6] max-w-[260px]">AI-powered recruitment infrastructure for modern agencies. Source, engage, and place candidates faster.</p>
             </div>
@@ -32,8 +34,8 @@ const HomepageFooter = () => {
             <div>
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Company</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
-                <li><a href="https://cal.com/vantahire/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
-                <li><a href="mailto:hello@vantahire.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
+                <li><a href="https://cal.com/ealana/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
+                <li><a href="mailto:hello@ealana.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
               </ul>
             </div>
             <div>
@@ -55,8 +57,8 @@ const HomepageFooter = () => {
             </div>
           </div>
           <div className="max-w-[1100px] mx-auto pt-5 border-t border-[rgba(255,255,255,0.08)] flex items-center justify-between gap-4 text-[0.78rem] text-hr-text-muted max-md:flex-col max-md:text-center">
-            <span>© 2026 VantaHire. All rights reserved.</span>
-            <span>Made in India 🇮🇳</span>
+            <span>Copyright 2026 ealana. All rights reserved.</span>
+            <span>Made in India.</span>
           </div>
         </footer>
       </div>

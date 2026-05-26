@@ -21,6 +21,7 @@ import { AIActionsPanel } from "@/components/recruiter/AIActionsPanel";
 import { TodaysInterviewsPanel } from "@/components/recruiter/TodaysInterviewsPanel";
 import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
 import { useSubscription } from "@/hooks/use-subscription";
+import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 // Extended types for API responses with relations
 type ApplicationWithJob = Application & {
   job?: { title: string };
@@ -276,9 +277,7 @@ export default function RecruiterDashboard() {
     return (
       <Layout>
         <div className={cn(DASHBOARD_PAGE_BACKGROUND, "min-h-screen px-4 py-16 md:px-8")}>
-          <div className="flex items-center justify-center h-64">
-            <div className="text-muted-foreground">Loading...</div>
-          </div>
+          <BrandedLoadingScreen label="Loading your Flow dashboard..." />
         </div>
       </Layout>
     );
@@ -297,7 +296,7 @@ export default function RecruiterDashboard() {
                     <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.header.eyebrow}</p>
                     <div className="flex flex-wrap items-center gap-3">
                       <h1 className={cn(DASHBOARD_TITLE, "text-[28px] md:text-[34px]")}>{recruiterDashboardCopy.header.title}</h1>
-                      <Badge variant="outline" className="rounded-full border-[#D8DBE6] bg-white/80 px-3 py-1 text-xs font-semibold text-[#5B4FF7]">
+                      <Badge variant="outline" className="rounded-full border-[#D8DBE6] bg-white/80 px-3 py-1 text-xs font-semibold text-[#4B8EF0]">
                     {planName} Plan
                   </Badge>
                     </div>
@@ -309,7 +308,7 @@ export default function RecruiterDashboard() {
                     <Button
                       size="sm"
                       onClick={() => setLocation("/jobs/post")}
-                      className="h-11 rounded-2xl bg-[#5B4FF7] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(91,79,247,0.22)] hover:bg-[#4F46E5]"
+                      className="h-11 rounded-2xl bg-[#4B8EF0] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Post New Job

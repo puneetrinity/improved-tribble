@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useRoute, Link } from "wouter";
-import { CheckCircle, XCircle, Loader2, KeyRound } from "lucide-react";
+import { CheckCircle, XCircle, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Layout from "@/components/Layout";
 import { useToast } from "@/hooks/use-toast";
+import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 
 type ResetState = "form" | "loading" | "success" | "error" | "expired";
 
@@ -99,7 +100,7 @@ export default function ResetPasswordPage() {
             </CardHeader>
             <CardContent>
               <Link href="/recruiter-auth">
-                <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
+                <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                   Go to Login
                 </Button>
               </Link>
@@ -168,7 +169,7 @@ export default function ResetPasswordPage() {
 
                     <Button
                       type="submit"
-                      className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600"
+                      className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95"
                     >
                       Reset Password
                     </Button>
@@ -178,15 +179,9 @@ export default function ResetPasswordPage() {
             )}
 
             {state === "loading" && (
-              <CardHeader className="text-center">
-                <div className="flex justify-center mb-4">
-                  <Loader2 className="h-16 w-16 text-primary animate-spin" />
-                </div>
-                <CardTitle className="text-foreground text-2xl">Resetting password...</CardTitle>
-                <CardDescription className="text-muted-foreground/50">
-                  Please wait while we reset your password.
-                </CardDescription>
-              </CardHeader>
+              <CardContent className="p-4">
+                <BrandedLoadingScreen label="Resetting your password..." />
+              </CardContent>
             )}
 
             {state === "success" && (
@@ -204,7 +199,7 @@ export default function ResetPasswordPage() {
                 </CardHeader>
                 <CardContent>
                   <Link href="/recruiter-auth">
-                    <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
+                    <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                       Continue to Login
                     </Button>
                   </Link>
@@ -230,7 +225,7 @@ export default function ResetPasswordPage() {
                     The reset link may be invalid or already used.
                   </p>
                   <Link href="/recruiter-auth">
-                    <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
+                    <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                       Go to Login
                     </Button>
                   </Link>
@@ -256,7 +251,7 @@ export default function ResetPasswordPage() {
                     Please request a new password reset link.
                   </p>
                   <Link href="/recruiter-auth">
-                    <Button className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600">
+                    <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                       Go to Login
                     </Button>
                   </Link>

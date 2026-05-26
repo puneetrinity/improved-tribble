@@ -1,7 +1,7 @@
-import { trackEvent } from "@/lib/analytics";
+﻿import { trackEvent } from "@/lib/analytics";
 import { btnPrimary, btnSecondary } from "@/lib/shared-styles";
 
-/* ── Reusable class-string constants ── */
+/* â”€â”€ Reusable class-string constants â”€â”€ */
 const structuralDiv = "max-md:hidden";
 const navItem = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-[#9ca3af] cursor-default";
 const navItemActive = "flex items-center gap-2.5 py-[7px] px-4 text-[0.75rem] text-[#1a1a2e] bg-[rgba(0,0,0,0.03)] cursor-default";
@@ -40,7 +40,7 @@ const metricSubLabel = "text-[0.55rem] text-[#9ca3af] mb-1";
 const Hero = () => {
   const openCalendar = () => {
     trackEvent("cta_click", { location: "home_hero", action: "book_demo" });
-    window.open('https://cal.com/vantahire/quick-connect', '_blank');
+    window.open('https://cal.com/ealana/quick-connect', '_blank');
   };
 
   return (
@@ -62,7 +62,7 @@ const Hero = () => {
           <h1 className="font-satoshi text-[clamp(2.8rem,5.5vw,4rem)] max-md:text-[clamp(2rem,8vw,2.8rem)] max-sm:text-[1.85rem] font-normal leading-[1.15] tracking-tight text-hr-text mb-7">Make better hires, faster.</h1>
 
           <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto mb-9 font-normal max-md:text-[0.88rem]">
-            VantaHire is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows.
+            ealana is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows.
           </p>
 
           <div className="flex items-center justify-center gap-3 mb-[18px] max-md:flex-col max-md:w-full">
@@ -98,13 +98,13 @@ const Hero = () => {
                 <span className="w-2.5 h-2.5 rounded-full bg-[rgba(0,0,0,0.1)]"></span>
                 <span className="w-2.5 h-2.5 rounded-full bg-[rgba(0,0,0,0.1)]"></span>
               </div>
-              <div className="flex-1 text-center font-mono text-[0.65rem] text-[#9ca3af]">app.vantahire.com / Analytics / Pipeline Intelligence</div>
+              <div className="flex-1 text-center font-mono text-[0.65rem] text-[#9ca3af]">app.ealana.com / Analytics / Pipeline Intelligence</div>
               <div className="flex gap-1.5 items-center">
-                <span className="text-[0.6rem] text-[#9ca3af] py-[3px] px-2 border border-[rgba(0,0,0,0.08)] rounded-[3px] flex items-center gap-1">↗ Share</span>
-                <span className="text-[0.6rem] text-[#9ca3af]">☆</span>
-                <span className="text-[0.6rem] text-[#9ca3af]">⚡</span>
-                <span className="text-[0.6rem] text-[#9ca3af]">⛶</span>
-                <span className="text-[0.6rem] text-[#9ca3af]">⋯</span>
+                <span className="text-[0.6rem] text-[#9ca3af] py-[3px] px-2 border border-[rgba(0,0,0,0.08)] rounded-[3px] flex items-center gap-1">â†— Share</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">â˜†</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">âš¡</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">â›¶</span>
+                <span className="text-[0.6rem] text-[#9ca3af]">â‹¯</span>
               </div>
             </div>
             <div className="flex min-h-[480px]">
@@ -112,27 +112,27 @@ const Hero = () => {
               <div className="w-[190px] bg-[#f7f8fa] border-r border-[rgba(0,0,0,0.08)] py-3.5 shrink-0 max-md:hidden">
                 <div className="px-4 pb-3.5 pt-0.5 font-bold text-[0.82rem] text-[#1a1a2e] flex items-center gap-2 border-b border-[rgba(0,0,0,0.08)] mb-1.5">
                   <span className="w-5 h-5 bg-hr-accent rounded-[5px] flex items-center justify-center text-[0.55rem] font-extrabold text-white">V</span>
-                  VantaHire
+                  ealana
                 </div>
                 <div className="mx-3 my-2 py-[5px] px-2.5 text-[0.65rem] text-[#4a5568] border border-[rgba(0,0,0,0.08)] rounded-[5px] bg-transparent flex items-center justify-between">
-                  FlowHire [INT] <span className="text-[#9ca3af] text-[0.5rem]">⇅</span>
+                  FlowHire [INT] <span className="text-[#9ca3af] text-[0.5rem]">â‡…</span>
                 </div>
-                <div className={navItem}><span className={navIcon}>⌂</span> Home</div>
-                <div className={navItem}><span className={navIcon}>👤</span> Candidates</div>
-                <div className={navItem}><span className={navIcon}>🔍</span> Sourcing</div>
-                <div className={navItem}><span className={navIcon}>📨</span> Outreach</div>
-                <div className={navItem}><span className={navIcon}>🎤</span> Interviews</div>
-                <div className={navItem}><span className={navIcon}>📊</span> Reports</div>
-                <div className={navItemActive}><span className={navIcon}>📈</span> Analytics</div>
+                <div className={navItem}><span className={navIcon}>âŒ‚</span> Home</div>
+                <div className={navItem}><span className={navIcon}>ðŸ‘¤</span> Candidates</div>
+                <div className={navItem}><span className={navIcon}>ðŸ”</span> Sourcing</div>
+                <div className={navItem}><span className={navIcon}>ðŸ“¨</span> Outreach</div>
+                <div className={navItem}><span className={navIcon}>ðŸŽ¤</span> Interviews</div>
+                <div className={navItem}><span className={navIcon}>ðŸ“Š</span> Reports</div>
+                <div className={navItemActive}><span className={navIcon}>ðŸ“ˆ</span> Analytics</div>
                 <div className="pl-10">
                   <div className={navSubItemActive}>Pipeline Intelligence</div>
                   <div className={navSubItem}>Team Performance</div>
                 </div>
                 <div className="h-px bg-[rgba(0,0,0,0.08)] my-2"></div>
-                <div className={navItem}><span className={navIcon}>⚙</span> Settings</div>
-                <div className={navItem}><span className={navIcon}>🔗</span> Integrations</div>
-                <div className={navItem}><span className={navIcon}>🔒</span> Permissions</div>
-                <div className={navItem}><span className={navIcon}>⚡</span> Automations</div>
+                <div className={navItem}><span className={navIcon}>âš™</span> Settings</div>
+                <div className={navItem}><span className={navIcon}>ðŸ”—</span> Integrations</div>
+                <div className={navItem}><span className={navIcon}>ðŸ”’</span> Permissions</div>
+                <div className={navItem}><span className={navIcon}>âš¡</span> Automations</div>
               </div>
 
               {/* Main */}
@@ -142,7 +142,7 @@ const Hero = () => {
                 </div>
 
                 <div className="flex items-center gap-3 mb-4 flex-wrap">
-                  <div className="font-mono text-[0.62rem] text-[#4a5568] py-[5px] px-2.5 border border-[rgba(0,0,0,0.08)] rounded flex items-center gap-1.5">📅 Mar 1, 2026 - Mar 21, 2026 ⇅</div>
+                  <div className="font-mono text-[0.62rem] text-[#4a5568] py-[5px] px-2.5 border border-[rgba(0,0,0,0.08)] rounded flex items-center gap-1.5">ðŸ“… Mar 1, 2026 - Mar 21, 2026 â‡…</div>
                   <div className="flex">
                     <div className={timeTab}>Today</div>
                     <div className={timeTab}>Yesterday</div>
@@ -152,9 +152,9 @@ const Hero = () => {
                     <div className={timeTab}>6M</div>
                   </div>
                   <div className="ml-auto flex gap-1.5">
-                    <div className={filterBtn}># Metric ▾</div>
-                    <div className={filterBtn}>Exclude ▾</div>
-                    <div className={filterBtn}>Compare ▾</div>
+                    <div className={filterBtn}># Metric â–¾</div>
+                    <div className={filterBtn}>Exclude â–¾</div>
+                    <div className={filterBtn}>Compare â–¾</div>
                   </div>
                 </div>
 
@@ -180,8 +180,8 @@ const Hero = () => {
                 <div className="flex items-center justify-between mb-3.5">
                   <span className="text-[0.8rem] font-semibold text-[#1a1a2e]">Pipeline Overview</span>
                   <div className="flex gap-2">
-                    <span className={pipelineActionSpan}>✨ AI Insights</span>
-                    <span className={pipelineActionSpan}>Export ↗</span>
+                    <span className={pipelineActionSpan}>âœ¨ AI Insights</span>
+                    <span className={pipelineActionSpan}>Export â†—</span>
                   </div>
                 </div>
 
@@ -219,9 +219,9 @@ const Hero = () => {
                 <div className="flex items-center justify-between mb-2.5">
                   <span className="text-[0.78rem] font-semibold text-[#1a1a2e]">Pipeline Impact</span>
                   <div className="flex gap-1.5">
-                    <span className={tableActionSpan}>🔍 Search</span>
-                    <span className={tableActionSpan}>⚡ Filters ▾</span>
-                    <span className={tableActionSpan}>Export ↗</span>
+                    <span className={tableActionSpan}>ðŸ” Search</span>
+                    <span className={tableActionSpan}>âš¡ Filters â–¾</span>
+                    <span className={tableActionSpan}>Export â†—</span>
                   </div>
                 </div>
 
@@ -274,31 +274,31 @@ const Hero = () => {
                   <div className={metricItem}>
                     <span className={metricLetter} style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>A</span>
                     Candidate Added
-                    <span className={metricArrow}>›</span>
+                    <span className={metricArrow}>â€º</span>
                   </div>
                   <div className={metricItem}>
                     <span className={metricLetter} style={{ background: 'rgba(16,185,129,0.2)', color: '#10B981' }}>B</span>
                     Outreach Sent
-                    <span className={metricArrow}>›</span>
+                    <span className={metricArrow}>â€º</span>
                   </div>
                   <div className={metricItem}>
                     <span className={metricLetter} style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B' }}>C</span>
                     Reply Received
-                    <span className={metricArrow}>›</span>
+                    <span className={metricArrow}>â€º</span>
                   </div>
                   <div className={metricItem}>
                     <span className={metricLetter} style={{ background: 'rgba(6,182,212,0.2)', color: '#06B6D4' }}>D</span>
                     Interview Completed
-                    <span className={metricArrow}>›</span>
+                    <span className={metricArrow}>â€º</span>
                   </div>
                   <div className={metricItem}>
                     <span className={metricLetter} style={{ background: 'rgba(139,92,246,0.2)', color: '#8B5CF6' }}>E</span>
                     Offer Accepted
-                    <span className={metricArrow}>›</span>
+                    <span className={metricArrow}>â€º</span>
                   </div>
                   <div className="flex gap-2 mt-2 px-1.5">
-                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]"># User ▾</span>
-                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Uniques ▾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]"># User â–¾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Uniques â–¾</span>
                   </div>
                 </div>
 
@@ -306,16 +306,16 @@ const Hero = () => {
                   <div className={metricGroupLabel}><span className={metricGroupNum}>2</span> Outreach engagement</div>
                   <div className={`${metricSubLabel} px-1.5`}>Event: <span className="text-[#4a5568]">Event Count</span></div>
                   <div className={metricItem}>
-                    <span className={metricLetter} style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>📧</span>
+                    <span className={metricLetter} style={{ background: 'rgba(124,58,237,0.2)', color: '#A78BFA' }}>ðŸ“§</span>
                     Email Opened
-                    <span className={metricArrow}>›</span>
+                    <span className={metricArrow}>â€º</span>
                   </div>
                   <div className="p-1.5 text-[0.52rem] text-[#9ca3af] flex items-center gap-1">
-                    ⊕ Add Event
+                    âŠ• Add Event
                   </div>
                   <div className="flex gap-2 px-1.5">
-                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Breakdown ▾</span>
-                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Recruiter ▾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Breakdown â–¾</span>
+                    <span className="text-[0.52rem] text-[#9ca3af] py-0.5 px-1.5 border border-[rgba(0,0,0,0.08)] rounded-[3px]">Recruiter â–¾</span>
                   </div>
                 </div>
 

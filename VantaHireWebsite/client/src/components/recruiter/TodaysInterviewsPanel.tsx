@@ -106,7 +106,7 @@ function splitInterviewTime(value: string | null): { time: string; meridiem: str
 function statusDotClass(status: InterviewStatus): string {
   if (status === "completed") return "bg-[#22C55E]";
   if (status === "upcoming") return "bg-[#F59E0B]";
-  return "bg-[#4F46E5]";
+  return "bg-[#4B8EF0]";
 }
 
 function avatarFallbackClass(name: string): string {
@@ -170,7 +170,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
           <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.interviewsPanel.eyebrow}</p>
           <div className="flex items-center gap-3">
             <h2 className={cn(DASHBOARD_TITLE, "text-base")}>{recruiterDashboardCopy.interviewsPanel.title}</h2>
-            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#F1EEFF] px-2 text-[11px] font-medium text-[#5B4FF7]">
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#EEF5FF] px-2 text-[11px] font-medium text-[#4B8EF0]">
               {count}
             </span>
           </div>
@@ -180,7 +180,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
       <div className="mt-4 flex flex-wrap items-center gap-2 text-[11px] font-medium text-[#7B8497]">
         <span className="rounded-full bg-[#F3F4F8] px-3 py-1">{recruiterDashboardCopy.interviewsPanel.hint}</span>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8F9FC] px-3 py-1">
-          <span className="h-2 w-2 rounded-full bg-[#4F46E5]" />
+          <span className="h-2 w-2 rounded-full bg-[#4B8EF0]" />
           {recruiterDashboardCopy.interviewsPanel.statuses.scheduled}
         </span>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF6E8] px-3 py-1">
@@ -219,7 +219,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
                 className={cn(
                   "flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-medium leading-none transition-all md:h-[42px] md:w-[42px] md:text-[14px]",
                   isSelected
-                    ? "border-[#5B4FF7] bg-[#5B4FF7] text-white shadow-[0_8px_18px_rgba(91,79,247,0.22)]"
+                    ? "border-[#4B8EF0] bg-[#4B8EF0] text-white shadow-[0_8px_18px_rgba(75,142,240,0.24)]"
                     : "border-[#ECEEF3] bg-[#FAFAFC] text-[#B8BDC8]",
                   !isSelected && isWeekend && "text-[#CDD1DA]",
                   isSelected && "font-semibold",
@@ -227,7 +227,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
               >
                 {date.getDate()}
               </span>
-              <span className={cn("h-1 w-1 rounded-full", day.count > 0 ? "bg-[#5B4FF7]" : "bg-transparent")} />
+              <span className={cn("h-1 w-1 rounded-full", day.count > 0 ? "bg-[#4B8EF0]" : "bg-transparent")} />
             </button>
           );
         })}
@@ -236,7 +236,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
       <div
         ref={listRef}
         className={cn(
-          "interview-list mt-6 space-y-4 overflow-y-auto pr-1 transition-[overflow,opacity] duration-150 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#C4C0FF] [&::-webkit-scrollbar-thumb:hover]:bg-[#6C63FF] [&::-webkit-scrollbar-track]:bg-transparent md:h-[272px] md:overflow-y-hidden md:hover:[scrollbar-color:#C4C0FF_transparent] md:[.interview-panel:hover_&]:overflow-y-auto xl:h-[248px]",
+          "interview-list mt-6 space-y-4 overflow-y-auto pr-1 transition-[overflow,opacity] duration-150 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#B8D5FF] [&::-webkit-scrollbar-thumb:hover]:bg-[#4B8EF0] [&::-webkit-scrollbar-track]:bg-transparent md:h-[272px] md:overflow-y-hidden md:hover:[scrollbar-color:#B8D5FF_transparent] md:[.interview-panel:hover_&]:overflow-y-auto xl:h-[248px]",
           isFetching && !isLoading && "opacity-70",
         )}
       >
@@ -309,7 +309,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
                       {item.jobTitle}
                     </div>
                     {item.aiFitLabel && (
-                      <span className="mt-2 inline-flex rounded-[6px] bg-[#EEEBFF] px-2.5 py-1 text-[11px] font-medium leading-none text-[#5B4FF7]">
+                      <span className="mt-2 inline-flex rounded-[6px] bg-[#EEF5FF] px-2.5 py-1 text-[11px] font-medium leading-none text-[#4B8EF0]">
                         {item.aiFitLabel}
                       </span>
                     )}
@@ -322,7 +322,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
                     className={cn(
                       "h-11 min-w-[44px] rounded-[10px] px-4 py-2 text-[13px] font-semibold leading-none shadow-none",
                       isPrimaryAction
-                        ? "bg-[#5B4FF7] text-white hover:bg-[#4F46E5]"
+                        ? "bg-[#4B8EF0] text-white hover:bg-[#3679DB]"
                         : "border-0 bg-[#F0F0F0] text-[#4B5563] hover:bg-[#E9E9E9]",
                     )}
                     onClick={(event) => event.stopPropagation()}

@@ -130,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["/api/user"], response);
       toast({
         title: "Registration successful",
-        description: "Welcome to VantaHire!",
+        description: "Welcome to ealana!",
       });
     },
     onError: (error: Error) => {

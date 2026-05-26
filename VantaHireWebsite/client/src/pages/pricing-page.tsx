@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
@@ -44,10 +44,11 @@ import GridOverlay from "@/components/GridOverlay";
 import { sectionLabel } from "@/lib/shared-styles";
 import { apiRequest } from "@/lib/queryClient";
 
-const planBtnBase = "block w-full py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
-const planBtnPrimary = `${planBtnBase} bg-hr-accent text-white border-none hover:bg-hr-accent-hover`;
-const planBtnSecondary = `${planBtnBase} bg-transparent text-hr-text border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.25)]`;
-const planFeatureLi = "flex items-start gap-2.5 text-[0.88rem] text-hr-text-secondary leading-[1.4]";
+const planBtnBase = "block w-full py-3 px-6 rounded-xl font-ui text-[0.875rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
+const planBtnPrimary = `${planBtnBase} bg-e-blue text-white border-none hover:brightness-110`;
+const planBtnSecondary = `${planBtnBase} bg-transparent text-e-text border border-white/10 hover:border-white/25 hover:bg-white/[0.03]`;
+const planFeatureLi = "flex items-start gap-2.5 text-[0.88rem] text-e-text2 leading-[1.5]";
+const marketingCard = "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.03)_100%)] shadow-[0_20px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl";
 
 export default function PricingPage() {
   const { user } = useAuth();
@@ -97,7 +98,7 @@ export default function PricingPage() {
 
   const formatMetric = (value?: number | null) => {
     if (typeof value !== "number" || value <= 0) {
-      return "—";
+      return "â€”";
     }
     return String(value);
   };
@@ -264,7 +265,7 @@ export default function PricingPage() {
   const isCheckoutPending = publicCheckout.isPending || createOrgCheckout.isPending || createCheckout.isPending;
 
   const handleContactSales = () => {
-    window.location.href = 'mailto:sales@vantahire.com?subject=VantaHire%20Business%20Plan%20Inquiry';
+    window.location.href = 'mailto:sales@ealana.com?subject=ealana%20Business%20Plan%20Inquiry';
   };
 
   const renderFeatureValue = (value: boolean | string) => {
@@ -281,25 +282,45 @@ export default function PricingPage() {
   return (
     <>
       <Helmet>
-        <title>Pricing | VantaHire - Simple, Transparent Pricing</title>
+        <title>Pricing | ealana - Simple, Transparent Pricing</title>
         <meta name="description" content="Simple pricing. No surprises. Start free, upgrade when your team grows. No long contracts. AI sourcing, WhatsApp outreach, client portal, and pipeline management included." />
-        <link rel="canonical" href="https://vantahire.com/pricing" />
-        <meta property="og:title" content="Pricing | VantaHire - Simple, Transparent Pricing" />
+        <link rel="canonical" href="https://ealana.com/pricing" />
+        <meta property="og:title" content="Pricing | ealana - Simple, Transparent Pricing" />
         <meta property="og:description" content="Simple pricing. No surprises. Start free, upgrade when your team grows." />
-        <meta property="og:url" content="https://vantahire.com/pricing" />
+        <meta property="og:url" content="https://ealana.com/pricing" />
         <meta property="og:type" content="website" />
       </Helmet>
 
-      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
+      <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme min-h-screen">
         <GridOverlay />
         <div className="relative z-10">
           <HomepageNav />
 
           {/* Hero */}
-          <div className="pt-[140px] px-12 pb-20 text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-12">
-            <div className={sectionLabel}>Pricing</div>
-            <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] font-normal leading-[1.2] tracking-tight mb-5 text-hr-text">Simple pricing.<br />No surprises.</h1>
-            <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[540px] mx-auto">
+          <div className="relative pt-[140px] px-12 pb-20 text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-12">
+            <div
+              className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[760px] -translate-x-1/2"
+              style={{
+                background: "radial-gradient(ellipse, rgba(75,142,240,0.12) 0%, rgba(52,209,122,0.06) 42%, transparent 72%)",
+                filter: "blur(80px)",
+              }}
+            />
+            <div className={`${sectionLabel} relative text-e-blue`}>Pricing</div>
+            <h1 className="relative font-display text-[clamp(2.8rem,5vw,4.5rem)] font-medium leading-[1.05] tracking-[-0.03em] mb-5 text-e-text">
+              Simple pricing.
+              <br />
+              <span
+                style={{
+                  fontStyle: "italic",
+                  background: "linear-gradient(135deg, #4B8EF0 0%, #34D17A 100%)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                }}
+              >
+                No surprises.
+              </span>
+            </h1>
+            <p className="relative text-base leading-[1.8] text-e-text2 max-w-[540px] mx-auto">
               Start free. Upgrade when your team grows. No long contracts. No hidden fees.
             </p>
           </div>
@@ -310,22 +331,22 @@ export default function PricingPage() {
             style={{ animation: 'hr-fade-up 0.9s ease-out 0.15s both' }}
           >
             {/* Free Plan */}
-            <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <Users size={18} style={{ color: '#8A8A9A' }} />
+            <div className={`${marketingCard} py-8 px-7 flex flex-col relative transition-all duration-300 hover:border-white/20 hover:-translate-y-1`}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <Users size={18} style={{ color: '#8891AA' }} />
               </div>
-              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Free</div>
-              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{freePlanCard?.summary || "Get started in minutes"}</div>
-              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">
+              <div className="font-display text-[1.35rem] font-medium text-e-text mb-1">Free</div>
+              <div className="text-[0.85rem] text-e-text2 leading-[1.6] mb-6">{freePlanCard?.summary || "Get started in minutes"}</div>
+              <div className="font-display text-[2.7rem] font-semibold text-e-text leading-none mb-1">
                 {formatPriceINR(0)}
-                <span className="text-[0.85rem] font-normal text-hr-text-muted font-dm"> /month</span>
+                <span className="text-[0.85rem] font-normal text-e-text2 font-ui"> /month</span>
               </div>
-              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">&nbsp;</div>
-              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
+              <div className="text-[0.72rem] text-e-text3 mb-6 font-ui">&nbsp;</div>
+              <div className="h-px bg-white/8 mb-5"></div>
               <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(freePlanCard?.highlights ?? []).map((highlight) => (
                   <li key={highlight} className={planFeatureLi}>
-                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-e-green" />
                     {highlight}
                   </li>
                 ))}
@@ -340,26 +361,31 @@ export default function PricingPage() {
             </div>
 
             {/* Growth Plan */}
-            <div className="bg-[linear-gradient(165deg,rgba(124,58,237,0.08)_0%,#111116_40%)] border-2 border-hr-accent rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 max-md:-order-1">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 font-mono text-[0.68rem] font-medium tracking-[0.08em] uppercase bg-hr-accent text-white py-1 px-4 whitespace-nowrap">Most Popular</div>
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(124,58,237,0.15)' }}>
-                <Zap size={18} style={{ color: '#A78BFA' }} />
+            <div className="rounded-[26px] py-8 px-7 flex flex-col relative transition-all duration-300 max-md:-order-1 hover:-translate-y-1"
+              style={{
+                background: "linear-gradient(180deg, rgba(75,142,240,0.18) 0%, rgba(17,19,38,0.96) 24%, rgba(13,15,30,0.98) 100%)",
+                border: "1px solid rgba(75,142,240,0.4)",
+                boxShadow: "0 24px 90px rgba(75,142,240,0.16), inset 0 1px 0 rgba(255,255,255,0.08)",
+              }}>
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2 font-mono text-[0.68rem] font-medium tracking-[0.08em] uppercase bg-e-blue text-white py-1 px-4 rounded-full whitespace-nowrap">Most Popular</div>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(75,142,240,0.16)' }}>
+                <Zap size={18} style={{ color: '#4B8EF0' }} />
               </div>
-              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Growth</div>
-              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{proPlanCard?.summary || "Scale your hiring output"}</div>
-              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">
+              <div className="font-display text-[1.35rem] font-medium text-e-text mb-1">Growth</div>
+              <div className="text-[0.85rem] text-e-text2 leading-[1.6] mb-6">{proPlanCard?.summary || "Scale your hiring output"}</div>
+              <div className="font-display text-[2.7rem] font-semibold text-e-text leading-none mb-1">
                 {proPlan ? formatPriceINR(proPlan.pricePerSeatMonthly) : '...'}
-                <span className="text-[0.85rem] font-normal text-hr-text-muted font-dm"> /seat/month</span>
+                <span className="text-[0.85rem] font-normal text-e-text2 font-ui"> /seat/month</span>
               </div>
-              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">
+              <div className="text-[0.72rem] text-e-text3 mb-6 font-ui">
                 {taxEnabled ? `+ GST (${gstRate}%) | Save with annual billing` : 'Save with annual billing'}
               </div>
-              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
-              <div className="text-[0.72rem] text-hr-text-muted mb-3 font-mono tracking-[0.04em] uppercase">Everything in Free, plus:</div>
+              <div className="h-px bg-white/10 mb-5"></div>
+              <div className="text-[0.72rem] text-e-text3 mb-3 font-mono tracking-[0.04em] uppercase">Everything in Free, plus:</div>
               <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(proPlanCard?.highlights ?? []).map((highlight) => (
                   <li key={highlight} className={planFeatureLi}>
-                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-e-green" />
                     {highlight.includes("top-ups") ? creditPackLabel : highlight}
                   </li>
                 ))}
@@ -374,20 +400,20 @@ export default function PricingPage() {
             </div>
 
             {/* Enterprise Plan */}
-            <div className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-[10px] py-8 px-7 flex flex-col relative transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
-              <div className="w-9 h-9 rounded-lg flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                <Building2 size={18} style={{ color: '#8A8A9A' }} />
+            <div className={`${marketingCard} py-8 px-7 flex flex-col relative transition-all duration-300 hover:border-white/20 hover:-translate-y-1`}>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                <Building2 size={18} style={{ color: '#8891AA' }} />
               </div>
-              <div className="font-satoshi text-[1.3rem] font-medium text-hr-text mb-1">Enterprise</div>
-              <div className="text-[0.85rem] text-hr-text-muted leading-[1.5] mb-6">{businessPlanCard?.summary || "Custom fit for large teams"}</div>
-              <div className="font-satoshi text-[2.4rem] font-bold text-hr-text leading-none mb-1">Custom</div>
-              <div className="text-[0.72rem] text-hr-text-muted mb-6 font-dm">Tailored to your needs</div>
-              <div className="h-px bg-[rgba(255,255,255,0.08)] mb-5"></div>
-              <div className="text-[0.72rem] text-hr-text-muted mb-3 font-mono tracking-[0.04em] uppercase">Everything in Growth, plus:</div>
+              <div className="font-display text-[1.35rem] font-medium text-e-text mb-1">Enterprise</div>
+              <div className="text-[0.85rem] text-e-text2 leading-[1.6] mb-6">{businessPlanCard?.summary || "Custom fit for large teams"}</div>
+              <div className="font-display text-[2.7rem] font-semibold text-e-text leading-none mb-1">Custom</div>
+              <div className="text-[0.72rem] text-e-text3 mb-6 font-ui">Tailored to your needs</div>
+              <div className="h-px bg-white/8 mb-5"></div>
+              <div className="text-[0.72rem] text-e-text3 mb-3 font-mono tracking-[0.04em] uppercase">Everything in Growth, plus:</div>
               <ul className="list-none p-0 mb-7 flex flex-col gap-2.5 flex-1">
                 {(businessPlanCard?.highlights ?? []).slice(1).map((highlight) => (
                   <li key={highlight} className={planFeatureLi}>
-                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-hr-green" />
+                    <Check size={16} className="w-4 h-4 shrink-0 mt-0.5 text-e-green" />
                     {highlight}
                   </li>
                 ))}
@@ -406,27 +432,27 @@ export default function PricingPage() {
                 className="max-w-[1100px] mx-auto mb-[100px] px-12 max-md:px-5 max-md:overflow-x-auto"
                 style={{ animation: 'hr-fade-up 0.9s ease-out 0.3s both' }}
               >
-                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-10 text-hr-text text-center">Compare plans side by side</h2>
+                <h2 className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-medium leading-[1.1] tracking-[-0.025em] mb-10 text-e-text text-center">Compare plans side by side</h2>
                 <div style={{ overflowX: 'auto' }}>
-                  <table className="w-full border border-[rgba(255,255,255,0.08)] rounded-[10px] overflow-hidden border-separate max-md:min-w-[560px]" style={{ borderSpacing: 0 }}>
+                  <table className="w-full border border-white/10 rounded-[24px] overflow-hidden border-separate max-md:min-w-[560px] bg-[rgba(255,255,255,0.03)] backdrop-blur-xl" style={{ borderSpacing: 0 }}>
                     <thead>
                       <tr>
-                        <th className="py-4 px-5 text-left font-mono text-[0.72rem] font-semibold tracking-[0.06em] uppercase text-hr-text-muted bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Feature</th>
-                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-text text-center bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Free</th>
-                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-accent-hover text-center bg-[rgba(124,58,237,0.08)] border-b border-[rgba(255,255,255,0.08)]">Growth</th>
-                        <th className="py-4 px-5 font-dm text-[0.82rem] font-semibold text-hr-text text-center bg-hr-bg-elevated border-b border-[rgba(255,255,255,0.08)]">Enterprise</th>
+                        <th className="py-4 px-5 text-left font-mono text-[0.72rem] font-semibold tracking-[0.06em] uppercase text-e-text3 bg-white/[0.05] border-b border-white/8">Feature</th>
+                        <th className="py-4 px-5 font-ui text-[0.82rem] font-semibold text-e-text text-center bg-white/[0.05] border-b border-white/8">Free</th>
+                        <th className="py-4 px-5 font-ui text-[0.82rem] font-semibold text-e-blue text-center bg-[rgba(75,142,240,0.09)] border-b border-white/8">Growth</th>
+                        <th className="py-4 px-5 font-ui text-[0.82rem] font-semibold text-e-text text-center bg-white/[0.05] border-b border-white/8">Enterprise</th>
                       </tr>
                     </thead>
                     <tbody>
                       {comparisonRows.map((feature, idx) => {
                         const isLast = idx === comparisonRows.length - 1;
-                        const borderClass = isLast ? '' : 'border-b border-[rgba(255,255,255,0.08)]';
+                        const borderClass = isLast ? '' : 'border-b border-white/8';
                         return (
                           <tr key={feature.name} className="group">
-                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text font-normal text-left bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{feature.name}</td>
-                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{renderFeatureValue(feature.free)}</td>
-                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-[rgba(124,58,237,0.03)] ${borderClass} group-hover:bg-[rgba(124,58,237,0.05)]`}>{renderFeatureValue(feature.pro)}</td>
-                            <td className={`py-3 px-5 text-[0.85rem] text-hr-text-secondary text-center bg-hr-bg ${borderClass} group-hover:bg-[rgba(255,255,255,0.02)]`}>{renderFeatureValue(feature.business)}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-e-text font-normal text-left bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04]`}>{feature.name}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-e-text2 text-center bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04]`}>{renderFeatureValue(feature.free)}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-e-text2 text-center bg-[rgba(75,142,240,0.04)] ${borderClass} group-hover:bg-[rgba(75,142,240,0.08)]`}>{renderFeatureValue(feature.pro)}</td>
+                            <td className={`py-3 px-5 text-[0.85rem] text-e-text2 text-center bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04]`}>{renderFeatureValue(feature.business)}</td>
                           </tr>
                         );
                       })}
@@ -446,12 +472,12 @@ export default function PricingPage() {
                 className="max-w-[720px] mx-auto mb-[100px] px-12 max-md:px-5"
                 style={{ animation: 'hr-fade-up 0.9s ease-out 0.4s both' }}
               >
-                <div className={`${sectionLabel} text-center`}>FAQ</div>
-                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-10 text-hr-text text-center">Pricing questions, answered.</h2>
+                <div className={`${sectionLabel} text-center text-e-blue`}>FAQ</div>
+                <h2 className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-medium leading-[1.1] tracking-[-0.025em] mb-10 text-e-text text-center">Pricing questions, answered.</h2>
                 {faqs.map((faq, i) => (
-                  <div key={i} className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-lg py-6 px-7 mb-3 transition-colors duration-200 hover:border-[rgba(255,255,255,0.12)]">
-                    <h3 className="font-satoshi text-base font-medium text-hr-text mb-2">{faq.question}</h3>
-                    <p className="text-[0.875rem] text-hr-text-secondary leading-[1.7]">{faq.answer}</p>
+                  <div key={i} className={`${marketingCard} py-6 px-7 mb-3 transition-all duration-200 hover:border-white/20`}>
+                    <h3 className="font-display text-base font-medium text-e-text mb-2">{faq.question}</h3>
+                    <p className="text-[0.875rem] text-e-text2 leading-[1.8]">{faq.answer}</p>
                   </div>
                 ))}
               </div>
@@ -463,16 +489,16 @@ export default function PricingPage() {
           <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
             <div></div>
             <div>
-              <div className="text-center py-20 px-12 pb-[100px] border-t border-[rgba(255,255,255,0.08)] max-md:py-[60px] max-md:px-5">
-                <div className={sectionLabel}>Get Started</div>
-                <h2 className="font-satoshi text-[clamp(2rem,4vw,2.8rem)] font-normal leading-[1.2] tracking-tight mb-4 text-hr-text max-w-[480px] mx-auto">Start hiring with<br />the right plan.</h2>
-                <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto text-center mb-9">
+              <div className="text-center py-20 px-12 pb-[100px] border-t border-white/8 max-md:py-[60px] max-md:px-5">
+                <div className={`${sectionLabel} text-e-blue`}>Get Started</div>
+                <h2 className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-medium leading-[1.1] tracking-[-0.025em] mb-4 text-e-text max-w-[480px] mx-auto">Start hiring with<br />the right plan.</h2>
+                <p className="text-base leading-[1.8] text-e-text2 max-w-[520px] mx-auto text-center mb-9">
                   Every plan includes AI sourcing, fit scoring, and a recruiter-grade pipeline. Pick the one that fits your team today.
                 </p>
                 <div className="flex items-center justify-center gap-3 max-md:flex-col max-md:w-full">
                   <a
                     href="/recruiter-auth"
-                    className="bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover max-md:w-full max-md:text-center"
+                    className="bg-e-blue text-white border-none py-3 px-6 rounded-xl font-ui text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:brightness-110 hover:shadow-[0_8px_36px_rgba(75,142,240,0.35)] max-md:w-full max-md:text-center"
                     onClick={(e) => {
                       e.preventDefault();
                       setLocation('/recruiter-auth');
@@ -481,10 +507,10 @@ export default function PricingPage() {
                     Start Free
                   </a>
                   <a
-                    href="https://cal.com/vantahire/quick-connect"
+                    href="https://cal.com/ealana/quick-connect"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-transparent text-hr-text border border-[rgba(255,255,255,0.12)] py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-[rgba(255,255,255,0.25)] max-md:w-full max-md:text-center"
+                    className="bg-transparent text-e-text border border-white/12 py-3 px-6 rounded-xl font-ui text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-white/25 hover:bg-white/[0.03] max-md:w-full max-md:text-center"
                   >
                     Book a Demo
                   </a>
@@ -500,11 +526,11 @@ export default function PricingPage() {
 
       {/* Checkout Dialog */}
       <Dialog open={checkoutDialogOpen} onOpenChange={setCheckoutDialogOpen}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none p-5 font-dm text-hr-text public-theme">
+        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto rounded-[24px] p-5 font-ui text-e-text public-theme border border-white/10 bg-[linear-gradient(180deg,rgba(17,19,38,0.98)_0%,rgba(13,15,30,0.98)_100%)] shadow-[0_24px_90px_rgba(0,0,0,0.45)]">
           <div className="flex justify-between items-start">
             <div>
-              <DialogTitle className="font-satoshi text-base font-medium text-hr-text mb-1">Upgrade to Growth</DialogTitle>
-              <DialogDescription className="text-[0.82rem] text-hr-text-muted leading-[1.5]">
+              <DialogTitle className="font-display text-base font-medium text-e-text mb-1">Upgrade to Growth</DialogTitle>
+              <DialogDescription className="text-[0.82rem] text-e-text2 leading-[1.6]">
                 {checkoutMode === 'public'
                   ? "Enter your details to get started."
                   : checkoutMode === 'create-org'
@@ -541,18 +567,18 @@ export default function PricingPage() {
               {/* Email field - only for public checkout */}
               {checkoutMode === 'public' && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">Email Address *</label>
+                  <label className="text-[0.78rem] font-medium text-e-text2">Email Address *</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-hr-text-muted" />
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-e-text3" />
                     <input
                       type="email"
                       placeholder="you@company.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 pl-10 pr-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                      className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 pl-10 pr-3 font-ui text-[0.88rem] text-e-text outline-none transition-all duration-200 w-full placeholder:text-e-text3 focus:border-e-blue focus:shadow-[0_0_0_2px_rgba(75,142,240,0.22)]"
                     />
                   </div>
-                  <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                  <p className="text-[0.72rem] text-e-text3 leading-[1.5]">
                     We'll send your receipt and login details here.
                   </p>
                 </div>
@@ -561,43 +587,43 @@ export default function PricingPage() {
               {/* Org name - for public and create-org modes */}
               {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">Organization Name *</label>
+                  <label className="text-[0.78rem] font-medium text-e-text2">Organization Name *</label>
                   <div className="relative">
-                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-hr-text-muted" />
+                    <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-e-text3" />
                     <input
                       placeholder="Acme Inc"
                       value={orgName}
                       onChange={(e) => setOrgName(e.target.value)}
-                      className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 pl-10 pr-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                      className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 pl-10 pr-3 font-ui text-[0.88rem] text-e-text outline-none transition-all duration-200 w-full placeholder:text-e-text3 focus:border-e-blue focus:shadow-[0_0_0_2px_rgba(75,142,240,0.22)]"
                     />
                   </div>
                 </div>
               )}
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[0.78rem] font-medium text-hr-text-secondary">Number of Seats *</label>
+                <label className="text-[0.78rem] font-medium text-e-text2">Number of Seats *</label>
                 <input
                   type="number"
                   min={1}
                   max={1000}
                   value={seats}
                   onChange={(e) => setSeats(parseInt(e.target.value) || 1)}
-                  className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                  className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 px-3 font-ui text-[0.88rem] text-e-text outline-none transition-all duration-200 w-full placeholder:text-e-text3 focus:border-e-blue focus:shadow-[0_0_0_2px_rgba(75,142,240,0.22)]"
                 />
-                <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                <p className="text-[0.72rem] text-e-text3 leading-[1.5]">
                   Growth includes {formatMetric(proCredits)} AI credits per seat per month, pooled across the organization. With {seats} seat{seats === 1 ? "" : "s"}, that is {proCredits * seats} included credits per month. {commercialConfig?.seatPolicies?.seatAddCredits.summary} {creditPackConfig ? `Extra ${creditPackConfig.creditsPerPack}-credit packs are available at ${formatPriceINR(creditPackConfig.pricePerPack)}.` : 'Extra credit packs are available.'}
                 </p>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="text-[0.78rem] font-medium text-hr-text-secondary">Billing Cycle *</label>
+                <label className="text-[0.78rem] font-medium text-e-text2">Billing Cycle *</label>
                 <Select value={billingCycle} onValueChange={(v: 'monthly' | 'annual') => setBillingCycle(v)}>
-                  <SelectTrigger className="bg-hr-bg-elevated border-[rgba(255,255,255,0.08)] rounded-none text-hr-text font-dm text-[0.88rem] py-2.5 focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)] focus:ring-0">
+                  <SelectTrigger className="bg-white/[0.04] border-white/10 rounded-xl text-e-text font-ui text-[0.88rem] py-2.5 focus:border-e-blue focus:shadow-[0_0_0_2px_rgba(75,142,240,0.22)] focus:ring-0">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent className="bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none text-hr-text font-dm">
-                    <SelectItem value="monthly" className="text-hr-text rounded-none focus:bg-[rgba(255,255,255,0.06)] focus:text-hr-text">Monthly</SelectItem>
-                    <SelectItem value="annual" className="text-hr-text rounded-none focus:bg-[rgba(255,255,255,0.06)] focus:text-hr-text">Annual (Save 17%)</SelectItem>
+                  <SelectContent className="bg-e-bg2 border border-white/10 rounded-xl text-e-text font-ui">
+                    <SelectItem value="monthly" className="text-e-text rounded-lg focus:bg-white/[0.06] focus:text-e-text">Monthly</SelectItem>
+                    <SelectItem value="annual" className="text-e-text rounded-lg focus:bg-white/[0.06] focus:text-e-text">Annual (Save 17%)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -605,42 +631,42 @@ export default function PricingPage() {
               {/* Optional GSTIN field */}
               {(checkoutMode === 'public' || checkoutMode === 'create-org') && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[0.78rem] font-medium text-hr-text-secondary">GSTIN (Optional)</label>
+                  <label className="text-[0.78rem] font-medium text-e-text2">GSTIN (Optional)</label>
                   <input
                     placeholder="22AAAAA0000A1Z5"
                     value={gstin}
                     onChange={(e) => setGstin(e.target.value.toUpperCase())}
-                    className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]"
+                    className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 px-3 font-ui text-[0.88rem] text-e-text outline-none transition-all duration-200 w-full placeholder:text-e-text3 focus:border-e-blue focus:shadow-[0_0_0_2px_rgba(75,142,240,0.22)]"
                   />
-                  <p className="text-[0.72rem] text-hr-text-muted leading-[1.4]">
+                  <p className="text-[0.72rem] text-e-text3 leading-[1.5]">
                     Add GSTIN if you want it printed on the invoice.
                   </p>
                 </div>
               )}
 
               {proPlan && (
-                <div className="p-4 bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none">
-                  <div className="flex justify-between text-[0.88rem] text-hr-text-secondary">
+                <div className="p-4 bg-white/[0.04] border border-white/10 rounded-xl">
+                  <div className="flex justify-between text-[0.88rem] text-e-text2">
                     <span>Subtotal</span>
-                    <span className="text-hr-text">{formatPriceINR(subtotal)}</span>
+                    <span className="text-e-text">{formatPriceINR(subtotal)}</span>
                   </div>
                   {taxEnabled && (
-                    <div className="mt-2 flex justify-between text-[0.88rem] text-hr-text-secondary">
+                    <div className="mt-2 flex justify-between text-[0.88rem] text-e-text2">
                       <span>GST ({gstRate}%)</span>
-                      <span className="text-hr-text">{formatPriceINR(gstAmount)}</span>
+                      <span className="text-e-text">{formatPriceINR(gstAmount)}</span>
                     </div>
                   )}
-                  <div className="h-px bg-[rgba(255,255,255,0.08)] my-2.5"></div>
+                  <div className="h-px bg-white/8 my-2.5"></div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-[0.88rem] text-hr-text-secondary">Total</span>
-                    <span className="font-satoshi font-bold text-hr-text text-lg">
+                    <span className="text-[0.88rem] text-e-text2">Total</span>
+                    <span className="font-display font-semibold text-e-text text-lg">
                       {formatPriceINR(totalWithTax)}
-                      <span className="text-[0.8rem] font-normal text-hr-text-muted font-dm">
+                      <span className="text-[0.8rem] font-normal text-e-text3 font-ui">
                         /{billingCycle === 'monthly' ? 'month' : 'year'}
                       </span>
                     </span>
                   </div>
-                  <p className="text-[0.72rem] text-hr-text-muted mt-1.5">
+                  <p className="text-[0.72rem] text-e-text3 mt-1.5">
                     {taxEnabled
                       ? `GST (${gstRate}%) is added at checkout.`
                       : 'No additional tax is configured.'}

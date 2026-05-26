@@ -100,7 +100,7 @@ export default function OrgSetupStep({ onComplete, userEmail }: OrgSetupStepProp
           Create Your Organization
         </h2>
         <p className="text-muted-foreground mt-1">
-          Set up your company or team on VantaHire
+          Set up your company or team on ealana
         </p>
       </div>
 
@@ -191,7 +191,7 @@ export default function OrgSetupStep({ onComplete, userEmail }: OrgSetupStepProp
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground">
-                  Your request will be reviewed by VantaHire admins.
+                  Your request will be reviewed by ealana admins.
                   You can skip this and set it up later from organization settings.
                 </p>
               </div>

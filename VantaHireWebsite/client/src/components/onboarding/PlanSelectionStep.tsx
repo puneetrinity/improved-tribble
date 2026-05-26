@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import {
   useCommercialConfig,
   useCreateCheckout,
@@ -72,7 +72,7 @@ export default function PlanSelectionStep({ onComplete }: PlanSelectionStepProps
   const totalWithTax = calculateTotalWithTax(subtotal, gstRate);
   const formatMetric = (value?: number | null) => {
     if (typeof value !== "number" || value <= 0) {
-      return "—";
+      return "â€”";
     }
     return String(value);
   };
@@ -85,7 +85,7 @@ export default function PlanSelectionStep({ onComplete }: PlanSelectionStepProps
     try {
       await completeOnboardingAsync();
       toast({
-        title: "Welcome to VantaHire!",
+        title: "Welcome to ealana!",
         description: "You're all set up with the Free plan.",
       });
       onComplete();
@@ -145,7 +145,7 @@ export default function PlanSelectionStep({ onComplete }: PlanSelectionStepProps
     completeOnboardingAsync().catch(() => {
       // Ignore errors
     });
-    window.location.href = 'mailto:sales@vantahire.com?subject=VantaHire%20Business%20Plan%20Inquiry';
+    window.location.href = 'mailto:sales@ealana.com?subject=ealana%20Business%20Plan%20Inquiry';
   };
 
   if (plansLoading) {
@@ -187,7 +187,7 @@ export default function PlanSelectionStep({ onComplete }: PlanSelectionStepProps
                 {(freePlanCard?.highlights ?? [
                   `${formatMetric(freeCredits)} AI credits per month`,
                   "Up to 5 active jobs",
-                  "Basic ATS features",
+                  "Basic Flow features",
                 ]).slice(0, 3).map((highlight) => (
                   <li key={highlight} className="flex items-center gap-2">
                     <Check className="h-3.5 w-3.5 text-green-500" />

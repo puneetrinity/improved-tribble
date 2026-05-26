@@ -246,7 +246,7 @@ export default function ApplicationsPage() {
           {
             label: "With Feedback",
             value: applications.filter((app) => (app.feedbackCount ?? 0) > 0).length,
-            accentClassName: "text-[#4D41DF]",
+            accentClassName: "text-[#4B8EF0]",
           },
         ]}
       />

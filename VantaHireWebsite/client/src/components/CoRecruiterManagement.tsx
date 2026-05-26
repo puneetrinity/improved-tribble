@@ -476,7 +476,7 @@ export function CoRecruiterManagement({ jobId, className = "" }: CoRecruiterMana
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p>
-                <strong>{pendingInviteData?.email}</strong> is not currently on VantaHire.
+                <strong>{pendingInviteData?.email}</strong> is not currently on ealana.
               </p>
               <p>
                 When they accept this invitation and register, they will be added to your organization

@@ -89,13 +89,13 @@ export default function QuickAccessBar() {
   const showAdminSettings = user.role === 'super_admin';
 
   return (
-    <div className="sticky top-0 z-50 bg-gradient-to-r from-slate-900/95 via-purple-900/95 to-slate-900/95 backdrop-blur-lg border-b border-white/10">
+    <div className="sticky top-0 z-50 border-b border-white/10 bg-gradient-to-r from-slate-900/95 via-[#111326]/95 to-slate-900/95 backdrop-blur-lg">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo/Brand */}
           <div className="flex items-center gap-2">
-            <Target className="h-6 w-6 text-[#7B38FB]" />
-            <span className="text-white font-bold text-lg hidden sm:inline">VantaHire</span>
+            <Target className="h-6 w-6 text-[#4B8EF0]" />
+            <span className="text-white font-bold text-lg hidden sm:inline">ealana</span>
           </div>
 
           {/* Navigation Items */}
@@ -112,7 +112,7 @@ export default function QuickAccessBar() {
                   size="sm"
                   className={`
                     ${active
-                      ? "bg-gradient-to-r from-[#7B38FB] to-[#FF5BA8] text-white"
+                      ? "bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] text-white"
                       : "text-white/70 hover:text-white hover:bg-white/10"
                     }
                     ${item.primary ? "hidden sm:flex" : ""}

@@ -7,7 +7,7 @@ import { Menu, X, LogOut, Briefcase, Plus } from "lucide-react";
 import { useState, useEffect, type CSSProperties } from "react";
 import Footer from "@/components/Footer";
 import QuickAccessBar from "@/components/QuickAccessBar";
-import vantahireLogo from "@/assets/vantahire-logo.png";
+import ealanaLogo from "@/assets/ealana_logo.svg";
 import AtsSidebar from "@/components/AtsSidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
@@ -48,11 +48,11 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
     }
   };
 
-  // ATS context detection - determines if we should use light ATS theme
-  const atsUser = isRecruiter || isAdmin || isHiringManager || isCandidate;
+  // Internal app context detection - determines if we should use the Flow workspace shell
+  const flowUser = isRecruiter || isAdmin || isHiringManager || isCandidate;
 
-  const isAtsRoute = (path: string): boolean => {
-    const atsRoutes = [
+  const isFlowRoute = (path: string): boolean => {
+    const flowRoutes = [
       '/recruiter-dashboard',
       '/applications',
       '/candidates',
@@ -75,7 +75,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
     ];
 
     // Check exact matches first
-    if (atsRoutes.some(route => path === route || path.startsWith(route + '/'))) {
+    if (flowRoutes.some(route => path === route || path.startsWith(route + '/'))) {
       return true;
     }
 
@@ -91,7 +91,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
     return false;
   };
 
-  const atsContext = atsUser && isAtsRoute(location);
+  const flowContext = flowUser && isFlowRoute(location);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -112,9 +112,9 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
 
   const isJobsRoute = location.startsWith('/jobs');
 
-  if (atsContext) {
+  if (flowContext) {
     return (
-      <div className="min-h-screen w-full overflow-x-hidden bg-[linear-gradient(180deg,#F4F6FA_0%,#EEF2F6_100%)] text-foreground ats-theme">
+      <div className="min-h-screen w-full overflow-x-hidden bg-[radial-gradient(circle_at_top_left,rgba(75,142,240,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(52,209,122,0.10),transparent_24%),linear-gradient(180deg,#F7F9FF_0%,#EEF3FB_55%,#F5F8FF_100%)] text-foreground ats-theme">
         <SidebarProvider
           defaultOpen
           className="overflow-x-hidden"
@@ -144,8 +144,8 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
             <div className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-sidebar-border bg-sidebar px-4 text-sidebar-foreground shadow-[0_10px_28px_rgba(0,0,0,0.18)] backdrop-blur md:hidden">
               <SidebarTrigger className="-ml-1 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-primary" />
               <div className="flex min-w-0 items-center gap-2">
-                <img src={vantahireLogo} alt="VantaHire" className="h-8 w-auto" />
-                <span className="truncate text-sm font-semibold text-sidebar-foreground">VantaHire ATS</span>
+                <img src={ealanaLogo} alt="ealana" className="h-8 w-auto" />
+                <span className="truncate text-sm font-semibold text-sidebar-foreground">ealana Flow</span>
               </div>
             </div>
 
@@ -166,7 +166,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
       "min-h-screen bg-background text-foreground",
       "public-theme"
     )}>
-      {/* Quick Access Bar for authenticated users (not in ATS context) */}
+      {/* Quick Access Bar for authenticated users outside the internal Flow workspace */}
       {user && <QuickAccessBar />}
 
       {/* Header (for public pages or as fallback) */}
@@ -198,11 +198,11 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
             }}
           >
             <img
-              src={vantahireLogo}
-              alt="VantaHire"
+              src={ealanaLogo}
+              alt="ealana"
               className="h-10 w-auto transition-transform duration-300 group-hover:scale-105"
             />
-            <span className="text-xl font-bold gradient-text-mixed hidden sm:inline">VantaHire</span>
+            <span className="text-xl font-bold gradient-text-mixed hidden sm:inline">ealana</span>
           </Link>
           
           {/* Desktop Navigation */}
@@ -358,11 +358,11 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
                 }}
               >
                 <img
-                  src={vantahireLogo}
-                  alt="VantaHire"
+                  src={ealanaLogo}
+                  alt="ealana"
                   className="h-10 w-auto"
                 />
-                <span className="text-xl font-bold gradient-text-mixed">VantaHire</span>
+                <span className="text-xl font-bold gradient-text-mixed">ealana</span>
               </Link>
               <button
                 onClick={toggleMenu}
@@ -441,7 +441,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
                         className="text-xl relative px-2 py-1 text-white transition-all duration-300 border-l-2 pl-4 border-transparent hover:border-[#7B38FB]"
                         onClick={(e) => { e.preventDefault(); setLocation("/candidates"); setIsMenuOpen(false); }}
                       >
-                        Talent Search
+                        Discover
                       </a>
                       <a
                         href="/my-jobs"
