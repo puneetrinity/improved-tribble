@@ -2,11 +2,12 @@ import { sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { getResults } from './signal-client';
 import type {
-  SignalResultCandidate,
+  SignalResultCandidateV3,
   SignalResultsResponse,
 } from './signal-contracts';
 
 const ENRICHED_STATUSES = new Set(['completed', 'enriched']);
+const PENDING_STATUSES = new Set(['pending', 'queued']);
 const FAILED_STATUSES = new Set(['failed', 'error']);
 
 function readOptionalStringOrNull(
@@ -59,38 +60,39 @@ export interface SyncSignalResultsResult {
 }
 
 export function computeEnrichmentProgress(
-  candidates: SignalResultCandidate[],
+  candidates: SignalResultCandidateV3[],
 ): SourcingEnrichmentProgress {
+  const totalCandidates = candidates.length;
+
   let enrichedCount = 0;
-  let failedCount = 0;
   let pendingCount = 0;
+  let failedCount = 0;
 
-  for (const candidate of candidates) {
-    const statusRaw = candidate.candidate?.enrichmentStatus ?? candidate.enrichmentStatus ?? '';
-    const status = typeof statusRaw === 'string' ? statusRaw.toLowerCase() : '';
-
+  for (const c of candidates) {
+    const status = c.candidate.enrichmentStatus ?? '';
     if (ENRICHED_STATUSES.has(status)) {
       enrichedCount++;
-      continue;
-    }
-    if (FAILED_STATUSES.has(status)) {
+    } else if (FAILED_STATUSES.has(status)) {
       failedCount++;
-      continue;
+    } else if (PENDING_STATUSES.has(status) || status === '') {
+      pendingCount++;
+    } else {
+      // Unknown status — treat as pending
+      pendingCount++;
     }
-    pendingCount++;
   }
 
-  const totalCandidates = candidates.length;
   const percent = totalCandidates > 0
-    ? Math.round((enrichedCount / totalCandidates) * 100)
+    ? Number(((enrichedCount / totalCandidates) * 100).toFixed(1))
     : 0;
+  const inProgress = pendingCount > 0;
 
   return {
     totalCandidates,
     enrichedCount,
     pendingCount,
     failedCount,
-    inProgress: pendingCount > 0,
+    inProgress,
     percent,
     lastSyncedAt: new Date().toISOString(),
   };
@@ -143,17 +145,23 @@ export async function upsertSignalCandidates(
   organizationId: number,
   jobId: number,
   requestId: string,
-  candidates: SignalResultCandidate[],
+  candidates: SignalResultCandidateV3[],
+  onCandidateUpserted?: (candidate: SignalResultCandidateV3, rank: number) => void,
 ): Promise<number> {
-  let upserted = 0;
+  if (candidates.length === 0) return 0;
 
-  for (const c of candidates) {
-    const fitScore = normalizeFitScoreForStorage(c.fitScore);
+  // Build all row values for a single bulk INSERT
+  const rows = candidates.map((c) => {
+    const fitScore = normalizeFitScoreForStorage(c.fitScore ?? null);
     const searchSnippet = (c.candidate as unknown as { searchSnippet?: unknown }).searchSnippet ?? null;
     const searchMeta = (c.candidate as unknown as { searchMeta?: unknown }).searchMeta ?? null;
     const searchProvider = (c.candidate as unknown as { searchProvider?: unknown }).searchProvider ?? null;
     const searchSignals = (c.candidate as unknown as { searchSignals?: unknown }).searchSignals ?? null;
+
     const summary = {
+      candidate: c.candidate,
+      sourcingContext: c.sourcingContext,
+      cardSignals: c.cardSignals,
       nameHint: c.candidate.nameHint,
       headlineHint: c.candidate.headlineHint,
       locationHint: c.candidate.locationHint,
@@ -167,56 +175,94 @@ export async function upsertSignalCandidates(
       searchProvider,
       searchSignals,
       identitySummary: c.identitySummary ?? null,
-      snapshot: c.snapshot,
-      rank: c.rank,
-      fitScoreRaw: c.fitScore,
+      identities: (c as any).identities ?? [],
+      aiSummary: c.aiSummary ?? null,
+      snapshot: c.snapshot ?? null,
+      rank: c.sourcingContext?.rank ?? c.rank ?? null,
+      fitScoreRaw: c.fitScore ?? null,
       matchTier: c.matchTier ?? null,
       locationMatchType: c.locationMatchType ?? null,
       countryCode: (c as any).countryCode ?? null,
       dataConfidence: c.dataConfidence ?? null,
       professionalValidation: c.professionalValidation ?? null,
-      locationLabel: (c as any).locationLabel ?? null,
+      locationLabel: c.locationLabel ?? null,
     };
 
-    await db.execute(sql`
-      INSERT INTO job_sourced_candidates (
-        organization_id, job_id, request_id, signal_candidate_id,
-        fit_score, fit_breakdown, source_type, state,
-        candidate_summary, last_synced_at, created_at, updated_at
-      ) VALUES (
-        ${organizationId}, ${jobId}, ${requestId}, ${c.candidateId},
-        ${fitScore}, ${JSON.stringify(c.fitBreakdown)}::jsonb, ${c.sourceType}, 'new',
-        ${JSON.stringify(summary)}::jsonb, NOW(), NOW(), NOW()
-      )
-      ON CONFLICT (job_id, signal_candidate_id) DO UPDATE SET
-        request_id = EXCLUDED.request_id,
-        fit_score = EXCLUDED.fit_score,
-        fit_breakdown = EXCLUDED.fit_breakdown,
-        source_type = EXCLUDED.source_type,
-        candidate_summary = EXCLUDED.candidate_summary,
-        last_synced_at = NOW(),
-        updated_at = NOW()
-    `);
-    upserted++;
+    return {
+      candidateId: c.candidate.id,
+      fitScore,
+      fitBreakdown: JSON.stringify(c.fitBreakdown ?? null),
+      sourceType: c.sourceType ?? 'discovered',
+      summary: JSON.stringify(summary),
+    };
+  });
+
+  // Single bulk upsert — dramatically faster than 100 sequential awaits
+  // Build a drizzle sql template with all rows inlined as parameterized values
+  let bulkSql = sql`
+    INSERT INTO job_sourced_candidates (
+      organization_id, job_id, request_id, signal_candidate_id,
+      fit_score, fit_breakdown, source_type, state,
+      candidate_summary, last_synced_at, created_at, updated_at
+    ) VALUES
+  `;
+
+  const sqlParts = rows.map((row) =>
+    sql`(
+      ${organizationId}, ${jobId}, ${requestId}, ${row.candidateId},
+      ${row.fitScore}, ${row.fitBreakdown}::jsonb, ${row.sourceType}, 'new',
+      ${row.summary}::jsonb, NOW(), NOW(), NOW()
+    )`
+  );
+
+  // Join rows with commas
+  for (let i = 0; i < sqlParts.length; i++) {
+    if (i > 0) bulkSql = sql`${bulkSql},`;
+    bulkSql = sql`${bulkSql} ${sqlParts[i]}`;
   }
 
-  return upserted;
+  bulkSql = sql`${bulkSql}
+    ON CONFLICT (job_id, signal_candidate_id) DO UPDATE SET
+      request_id = EXCLUDED.request_id,
+      fit_score = EXCLUDED.fit_score,
+      fit_breakdown = EXCLUDED.fit_breakdown,
+      source_type = EXCLUDED.source_type,
+      candidate_summary = EXCLUDED.candidate_summary,
+      last_synced_at = NOW(),
+      updated_at = NOW()
+  `;
+
+  await db.execute(bulkSql);
+
+
+  // Fire per-candidate callbacks after the batch
+  if (onCandidateUpserted) {
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i]!;
+      onCandidateUpserted(c, c.sourcingContext?.rank ?? c.rank ?? i + 1);
+    }
+  }
+
+  return candidates.length;
 }
+
 
 /**
  * Fetch latest Signal /results and upsert candidates in Vanta.
  */
 export async function syncSignalResultsIntoVanta(
   params: SyncSignalResultsParams,
+  onCandidateUpserted?: (candidate: SignalResultCandidateV3, rank: number) => void,
 ): Promise<SyncSignalResultsResult> {
   const fetchedResults = await getResults(
     params.signalTenantId,
     params.externalJobId,
     params.requestId,
+    true // includeSummary
   );
 
-  const candidates = Array.isArray(fetchedResults.candidates)
-    ? fetchedResults.candidates
+  const candidates = Array.isArray(fetchedResults.data)
+    ? fetchedResults.data
     : [];
   let candidateCount = fetchedResults.resultCount ?? 0;
   let upsertedCount = 0;
@@ -227,6 +273,7 @@ export async function syncSignalResultsIntoVanta(
       params.jobId,
       params.requestId,
       candidates,
+      onCandidateUpserted,
     );
     candidateCount = candidates.length;
   }

@@ -596,21 +596,39 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     }
   };
 
-  // Handle skill add
-  const handleAddSkill = () => {
-    if (newSkill.trim() && !skills.includes(newSkill.trim())) {
-      setSkills([...skills, newSkill.trim()]);
-      setNewSkill("");
-    }
+  // Adds one or more skills from a raw string (comma-separated)
+  const commitSkills = (raw: string) => {
+    const tokens = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (tokens.length === 0) return;
+    setSkills((prev) => {
+      const next = [...prev];
+      for (const t of tokens) {
+        if (!next.includes(t)) next.push(t);
+      }
+      return next;
+    });
+    setNewSkill('');
   };
 
-  // Handle good-to-have skill add
-  const handleAddGoodToHaveSkill = () => {
-    if (newGoodToHaveSkill.trim() && !goodToHaveSkills.includes(newGoodToHaveSkill.trim())) {
-      setGoodToHaveSkills([...goodToHaveSkills, newGoodToHaveSkill.trim()]);
-      setNewGoodToHaveSkill("");
-    }
+  // Handle skill add (button / Enter)
+  const handleAddSkill = () => commitSkills(newSkill);
+
+  // Adds one or more good-to-have skills from a raw string (comma-separated)
+  const commitGoodToHaveSkills = (raw: string) => {
+    const tokens = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    if (tokens.length === 0) return;
+    setGoodToHaveSkills((prev) => {
+      const next = [...prev];
+      for (const t of tokens) {
+        if (!next.includes(t)) next.push(t);
+      }
+      return next;
+    });
+    setNewGoodToHaveSkill('');
   };
+
+  // Handle good-to-have skill add (button / Enter)
+  const handleAddGoodToHaveSkill = () => commitGoodToHaveSkills(newGoodToHaveSkill);
 
   // Handle template selection toggle
   const toggleTemplate = (templateId: number) => {
@@ -860,10 +878,20 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   <Input
                     type="text"
                     value={newSkill}
-                    onChange={(e) => setNewSkill(e.target.value)}
-                    placeholder="Add a required skill..."
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      // Auto-commit on comma
+                      if (val.endsWith(',')) {
+                        commitSkills(val);
+                      } else {
+                        setNewSkill(val);
+                      }
+                    }}
+                    placeholder="e.g. React, Node.js, Docker..."
                     className="flex-1"
-                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddSkill())}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddSkill(); }
+                    }}
                   />
                   <Button type="button" onClick={handleAddSkill} size="icon" aria-label="Add required skill">
                     <Plus className="h-4 w-4" />
@@ -912,10 +940,20 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   <Input
                     type="text"
                     value={newGoodToHaveSkill}
-                    onChange={(e) => setNewGoodToHaveSkill(e.target.value)}
-                    placeholder="Add a nice-to-have skill..."
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      // Auto-commit on comma
+                      if (val.endsWith(',')) {
+                        commitGoodToHaveSkills(val);
+                      } else {
+                        setNewGoodToHaveSkill(val);
+                      }
+                    }}
+                    placeholder="e.g. GraphQL, Kubernetes, Python..."
                     className="flex-1"
-                    onKeyPress={(e) => e.key === "Enter" && (e.preventDefault(), handleAddGoodToHaveSkill())}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') { e.preventDefault(); handleAddGoodToHaveSkill(); }
+                    }}
                   />
                   <Button type="button" onClick={handleAddGoodToHaveSkill} size="icon" aria-label="Add preferred skill">
                     <Plus className="h-4 w-4" />

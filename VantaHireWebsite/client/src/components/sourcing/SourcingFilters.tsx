@@ -64,18 +64,7 @@ export function SourcingFilters({
     <Card className="shadow-sm">
       <CardContent className="p-4 space-y-3">
         <div className="flex flex-wrap items-center gap-3">
-          {hasTierData && !allBroader && (
-            <div className="flex items-center gap-2 rounded-md border px-2 h-8">
-              <Switch
-                id="best-matches-only"
-                checked={bestMatchesOnly}
-                onCheckedChange={onBestMatchesOnlyChange}
-              />
-              <Label htmlFor="best-matches-only" className="text-xs cursor-pointer">
-                Top matches only
-              </Label>
-            </div>
-          )}
+
 
           <Input
             placeholder="Location"

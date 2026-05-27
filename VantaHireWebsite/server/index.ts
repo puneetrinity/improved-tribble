@@ -89,8 +89,11 @@ app.use((req, res, next) => {
   next();
 });
 
+import { initWebSocketServer } from "./websocket";
+
 (async () => {
   const server = await registerRoutes(app);
+  initWebSocketServer(server);
 
   if (process.env.SENTRY_DSN) {
     Sentry.setupExpressErrorHandler?.(app);
@@ -126,8 +129,8 @@ app.use((req, res, next) => {
   // Bind to platform-provided PORT (e.g., Railway/Heroku), fallback to 5000
   const port = Number(process.env.PORT) || 5000;
   const host = process.env.HOST || "0.0.0.0";
-  // reusePort causes issues on macOS (darwin), so we disable it there
-  const reusePort = process.platform !== 'darwin';
+  // reusePort causes issues on Windows and macOS, so we only enable it on linux (where Railway runs)
+  const reusePort = process.platform === 'linux';
   
   server.listen({
     port,
