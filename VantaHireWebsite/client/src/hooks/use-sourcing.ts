@@ -2,7 +2,9 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest, isApiError } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { trackEvent } from "@/lib/analytics";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
+import type { PipelineProgressState, EnrichmentCandidateEvent } from "@/components/sourcing/SourcingProgressModal";
+import { INITIAL_PROGRESS } from "@/components/sourcing/SourcingProgressModal";
 
 export type MatchTier = "best_matches" | "broader_pool";
 export type LocationMatchType = "city_exact" | "city_alias" | "country_only" | "unknown_location" | "none";
@@ -19,10 +21,7 @@ export interface SourcedCandidateForUI {
   displayBucket: "talent_pool" | "newly_discovered";
   state: "new" | "shortlisted" | "hidden" | "converted";
 
-  nameHint: string | null;
-  headlineHint: string | null;
-  locationHint: string | null;
-  companyHint: string | null;
+  crustdata: Record<string, any> | null;
   linkedinUrl: string | null;
   enrichmentStatus: string | null;
   confidenceScore: number | null;
@@ -57,6 +56,7 @@ export interface SourcedCandidateForUI {
     seniorityBand: string | null;
     location: string | null;
     computedAt: string | null;
+    signalsJson?: any;
   } | null;
 
   freshness: {
@@ -70,7 +70,30 @@ export interface SourcedCandidateForUI {
   locationLabel?: string | null;
   locationConfidenceNumeric?: number | null;
 
-  candidateSummary: unknown;
+  profilePictureUrl?: string | null;
+  cardSignals: {
+    email: string | null;
+    phone: string | null;
+    github: string | null;
+    twitter: string | null;
+    skillsTopN: string[];
+    activeSeeker: boolean;
+    summaryShort: string | null;
+    emailAvailable: boolean;
+    phoneAvailable: boolean;
+  } | null;
+  aiSummary: {
+    text: string;
+    skills: string[];
+  } | null;
+  candidateSummary: {
+    identities?: Array<{
+      platform: string;
+      confidence: number;
+      platformId: string;
+      profileUrl: string;
+    }>;
+  } | null;
   lastSyncedAt: string | null;
   createdAt: string | null;
 }
@@ -83,18 +106,7 @@ export interface SourcingStatus {
   submittedAt?: string;
   completedAt?: string;
   errorMessage?: string;
-  enrichment?: {
-    totalCandidates: number;
-    enrichedCount: number;
-    pendingCount: number;
-    failedCount: number;
-    percent: number;
-    inProgress: boolean;
-    lastSyncedAt?: string | null;
-    refreshStatus?: string | null;
-    queueJobId?: string | null;
-    lastRerankedAt?: string | null;
-  };
+
 }
 
 export interface SourcedCandidatesResponse {
@@ -160,14 +172,11 @@ function isTerminal(status: string | undefined): boolean {
   return !!status && TERMINAL_STATUSES.has(status);
 }
 
-function hasEnrichmentInProgress(status: SourcingStatus | undefined): boolean {
-  return status?.enrichment?.inProgress === true;
-}
+
 
 export function useSourcingStatus(jobId: number | undefined) {
   const queryClient = useQueryClient();
   const prevStatusRef = useRef<string | undefined>(undefined);
-  const prevEnrichmentRef = useRef<boolean>(false);
 
   const query = useQuery<SourcingStatus>({
     queryKey: ["/api/jobs", jobId, "sourcing-status"],
@@ -176,44 +185,70 @@ export function useSourcingStatus(jobId: number | undefined) {
       return res.json();
     },
     enabled: !!jobId,
-    refetchInterval: (q) => {
-      const data = q.state.data;
-      if (!data?.hasRun) return false;
-      if (!isTerminal(data.status)) return 7000;
-      return hasEnrichmentInProgress(data) ? 7000 : false;
+    refetchOnWindowFocus: false,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      // Only poll while job is actively running (not terminal).
+      // Enrichment is now atomic in the orchestrator, so 'completed' = done.
+      const isPolling = !!data?.hasRun && !isTerminal(data?.status);
+      return isPolling ? 5000 : false;
     },
   });
 
   useEffect(() => {
+    if (!jobId) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/api/sourcing/ws/${jobId}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.jobId !== jobId) return;
+
+        // Only invalidate on the terminal sourcing_update — NOT on candidate_sourced.
+        // The webhook streams a candidate_sourced event for every candidate synced
+        // (up to 100), so listening to it here would fire 100 simultaneous
+        // invalidateQueries calls and create a request storm.
+        // candidate_enriched: no-op — enrichment is atomic, candidates fetched on completion.
+        if (data.type === 'sourcing_update') {
+          queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "sourcing-status"] });
+
+          // Self-close WS once job reaches a terminal state — no more events expected.
+          if (data.status && isTerminal(data.status)) {
+            ws.close();
+          }
+        }
+      } catch (e) {
+        console.error("Failed to parse websocket message", e);
+      }
+    };
+
+    return () => ws.close();
+  }, [jobId, queryClient]);
+
+  useEffect(() => {
     const currentStatus = query.data?.status;
     const prevStatus = prevStatusRef.current;
-    const currentEnrichment = hasEnrichmentInProgress(query.data);
-    const prevEnrichment = prevEnrichmentRef.current;
-
     prevStatusRef.current = currentStatus;
-    prevEnrichmentRef.current = currentEnrichment;
 
-    const runJustCompleted = currentStatus && prevStatus && !isTerminal(prevStatus) && isTerminal(currentStatus);
-    const enrichmentChanged = currentEnrichment !== prevEnrichment;
+    // Only fetch candidates when job transitions TO a terminal state.
+    // Candidates don't change mid-run — enrichment is atomic in the orchestrator.
+    const justBecameTerminal =
+      currentStatus && prevStatus && !isTerminal(prevStatus) && isTerminal(currentStatus);
 
-    if (runJustCompleted || currentEnrichment || enrichmentChanged) {
-      queryClient.invalidateQueries({
+    if (justBecameTerminal) {
+      queryClient.refetchQueries({
         queryKey: ["/api/jobs", jobId, "sourced-candidates"],
       });
     }
-  }, [
-    query.data?.status,
-    query.data?.enrichment?.inProgress,
-    query.data?.enrichment?.enrichedCount,
-    query.data?.enrichment?.pendingCount,
-    jobId,
-    queryClient,
-  ]);
+  }, [query.data?.status, jobId, queryClient]);
 
   return {
     data: query.data,
     isLoading: query.isLoading,
-    isPolling: !!query.data?.hasRun && (!isTerminal(query.data?.status) || hasEnrichmentInProgress(query.data)),
+    isPolling: !!query.data?.hasRun && !isTerminal(query.data?.status),
   };
 }
 
@@ -225,25 +260,243 @@ export function useSourcedCandidates(jobId: number | undefined) {
       return res.json();
     },
     enabled: !!jobId,
+    refetchOnWindowFocus: false,
   });
 }
+
+// ─── Pipeline Progress Hook ───────────────────────────────────────────────────
+
+/**
+ * useSourcingProgress — tracks the real-time pipeline state from the sourcing-status poll.
+ * Powers the SourcingProgressModal. Derives phase/percent from DB status instead of WS
+ * events (which are not bridged from the signal worker to Express).
+ */
+export function useSourcingProgress(jobId: number | undefined) {
+  const queryClient = useQueryClient();
+  const [progress, setProgress] = useState<PipelineProgressState>({ ...INITIAL_PROGRESS });
+  const [modalOpen, setModalOpen] = useState(false);
+  const startTimeRef = useRef<number | null>(null);
+  const logsRef = useRef<string[]>([]);
+
+  const addLog = useCallback((msg: string) => {
+    const now = new Date().toLocaleTimeString("en-GB", { hour12: false });
+    const entry = `${now} ${msg}`;
+    logsRef.current = [...logsRef.current.slice(-199), entry];
+    setProgress((prev) => ({ ...prev, devLogs: logsRef.current }));
+  }, []);
+
+  const resetProgress = useCallback(() => {
+    logsRef.current = [];
+    startTimeRef.current = Date.now();
+    setProgress({ ...INITIAL_PROGRESS });
+  }, []);
+
+  const openModal = useCallback(() => {
+    resetProgress();
+    setModalOpen(true);
+    setProgress((prev) => ({
+      ...prev,
+      phase: "discovery",
+      percent: 2,
+      message: "Connecting to pipeline...",
+    }));
+    addLog("🚀 [PIPELINE] Sourcing job queued — waiting for worker...");
+  }, [resetProgress, addLog]);
+
+  const closeModal = useCallback(() => {
+    setModalOpen(false);
+  }, []);
+
+  // ── WS-driven real-time progress ─────────────────────────────────────────
+  // Each pipeline event from the server maps directly to a UI state update
+  // with zero polling delay — the WS message arrives milliseconds after
+  // the worker fires sendProgressCallback().
+  useEffect(() => {
+    if (!jobId || !modalOpen) return;
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const ws = new WebSocket(`${protocol}//${window.location.host}/api/sourcing/ws/${jobId}`);
+
+    ws.onmessage = (rawEvent) => {
+      try {
+        const data = JSON.parse(rawEvent.data);
+        if (data.jobId !== jobId) return;
+
+        switch (data.type) {
+          case "phase_started":
+            setProgress((p) => ({
+              ...p,
+              phase: "discovery",
+              percent: 5,
+              message: "Pipeline started — fetching candidates from Crustdata...",
+            }));
+            addLog("🚀 [PIPELINE] Phase started — worker is live");
+            break;
+
+          case "crustdata_fetching":
+            setProgress((p) => ({
+              ...p,
+              phase: "discovery",
+              percent: 15,
+              message: "Searching Crustdata (300 candidates, relaxed query)...",
+            }));
+            addLog("📡 [CRUSTDATA] Fetching up to 300 candidates...");
+            break;
+
+          case "ranking_started": {
+            const found = data.count as number | undefined;
+            setProgress((p) => ({
+              ...p,
+              phase: "ranking",
+              percent: 45,
+              message: `Ranking ${found ?? 300} candidates against job requirements...`,
+              ...(found !== undefined ? { crustdataFound: found } : {}),
+            }));
+            addLog(`📊 [RANKING] Locally ranking ${found ?? "300"} candidates...`);
+            break;
+          }
+
+          case "pipeline_complete": {
+            const elapsed = startTimeRef.current
+              ? Math.round((Date.now() - startTimeRef.current) / 1000)
+              : 0;
+            setProgress((p) => ({
+              ...p,
+              phase: "finalizing",
+              percent: 92,
+              message: "Saving results...",
+            }));
+            addLog(`✅ [PIPELINE] Ranked — saving top 100 to database (${elapsed}s)`);
+            break;
+          }
+
+          case "sourcing_update": {
+            if (data.status === "completed") {
+              const count = (data.candidateCount as number | undefined) ?? 0;
+              const elapsed = startTimeRef.current
+                ? Math.round((Date.now() - startTimeRef.current) / 1000)
+                : 0;
+              addLog(`🎉 [DONE] ${count} candidates saved (${elapsed}s total)`);
+              // Pre-fetch candidates NOW so they're already in cache when the
+              // modal disappears — eliminates the "no candidates" flash.
+              queryClient.refetchQueries({
+                queryKey: ["/api/jobs", jobId, "sourced-candidates"],
+              });
+              // Also update status cache so the page knows it's completed.
+              queryClient.invalidateQueries({
+                queryKey: ["/api/jobs", jobId, "sourcing-status"],
+              });
+              setProgress({
+                phase: "complete",
+                percent: 100,
+                message: `Done! ${count} candidates ranked & ready`,
+                candidates: [],
+                devLogs: logsRef.current,
+                enrichedCount: 0,
+                totalToEnrich: 0,
+                replacedCount: 0,
+              });
+              // Close immediately — candidates are being fetched in parallel.
+              setModalOpen(false);
+            } else if (data.status === "failed") {
+              setProgress((p) => ({
+                ...p,
+                phase: "error",
+                message: `Pipeline failed${data.errorMessage ? `: ${data.errorMessage}` : ""}`,
+                ...(data.errorMessage ? { error: data.errorMessage as string } : {}),
+              }));
+              addLog(`❌ [ERROR] ${data.errorMessage ?? "unknown error"}`);
+            }
+            break;
+          }
+
+          default:
+            break;
+        }
+      } catch (e) {
+        console.error("Failed to parse pipeline WS message", e);
+      }
+    };
+
+    return () => ws.close();
+  }, [jobId, modalOpen, addLog]);
+
+  // ── Slow-creep fallback ───────────────────────────────────────────────────
+  // Nudges the progress bar forward between WS events so the bar never looks
+  // frozen. Stops automatically when phase reaches complete/error/idle.
+  useEffect(() => {
+    if (!modalOpen) return;
+    const interval = setInterval(() => {
+      setProgress((p) => {
+        if (p.phase === "complete" || p.phase === "error" || p.phase === "idle") return p;
+        return { ...p, percent: Math.min(p.percent + 0.3, 88) };
+      });
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [modalOpen]);
+
+  // ── Cache hydration on open ──────────────────────────────────────────────
+  // If the modal opens on an already-completed job, show complete immediately.
+  useEffect(() => {
+    if (!jobId || !modalOpen) return;
+    const cached = queryClient.getQueryData<SourcingStatus>(["/api/jobs", jobId, "sourcing-status"]);
+    if (cached?.status === "completed") {
+      const count = cached.candidateCount ?? 0;
+      setProgress({
+        phase: "complete",
+        percent: 100,
+        message: `Done! ${count} candidates ranked & ready`,
+        candidates: [],
+        devLogs: logsRef.current,
+        enrichedCount: 0,
+        totalToEnrich: 0,
+        replacedCount: 0,
+      });
+      setModalOpen(false);
+    }
+  }, [jobId, modalOpen, queryClient]);
+
+  return { progress, modalOpen, openModal, closeModal, resetProgress };
+}
+
+
+
 
 export function useFindCandidates(jobId: number | undefined) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const mutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", `/api/jobs/${jobId}/find-candidates`);
+    mutationFn: async (opts?: { refresh?: boolean; forceSourcing?: boolean }) => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/find-candidates`, opts);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({
+    onSuccess: (data) => {
+      const isIdempotent = data?.idempotent === true;
+
+      // Immediately refetch both queries so stale data is dropped
+      queryClient.refetchQueries({
         queryKey: ["/api/jobs", jobId, "sourcing-status"],
       });
+      queryClient.refetchQueries({
+        queryKey: ["/api/jobs", jobId, "sourced-candidates"],
+      });
+
+      // For idempotent (already-completed) runs, the server re-syncs Signal data
+      // before responding. Give it 2 seconds to commit, then refetch candidates again.
+      if (isIdempotent) {
+        setTimeout(() => {
+          queryClient.refetchQueries({
+            queryKey: ["/api/jobs", jobId, "sourced-candidates"],
+          });
+        }, 2000);
+      }
+
       toast({
-        title: "Sourcing started",
-        description: "Searching for candidates matching this role...",
+        title: isIdempotent ? "Candidates refreshed" : "Sourcing started",
+        description: isIdempotent
+          ? "Showing the latest ranked candidates for this role."
+          : "Searching for candidates matching this role...",
       });
     },
     onError: (error: Error) => {
@@ -348,6 +601,48 @@ export function useUpdateCandidateState(jobId: number | undefined) {
 
   return {
     update: mutation.mutate,
+    isPending: mutation.isPending,
+  };
+}
+
+
+export function useFindContact() {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async ({ candidateId, jobId }: { candidateId: number, jobId: number }) => {
+      const res = await apiRequest("POST", `/api/candidates/${candidateId}/find-contact`);
+      return await res.json();
+    },
+    onSuccess: (data, variables) => {
+      if (data.emails && data.emails.length > 0) {
+        queryClient.invalidateQueries({
+          queryKey: ["/api/jobs", variables.jobId, "sourced-candidates"],
+        });
+        toast({
+          title: "Contact Found",
+          description: `Discovered ${data.emails.length} email(s) for this candidate!`,
+        });
+      } else {
+        toast({
+          title: "No Contact Found",
+          description: "We couldn't find a professional email for this candidate.",
+          variant: "destructive",
+        });
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Contact Search Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return {
+    findContact: mutation.mutate,
     isPending: mutation.isPending,
   };
 }

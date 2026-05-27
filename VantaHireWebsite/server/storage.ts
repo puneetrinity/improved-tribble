@@ -1109,7 +1109,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateJob(
     id: number,
-    updates: Partial<Pick<Job, 'title' | 'description' | 'location' | 'type' | 'skills' | 'hiringManagerId' | 'clientId'>>
+    updates: Partial<Pick<Job, 'title' | 'description' | 'location' | 'type' | 'skills' | 'hiringManagerId' | 'clientId' | 'jdDigest' | 'jdDigestVersion'>>
   ): Promise<Job | undefined> {
     const currentJob = await this.getJob(id);
     if (!currentJob) return undefined;

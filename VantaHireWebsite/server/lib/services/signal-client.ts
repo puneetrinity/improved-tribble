@@ -62,6 +62,36 @@ async function signalFetch(
 }
 
 /**
+ * Safely parse a Signal response as JSON.
+ * If Signal returns a non-JSON body (e.g. HTML error page during startup/crash),
+ * this throws a SignalApiError instead of crashing with "Unexpected end of JSON input".
+ */
+async function safeJson(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text || !text.trim()) {
+    throw new SignalApiError(
+      `Signal returned empty response (status ${res.status}) — it may still be starting up`,
+      res.status,
+    );
+  }
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new SignalApiError(
+      `Signal returned non-JSON response (status ${res.status}): ${text.substring(0, 200)}`,
+      res.status,
+    );
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new SignalApiError(
+      `Signal returned malformed JSON (status ${res.status}): ${text.substring(0, 200)}`,
+      res.status,
+    );
+  }
+}
+
+/**
  * POST /api/v3/jobs/{externalJobId}/source
  *
  * Submits a sourcing request to Signal. Returns the requestId for tracking.
@@ -82,7 +112,7 @@ export async function sourceJob(
     },
   );
 
-  const body: any = await res.json();
+  const body: any = await safeJson(res);
 
   if (!res.ok) {
     throw new SignalApiError(
@@ -105,8 +135,12 @@ export async function getResults(
   tenantId: string,
   externalJobId: string,
   requestId: string,
+  includeSummary: boolean = true,
 ): Promise<SignalResultsResponse> {
   const params = new URLSearchParams({ requestId });
+  if (includeSummary) {
+    params.append('includeSummary', 'true');
+  }
   const res = await signalFetch(
     `/api/v3/jobs/${encodeURIComponent(externalJobId)}/results?${params}`,
     {
@@ -117,7 +151,7 @@ export async function getResults(
     },
   );
 
-  const body: any = await res.json();
+  const body: any = await safeJson(res);
 
   if (!res.ok) {
     throw new SignalApiError(
@@ -128,4 +162,64 @@ export async function getResults(
   }
 
   return body as SignalResultsResponse;
+}
+
+/**
+ * POST /api/v3/jobs/{externalJobId}/enrich-batch
+ */
+export async function enrichBatch(
+  tenantId: string,
+  externalJobId: string,
+  candidateIds: number[],
+): Promise<{ enrichedCount: number }> {
+  const res = await signalFetch(
+    `/api/v3/jobs/${encodeURIComponent(externalJobId)}/enrich-batch`,
+    {
+      method: 'POST',
+      tenantId,
+      scopes: SIGNAL_SCOPES.SOURCE,
+      body: { candidateIds },
+    },
+  );
+
+  const body: any = await safeJson(res);
+
+  if (!res.ok) {
+    throw new SignalApiError(
+      body.error || `Signal /enrich-batch returned ${res.status}`,
+      res.status,
+      body,
+    );
+  }
+
+  return body;
+}
+
+/**
+ * POST /api/v3/candidates/{externalCandidateId}/find-contact
+ */
+export async function findContact(
+  tenantId: string,
+  externalCandidateId: string,
+): Promise<{ emails: string[], success: boolean }> {
+  const res = await signalFetch(
+    `/api/v3/candidates/${encodeURIComponent(externalCandidateId)}/find-contact`,
+    {
+      method: 'POST',
+      tenantId,
+      scopes: SIGNAL_SCOPES.SOURCE,
+    },
+  );
+
+  const body: any = await safeJson(res);
+
+  if (!res.ok) {
+    throw new SignalApiError(
+      body.error || `Signal /find-contact returned ${res.status}`,
+      res.status,
+      body,
+    );
+  }
+
+  return body;
 }

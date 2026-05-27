@@ -65,20 +65,20 @@ async function main() {
       continue;
     }
 
-    if (!results.candidates?.length) {
+    if (!(results as any).data?.length) {
       console.log(`  SKIP: no candidates in Signal response`);
       totalSkipped++;
       continue;
     }
 
-    console.log(`  Signal returned ${results.candidates.length} candidates`);
+    console.log(`  Signal returned ${(results as any).data.length} candidates`);
 
     // 4. Build a lookup: signalCandidateId → { matchTier, locationMatchType }
     const tierMap = new Map<string, { matchTier: string | null; locationMatchType: string | null }>();
-    for (const c of results.candidates) {
-      tierMap.set(c.candidateId, {
-        matchTier: (c as any).matchTier ?? null,
-        locationMatchType: (c as any).locationMatchType ?? null,
+    for (const c of (results as any).data) {
+      tierMap.set((c as any).candidate.id, {
+        matchTier: (c as any).sourcingContext?.matchStrength ?? null,
+        locationMatchType: (c as any).sourcingContext?.locationStatus ?? null,
       });
     }
 

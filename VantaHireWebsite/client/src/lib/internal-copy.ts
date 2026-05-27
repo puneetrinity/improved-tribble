@@ -1285,6 +1285,7 @@ export const jobSourcingPageCopy = {
     searching: "Searching for candidates...",
     enriching: "Enrichment in progress...",
     action: "Find Candidates",
+    actionRefresh: "Refresh data",
     actionPending: "Searching...",
   },
   emptyState: {

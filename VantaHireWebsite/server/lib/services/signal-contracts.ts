@@ -68,22 +68,24 @@ export interface SignalSourceResponse {
 
 /** Response from Signal GET /api/v3/jobs/{externalJobId}/results?requestId=... */
 export interface SignalResultsResponse {
-  success: boolean;
   requestId: string;
   externalJobId: string;
-  status: string;                           // SourcingRequestStatus passthrough
-  callbackStatus?: string | null;           // CallbackDeliveryStatus: 'pending' | 'delivered' | 'failed'
-  callbackSentAt?: string | null;           // ISO 8601
-  requestedAt: string;                      // ISO 8601
-  completedAt: string | null;
-  lastRerankedAt?: string | null;
   resultCount: number | null;
+  data: SignalResultCandidateV3[];
+  error?: string;
+  
+  // These are kept optional in case we need them for back-compat or future use
+  success?: boolean;
+  status?: string;
+  callbackStatus?: string | null;
+  callbackSentAt?: string | null;
+  requestedAt?: string;
+  completedAt?: string | null;
+  lastRerankedAt?: string | null;
   diagnostics?: Record<string, unknown> | null;
   trackDecision?: Record<string, unknown> | null;
   groupCounts?: SignalResultsGroupCounts | null;
   snapshotStats?: Record<string, unknown> | null;
-  candidates: SignalResultCandidate[];
-  error?: string;
 }
 
 export interface SignalResultsGroupCounts {
@@ -110,28 +112,58 @@ export interface SignalResultsGroupCounts {
   selectedSnapshotTrack?: string | null;
 }
 
-export interface SignalResultCandidate {
-  candidateId: string;
-  fitScore: number | null;
-  fitBreakdown: Record<string, unknown> | null;
-  sourceType: string;                       // raw Signal value
-  enrichmentStatus: string;
-  rank: number;
-  matchTier?: CandidateMatchTier | null;    // Signal tiering: best_matches | broader_pool
-  locationMatchType?: CandidateLocationMatchType | null; // city_exact | city_alias | country_only | none
-  dataConfidence?: 'high' | 'medium' | 'low' | null;
-  candidate: SignalCandidateDetail;
-  identitySummary?: SignalIdentitySummary | null;
-  snapshot: SignalIntelligenceSnapshot | null;
-  freshness: {
-    stale?: boolean | null;
-    staleServed?: boolean | null;           // Signal v3 name
-    snapshotAgeDays?: number | null;
-    lastEnrichedAt: string | null;          // ISO 8601
+export interface SignalResultCandidateV3 {
+  // --- NEW UNIFIED CARD SCHEMA ---
+  candidate: {
+    id: string;
+    name: string | null;
+    linkedinUrl: string | null;
+    headline: string | null;
+    location: string | null;
+    company: string | null;
+    
+    // Legacy hints
+    nameHint?: string | null;
+    headlineHint?: string | null;
+    locationHint?: string | null;
+    companyHint?: string | null;
+    enrichmentStatus?: string | null;
+    confidenceScore?: number | null;
+    lastEnrichedAt?: string | null;
+    profilePictureUrl?: string | null;
   };
-  professionalValidation?: unknown;
+  sourcingContext: {
+    rank: number;
+    matchStrength: 'strong' | 'good' | 'possible';
+    locationStatus: 'verified' | 'partial' | 'unverified' | 'mismatch' | 'unknown';
+  };
+  cardSignals: {
+    skillsTopN: string[];
+    summaryShort: string | null;
+    emailAvailable: boolean;
+    phoneAvailable?: boolean;
+    activeSeeker: boolean;
+    email?: string | null;
+    phone?: string | null;
+    github?: string | null;
+    twitter?: string | null;
+  };
+
+  // --- DETAILED FIELDS FOR DETAIL VIEW ---
+  candidateId?: string; // used by some legacy mapping
+  sourceType?: string;
+  rank?: number;
+  fitScore?: number | null;
+  fitBreakdown?: Record<string, unknown> | null;
+  matchTier?: string | null;
+  locationMatchType?: string | null;
+  dataConfidence?: string | null;
+  professionalValidation?: Record<string, unknown> | null;
   locationLabel?: string | null;
-  countryCode?: string | null;
+  snapshot?: Record<string, unknown> | null;
+  identitySummary?: SignalIdentitySummary | null;
+  aiSummary?: { text: string; skills: string[] } | null;
+  freshness?: { lastEnrichedAt?: string | null };
 }
 
 export type IdentityDisplayStatus = 'verified' | 'review' | 'weak';
@@ -201,6 +233,10 @@ export interface SignalCallbackPayload {
   candidateCount: number;
   enrichedCount: number;
   error?: string;
+  /** Optional event type for partial updates */
+  event?: 'candidate_enriched' | 'sourcing_started' | 'discovery_completed';
+  /** Optional candidate data for 'candidate_enriched' event */
+  candidateData?: any;
 }
 
 // =====================================================
@@ -268,11 +304,9 @@ export interface SourcedCandidateForUI {
   state: 'new' | 'shortlisted' | 'hidden' | 'converted';
 
   // Flattened from candidateSummary
-  nameHint: string | null;
-  headlineHint: string | null;
-  locationHint: string | null;
-  companyHint: string | null;
+  crustdata: Record<string, any> | null;
   linkedinUrl: string | null;
+  profilePictureUrl: string | null;
   enrichmentStatus: string | null;
   confidenceScore: number | null;
   searchSnippet: string | null;
@@ -284,6 +318,18 @@ export interface SourcedCandidateForUI {
     linkedinLocale: string | null;
   };
 
+  cardSignals: {
+    email: string | null;
+    phone: string | null;
+    github: string | null;
+    twitter: string | null;
+    skillsTopN: string[];
+    activeSeeker: boolean;
+    summaryShort: string | null;
+    emailAvailable: boolean;
+    phoneAvailable: boolean;
+  } | null;
+
   // Tiering/quality metadata (additive, null-safe)
   matchTier: CandidateMatchTier | null;
   locationMatchType: CandidateLocationMatchType | null;
@@ -293,6 +339,9 @@ export interface SourcedCandidateForUI {
 
   // Identity (extracted from candidateSummary.identitySummary)
   identitySummary: SignalIdentitySummary | null;
+
+  // AI Summary (extracted from candidateSummary.aiSummary)
+  aiSummary: { text: string; skills: string[] } | null;
 
   // Snapshot highlights
   snapshot: {
@@ -348,10 +397,17 @@ export function isEngagementReady(opts: {
   enrichmentStatus: string | null;
 }): boolean {
   const t = ENGAGEMENT_READY_THRESHOLDS;
-  const fitOk = (opts.fitScorePct ?? 0) >= t.minFitScorePct;
+  
+  // If fitScorePct is completely missing, we skip fit criteria
+  const fitOk = opts.fitScorePct == null ? true : opts.fitScorePct >= t.minFitScorePct;
+  
+  // If locationMatchType and confidence are missing, skip location criteria
   const locationOk = opts.locationConfidenceNumeric != null
     ? opts.locationConfidenceNumeric >= 0.6
-    : t.strongLocationTypes.has(opts.locationMatchType ?? '' as any);
+    : opts.locationMatchType != null 
+      ? t.strongLocationTypes.has(opts.locationMatchType)
+      : true;
+      
   const enrichmentOk = !t.blockedEnrichmentStatuses.has(opts.enrichmentStatus ?? '');
   const identityOk = opts.identityConfidence == null || opts.identityConfidence >= t.minIdentityConfidence;
   return fitOk && locationOk && enrichmentOk && identityOk;
@@ -473,11 +529,9 @@ export function flattenCandidateForUI(row: {
       ? row.state
       : 'new') as SourcedCandidateForUI['state'],
 
-    nameHint: safeString(cs.nameHint),
-    headlineHint: safeString(cs.headlineHint),
-    locationHint: safeString(cs.locationHint),
-    companyHint: safeString(cs.companyHint),
-    linkedinUrl: safeString(cs.linkedinUrl),
+    crustdata: ((cs as any)?.candidate?.searchMeta?.crustdata as Record<string, unknown>) || null,
+    linkedinUrl: safeString(cs.linkedinUrl) ?? safeString((cs.candidate as any)?.linkedinUrl),
+    profilePictureUrl: safeString(cs.profilePictureUrl) ?? safeString((cs.candidate as any)?.profilePictureUrl),
     enrichmentStatus: safeString(cs.enrichmentStatus),
     confidenceScore: typeof cs.confidenceScore === 'number' ? cs.confidenceScore : null,
     searchSnippet: safeString(cs.searchSnippet),
@@ -489,7 +543,20 @@ export function flattenCandidateForUI(row: {
     roleScore: safeNumber(cs.roleScore) ?? safeNumber((row.fitBreakdown as any)?.roleScore),
     experienceScore: safeNumber(cs.experienceScore) ?? safeNumber((row.fitBreakdown as any)?.experienceScore),
 
+    cardSignals: (cs.cardSignals && typeof cs.cardSignals === 'object') ? {
+      email: safeString((cs.cardSignals as any).email),
+      phone: safeString((cs.cardSignals as any).phone),
+      github: safeString((cs.cardSignals as any).github),
+      twitter: safeString((cs.cardSignals as any).twitter),
+      skillsTopN: Array.isArray((cs.cardSignals as any).skillsTopN) ? (cs.cardSignals as any).skillsTopN : [],
+      activeSeeker: Boolean((cs.cardSignals as any).activeSeeker),
+      summaryShort: safeString((cs.cardSignals as any).summaryShort),
+      emailAvailable: Boolean((cs.cardSignals as any).emailAvailable),
+      phoneAvailable: Boolean((cs.cardSignals as any).phoneAvailable),
+    } : null,
+
     identitySummary,
+    aiSummary: cs.aiSummary && typeof cs.aiSummary === 'object' ? cs.aiSummary as { text: string; skills: string[] } : null,
     snapshot,
 
     freshness: {

@@ -13,10 +13,22 @@ import {
   useSourcedCandidates,
   useFindCandidates,
   useUpdateCandidateState,
+  useSourcingProgress,
+  // useBatchEnrich,
   type SourcedCandidateForUI,
 } from "@/hooks/use-sourcing";
+import { SourcingProgressModal } from "@/components/sourcing/SourcingProgressModal";
 import { CandidateCard } from "@/components/sourcing/CandidateCard";
 import { CandidateDrawer } from "@/components/sourcing/CandidateDrawer";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
   SourcingFilters,
   defaultFilters,
@@ -80,7 +92,8 @@ function filterCandidates(candidates: SourcedCandidateForUI[], filters: Sourcing
     }
 
     if (filters.location) {
-      const loc = (c.locationHint || c.snapshot?.location || "").toLowerCase();
+      const crustLoc = c.crustdata?.location || c.crustdata?.basic_profile?.location?.full_location || c.crustdata?.basic_profile?.location?.name;
+      const loc = (crustLoc || c.snapshot?.location || "").toLowerCase();
       if (!loc.includes(filters.location.toLowerCase())) return false;
     }
 
@@ -125,13 +138,25 @@ export default function JobSourcingPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [filters, setFilters] = useState<SourcingFilterState>(defaultFilters);
   const [sortBy, setSortBy] = useState<SortKey>("rank");
-  const [bestMatchesOnly, setBestMatchesOnly] = useState(true);
-  const [showBroader, setShowBroader] = useState(false);
+  const [bestMatchesOnly, setBestMatchesOnly] = useState(false);
+  const [showBroader, setShowBroader] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   const { data: status, isLoading: statusLoading, isPolling } = useSourcingStatus(jobId);
   const { data: candidatesData, isLoading: candidatesLoading } = useSourcedCandidates(jobId);
-  const { trigger: findCandidates, isPending: findPending } = useFindCandidates(jobId);
+  const { trigger: findCandidatesBase, isPending: findPending } = useFindCandidates(jobId);
   const { update: updateState, isPending: updatePending } = useUpdateCandidateState(jobId);
+  const { progress, modalOpen, openModal, closeModal } = useSourcingProgress(jobId);
+  // const { enrichBatch, isPending: enrichPending } = useBatchEnrich(jobId);
+
+  // Open the progress modal first, then trigger sourcing
+  const findCandidates = (opts: Record<string, unknown>) => {
+    if (!opts.refresh) {
+      openModal();
+    }
+    findCandidatesBase(opts);
+  };
 
   // Lock tier model per sourcing run to prevent UI instability during enrichment refreshes
   const [lockedTierModel, setLockedTierModel] = useState<TierModel | null>(null);
@@ -145,8 +170,21 @@ export default function JobSourcingPage() {
     }
   }, [currentRequestId]);
 
+  // Also unlock the tier model whenever the underlying candidate list changes
+  // so re-enrichment / re-rank updates are reflected immediately
+  const prevCandidateCountRef = useRef<number>(-1);
+
   const allCandidates = candidatesData?.candidates ?? [];
   const counts = candidatesData?.counts ?? { total: 0, talentPool: 0, newlyDiscovered: 0 };
+
+  useEffect(() => {
+    const newCount = allCandidates.length;
+    if (prevCandidateCountRef.current !== -1 && prevCandidateCountRef.current !== newCount) {
+      setLockedTierModel(null);
+    }
+    prevCandidateCountRef.current = newCount;
+  }, [allCandidates.length]);
+
 
   const filteredSorted = useMemo(
     () => sortCandidates(filterCandidates(allCandidates, filters), sortBy),
@@ -171,6 +209,26 @@ export default function JobSourcingPage() {
   // Detect all-broader edge case: explicit tier data exists, but zero best matches
   const allBroader = grouped.tierModel === "explicit" && bestMatches.length === 0 && broaderPool.length > 0;
 
+  // Pagination Logic
+  const visibleCandidates = bestMatchesOnly && !allBroader ? bestMatches : [...bestMatches, ...broaderPool];
+  const totalVisibleCount = visibleCandidates.length;
+  const totalPages = Math.ceil(totalVisibleCount / PAGE_SIZE) || 1;
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const startIndex = (safePage - 1) * PAGE_SIZE;
+  const endIndex = startIndex + PAGE_SIZE;
+
+  const currentVisibleCandidates = visibleCandidates.slice(startIndex, endIndex);
+  const currentBestMatches = currentVisibleCandidates.filter(c => bestMatches.some(bm => bm.id === c.id));
+  const currentBroaderPool = currentVisibleCandidates.filter(c => broaderPool.some(bp => bp.id === c.id));
+
+  // Reset page to 1 when filters or data change fundamentally
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters, sortBy, bestMatchesOnly, lockedTierModel]);
+
+  // Removed frontend lazy enrichment as this is now orchestrated by the backend
+
   // Auto-disable bestMatchesOnly when all candidates are broader pool
   useEffect(() => {
     if (allBroader && bestMatchesOnly) {
@@ -185,7 +243,6 @@ export default function JobSourcingPage() {
     }
   }, [allBroader]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const visibleCandidates = bestMatchesOnly && !allBroader ? bestMatches : [...bestMatches, ...broaderPool];
   const handleBestMatchesOnlyChange = (checked: boolean) => {
     setBestMatchesOnly(checked);
     trackEvent("sourcing_best_matches_only_toggled", {
@@ -213,10 +270,10 @@ export default function JobSourcingPage() {
 
   const hasRun = status?.hasRun ?? false;
   const runStatus = status?.status;
-  const enrichment = status?.enrichment;
-  const enrichmentInProgress = enrichment?.inProgress === true;
+  // const enrichment = status?.enrichment;
+  // const enrichmentInProgress = enrichment?.inProgress === true;
   const isSourcingActive = hasRun && !["completed", "failed", "expired"].includes(runStatus ?? "");
-  const isRunning = isSourcingActive || enrichmentInProgress;
+  const isRunning = isSourcingActive/*  || enrichmentInProgress */;
   const isFailed = runStatus === "failed";
   const isExpired = runStatus === "expired";
   const isCompleted = runStatus === "completed";
@@ -257,6 +314,20 @@ export default function JobSourcingPage() {
     });
   };
 
+  // Compute sequential display positions across ALL visible candidates
+  // (best matches first, then broader pool) so #1 is always the first rendered card.
+  const displayPositionMap = useMemo(() => {
+    const map = new Map<number, number>();
+    let pos = 1;
+    const sections = allBroader ? [broaderPool] : [bestMatches, ...(!bestMatchesOnly && showBroader ? [broaderPool] : [])];
+    for (const section of sections) {
+      for (const c of section) {
+        map.set(c.id, pos++);
+      }
+    }
+    return map;
+  }, [bestMatches, broaderPool, allBroader, bestMatchesOnly, showBroader]);
+
   const renderList = (candidates: SourcedCandidateForUI[]) => {
     if (candidatesLoading) {
       return <SourcingListSkeleton />;
@@ -268,15 +339,19 @@ export default function JobSourcingPage() {
 
     return (
       <div className="space-y-3">
-        {candidates.map((c) => (
-          <CandidateCard
-            key={c.id}
-            candidate={c}
-            onClick={() => handleCardClick(c)}
-            onShortlist={() => handleShortlistToggle(c)}
-            isUpdating={updatePending}
-          />
-        ))}
+        {candidates.map((c) => {
+          const pos = displayPositionMap.get(c.id);
+          return (
+            <CandidateCard
+              key={c.id}
+              candidate={c}
+              onClick={() => handleCardClick(c)}
+              onShortlist={() => handleShortlistToggle(c)}
+              isUpdating={updatePending}
+              {...(pos != null ? { displayPosition: pos } : {})}
+            />
+          );
+        })}
       </div>
     );
   };
@@ -285,21 +360,21 @@ export default function JobSourcingPage() {
     <Layout>
       <JobSubNav jobId={jobId ?? 0} />
 
-	      <div className="container mx-auto px-4 py-6 max-w-6xl">
-	        <div className="flex items-center justify-between mb-4">
-	          <div>
-	            <div className="flex items-center gap-2">
-	              <h1 className="text-xl font-semibold">{jobSourcingPageCopy.header.title}</h1>
-	              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
-	                {jobSourcingPageCopy.header.betaBadge}
-	              </Badge>
-	            </div>
-	            <p className="mt-1 text-sm text-amber-700">
-	              {jobSourcingPageCopy.header.betaHint}
-	            </p>
-	            {isPolling && (
-	              <div className="flex items-center gap-2 mt-1">
-	                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+      <div className="container mx-auto px-4 py-6 max-w-6xl">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-xl font-semibold">{jobSourcingPageCopy.header.title}</h1>
+              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
+                {jobSourcingPageCopy.header.betaBadge}
+              </Badge>
+            </div>
+            <p className="mt-1 text-sm text-amber-700">
+              {jobSourcingPageCopy.header.betaHint}
+            </p>
+            {isPolling && (
+              <div className="flex items-center gap-2 mt-1">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                 <span className="text-sm text-muted-foreground">
                   {isSourcingActive
                     ? jobSourcingPageCopy.header.searching
@@ -307,31 +382,39 @@ export default function JobSourcingPage() {
                   {isSourcingActive && status?.candidateCount != null && status.candidateCount > 0 && (
                     <> ({status.candidateCount} found so far)</>
                   )}
-                  {!isSourcingActive && enrichmentInProgress && (
+                  {/* {!isSourcingActive && (
                     <> ({enrichment?.enrichedCount ?? 0}/{enrichment?.totalCandidates ?? 0} enriched)</>
-                  )}
+                  )} */}
                 </span>
               </div>
             )}
           </div>
-          <Button onClick={() => findCandidates()} disabled={findPending || isRunning} size="sm">
-            {findPending || isRunning ? (
-              <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-            ) : (
-              <Search className="h-4 w-4 mr-1.5" />
+          <div className="flex items-center gap-2">
+            {!hasRun && (
+              <Button
+                onClick={() => findCandidates({ forceSourcing: true })}
+                disabled={findPending || isRunning}
+                size="sm"
+              >
+                {findPending || isRunning ? (
+                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                ) : (
+                  <Search className="h-4 w-4 mr-1.5" />
+                )}
+                {isRunning ? "Running..." : "Find Candidates"}
+              </Button>
             )}
-            {isRunning ? jobSourcingPageCopy.header.actionPending : jobSourcingPageCopy.header.action}
-          </Button>
+          </div>
         </div>
 
         {isRunning && (
           <Progress
-            value={isSourcingActive ? undefined : enrichment?.percent}
+            value={isSourcingActive ? undefined : /* enrichment?.percent */ 0}
             className="h-1.5 mb-4"
           />
         )}
 
-        {!isFailed && !isExpired && enrichmentInProgress && (
+        {/* {!isFailed && !isExpired && enrichmentInProgress && (
           <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3 mb-4">
             <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
               We are still enriching candidate profiles in the background.
@@ -340,7 +423,7 @@ export default function JobSourcingPage() {
               {enrichment?.enrichedCount ?? 0} of {enrichment?.totalCandidates ?? 0} profiles enriched so far. This list updates automatically.
             </p>
           </div>
-        )}
+        )} */}
 
         {isFailed && (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 mb-4 flex items-center gap-3">
@@ -349,7 +432,7 @@ export default function JobSourcingPage() {
               <p className="text-sm font-medium text-destructive">Sourcing failed</p>
               {status?.errorMessage && <p className="text-xs text-muted-foreground mt-0.5">{status.errorMessage}</p>}
             </div>
-            <Button variant="outline" size="sm" onClick={() => findCandidates()} disabled={findPending}>
+            <Button variant="outline" size="sm" onClick={() => findCandidates({})} disabled={findPending}>
               Retry
             </Button>
           </div>
@@ -364,7 +447,7 @@ export default function JobSourcingPage() {
                 The search timed out. This can happen if results take longer than expected.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => findCandidates()} disabled={findPending}>
+            <Button variant="outline" size="sm" onClick={() => findCandidates({})} disabled={findPending}>
               Retry
             </Button>
           </div>
@@ -379,7 +462,7 @@ export default function JobSourcingPage() {
             <p className="text-sm text-muted-foreground mb-6 max-w-md">
               We will prioritize the strongest matches first and clearly separate broader results when location or fit constraints are expanded.
             </p>
-            <Button onClick={() => findCandidates()} disabled={findPending}>
+            <Button onClick={() => findCandidates({})} disabled={findPending}>
               {findPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
               Find Candidates
             </Button>
@@ -389,7 +472,7 @@ export default function JobSourcingPage() {
         {isCompleted && counts.total === 0 && !candidatesLoading && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <p className="text-sm text-muted-foreground mb-4">No matching candidates found for this role.</p>
-            <Button variant="outline" size="sm" onClick={() => findCandidates()} disabled={findPending}>
+            <Button variant="outline" size="sm" onClick={() => findCandidates({})} disabled={findPending}>
               Retry
             </Button>
           </div>
@@ -512,26 +595,28 @@ export default function JobSourcingPage() {
                     <h2 className="text-sm font-medium text-muted-foreground">
                       {requestedLocation ? `Additional Candidates near ${requestedLocation}` : "Wider Search Results"}
                     </h2>
-                    <Badge variant="secondary">{broaderPool.length}</Badge>
+                    <Badge variant="secondary">{currentBroaderPool.length}</Badge>
                   </div>
-                  {renderList(broaderPool)}
+                  {renderList(currentBroaderPool)}
                 </section>
               ) : (
                 <>
-                  <section>
-                    <div className="flex items-center justify-between mb-2">
-                      <h2 className="text-sm font-medium text-muted-foreground">
-                        {grouped.tierModel === "fallback"
-                          ? "Candidates"
-                          : requestedLocation ? `Top Matches in ${requestedLocation}` : "Top Matches"}
-                      </h2>
-                      <Badge variant="secondary">{bestMatches.length}</Badge>
-                    </div>
-                    {renderList(bestMatches)}
-                  </section>
-
-                  {!bestMatchesOnly && broaderPool.length > 0 && (
+                  {currentBestMatches.length > 0 && (
                     <section>
+                      <div className="flex items-center justify-between mb-2">
+                        <h2 className="text-sm font-medium text-muted-foreground">
+                          {grouped.tierModel === "fallback"
+                            ? "Candidates"
+                            : requestedLocation ? `Top Matches in ${requestedLocation}` : "Top Matches"}
+                        </h2>
+                        <Badge variant="secondary">{currentBestMatches.length}</Badge>
+                      </div>
+                      {renderList(currentBestMatches)}
+                    </section>
+                  )}
+
+                  {!bestMatchesOnly && currentBroaderPool.length > 0 && (
+                    <section className={currentBestMatches.length > 0 ? "pt-6 border-t border-border/50" : ""}>
                       <button
                         type="button"
                         className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground"
@@ -540,12 +625,40 @@ export default function JobSourcingPage() {
                         {showBroader ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         Wider Search Results ({broaderPool.length})
                       </button>
-                      {showBroader && renderList(broaderPool)}
+                      {showBroader && renderList(currentBroaderPool)}
                     </section>
                   )}
                 </>
               )}
             </div>
+
+            {totalPages > 1 && (
+              <div className="mt-8 mb-4">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.max(1, p - 1)); }}
+                        className={safePage === 1 ? "pointer-events-none opacity-50" : ""}
+                      />
+                    </PaginationItem>
+
+                    <PaginationItem>
+                      <span className="text-sm px-4 text-muted-foreground">Page {safePage} of {totalPages}</span>
+                    </PaginationItem>
+
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        onClick={(e) => { e.preventDefault(); setCurrentPage(p => Math.min(totalPages, p + 1)); }}
+                        className={safePage === totalPages ? "pointer-events-none opacity-50" : ""}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -556,6 +669,12 @@ export default function JobSourcingPage() {
         onClose={() => setDrawerOpen(false)}
         onUpdateState={(candidateId, state) => updateState({ candidateId, state })}
         isUpdating={updatePending}
+      />
+
+      <SourcingProgressModal
+        open={modalOpen}
+        progress={progress}
+        onClose={closeModal}
       />
     </Layout>
   );

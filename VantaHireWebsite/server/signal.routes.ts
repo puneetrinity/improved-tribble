@@ -8,13 +8,13 @@
 
 import type { Express, Request, Response, NextFunction } from 'express';
 import { db } from './db';
-import { eq, and, desc, asc, sql } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, inArray } from 'drizzle-orm';
 import { jobs, organizations, jobSourcingRuns, jobSourcedCandidates, recruiterFeedbackEvents, type JobSourcingRun, type JobSourcedCandidate } from '@shared/schema';
 import { requireRole } from './auth';
 import { requireSeat } from './auth';
 import { getUserOrganization, requireSignalTenantId } from './lib/organizationService';
 import { queueMauticSourcingRunSync } from './lib/mauticService';
-import { sourceJob } from './lib/services/signal-client';
+import { sourceJob, enrichBatch, findContact } from './lib/services/signal-client';
 import {
   CONTEXT_HASH_VERSION,
   toDisplayBucket,
@@ -261,11 +261,15 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       const externalJobId = `vanta:jobs:${job.id}`;
 
-      // Ensure JD digest exists before sourcing (same pattern as aiWorker.ts:172-178).
-      // Retry once on failure (empty topSkills indicates LLM call failed).
-      // Must happen BEFORE contextHash so the hash includes the digest.
+      // Ensure JD digest exists before sourcing.
+      // IMPORTANT: If a stale digest exists, use it immediately and regenerate in background.
+      // This eliminates a ~20s LLM round-trip from the 202 response path.
+      // Only block if there is NO digest at all (new job).
       let jdDigest = job.jdDigest as Record<string, unknown> | null;
-      if (!jdDigest || !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
+      const digestStale = !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION;
+
+      if (!jdDigest) {
+        // No digest at all — must generate synchronously so we have topSkills for sourcing.
         let generated = await generateJDDigest(job.title, job.description);
         if (generated.topSkills.length === 0) {
           generated = await generateJDDigest(job.title, job.description);
@@ -275,10 +279,26 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           jdDigestVersion: generated.version,
         }).where(eq(jobs.id, job.id));
         jdDigest = generated as unknown as Record<string, unknown>;
-        // Update in-memory job for contextHash computation
         (job as any).jdDigest = jdDigest;
         (job as any).jdDigestVersion = generated.version;
+      } else if (digestStale) {
+        // Stale digest — use existing version now, upgrade in background (non-blocking).
+        setImmediate(async () => {
+          try {
+            let generated = await generateJDDigest(job.title, job.description);
+            if (generated.topSkills.length === 0) {
+              generated = await generateJDDigest(job.title, job.description);
+            }
+            await db.update(jobs).set({
+              jdDigest: generated,
+              jdDigestVersion: generated.version,
+            }).where(eq(jobs.id, job.id));
+          } catch (e) {
+            console.error(`[find-candidates] Background JD digest refresh failed for job ${job.id}:`, e);
+          }
+        });
       }
+
 
       const contextHash = computeContextHash(job);
 
@@ -292,7 +312,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         orderBy: desc(jobSourcingRuns.createdAt),
       });
 
-      if (existingRun && !isTerminalStatus(existingRun.status as SourcingRunStatus)) {
+      if (existingRun && !req.body.forceSourcing && !isTerminalStatus(existingRun.status as SourcingRunStatus)) {
         // Dedupe: return existing active run
         res.status(200).json({
           success: true,
@@ -317,6 +337,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           location: job.location,
           ...(job.experienceYears != null ? { experienceYears: job.experienceYears } : {}),
           ...(job.educationRequirement ? { education: job.educationRequirement } : {}),
+          ...(req.body.refresh ? { refresh: true } : {}),
+          ...(req.body.forceSourcing ? { forceSourcing: true } : {}),
         },
         callbackUrl,
       };
@@ -335,6 +357,25 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       });
 
       if (existingByRequestId) {
+        if (req.body.forceSourcing) {
+          await db.update(jobSourcingRuns)
+            .set({
+              status: 'submitted',
+              candidateCount: 0,
+              updatedAt: new Date()
+            })
+            .where(eq(jobSourcingRuns.id, existingByRequestId.id));
+
+          res.status(200).json({
+            success: true,
+            requestId: existingByRequestId.requestId,
+            status: 'submitted',
+            candidateCount: 0,
+            idempotent: false,
+          });
+          return;
+        }
+
         res.status(200).json({
           success: true,
           requestId: existingByRequestId.requestId,
@@ -487,10 +528,12 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         || refreshStatus === 'stopped_max_age'
         || refreshStatus === 'stopped_no_queue'
         || refreshStatus === 'stopped_enqueue_error';
-      const inProgress = refreshTerminal
-        ? false
-        : (readBoolean(enrichmentProgressRaw, 'inProgress')
-          ?? (pendingCount > 0 && latestRun.status === 'completed'));
+      const inProgress = latestRun.status === 'completed'
+        ? false  // enrichment is atomic in orchestrator; no separate phase remains
+        : refreshTerminal
+          ? false
+          : (readBoolean(enrichmentProgressRaw, 'inProgress')
+            ?? (pendingCount > 0 && latestRun.status === 'completed'));
       const queueJobId = readOptionalStringOrNull(enrichmentRefreshRaw, 'queueJobId') ?? null;
       const lastSyncedAt = readOptionalStringOrNull(enrichmentProgressRaw, 'lastSyncedAt')
         ?? readOptionalStringOrNull(runMeta, 'lastResultsSyncAt')
@@ -498,17 +541,17 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       const lastRerankedAt = readOptionalStringOrNull(runMeta, 'lastRerankedAt') ?? null;
       const enrichment = enrichmentProgressRaw
         ? {
-            totalCandidates: readFiniteNumber(enrichmentProgressRaw, 'totalCandidates') ?? 0,
-            enrichedCount: readFiniteNumber(enrichmentProgressRaw, 'enrichedCount') ?? 0,
-            pendingCount,
-            failedCount: readFiniteNumber(enrichmentProgressRaw, 'failedCount') ?? 0,
-            percent: readFiniteNumber(enrichmentProgressRaw, 'percent') ?? 0,
-            inProgress,
-            lastSyncedAt,
-            refreshStatus,
-            queueJobId,
-            lastRerankedAt,
-          }
+          totalCandidates: readFiniteNumber(enrichmentProgressRaw, 'totalCandidates') ?? 0,
+          enrichedCount: readFiniteNumber(enrichmentProgressRaw, 'enrichedCount') ?? 0,
+          pendingCount,
+          failedCount: readFiniteNumber(enrichmentProgressRaw, 'failedCount') ?? 0,
+          percent: readFiniteNumber(enrichmentProgressRaw, 'percent') ?? 0,
+          inProgress,
+          lastSyncedAt,
+          refreshStatus,
+          queueJobId,
+          lastRerankedAt,
+        }
         : undefined;
 
       res.json({
@@ -556,13 +599,25 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       }
       const { organizationId } = contextResult.context;
 
-      const candidates: JobSourcedCandidate[] = await db.query.jobSourcedCandidates.findMany({
-        where: and(
-          eq(jobSourcedCandidates.organizationId, organizationId),
-          eq(jobSourcedCandidates.jobId, jobId),
-        ),
-        orderBy: [desc(jobSourcedCandidates.fitScore), asc(jobSourcedCandidates.id)],
-      });
+      const [candidates, latestRunForMeta] = await Promise.all([
+        db.query.jobSourcedCandidates.findMany({
+          where: and(
+            eq(jobSourcedCandidates.organizationId, organizationId),
+            eq(jobSourcedCandidates.jobId, jobId),
+          ),
+          orderBy: [desc(jobSourcedCandidates.fitScore), asc(jobSourcedCandidates.id)],
+        }) as Promise<JobSourcedCandidate[]>,
+        db.query.jobSourcingRuns.findFirst({
+          where: and(
+            eq(jobSourcingRuns.organizationId, organizationId),
+            eq(jobSourcingRuns.jobId, jobId),
+          ),
+          orderBy: desc(jobSourcingRuns.createdAt),
+          columns: { id: true, meta: true, submittedAt: true },
+        }),
+      ]);
+
+      const runMeta = (latestRunForMeta?.meta as Record<string, unknown>) ?? {};
 
       // Flatten to UI shape and preserve Signal's assembly order when rank exists.
       const enriched = sortSourcedCandidatesForDisplay(
@@ -590,16 +645,6 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         broaderPool = enriched.filter((c) => c.locationMatchType === 'none').length;
       }
 
-      // Look up latest run meta for diagnostics
-      const latestRunForMeta = await db.query.jobSourcingRuns.findFirst({
-        where: and(
-          eq(jobSourcingRuns.organizationId, organizationId),
-          eq(jobSourcingRuns.jobId, jobId),
-        ),
-        orderBy: desc(jobSourcingRuns.createdAt),
-        columns: { id: true, meta: true, submittedAt: true },
-      });
-      const runMeta = (latestRunForMeta?.meta as Record<string, unknown>) ?? {};
       const runDiagnostics = runMeta.diagnostics && typeof runMeta.diagnostics === 'object'
         ? runMeta.diagnostics as Record<string, unknown>
         : null;
@@ -609,6 +654,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       const runMetaGroupCounts = runMeta.groupCounts && typeof runMeta.groupCounts === 'object'
         ? runMeta.groupCounts as Record<string, unknown>
         : null;
+
       const resolvedBestMatches =
         readFiniteNumber(runMetaGroupCounts, 'bestMatches') ??
         readFiniteNumber(runMetaGroupCounts, 'strictMatchedCount') ??
@@ -624,10 +670,10 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         : metaExpansionReason !== undefined
           ? metaExpansionReason
           : (resolvedBestMatches === 0 && resolvedBroaderPool > 0
-              ? 'strict_low_quality'
-              : resolvedBroaderPool > 0
-                ? 'expanded_location_results'
-                : null);
+            ? 'strict_low_quality'
+            : resolvedBroaderPool > 0
+              ? 'expanded_location_results'
+              : null);
       const groupRequestedLocation = readOptionalStringOrNull(runMetaGroupCounts, 'requestedLocation');
       const metaRequestedLocation = readOptionalStringOrNull(runMeta, 'requestedLocation');
       const resolvedRequestedLocation = groupRequestedLocation !== undefined
@@ -700,18 +746,18 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         : null;
       const discoverySummary = runDiscoveryTelemetry
         ? {
-            mode: readOptionalStringOrNull(runDiscoveryTelemetry, 'mode') ?? 'deterministic',
-            strictQueriesExecuted: strictExecuted ?? 0,
-            fallbackQueriesExecuted: fallbackExecuted ?? 0,
-            queriesExecuted: (strictExecuted ?? 0) + (fallbackExecuted ?? 0),
-            strictYield: readFiniteNumber(runDiscoveryTelemetry, 'strictYield') ?? 0,
-            fallbackYield: readFiniteNumber(runDiscoveryTelemetry, 'fallbackYield') ?? 0,
-            stoppedReason: readOptionalStringOrNull(runDiscoveryTelemetry, 'stoppedReason'),
-            providerUsage,
-            groqUsed: runDiscoveryTelemetry.groq && typeof runDiscoveryTelemetry.groq === 'object'
-              ? Boolean((runDiscoveryTelemetry.groq as Record<string, unknown>).used)
-              : false,
-          }
+          mode: readOptionalStringOrNull(runDiscoveryTelemetry, 'mode') ?? 'deterministic',
+          strictQueriesExecuted: strictExecuted ?? 0,
+          fallbackQueriesExecuted: fallbackExecuted ?? 0,
+          queriesExecuted: (strictExecuted ?? 0) + (fallbackExecuted ?? 0),
+          strictYield: readFiniteNumber(runDiscoveryTelemetry, 'strictYield') ?? 0,
+          fallbackYield: readFiniteNumber(runDiscoveryTelemetry, 'fallbackYield') ?? 0,
+          stoppedReason: readOptionalStringOrNull(runDiscoveryTelemetry, 'stoppedReason'),
+          providerUsage,
+          groqUsed: runDiscoveryTelemetry.groq && typeof runDiscoveryTelemetry.groq === 'object'
+            ? Boolean((runDiscoveryTelemetry.groq as Record<string, unknown>).used)
+            : false,
+        }
         : null;
 
       const totalForQuality = enriched.length;
@@ -719,7 +765,10 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         (c) => c.locationMatchType === 'city_exact' || c.locationMatchType === 'city_alias' || c.locationMatchType === 'country_only',
       ).length;
       const validLocationHintCount = enriched.filter(
-        (c) => isLikelyValidLocationHint(c.locationHint ?? c.snapshot?.location ?? null),
+        (c) => {
+          const loc = c.crustdata?.location || c.crustdata?.basic_profile?.location?.full_location || c.crustdata?.basic_profile?.location?.name || c.snapshot?.location || null;
+          return isLikelyValidLocationHint(loc);
+        },
       ).length;
       const nonZeroSkillScoreCount = enriched.filter((c) => {
         const skillScore = c.fitBreakdown && typeof c.fitBreakdown === 'object'
@@ -863,7 +912,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       // Feedback capture (non-blocking, best-effort)
       if (process.env.FEEDBACK_CAPTURE_ENABLED === 'true'
-          && ['shortlisted', 'hidden', 'converted'].includes(newState)) {
+        && ['shortlisted', 'hidden', 'converted'].includes(newState)) {
         try {
           const { randomUUID } = await import('crypto');
 
@@ -936,6 +985,92 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       }
 
       res.json({ success: true, id: candidate.id, state: newState });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/jobs/:id/enrich-batch', requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const jobId = parseInt(req.params.id || '', 10);
+      if (isNaN(jobId)) {
+        res.status(400).json({ error: 'Invalid job ID' });
+        return;
+      }
+      const { candidateIds } = req.body;
+      if (!Array.isArray(candidateIds) || candidateIds.length === 0) {
+        res.status(400).json({ error: 'Invalid or missing candidateIds' });
+        return;
+      }
+
+      const contextResult = await resolveAccessibleSignalJobContext(req.user as SignalRouteUser, jobId);
+      if (!contextResult.ok) {
+        res.status(contextResult.error === 'JOB_NOT_FOUND' ? 404 : 403).json({ error: contextResult.error });
+        return;
+      }
+
+      // Map local candidate IDs to signal candidate IDs
+      const candidates = await db.query.jobSourcedCandidates.findMany({
+        where: inArray(jobSourcedCandidates.id, candidateIds)
+      });
+
+      const signalCandidateIds = candidates.map((c: (typeof candidates)[number]) => c.signalCandidateId).filter((id: string | null): id is string => id !== null);
+
+      if (signalCandidateIds.length === 0) {
+        res.status(400).json({ error: 'No valid signal candidate IDs found' });
+        return;
+      }
+
+      const { signalTenantId } = contextResult.context;
+      if (!signalTenantId) {
+        res.status(500).json({ error: 'Tenant ID is missing' });
+        return;
+      }
+      const externalJobId = `vanta:jobs:${jobId}`;
+
+      const response = await enrichBatch(signalTenantId, externalJobId, signalCandidateIds);
+      res.json(response);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post('/api/candidates/:candidateId/find-contact', requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const candidateId = parseInt(req.params.candidateId || '', 10);
+      if (isNaN(candidateId)) {
+        res.status(400).json({ error: 'Invalid candidate ID' });
+        return;
+      }
+
+      // Need signalTenantId for the candidate. Since candidates are job-scoped, we look up the candidate.
+      const candidate = await db.query.jobSourcedCandidates.findFirst({
+        where: eq(jobSourcedCandidates.id, candidateId),
+      });
+
+      if (!candidate) {
+        res.status(404).json({ error: 'Candidate not found' });
+        return;
+      }
+
+      const contextResult = await resolveAccessibleSignalJobContext(req.user as SignalRouteUser, candidate.jobId);
+      if (!contextResult.ok) {
+        res.status(contextResult.error === 'JOB_NOT_FOUND' ? 404 : 403).json({ error: contextResult.error });
+        return;
+      }
+
+      const { signalTenantId } = contextResult.context;
+      if (!signalTenantId) {
+        res.status(500).json({ error: 'Tenant ID is missing' });
+        return;
+      }
+      const signalCandidateId = candidate.signalCandidateId;
+      if (!signalCandidateId) {
+        res.status(400).json({ error: 'Candidate has no signal ID' });
+        return;
+      }
+      const response = await findContact(signalTenantId, signalCandidateId);
+      res.json(response);
     } catch (error) {
       next(error);
     }
