@@ -192,7 +192,7 @@ export default function HomepageNav() {
               trackEvent("cta_click", { location: "site_header_mobile", action: "get_started" });
             }}
           >
-            Get Early Access
+            Get Started {"->"}
           </a>
         </div>
       </div>
@@ -249,9 +249,6 @@ export default function HomepageNav() {
           >
             Pricing
           </Link>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
           <Link
             href="/jobs"
             style={linkStyle}
@@ -260,6 +257,9 @@ export default function HomepageNav() {
           >
             Jobs
           </Link>
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
           <a
             href="https://cal.com/ealana/quick-connect"
             target="_blank"
@@ -276,7 +276,7 @@ export default function HomepageNav() {
             style={primaryButtonStyle}
             onClick={() => trackEvent("cta_click", { location: "site_header", action: "get_started" })}
           >
-            Get Early Access
+            Get Started {"->"}
           </a>
         </div>
       </motion.div>
@@ -360,7 +360,7 @@ export default function HomepageNav() {
             style={pillButtonStyle}
             onClick={() => trackEvent("cta_click", { location: "site_header_floating", action: "get_started" })}
           >
-            Get Early Access
+            Get Started {"->"}
           </a>
         </div>
       </motion.div>

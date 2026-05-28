@@ -11,7 +11,7 @@ const HomepageFooter = () => {
       <div></div>
       <div className="border-b border-[rgba(255,255,255,0.07)]">
         <footer className="pt-14 px-12 pb-7 max-md:pt-10 max-md:px-5 max-md:pb-5 border-t-0">
-          <div className="grid grid-cols-[2fr_repeat(3,1fr)] gap-10 max-w-[1100px] mx-auto mb-10 max-md:grid-cols-2 max-md:gap-6 max-sm:grid-cols-1 max-sm:gap-5">
+          <div className="grid grid-cols-[2.2fr_repeat(3,1fr)] gap-10 max-w-[1100px] mx-auto mb-10 max-md:grid-cols-2 max-md:gap-6 max-sm:grid-cols-1 max-sm:gap-5">
             <div>
               <div className="flex items-center gap-2.5 font-bold text-base text-hr-text mb-3 no-underline">
                 <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[radial-gradient(circle_at_30%_30%,rgba(75,142,240,0.22),transparent_58%),radial-gradient(circle_at_70%_70%,rgba(52,209,122,0.18),transparent_62%),rgba(255,255,255,0.03)] shadow-[0_0_30px_rgba(75,142,240,0.12)]">
@@ -19,16 +19,28 @@ const HomepageFooter = () => {
                 </div>
                 <span className="font-outfit text-[1.02rem] font-semibold tracking-[-0.02em] text-hr-text">ealana</span>
               </div>
-              <p className="text-[0.82rem] text-hr-text-muted leading-[1.6] max-w-[260px]">AI-powered recruitment infrastructure for modern agencies. Source, engage, and place candidates faster.</p>
+              <div className="max-w-[360px]">
+                <p className="font-outfit text-[1rem] font-medium leading-[1.35] text-hr-text">
+                  The Neural OS for Talent
+                </p>
+                <p className="mt-1 text-[0.82rem] text-hr-text-muted leading-[1.6]">
+                  Cut the noise. Find the signal.
+                </p>
+                <div className="mt-5 flex items-center gap-3 text-[0.95rem] font-semibold max-sm:flex-wrap">
+                  <span className="text-[#4B8EF0]">Discover</span>
+                  <span className="text-[0.72rem] tracking-[0.3em] text-[#4B8EF0]/75">·····</span>
+                  <span className="text-[#34D17A]">Memory</span>
+                  <span className="text-[0.72rem] tracking-[0.3em] text-[#34D17A]/75">·····</span>
+                  <span className="text-[#F5C842]">Flow</span>
+                </div>
+              </div>
             </div>
             <div>
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Product</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
-                <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Features</Link></li>
                 <li><Link href="/solutions" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Solutions</Link></li>
                 <li><Link href="/pricing" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Pricing</Link></li>
                 <li><Link href="/jobs" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Browse Jobs</Link></li>
-                <li><Link href="/recruiters" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Recruiters</Link></li>
               </ul>
             </div>
             <div>

@@ -26,16 +26,16 @@ interface AuditLogEntry {
   createdAt: string;
 }
 
-const emptyStateCls = "flex flex-col items-center justify-center min-h-[60vh] text-center py-[60px] px-5 gap-3 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-hr-text-muted [&>svg]:mb-2";
-const btnApplyCls = "bg-hr-accent text-white border-none py-3 px-8 rounded-none font-dm text-[0.875rem] font-medium cursor-pointer transition-colors duration-200 whitespace-nowrap hover:bg-hr-accent-hover disabled:opacity-50 disabled:cursor-not-allowed";
-const btnSecondaryCls = "flex items-center gap-1.5 bg-transparent border border-[rgba(255,255,255,0.08)] text-hr-text-secondary py-2 px-4 rounded-none font-dm text-[0.82rem] font-normal cursor-pointer transition-all duration-200 whitespace-nowrap [&>svg]:w-3.5 [&>svg]:h-3.5 hover:border-[rgba(255,255,255,0.12)] hover:text-hr-text max-md:flex-1 max-md:justify-center";
-const cardCls = "bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none mb-4 overflow-hidden";
-const cardHeaderCls = "flex items-center gap-2.5 py-4 px-5 border-b border-[rgba(255,255,255,0.08)] font-satoshi text-base font-medium text-hr-text [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:text-hr-accent-hover [&>svg]:shrink-0";
+const emptyStateCls = "flex flex-col items-center justify-center min-h-[60vh] text-center py-[60px] px-5 gap-3 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-e-text3 [&>svg]:mb-2";
+const btnApplyCls = "bg-e-blue text-white border-none py-3 px-8 rounded-xl font-ui text-[0.875rem] font-medium cursor-pointer transition-all duration-200 whitespace-nowrap hover:brightness-110 hover:shadow-[0_10px_36px_rgba(75,142,240,0.28)] disabled:opacity-50 disabled:cursor-not-allowed";
+const btnSecondaryCls = "flex items-center gap-1.5 bg-transparent border border-white/10 text-e-text2 py-2 px-4 rounded-xl font-ui text-[0.82rem] font-normal cursor-pointer transition-all duration-200 whitespace-nowrap [&>svg]:w-3.5 [&>svg]:h-3.5 hover:border-white/20 hover:text-e-text hover:bg-white/[0.03] max-md:flex-1 max-md:justify-center";
+const cardCls = "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.03)_100%)] mb-4 overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.18)] backdrop-blur-xl";
+const cardHeaderCls = "flex items-center gap-2.5 py-4 px-5 border-b border-white/8 font-display text-base font-medium text-e-text [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:text-e-blue [&>svg]:shrink-0";
 const cardBodyCls = "p-5 max-md:p-4";
-const sidebarCardCls = "bg-hr-bg-card border border-[rgba(255,255,255,0.08)] rounded-none p-5";
-const sidebarItemCls = "flex items-start gap-3 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:text-hr-accent-hover [&>svg]:shrink-0 [&>svg]:mt-0.5";
-const metaItemCls = "flex items-center gap-[5px] text-[0.82rem] text-hr-text-muted [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0";
-const formInputCls = "bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.88rem] text-hr-text outline-none transition-all duration-200 resize-y w-full placeholder:text-hr-text-muted focus:border-hr-accent focus:shadow-[0_0_0_2px_rgba(124,58,237,0.3)]";
+const sidebarCardCls = "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.03)_100%)] p-5 shadow-[0_12px_48px_rgba(0,0,0,0.18)] backdrop-blur-xl";
+const sidebarItemCls = "flex items-start gap-3 [&>svg]:w-4 [&>svg]:h-4 [&>svg]:text-e-blue [&>svg]:shrink-0 [&>svg]:mt-0.5";
+const metaItemCls = "flex items-center gap-[5px] text-[0.82rem] text-e-text3 [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0";
+const formInputCls = "bg-white/[0.04] border border-white/10 rounded-xl py-2.5 px-3 font-ui text-[0.88rem] text-e-text outline-none transition-all duration-200 resize-y w-full placeholder:text-e-text3 focus:border-e-blue focus:shadow-[0_0_0_2px_rgba(75,142,240,0.22)]";
 const statusBadgeBase = "inline-block py-1 px-3 rounded-full font-mono text-[0.6rem] font-medium tracking-[0.06em] uppercase whitespace-nowrap";
 
 export default function JobDetailsPage() {
@@ -186,14 +186,14 @@ export default function JobDetailsPage() {
   // --- Loading state ---
   if (!match || !jobIdOrSlug) {
     return (
-      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+      <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
         <HomepageNav />
         <GridOverlay />
         <div className={emptyStateCls}>
           <Briefcase />
-          <h2 className="font-satoshi text-2xl font-medium text-hr-text">Job Not Found</h2>
-          <p className="text-sm text-hr-text-secondary max-w-[400px]">The job you're looking for doesn't exist.</p>
-          <Link href="/jobs" className="bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-[0.82rem] font-medium cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover">Browse Jobs</Link>
+          <h2 className="font-display text-2xl font-medium text-e-text">Job Not Found</h2>
+          <p className="text-sm text-e-text2 max-w-[400px]">The job you're looking for doesn't exist.</p>
+          <Link href="/jobs" className="bg-e-blue text-white border-none py-2 px-[18px] rounded-xl font-ui text-[0.82rem] font-medium cursor-pointer no-underline transition-all duration-200 inline-block hover:brightness-110">Browse Jobs</Link>
         </div>
         <HomepageFooter />
       </div>
@@ -202,12 +202,12 @@ export default function JobDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+      <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
         <HomepageNav />
         <GridOverlay />
         <div className={emptyStateCls}>
-          <div className="w-9 h-9 border-[3px] border-[rgba(255,255,255,0.08)] border-t-hr-accent rounded-full animate-hr-spin" />
-          <p className="text-sm text-hr-text-secondary max-w-[400px]">Loading job details...</p>
+          <div className="w-9 h-9 border-[3px] border-white/10 border-t-e-blue rounded-full animate-hr-spin" />
+          <p className="text-sm text-e-text2 max-w-[400px]">Loading job details...</p>
         </div>
         <HomepageFooter />
       </div>
@@ -219,29 +219,29 @@ export default function JobDetailsPage() {
     const isExpiredOrInactive = typedError?.status === 410;
 
     return (
-      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+      <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
         <HomepageNav />
         <GridOverlay />
         <div className={emptyStateCls}>
           {isExpiredOrInactive ? (
             <>
               <AlertTriangle style={{ color: '#F59E0B', width: 48, height: 48 }} />
-              <h2 className="font-satoshi text-2xl font-medium text-hr-text">{typedError?.code === 'EXPIRED' ? 'Job Has Expired' : 'Job No Longer Available'}</h2>
+              <h2 className="font-display text-2xl font-medium text-e-text">{typedError?.code === 'EXPIRED' ? 'Job Has Expired' : 'Job No Longer Available'}</h2>
               {typedError?.jobInfo?.title && (
-                <p className="text-hr-text-muted mb-1">"{typedError.jobInfo.title}"</p>
+                <p className="text-e-text3 mb-1">"{typedError.jobInfo.title}"</p>
               )}
-              <p className="text-sm text-hr-text-secondary max-w-[400px]">
+              <p className="text-sm text-e-text2 max-w-[400px]">
                 {typedError?.code === 'EXPIRED'
                   ? 'This job posting has expired and is no longer accepting applications.'
                   : 'This job is no longer active. It may have been filled or removed.'}
               </p>
-              <Link href="/jobs" className="bg-hr-accent text-white border-none py-2 px-[18px] rounded-none font-dm text-[0.82rem] font-medium cursor-pointer no-underline transition-colors duration-200 inline-block hover:bg-hr-accent-hover mt-4">Browse Active Jobs</Link>
+              <Link href="/jobs" className="bg-e-blue text-white border-none py-2 px-[18px] rounded-xl font-ui text-[0.82rem] font-medium cursor-pointer no-underline transition-all duration-200 inline-block hover:brightness-110 mt-4">Browse Active Jobs</Link>
             </>
           ) : (
             <>
               <AlertTriangle style={{ color: '#EF4444', width: 48, height: 48 }} />
-              <h2 className="font-satoshi text-2xl font-medium text-hr-text">Error</h2>
-              <p className="text-sm text-hr-text-secondary max-w-[400px]">Failed to load job details. Please try again.</p>
+              <h2 className="font-display text-2xl font-medium text-e-text">Error</h2>
+              <p className="text-sm text-e-text2 max-w-[400px]">Failed to load job details. Please try again.</p>
             </>
           )}
         </div>
@@ -291,7 +291,7 @@ export default function JobDetailsPage() {
         </script>
       </Helmet>
 
-      <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased">
+      <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
         <HomepageNav />
         <GridOverlay />
 
@@ -303,14 +303,14 @@ export default function JobDetailsPage() {
 
               {/* Breadcrumb */}
               <nav
-                className="flex items-center gap-2 pt-7 max-md:pt-5 text-[0.82rem] text-hr-text-muted [&>a]:text-hr-text-muted [&>a]:no-underline [&>a]:transition-colors [&>a]:duration-200 hover:[&>a]:text-hr-accent-hover [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0 [&>svg]:opacity-50"
+                className="flex items-center gap-2 pt-7 max-md:pt-5 text-[0.82rem] text-e-text3 [&>a]:text-e-text3 [&>a]:no-underline [&>a]:transition-colors [&>a]:duration-200 hover:[&>a]:text-e-blue [&>svg]:w-3.5 [&>svg]:h-3.5 [&>svg]:shrink-0 [&>svg]:opacity-50"
                 style={{ animation: 'hr-fade-up 0.5s ease-out both' }}
               >
                 <Link href="/">Home</Link>
                 <ChevronRight />
                 <Link href="/jobs">Jobs</Link>
                 <ChevronRight />
-                <span className="text-hr-text-secondary">{job.title}</span>
+                <span className="text-e-text2">{job.title}</span>
               </nav>
 
               {/* Hero header */}
@@ -320,7 +320,7 @@ export default function JobDetailsPage() {
               >
                 <div className="flex-1 min-w-0">
                   <div className={sectionLabel}>Job Opening</div>
-                  <h1 className="font-satoshi text-[clamp(1.8rem,4vw,2.6rem)] max-md:text-[1.5rem] font-medium leading-[1.2] tracking-[-0.01em] text-hr-text mb-4">{job.title}</h1>
+                  <h1 className="font-display text-[clamp(2rem,4vw,3rem)] max-md:text-[1.7rem] font-medium leading-[1.08] tracking-[-0.03em] text-e-text mb-4">{job.title}</h1>
                   <div className="flex flex-wrap gap-[18px] mb-4">
                     <span className={metaItemCls}>
                       <MapPin /> {job.location}
@@ -332,7 +332,7 @@ export default function JobDetailsPage() {
                       <span className={metaItemCls}>
                         <User />
                         {job.postedById && job.isRecruiterProfilePublic ? (
-                          <Link href={`/recruiters/${job.postedById}`} className="text-hr-accent-hover no-underline transition-colors duration-200 hover:underline">{job.postedByName}</Link>
+                          <Link href={`/recruiters/${job.postedById}`} className="text-e-blue no-underline transition-colors duration-200 hover:underline">{job.postedByName}</Link>
                         ) : (
                           job.postedByName
                         )}
@@ -340,10 +340,10 @@ export default function JobDetailsPage() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2 items-center">
-                    <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.06em] uppercase bg-[rgba(124,58,237,0.12)] text-hr-accent-hover whitespace-nowrap">{job.type.replace('-', ' ')}</span>
-                    {isExpired && <span className={`${statusBadgeBase} bg-[rgba(239,68,68,0.12)] text-hr-red`}>Expired</span>}
+                    <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.06em] uppercase bg-[rgba(75,142,240,0.12)] border border-[rgba(75,142,240,0.16)] text-e-blue whitespace-nowrap">{job.type.replace('-', ' ')}</span>
+                    {isExpired && <span className={`${statusBadgeBase} bg-[rgba(239,68,68,0.12)] text-red-400`}>Expired</span>}
                     {showExpiryWarning && !isExpired && (
-                      <span className={`${statusBadgeBase} bg-[rgba(245,158,11,0.12)] text-hr-yellow`}>
+                      <span className={`${statusBadgeBase} bg-[rgba(245,200,66,0.12)] text-e-amber`}>
                         Expires {daysUntilExpiry === 0 ? 'today' : daysUntilExpiry === 1 ? 'tomorrow' : `in ${daysUntilExpiry} days`}
                       </span>
                     )}
@@ -365,7 +365,7 @@ export default function JobDetailsPage() {
                   )}
                   {isExpired && isRecruiterOrAdmin && (
                     <button
-                      className="flex items-center gap-2 bg-transparent text-hr-green border border-[rgba(16,185,129,0.3)] py-2.5 px-6 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-all duration-200 [&>svg]:w-4 [&>svg]:h-4 hover:bg-[rgba(16,185,129,0.1)] hover:border-[rgba(16,185,129,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="flex items-center gap-2 bg-transparent text-e-green border border-[rgba(52,209,122,0.28)] py-2.5 px-6 rounded-xl font-ui text-[0.85rem] font-medium cursor-pointer transition-all duration-200 [&>svg]:w-4 [&>svg]:h-4 hover:bg-[rgba(52,209,122,0.08)] hover:border-[rgba(52,209,122,0.5)] disabled:opacity-50 disabled:cursor-not-allowed"
                       onClick={() => reactivateMutation.mutate()}
                       disabled={reactivateMutation.isPending}
                     >
@@ -398,15 +398,15 @@ export default function JobDetailsPage() {
               {/* Expiry warning banner */}
               {showExpiryWarning && !isExpired && (
                 <div
-                  className="flex items-start gap-3 py-3.5 px-[18px] border border-[rgba(245,158,11,0.25)] bg-[rgba(245,158,11,0.06)] rounded-none mb-7 [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:text-hr-yellow [&>svg]:shrink-0 [&>svg]:mt-0.5"
+                  className="flex items-start gap-3 py-3.5 px-[18px] border border-[rgba(245,200,66,0.25)] bg-[rgba(245,200,66,0.06)] rounded-[20px] mb-7 [&>svg]:w-[18px] [&>svg]:h-[18px] [&>svg]:text-e-amber [&>svg]:shrink-0 [&>svg]:mt-0.5"
                   style={{ animation: 'hr-fade-up 0.7s ease-out 0.1s both' }}
                 >
                   <AlertTriangle />
                   <div>
-                    <strong className="block text-[0.88rem] text-hr-yellow font-medium mb-0.5">
+                    <strong className="block text-[0.88rem] text-e-amber font-medium mb-0.5">
                       This job posting expires {daysUntilExpiry === 0 ? 'today' : daysUntilExpiry === 1 ? 'tomorrow' : `in ${daysUntilExpiry} days`}
                     </strong>
-                    <span className="text-[0.78rem] text-hr-text-muted">
+                    <span className="text-[0.78rem] text-e-text3">
                       {job.expiresAt && `Expiry date: ${format(new Date(job.expiresAt), "MMMM d, yyyy 'at' h:mm a")}`}
                     </span>
                   </div>
@@ -427,7 +427,7 @@ export default function JobDetailsPage() {
                       <FileText /> Job Description
                     </div>
                     <div className={cardBodyCls}>
-                      <p className="text-sm leading-[1.75] text-hr-text-secondary whitespace-pre-wrap">{job.description}</p>
+                      <p className="text-sm leading-[1.8] text-e-text2 whitespace-pre-wrap">{job.description}</p>
                     </div>
                   </section>
 
@@ -441,14 +441,14 @@ export default function JobDetailsPage() {
                         <div className="flex flex-col gap-4">
                           {job.educationRequirement && (
                             <div className="flex flex-col gap-1">
-                              <span className="text-[0.78rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Education</span>
-                              <span className="text-sm text-hr-text font-medium">{job.educationRequirement}</span>
+                              <span className="text-[0.78rem] text-e-text3 uppercase tracking-[0.06em] font-mono">Education</span>
+                              <span className="text-sm text-e-text font-medium">{job.educationRequirement}</span>
                             </div>
                           )}
                           {job.experienceYears && (
                             <div className="flex flex-col gap-1">
-                              <span className="text-[0.78rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Experience</span>
-                              <span className="text-sm text-hr-text font-medium">{job.experienceYears}+ years</span>
+                              <span className="text-[0.78rem] text-e-text3 uppercase tracking-[0.06em] font-mono">Experience</span>
+                              <span className="text-sm text-e-text font-medium">{job.experienceYears}+ years</span>
                             </div>
                           )}
                         </div>
@@ -465,7 +465,7 @@ export default function JobDetailsPage() {
                       <div className={cardBodyCls}>
                         <div className="flex flex-wrap gap-2">
                           {job.skills.map((skill, index) => (
-                            <span key={index} className="inline-block py-[5px] px-3.5 rounded-full text-[0.78rem] font-medium border bg-[rgba(239,68,68,0.08)] border-[rgba(239,68,68,0.2)] text-hr-red">{skill}</span>
+                            <span key={index} className="inline-block py-[5px] px-3.5 rounded-full text-[0.78rem] font-medium border bg-[rgba(75,142,240,0.08)] border-[rgba(75,142,240,0.2)] text-e-blue">{skill}</span>
                           ))}
                         </div>
                       </div>
@@ -481,7 +481,7 @@ export default function JobDetailsPage() {
                       <div className={cardBodyCls}>
                         <div className="flex flex-wrap gap-2">
                           {job.goodToHaveSkills.map((skill, index) => (
-                            <span key={index} className="inline-block py-[5px] px-3.5 rounded-full text-[0.78rem] font-medium border bg-[rgba(16,185,129,0.08)] border-[rgba(16,185,129,0.2)] text-hr-green">{skill}</span>
+                            <span key={index} className="inline-block py-[5px] px-3.5 rounded-full text-[0.78rem] font-medium border bg-[rgba(52,209,122,0.08)] border-[rgba(52,209,122,0.2)] text-e-green">{skill}</span>
                           ))}
                         </div>
                       </div>
@@ -496,14 +496,14 @@ export default function JobDetailsPage() {
                       </div>
                       <div className={cardBodyCls}>
                         <div className="flex items-baseline gap-2">
-                          <span className="font-satoshi text-2xl font-semibold text-hr-text">
+                          <span className="font-display text-2xl font-semibold text-e-text">
                             {job.salaryMin && job.salaryMax
-                              ? `â‚¹${job.salaryMin.toLocaleString('en-IN')} â€“ â‚¹${job.salaryMax.toLocaleString('en-IN')}`
+                              ? `Rs.${job.salaryMin.toLocaleString('en-IN')} - Rs.${job.salaryMax.toLocaleString('en-IN')}`
                               : job.salaryMin
-                              ? `â‚¹${job.salaryMin.toLocaleString('en-IN')}+`
-                              : `Up to â‚¹${job.salaryMax?.toLocaleString('en-IN')}`}
+                              ? `Rs.${job.salaryMin.toLocaleString('en-IN')}+`
+                              : `Up to Rs.${job.salaryMax?.toLocaleString('en-IN')}`}
                           </span>
-                          <span className="text-[0.85rem] text-hr-text-muted">
+                          <span className="text-[0.85rem] text-e-text3">
                             {job.salaryPeriod === 'per_month' ? '/month' : '/year'}
                           </span>
                         </div>
@@ -521,21 +521,21 @@ export default function JobDetailsPage() {
                         <div className="relative pl-5 before:content-[''] before:absolute before:left-1 before:top-0 before:bottom-0 before:w-px before:bg-[rgba(255,255,255,0.08)]">
                           {auditLog.slice(0, 10).map((entry) => (
                             <div key={entry.id} className="relative pb-4 pl-3 last:pb-0">
-                              <div className="absolute -left-[19px] top-1 w-[9px] h-[9px] rounded-full bg-hr-accent border-2 border-hr-bg-card" />
-                              <div className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-3 px-3.5">
+                              <div className="absolute -left-[19px] top-1 w-[9px] h-[9px] rounded-full bg-e-blue border-2 border-e-bg2" />
+                              <div className="bg-white/[0.04] border border-white/10 rounded-xl py-3 px-3.5">
                                 <div className="flex justify-between items-center gap-3 mb-1">
-                                  <span className="text-[0.85rem] font-medium text-hr-text capitalize">{entry.action.replace(/_/g, ' ')}</span>
-                                  <span className="text-[0.72rem] text-hr-text-muted font-mono whitespace-nowrap">
+                                  <span className="text-[0.85rem] font-medium text-e-text capitalize">{entry.action.replace(/_/g, ' ')}</span>
+                                  <span className="text-[0.72rem] text-e-text3 font-mono whitespace-nowrap">
                                     {entry.createdAt && !isNaN(new Date(entry.createdAt).getTime())
                                       ? format(new Date(entry.createdAt), "MMM d, yyyy 'at' h:mm a")
                                       : 'Unknown date'}
                                   </span>
                                 </div>
                                 {entry.performedBy && (
-                                  <span className="text-[0.75rem] text-hr-text-muted">by {entry.performedBy.firstName} {entry.performedBy.lastName}</span>
+                                  <span className="text-[0.75rem] text-e-text3">by {entry.performedBy.firstName} {entry.performedBy.lastName}</span>
                                 )}
                                 {entry.changes && Object.keys(entry.changes).length > 0 && (
-                                  <div className="flex flex-wrap gap-2 mt-2 text-[0.72rem] text-hr-text-muted">
+                                  <div className="flex flex-wrap gap-2 mt-2 text-[0.72rem] text-e-text3">
                                     {Object.entries(entry.changes).map(([key, value]) => (
                                       <span key={key}>{key}: {String(value)}</span>
                                     ))}
@@ -554,50 +554,50 @@ export default function JobDetailsPage() {
                 <aside className="sticky top-20 self-start flex flex-col gap-4 max-md:static" id="hr-jd-apply-section">
                   {/* Job summary card */}
                   <div className={sidebarCardCls}>
-                    <div className="font-satoshi text-base font-medium text-hr-text mb-4">Job Summary</div>
+                    <div className="font-display text-base font-medium text-e-text mb-4">Job Summary</div>
                     <div className="flex flex-col gap-4">
                       <div className={sidebarItemCls}>
                         <MapPin />
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Location</span>
-                          <span className="text-[0.88rem] text-hr-text font-medium">{job.location}</span>
+                          <span className="text-[0.72rem] text-e-text3 uppercase tracking-[0.06em] font-mono">Location</span>
+                          <span className="text-[0.88rem] text-e-text font-medium">{job.location}</span>
                         </div>
                       </div>
                       <div className={sidebarItemCls}>
                         <Briefcase />
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Job Type</span>
-                          <span className="text-[0.88rem] text-hr-text font-medium capitalize">{job.type.replace('-', ' ')}</span>
+                          <span className="text-[0.72rem] text-e-text3 uppercase tracking-[0.06em] font-mono">Job Type</span>
+                          <span className="text-[0.88rem] text-e-text font-medium capitalize">{job.type.replace('-', ' ')}</span>
                         </div>
                       </div>
                       {job.deadline && (
                         <div className={sidebarItemCls}>
                           <Calendar />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Deadline</span>
-                            <span className="text-[0.88rem] text-hr-yellow font-medium">{formatDate(job.deadline)}</span>
+                            <span className="text-[0.72rem] text-e-text3 uppercase tracking-[0.06em] font-mono">Deadline</span>
+                            <span className="text-[0.88rem] text-e-amber font-medium">{formatDate(job.deadline)}</span>
                           </div>
                         </div>
                       )}
                       <div className={sidebarItemCls}>
                         <Clock />
                         <div className="flex flex-col gap-0.5">
-                          <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Posted</span>
-                          <span className="text-[0.88rem] text-hr-text font-medium">{formatDate(job.createdAt)}</span>
+                          <span className="text-[0.72rem] text-e-text3 uppercase tracking-[0.06em] font-mono">Posted</span>
+                          <span className="text-[0.88rem] text-e-text font-medium">{formatDate(job.createdAt)}</span>
                         </div>
                       </div>
                       {(job.salaryMin || job.salaryMax) && (
                         <div className={sidebarItemCls}>
                           <IndianRupee />
                           <div className="flex flex-col gap-0.5">
-                            <span className="text-[0.72rem] text-hr-text-muted uppercase tracking-[0.06em] font-mono">Salary</span>
-                            <span className="text-[0.88rem] text-hr-text font-medium">
+                            <span className="text-[0.72rem] text-e-text3 uppercase tracking-[0.06em] font-mono">Salary</span>
+                            <span className="text-[0.88rem] text-e-text font-medium">
                               {job.salaryMin && job.salaryMax
-                                ? `â‚¹${job.salaryMin.toLocaleString('en-IN')} â€“ â‚¹${job.salaryMax.toLocaleString('en-IN')}`
+                                ? `Rs.${job.salaryMin.toLocaleString('en-IN')} - Rs.${job.salaryMax.toLocaleString('en-IN')}`
                                 : job.salaryMin
-                                ? `â‚¹${job.salaryMin.toLocaleString('en-IN')}+`
-                                : `Up to â‚¹${job.salaryMax?.toLocaleString('en-IN')}`}
-                              <span className="text-hr-text-muted font-normal text-[0.72rem] ml-1">
+                                ? `Rs.${job.salaryMin.toLocaleString('en-IN')}+`
+                                : `Up to Rs.${job.salaryMax?.toLocaleString('en-IN')}`}
+                              <span className="text-e-text3 font-normal text-[0.72rem] ml-1">
                                 {job.salaryPeriod === 'per_month' ? '/mo' : '/yr'}
                               </span>
                             </span>
@@ -609,20 +609,20 @@ export default function JobDetailsPage() {
 
                   {/* AI match badge */}
                   {aiEnabled && (
-                    <div className="bg-[linear-gradient(135deg,rgba(124,58,237,0.1),rgba(6,182,212,0.06))] border border-[rgba(124,58,237,0.2)] rounded-none py-[18px] px-5">
-                      <div className="flex items-center gap-2 text-[0.88rem] font-semibold text-hr-accent-hover mb-2 [&>svg]:w-4 [&>svg]:h-4">
+                    <div className="bg-[linear-gradient(135deg,rgba(75,142,240,0.1),rgba(52,209,122,0.05))] border border-[rgba(75,142,240,0.2)] rounded-[24px] py-[18px] px-5">
+                      <div className="flex items-center gap-2 text-[0.88rem] font-semibold text-e-blue mb-2 [&>svg]:w-4 [&>svg]:h-4">
                         <Sparkles /> AI Match Score
                       </div>
-                      <p className="text-[0.78rem] text-hr-text-muted leading-[1.5] mb-3">Upload your resume to see your match score</p>
-                      <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.04em] bg-[rgba(124,58,237,0.12)] text-hr-accent-hover border border-[rgba(124,58,237,0.2)]">AI-Powered Matching Available</span>
+                      <p className="text-[0.78rem] text-e-text3 leading-[1.5] mb-3">Upload your resume to see your match score</p>
+                      <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.04em] bg-[rgba(75,142,240,0.12)] text-e-blue border border-[rgba(75,142,240,0.2)]">AI-Powered Matching Available</span>
                     </div>
                   )}
 
                   {/* Apply card */}
                   {!showApplicationForm ? (
                     <div className={sidebarCardCls}>
-                      <div className="font-satoshi text-base font-medium text-hr-text mb-4">Interested?</div>
-                      <p className="text-[0.88rem] text-hr-text-secondary leading-[1.6] mb-5">
+                      <div className="font-display text-base font-medium text-e-text mb-4">Interested?</div>
+                      <p className="text-[0.88rem] text-e-text2 leading-[1.6] mb-5">
                         Submit your application and we'll get back to you.
                       </p>
                       {!isExpired && (
@@ -638,17 +638,17 @@ export default function JobDetailsPage() {
                   ) : (
                     <div className={`${sidebarCardCls} p-5`}>
                       <div className="flex justify-between items-start">
-                        <div className="font-satoshi text-base font-medium text-hr-text mb-4">Submit Application</div>
-                        <button className="bg-transparent border-none text-hr-text-muted cursor-pointer p-1 transition-colors duration-200 hover:text-hr-text [&>svg]:w-[18px] [&>svg]:h-[18px]" onClick={() => setShowApplicationForm(false)}>
+                        <div className="font-display text-base font-medium text-e-text mb-4">Submit Application</div>
+                        <button className="bg-transparent border-none text-e-text3 cursor-pointer p-1 transition-colors duration-200 hover:text-e-text [&>svg]:w-[18px] [&>svg]:h-[18px]" onClick={() => setShowApplicationForm(false)}>
                           <X />
                         </button>
                       </div>
-                      <p className="text-[0.82rem] text-hr-text-muted mb-5">
+                      <p className="text-[0.82rem] text-e-text3 mb-5">
                         Fill out the form below to apply for this position
                       </p>
                       <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
                         <div className="flex flex-col gap-1.5">
-                          <label htmlFor="name" className="text-[0.78rem] font-medium text-hr-text-secondary">Full Name *</label>
+                          <label htmlFor="name" className="text-[0.78rem] font-medium text-e-text2">Full Name *</label>
                           <input
                             id="name"
                             className={formInputCls}
@@ -659,7 +659,7 @@ export default function JobDetailsPage() {
                           />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label htmlFor="email" className="text-[0.78rem] font-medium text-hr-text-secondary">Email *</label>
+                          <label htmlFor="email" className="text-[0.78rem] font-medium text-e-text2">Email *</label>
                           <input
                             id="email"
                             type="email"
@@ -671,7 +671,7 @@ export default function JobDetailsPage() {
                           />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label htmlFor="phone" className="text-[0.78rem] font-medium text-hr-text-secondary">Phone *</label>
+                          <label htmlFor="phone" className="text-[0.78rem] font-medium text-e-text2">Phone *</label>
                           <input
                             id="phone"
                             type="tel"
@@ -683,26 +683,26 @@ export default function JobDetailsPage() {
                           />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label htmlFor="resume" className="text-[0.78rem] font-medium text-hr-text-secondary">Resume (PDF) *</label>
+                          <label htmlFor="resume" className="text-[0.78rem] font-medium text-e-text2">Resume (PDF) *</label>
                           <div className="relative">
                             <input
                               id="resume"
                               type="file"
                               accept=".pdf,.doc,.docx"
-                              className="bg-hr-bg-elevated border border-[rgba(255,255,255,0.08)] rounded-none py-2.5 px-3 font-dm text-[0.82rem] text-hr-text-secondary w-full cursor-pointer file:bg-hr-accent file:text-white file:border-none file:rounded-none file:py-1.5 file:px-4 file:mr-3 file:font-dm file:text-[0.78rem] file:font-medium file:cursor-pointer"
+                              className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 px-3 font-ui text-[0.82rem] text-e-text2 w-full cursor-pointer file:bg-e-blue file:text-white file:border-none file:rounded-xl file:py-1.5 file:px-4 file:mr-3 file:font-ui file:text-[0.78rem] file:font-medium file:cursor-pointer"
                               onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
                               required
                             />
-                            <Upload className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-hr-text-muted pointer-events-none" />
+                            <Upload className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-e-text3 pointer-events-none" />
                           </div>
                           {resumeFile && (
-                            <span className="flex items-center gap-1.5 text-[0.78rem] text-hr-green mt-1 [&>svg]:w-3.5 [&>svg]:h-3.5">
+                            <span className="flex items-center gap-1.5 text-[0.78rem] text-e-green mt-1 [&>svg]:w-3.5 [&>svg]:h-3.5">
                               <Check /> {resumeFile.name}
                             </span>
                           )}
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label htmlFor="coverLetter" className="text-[0.78rem] font-medium text-hr-text-secondary">Cover Letter</label>
+                          <label htmlFor="coverLetter" className="text-[0.78rem] font-medium text-e-text2">Cover Letter</label>
                           <textarea
                             id="coverLetter"
                             className={formInputCls}
@@ -721,7 +721,7 @@ export default function JobDetailsPage() {
                             className="mt-0.5 cursor-pointer"
                             style={{ accentColor: '#7C3AED' }}
                           />
-                          <label htmlFor="whatsappConsent" className="text-[0.78rem] text-hr-text-muted leading-[1.4] cursor-pointer">I agree to receive job updates via WhatsApp</label>
+                          <label htmlFor="whatsappConsent" className="text-[0.78rem] text-e-text3 leading-[1.4] cursor-pointer">I agree to receive job updates via WhatsApp</label>
                         </div>
                         <div className="flex gap-2 mt-1">
                           <button

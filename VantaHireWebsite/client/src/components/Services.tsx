@@ -1,4 +1,4 @@
-﻿import { Database, Search, MessageSquare, Users, LayoutDashboard, Target, ArrowRight } from "lucide-react";
+import { Database, Search, MessageSquare, Users, LayoutDashboard, Target, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const pillars = [
@@ -9,7 +9,7 @@ const pillars = [
     iconColor: "text-primary",
     title: "Resume Intelligence",
     subtitle: "Your talent pool grows with every resume",
-    description: "Search candidates using natural language â€” past applicants become findable and reusable for new roles.",
+    description: "Search candidates using natural language - past applicants become findable and reusable for new roles.",
     anchor: "pillar-1"
   },
   {
@@ -39,7 +39,7 @@ const pillars = [
     iconColor: "text-blue-400",
     title: "Client Feedback Portal",
     subtitle: "Client feedback in hours, not days",
-    description: "Share a shortlist via link. Clients review and respond with structured feedback â€” same day, not same week.",
+    description: "Share a shortlist via link. Clients review and respond with structured feedback - same day, not same week.",
     anchor: "pillar-4"
   },
   {
@@ -68,7 +68,6 @@ const Services = () => {
   return (
     <section id="features" className="py-24 relative z-10">
       <div className="container mx-auto px-4">
-        {/* Platform Overview */}
         <div className="text-center mb-6">
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
             Everything recruiters need. One platform.
@@ -81,11 +80,16 @@ const Services = () => {
           </p>
         </div>
 
-        {/* Link to Product */}
         <div className="text-center mb-16">
           <Button
             variant="ghost"
-            onClick={() => window.location.href = '/features'}
+            onClick={() => {
+              if (window.location.pathname === "/") {
+                document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
+                return;
+              }
+              window.location.href = "/#features";
+            }}
             className="text-primary hover:text-primary/80"
           >
             See how it works
@@ -93,37 +97,30 @@ const Services = () => {
           </Button>
         </div>
 
-        {/* Section Header */}
         <div className="text-center mb-12">
           <h3 className="text-2xl md:text-3xl font-bold text-white mb-4">
             The ealana Platform
           </h3>
         </div>
 
-        {/* Pillars Grid â€” 6 cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {pillars.map((pillar, index) => (
             <div key={index} className="service-card relative">
-              {/* Number Badge */}
               <div className="absolute top-6 right-6 text-4xl font-bold text-white/10">
                 {pillar.number}
               </div>
 
-              {/* Icon */}
               <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-5 ${pillar.iconBg}`}>
                 <span className={pillar.iconColor}>{pillar.icon}</span>
               </div>
 
-              {/* Title & Subtitle */}
               <h4 className="text-xl font-bold text-white mb-1">{pillar.title}</h4>
               <p className="text-primary text-sm font-medium mb-3">{pillar.subtitle}</p>
 
-              {/* Description */}
               <p className="text-[var(--text-secondary)] text-sm leading-relaxed mb-4">
                 {pillar.description}
               </p>
 
-              {/* Deep dive link per CONTENT-MAP.md */}
               <a
                 href={`/features#${pillar.anchor}`}
                 className="text-primary/70 text-sm hover:text-primary transition-colors inline-flex items-center gap-1"
@@ -135,7 +132,6 @@ const Services = () => {
           ))}
         </div>
 
-        {/* CTA Links */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-12">
           <Button
             variant="outlinePurple"

@@ -12,7 +12,6 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -50,7 +49,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
-import ealanaLogo from "@/assets/ealana_logo.svg";
+import ealanaMoth from "@/assets/ealana-moth (1).svg";
 import { atsShellCopy } from "@/lib/internal-copy";
 
 type NavItem = {
@@ -97,7 +96,7 @@ export default function AtsSidebar({
   isOrgOwnerOrAdmin,
   displayName,
 }: AtsSidebarProps) {
-  const { state, isMobile } = useSidebar();
+  const { state, isMobile, toggleSidebar } = useSidebar();
   const { data: subscription } = useSubscription();
   const isCollapsed = !isMobile && state === "collapsed";
   const [orgManagementOpen, setOrgManagementOpen] = React.useState(() => {
@@ -261,11 +260,13 @@ export default function AtsSidebar({
             onClick={() => navigate("/")}
             className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl text-left transition-opacity hover:opacity-90 group-data-[collapsible=icon]:hidden"
           >
-            <img
-              src={ealanaLogo}
-              alt="ealana"
-              className="h-12 w-auto shrink-0 rounded-[18px] object-contain shadow-[0_16px_34px_rgba(0,0,0,0.22)]"
-            />
+            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[18px] border border-sidebar-border bg-[radial-gradient(circle_at_30%_30%,rgba(75,142,240,0.2),transparent_58%),radial-gradient(circle_at_70%_70%,rgba(52,209,122,0.16),transparent_62%),rgba(255,255,255,0.03)] shadow-[0_16px_34px_rgba(0,0,0,0.22)]">
+              <img
+                src={ealanaMoth}
+                alt="ealana moth"
+                className="h-9 w-9 object-contain drop-shadow-[0_0_18px_rgba(75,142,240,0.22)]"
+              />
+            </div>
             <div className="min-w-0 space-y-1 group-data-[collapsible=icon]:hidden">
               <div className="flex items-center gap-2">
                 <div className="rounded-full border border-sidebar-border bg-[rgba(75,142,240,0.12)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-primary">{atsShellCopy.brand.badge}</div>
@@ -277,9 +278,19 @@ export default function AtsSidebar({
               )}
             </div>
           </button>
-          <SidebarTrigger
-            className="mt-1 shrink-0 rounded-xl border border-transparent text-sidebar-foreground/60 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-primary group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10"
-          />
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            className="hidden mt-1 shrink-0 rounded-xl border border-transparent text-sidebar-foreground/60 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-primary group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center"
+            aria-label={isCollapsed ? "Open sidebar" : "Collapse sidebar"}
+            title={isCollapsed ? "Open sidebar" : "Collapse sidebar"}
+          >
+            <img
+              src={ealanaMoth}
+              alt="ealana moth"
+              className="h-5 w-5 object-contain"
+            />
+          </button>
         </div>
       </SidebarHeader>
 

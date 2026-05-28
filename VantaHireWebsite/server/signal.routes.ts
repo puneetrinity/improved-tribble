@@ -40,6 +40,36 @@ function normalizeSkillList(skills: unknown): string[] {
   return [...new Set(normalized)].sort();
 }
 
+function readStructuredJobDescription(description: string | null | undefined): {
+  mustHaveSkills?: string[];
+  niceToHaveSkills?: string[];
+} | null {
+  if (!description) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(description) as {
+      mustHaveSkills?: unknown;
+      niceToHaveSkills?: unknown;
+    };
+
+    const mustHaveSkills = Array.isArray(parsed.mustHaveSkills)
+      ? parsed.mustHaveSkills.filter((skill): skill is string => typeof skill === 'string')
+      : undefined;
+    const niceToHaveSkills = Array.isArray(parsed.niceToHaveSkills)
+      ? parsed.niceToHaveSkills.filter((skill): skill is string => typeof skill === 'string')
+      : undefined;
+
+    return {
+      ...(mustHaveSkills ? { mustHaveSkills } : {}),
+      ...(niceToHaveSkills ? { niceToHaveSkills } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
 function isIdentityDisplayStatus(value: unknown): value is SignalIdentitySummary['displayStatus'] {
   return value === 'verified' || value === 'review' || value === 'weak';
 }
@@ -265,10 +295,11 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       // Retry once on failure (empty topSkills indicates LLM call failed).
       // Must happen BEFORE contextHash so the hash includes the digest.
       let jdDigest = job.jdDigest as Record<string, unknown> | null;
+      const digestSourceDescription = job.originalJD || job.description;
       if (!jdDigest || !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-        let generated = await generateJDDigest(job.title, job.description);
+        let generated = await generateJDDigest(job.title, digestSourceDescription);
         if (generated.topSkills.length === 0) {
-          generated = await generateJDDigest(job.title, job.description);
+          generated = await generateJDDigest(job.title, digestSourceDescription);
         }
         await db.update(jobs).set({
           jdDigest: generated,
@@ -308,12 +339,21 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       const callbackUrl = `${baseUrl}/api/webhooks/signal/callback`;
 
       // Build Signal request
+      const structuredDescription = readStructuredJobDescription(job.description);
+      const signalSkills = normalizeSkillList(
+        structuredDescription?.mustHaveSkills?.length ? structuredDescription.mustHaveSkills : job.skills,
+      );
+      const signalGoodToHaveSkills = normalizeSkillList([
+        ...(Array.isArray(job.goodToHaveSkills) ? job.goodToHaveSkills : []),
+        ...(structuredDescription?.niceToHaveSkills ?? []),
+      ]);
+
       const sourceRequest: SignalSourceRequest = {
         jobContext: {
           jdDigest: JSON.stringify(jdDigest),
           title: job.title,
-          skills: normalizeSkillList(job.skills),
-          goodToHaveSkills: normalizeSkillList(job.goodToHaveSkills),
+          skills: signalSkills,
+          goodToHaveSkills: signalGoodToHaveSkills,
           location: job.location,
           ...(job.experienceYears != null ? { experienceYears: job.experienceYears } : {}),
           ...(job.educationRequirement ? { education: job.educationRequirement } : {}),

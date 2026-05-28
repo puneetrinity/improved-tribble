@@ -19,7 +19,7 @@ import {
 
 const cookieNamesCls = "flex flex-wrap gap-[6px] mt-[10px]";
 const cookieTagCls =
-  "font-mono text-[0.7rem] font-normal tracking-[0.02em] text-hr-accent-hover bg-[rgba(124,58,237,0.1)] border border-[rgba(124,58,237,0.15)] py-[3px] px-[10px] rounded-[3px]";
+  "font-mono text-[0.7rem] font-normal tracking-[0.02em] text-e-blue bg-[rgba(75,142,240,0.1)] border border-[rgba(75,142,240,0.15)] py-[3px] px-[10px] rounded-[10px]";
 
 const sections: LegalSection[] = [
   {
@@ -185,9 +185,9 @@ const sections: LegalSection[] = [
           </div>
         </div>
         <ul className={listCls}>
-          <li><strong>Analytics cookies</strong> â€” Up to 2 years</li>
-          <li><strong>Preference cookies</strong> â€” Up to 1 year</li>
-          <li><strong>Consent cookies</strong> â€” Up to 1 year</li>
+          <li><strong>Analytics cookies</strong> - Up to 2 years</li>
+          <li><strong>Preference cookies</strong> - Up to 1 year</li>
+          <li><strong>Consent cookies</strong> - Up to 1 year</li>
         </ul>
       </>
     ),
@@ -207,7 +207,7 @@ const sections: LegalSection[] = [
             are necessary for the site to function.
           </p>
           <button
-            className="inline-flex items-center gap-2 mt-[14px] bg-hr-accent text-white border-none rounded-none font-dm font-medium text-[0.85rem] py-[10px] px-5 cursor-pointer no-underline transition-colors duration-200 hover:bg-hr-accent-hover"
+            className="inline-flex items-center gap-2 mt-[14px] bg-e-blue text-white border-none rounded-xl font-ui font-medium text-[0.85rem] py-[10px] px-5 cursor-pointer no-underline transition-all duration-200 hover:brightness-110"
             onClick={() => {
               window.dispatchEvent(new CustomEvent('cookie-consent:open', { detail: { reset: true } }));
             }}
@@ -237,25 +237,25 @@ const sections: LegalSection[] = [
           <h4 className={h4Cls}>Browser-Specific Instructions</h4>
           <ul className={listCls}>
             <li>
-              <strong>Chrome</strong> â€”{" "}
+              <strong>Chrome</strong> -{" "}
               <a href="https://support.google.com/chrome/answer/95647" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Chrome
               </a>
             </li>
             <li>
-              <strong>Firefox</strong> â€”{" "}
+              <strong>Firefox</strong> -{" "}
               <a href="https://support.mozilla.org/en-US/kb/cookies-information-websites-store-on-your-computer" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Firefox
               </a>
             </li>
             <li>
-              <strong>Safari</strong> â€”{" "}
+              <strong>Safari</strong> -{" "}
               <a href="https://support.apple.com/guide/safari/manage-cookies-sfri11471/mac" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Safari
               </a>
             </li>
             <li>
-              <strong>Edge</strong> â€”{" "}
+              <strong>Edge</strong> -{" "}
               <a href="https://support.microsoft.com/en-us/microsoft-edge/delete-cookies-in-microsoft-edge-63947406-40ac-c3b8-57b9-2a946a29ae09" target="_blank" rel="noopener noreferrer" className={linkCls}>
                 Manage cookies in Edge
               </a>

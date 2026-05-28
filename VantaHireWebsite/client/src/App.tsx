@@ -173,6 +173,7 @@ function RouteScopedBoundary() {
   const [isNavigating, setIsNavigating] = useState(true);
 
   useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
     setIsNavigating(true);
     const timeoutId = window.setTimeout(() => {
       setIsNavigating(false);

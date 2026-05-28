@@ -37,7 +37,7 @@ export default function FeaturesPage() {
         <meta name="description" content="Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center. All the capabilities recruiters need." />
         <link rel="canonical" href="https://ealana.com/features" />
         <meta property="og:title" content="Features | ealana - Six Pillars of AI-Native Recruiting" />
-        <meta property="og:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center â€” every capability recruiters need." />
+        <meta property="og:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center - every capability recruiters need." />
         <meta property="og:url" content="https://ealana.com/features" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://ealana.com/og-image.jpg" />
