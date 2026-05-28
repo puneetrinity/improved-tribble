@@ -14,10 +14,12 @@
 
 import type { Express, Request, Response } from 'express';
 import { db } from '../db';
+import { broadcastSourcingUpdate, broadcastPipelineEvent } from '../websocket';
 import { eq, and } from 'drizzle-orm';
 import {
   webhookEvents,
   jobSourcingRuns,
+  jobSourcedCandidates,
   jobs,
   organizations,
   type WebhookStatus,
@@ -28,7 +30,6 @@ import {
   type SignalCallbackPayload,
 } from '../lib/services/signal-contracts';
 import { syncSignalResultsIntoVanta } from '../lib/services/sourcing-sync';
-import { enqueueSourcingRefresh } from '../lib/sourcingRefreshQueue';
 
 const WEBHOOK_PROVIDER = 'signal';
 
@@ -47,22 +48,23 @@ async function claimWebhookEvent(
     eventId,
     eventType,
     payload: payload as Record<string, unknown>,
-    status: 'processing' as WebhookStatus,
-  }).onConflictDoNothing().returning();
+    processedAt: new Date(),
+    status: 'processing',
+  }).returning();
 
   return result.length > 0;
 }
 
-/** Update a claimed webhook event's final status. */
 async function finalizeWebhookEvent(
   eventId: string,
   status: WebhookStatus,
-  errorMessage?: string,
+  error?: string,
 ): Promise<void> {
   await db.update(webhookEvents)
     .set({
       status,
-      ...(errorMessage ? { errorMessage } : {}),
+      errorMessage: error || null,
+      processedAt: new Date(),
     })
     .where(and(
       eq(webhookEvents.provider, WEBHOOK_PROVIDER),
@@ -70,123 +72,58 @@ async function finalizeWebhookEvent(
     ));
 }
 
-function parseExternalJobId(externalJobId?: string | null): number | null {
-  if (!externalJobId) return null;
-  const match = /^vanta:jobs:(\d+)$/.exec(externalJobId.trim());
-  if (!match) return null;
-  const capturedJobId = match[1];
-  if (!capturedJobId) return null;
-  const parsed = Number.parseInt(capturedJobId, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-async function recoverMissingRunFromCallback(
-  req: Request,
-  payload: SignalCallbackPayload,
-  tenantId: string,
-) {
-  const jobId = parseExternalJobId(payload.externalJobId);
-  if (!jobId) return null;
-
-  const job = await db.query.jobs.findFirst({
-    where: eq(jobs.id, jobId),
-    columns: { id: true, organizationId: true },
-  });
-  if (!job) return null;
-
-  const org = await db.query.organizations.findFirst({
-    where: eq(organizations.id, job.organizationId),
-    columns: { signalTenantId: true },
-  });
-  if (!org?.signalTenantId || org.signalTenantId !== tenantId) return null;
-
-  const baseUrl = process.env.BASE_URL || `${req.protocol}://${req.get('host')}`;
-  const callbackUrl = `${baseUrl.replace(/\/+$/, '')}/api/webhooks/signal/callback`;
-
-  // Insert a recovery run so callback processing can proceed.
-  await db.insert(jobSourcingRuns).values({
-    organizationId: job.organizationId,
-    jobId: job.id,
-    requestId: payload.requestId,
-    externalJobId: payload.externalJobId ?? `vanta:jobs:${job.id}`,
-    status: payload.status === 'failed' ? 'failed' : 'submitted',
-    contextHash: `recovered:${payload.requestId}`,
-    callbackUrl,
-    submittedAt: new Date(),
-    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    meta: {
-      recoveredFromCallback: true,
-      callbackRecoveredAt: new Date().toISOString(),
-    },
-  }).onConflictDoNothing();
-
-  return db.query.jobSourcingRuns.findFirst({
-    where: eq(jobSourcingRuns.requestId, payload.requestId),
-  });
-}
-
 export function registerSignalWebhook(app: Express) {
-  app.post('/api/webhooks/signal/callback', async (req: Request & { rawBody?: string }, res: Response) => {
+  app.post('/api/webhooks/signal/callback', async (req: Request, res: Response) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      console.error('Signal callback: Missing or invalid Authorization header');
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const token = authHeader.substring(7);
+    let claims;
+    try {
+      claims = await verifySignalCallbackJwt(token);
+    } catch (error: any) {
+      console.error('Signal callback JWT verification failed:', error.message);
+      res.status(401).json({ error: 'Invalid token' });
+      return;
+    }
+
+    const payload = req.body as SignalCallbackPayload;
+    if (!payload.requestId || !payload.status) {
+      console.error('Signal callback: Invalid payload body', payload);
+      res.status(400).json({ error: 'Invalid payload' });
+      return;
+    }
+
     let claimedJti: string | null = null;
     try {
-      // 1. Extract and verify JWT
-      const authHeader = req.headers.authorization;
-      if (!authHeader?.startsWith('Bearer ')) {
-        res.status(401).json({ error: 'Missing Authorization header' });
+      // 1. Claim the event for replay protection
+      const success = await claimWebhookEvent(claims.jti, 'callback', payload);
+      if (!success) {
+        console.warn(`Signal callback already processed/processing: jti=${claims.jti}`);
+        res.status(200).json({ success: true, message: 'Already processed' });
         return;
       }
+      claimedJti = claims.jti;
 
-      const token = authHeader.slice(7);
-      let claims;
-      try {
-        claims = await verifySignalCallbackJwt(token);
-      } catch (jwtError: any) {
-        console.error('Signal callback JWT verification failed:', jwtError.message);
-        res.status(401).json({ error: 'Invalid callback token' });
-        return;
-      }
-
-      // 2. Parse callback payload (before claiming, so we can validate)
-      const payload = req.body as SignalCallbackPayload;
-      if (!payload.requestId || !payload.status) {
-        res.status(400).json({ error: 'Invalid callback payload' });
-        return;
-      }
-
-      // 3. Bind JWT claims to body — reject if mismatched
-      if (claims.requestId !== payload.requestId) {
-        console.error(`Signal callback claim/body mismatch: JWT request_id=${claims.requestId}, body requestId=${payload.requestId}`);
-        res.status(400).json({ error: 'JWT claims do not match callback body' });
-        return;
-      }
-
-      // 4. Atomic claim — insert with status 'processing'; if conflict, already handled
-      const claimed = await claimWebhookEvent(claims.jti, 'callback', payload);
-      if (claimed) {
-        claimedJti = claims.jti;
-      }
-      if (!claimed) {
-        console.log(`Signal callback ${claims.jti} already claimed, skipping`);
-        res.json({ success: true, message: 'Already processed' });
-        return;
-      }
-
-      // 5. Find the sourcing run
-      let run = await db.query.jobSourcingRuns.findFirst({
+      // 2. Fetch the sourcing run record
+      const run = await db.query.jobSourcingRuns.findFirst({
         where: eq(jobSourcingRuns.requestId, payload.requestId),
       });
-      if (!run) {
-        run = await recoverMissingRunFromCallback(req, payload, claims.tenantId);
-        if (run) {
-          console.warn(`Signal callback recovered missing run for requestId=${payload.requestId}`);
-        }
-      }
 
       if (!run) {
-        await finalizeWebhookEvent(claims.jti, 'skipped', `Unknown requestId: ${payload.requestId}`);
+        console.error(`Signal callback: Unknown request ID ${payload.requestId}`);
+        await finalizeWebhookEvent(claims.jti, 'failed', 'Unknown request ID');
         res.status(404).json({ error: 'Unknown request ID' });
         return;
       }
+
+      // 3. Skip if already terminal (unless it's a re-delivery or we need to allow idempotency)
+      // Actually, we should allow re-processing if the previous one failed, 
+      // but replay protection via JTI already handles this.
 
       // 6. Verify tenant binding — ensure callback org matches JWT tenant
       const org = await db.query.organizations.findFirst({
@@ -201,7 +138,79 @@ export function registerSignalWebhook(app: Express) {
         return;
       }
 
-      // 7. Map callback status to run status
+      // 7. Handle partial real-time updates (Pipeline Streaming)
+      if (payload.status === 'partial') {
+        const event = payload.event;
+        const eventData = payload.candidateData ?? (payload as any).eventData ?? {};
+
+        console.log(`✨ [WEBHOOK] PIPELINE EVENT: ${event} for jobId=${run.jobId}`);
+
+        // Pipeline progress events → forward directly to the WS frontend modal
+        const PIPELINE_PROGRESS_EVENTS = [
+          'phase_started', 'crustdata_fetching', 'crustdata_complete',
+          'ranking_started', 'ranking_complete',
+          'enrichment_started', 'enrichment_candidate', 'enrichment_replacement',
+          'final_ranking_started', 'final_ranking_complete',
+          'pipeline_complete', 'pipeline_error',
+        ];
+
+        if (event && PIPELINE_PROGRESS_EVENTS.includes(event)) {
+          broadcastPipelineEvent(run.jobId, event, eventData as Record<string, unknown>);
+          console.log(`📡 [WEBHOOK] WS BROADCAST → ${event} to jobId=${run.jobId}`);
+        }
+
+        // Legacy: candidate_enriched → update DB + broadcast candidate refresh
+        if (event === 'candidate_enriched' && payload.candidateData) {
+          try {
+            console.log(`👤 [WEBHOOK] LIVE ENRICHMENT FOR CANDIDATE: ${payload.candidateData.id}`);
+
+            const existing = await db.query.jobSourcedCandidates.findFirst({
+              where: and(
+                eq(jobSourcedCandidates.jobId, run.jobId),
+                eq(jobSourcedCandidates.signalCandidateId, payload.candidateData.id)
+              )
+            });
+
+            if (existing) {
+              const summary = (existing.candidateSummary as any) || {};
+              const updatedSummary = {
+                ...summary,
+                candidate: {
+                  ...(summary.candidate || {}),
+                  ...payload.candidateData
+                },
+                enrichmentStatus: payload.candidateData.enrichmentStatus,
+                lastEnrichedAt: payload.candidateData.lastEnrichedAt,
+              };
+
+              await db.update(jobSourcedCandidates)
+                .set({
+                  candidateSummary: updatedSummary,
+                  updatedAt: new Date(),
+                })
+                .where(eq(jobSourcedCandidates.id, existing.id));
+            }
+
+            broadcastSourcingUpdate(run.jobId, {
+              type: 'candidate_enriched',
+              candidateId: payload.candidateData.id,
+              data: payload.candidateData,
+              requestId: payload.requestId
+            });
+
+            console.log(`✅ [WEBHOOK] BROADCASTED REAL-TIME UPDATE FOR ${payload.candidateData.id}`);
+          } catch (err: any) {
+            console.error('Failed to process partial callback:', err.message);
+          }
+        }
+
+        await finalizeWebhookEvent(claims.jti, 'processed');
+        res.json({ success: true });
+        return;
+      }
+
+
+      // 8. Map callback status to run status
       const runStatus = mapCallbackStatusToRunStatus(payload.status);
       let processError: string | undefined;
       let candidateCount = payload.candidateCount || 0;
@@ -210,50 +219,54 @@ export function registerSignalWebhook(app: Express) {
       let refreshQueueError: string | undefined;
       let enrichmentInProgress = false;
 
-      // 8. If completed/partial, fetch results and upsert candidates
+      // 9. If completed, fetch results and upsert candidates
       if (runStatus === 'completed') {
         try {
-          const sync = await syncSignalResultsIntoVanta({
-            organizationId: run.organizationId,
-            jobId: run.jobId,
-            requestId: payload.requestId,
-            externalJobId: run.externalJobId,
-            signalTenantId: org.signalTenantId,
-          });
+          let streamedCount = 0;
+          const sync = await syncSignalResultsIntoVanta(
+            {
+              organizationId: run.organizationId,
+              jobId: run.jobId,
+              requestId: payload.requestId,
+              externalJobId: run.externalJobId,
+              signalTenantId: org.signalTenantId,
+            },
+            (candidate, rank) => {
+              streamedCount++;
+              broadcastSourcingUpdate(run.jobId, {
+                type: 'candidate_sourced',
+                candidate: {
+                  signalCandidateId: candidate.candidate.id,
+                  rank,
+                  crustdata: (candidate.candidate as any).searchMeta?.crustdata || null,
+                  linkedinUrl: candidate.candidate.linkedinUrl,
+                  enrichmentStatus: candidate.candidate.enrichmentStatus,
+                  fitScore: candidate.fitScore ?? null,
+                  matchTier: candidate.matchTier ?? null,
+                  sourceType: candidate.sourceType ?? 'discovered',
+                  summaryShort: candidate.cardSignals?.summaryShort ?? null,
+                  skillsTopN: candidate.cardSignals?.skillsTopN ?? [],
+                  emailAvailable: candidate.cardSignals?.emailAvailable ?? false,
+                  phoneAvailable: candidate.cardSignals?.phoneAvailable ?? false,
+                  aiSummary: candidate.aiSummary ?? null,
+                },
+                streamedCount,
+              });
+            },
+          );
 
           candidateCount = sync.candidateCount;
           metaPatch = sync.metaPatch;
           enrichmentInProgress = sync.enrichmentProgress.inProgress;
 
-          if (enrichmentInProgress) {
-            try {
-              refreshJobId = await enqueueSourcingRefresh({ requestId: payload.requestId });
-            } catch (enqueueError: any) {
-              refreshQueueError = enqueueError?.message || 'Failed to enqueue refresh job';
-              console.error(`Failed to enqueue sourcing refresh for ${payload.requestId}:`, refreshQueueError);
-            }
-          }
 
-          // Always enqueue a single delayed refresh to catch post-callback reranks.
-          // Rerank coalescing window is ~90s; 2 min delay gives enough margin.
-          if (!enrichmentInProgress && !refreshJobId) {
-            try {
-              refreshJobId = await enqueueSourcingRefresh(
-                { requestId: payload.requestId },
-                { delayMs: 120_000 },
-              );
-            } catch (delayedRefreshError: any) {
-              refreshQueueError = delayedRefreshError?.message || 'Failed to enqueue delayed refresh job';
-              console.error(`Failed to enqueue delayed sourcing refresh for ${payload.requestId}:`, refreshQueueError);
-            }
-          }
         } catch (fetchError: any) {
           console.error(`Failed to fetch Signal results for ${payload.requestId}:`, fetchError.message);
           processError = `Results fetch failed: ${fetchError.message}`;
         }
       }
 
-      // 9. Update run status — downgrade to 'failed' if result fetch threw
+      // 10. Update run status — downgrade to 'failed' if result fetch threw
       const finalStatus = processError ? 'failed' : runStatus;
       const finalCandidateCount = finalStatus === 'failed' ? 0 : candidateCount;
       const runMeta = (run.meta as Record<string, unknown>) || {};
@@ -274,21 +287,21 @@ export function registerSignalWebhook(app: Express) {
             : 'stopped_no_queue';
       const forcedNotInProgressMetaPatch = (refreshStatus === 'stopped_no_queue' || refreshStatus === 'stopped_enqueue_error')
         ? {
-            enrichmentProgress: {
-              ...(metaPatch?.enrichmentProgress as Record<string, unknown> ?? {}),
-              inProgress: false,
-            },
-          }
+          enrichmentProgress: {
+            ...(metaPatch?.enrichmentProgress as Record<string, unknown> ?? {}),
+            inProgress: false,
+          },
+        }
         : {};
       const enrichmentRefreshMeta = finalStatus === 'completed'
         ? {
-            ...priorRefreshMeta,
-            status: refreshStatus,
-            reason: refreshReason,
-            lastEnqueueAt: new Date().toISOString(),
-            queueJobId: refreshJobId,
-            ...(refreshQueueError ? { lastEnqueueError: refreshQueueError } : {}),
-          }
+          ...priorRefreshMeta,
+          status: refreshStatus,
+          reason: refreshReason,
+          lastEnqueueAt: new Date().toISOString(),
+          queueJobId: refreshJobId,
+          ...(refreshQueueError ? { lastEnqueueError: refreshQueueError } : {}),
+        }
         : priorRefreshMeta;
 
       await db.update(jobSourcingRuns)
@@ -310,9 +323,10 @@ export function registerSignalWebhook(app: Express) {
         })
         .where(eq(jobSourcingRuns.id, run.id));
 
-      // 10. Finalize webhook event
+      // 11. Finalize webhook event
       await finalizeWebhookEvent(claims.jti, finalStatus === 'failed' ? 'failed' : 'processed', processError);
 
+      broadcastSourcingUpdate(run.jobId, { status: finalStatus, candidateCount: finalCandidateCount });
       res.json({ success: true });
     } catch (error: any) {
       console.error('Signal webhook error:', error);

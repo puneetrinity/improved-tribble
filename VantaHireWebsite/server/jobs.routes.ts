@@ -382,6 +382,8 @@ export function registerJobsRoutes(
         goodToHaveSkills: string[] | null;
         educationRequirement: string | null;
         experienceYears: number | null;
+        jdDigest: any;
+        jdDigestVersion: any;
       }> = {};
 
       if (title !== undefined) {
@@ -516,6 +518,12 @@ export function registerJobsRoutes(
           res.status(400).json({ error: 'experienceYears must be an integer between 0-50 or null' });
           return;
         }
+      }
+
+      // Fix JD Caching bug: if core fields change, clear jdDigest to force AI re-evaluation
+      if (title !== undefined || description !== undefined || location !== undefined || skills !== undefined) {
+        updates.jdDigest = null;
+        updates.jdDigestVersion = null;
       }
 
       if (Object.keys(updates).length === 0) {

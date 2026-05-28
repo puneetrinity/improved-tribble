@@ -1,99 +1,58 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Star, MapPin, Building, Briefcase, CheckCircle2 } from "lucide-react";
+import {
+  Star, MapPin, Building, Briefcase, CheckCircle2,
+  Mail, Phone, Github, Twitter, Linkedin, Sparkles,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
 import {
   fitDescription,
-  tierLabel,
-  tierColor,
-  identityLabel,
-  enrichmentLabel,
   freshnessLabel,
   locationConfidence,
-  FIT_LABELS,
-  FIT_INTERNAL_KEYS,
-  toPctFitClient,
 } from "@/lib/sourcing-labels";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 interface CandidateCardProps {
   candidate: SourcedCandidateForUI;
   onClick: () => void;
   onShortlist: () => void;
   isUpdating: boolean;
+  displayPosition?: number;
 }
+
+// ─── Fit score badge ──────────────────────────────────────────────────────────
 
 function FitBadge({ score }: { score: number | null }) {
-  if (score == null) return <Badge variant="outline" className="text-xs">No score</Badge>;
-  const color =
+  if (score == null)
+    return (
+      <Badge variant="outline" className="text-xs text-muted-foreground">
+        No score
+      </Badge>
+    );
+  const { bg, text, border } =
     score >= 75
-      ? "bg-green-100 text-green-800 border-green-200"
+      ? { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" }
       : score >= 50
-        ? "bg-amber-100 text-amber-800 border-amber-200"
-        : "bg-red-100 text-red-800 border-red-200";
-  return (
-    <Badge variant="outline" className={cn("text-xs font-semibold", color)}>
-      {fitDescription(score)} &middot; {score}
-    </Badge>
-  );
-}
-
-function FitChips({ breakdown }: { breakdown: Record<string, unknown> | null }) {
-  if (!breakdown) return null;
-  const chips = Object.entries(breakdown)
-    .filter(([k, v]) => !FIT_INTERNAL_KEYS.has(k) && typeof v === "number" && v > 0.1)
-    .sort(([, a], [, b]) => (b as number) - (a as number))
-    .slice(0, 2);
-
-  if (chips.length === 0) return null;
-
-  return (
-    <div className="flex items-center gap-1 flex-wrap">
-      {chips.map(([key, value]) => {
-        const pct = toPctFitClient(value as number);
-        return (
-          <Badge key={key} variant="outline" className="text-[10px] font-normal text-muted-foreground">
-            {FIT_LABELS[key] || key} {pct != null ? `${pct}%` : ""}
-          </Badge>
-        );
-      })}
-    </div>
-  );
-}
-
-function TierBadge({ candidate }: { candidate: SourcedCandidateForUI }) {
+        ? { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" }
+        : { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-200" };
   return (
     <Badge
       variant="outline"
-      className={cn("text-xs", tierColor(candidate.matchTier, candidate.displayBucket))}
+      className={cn("text-xs font-semibold tabular-nums", bg, text, border)}
     >
-      {tierLabel(candidate.matchTier, candidate.displayBucket)}
+      {score}% &middot; {fitDescription(score)}
     </Badge>
   );
 }
 
-function IdentityBadge({
-  status,
-  confidence,
-}: {
-  status: string | null | undefined;
-  confidence: number | null | undefined;
-}) {
-  if (!status) return null;
-  const styles: Record<string, string> = {
-    verified: "bg-green-100 text-green-800 border-green-200",
-    review: "bg-amber-100 text-amber-800 border-amber-200",
-    weak: "bg-red-100 text-red-800 border-red-200",
-  };
-  return (
-    <Badge variant="outline" className={cn("text-xs", styles[status] || "")}>
-      {identityLabel(status)}
-      {typeof confidence === "number" && confidence >= 0.5 && (
-        <span className="ml-1 font-mono text-[10px]">{Math.round(confidence * 100)}%</span>
-      )}
-    </Badge>
-  );
-}
+
+// ─── Freshness helpers ────────────────────────────────────────────────────────
 
 function freshnessText(daysAgo: number | null, key: string): string | null {
   if (daysAgo == null) return null;
@@ -102,101 +61,321 @@ function freshnessText(daysAgo: number | null, key: string): string | null {
   return `${label} ${daysAgo}d ago`;
 }
 
-export function CandidateCard({ candidate, onClick, onShortlist, isUpdating }: CandidateCardProps) {
+// ─── Capitalise a skill label nicely ─────────────────────────────────────────
+
+function capSkill(s: string): string {
+  return s
+    .split(/[\s-]+/)
+    .map((w) => (w.length <= 2 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(" ");
+}
+
+// ─── Main card ────────────────────────────────────────────────────────────────
+
+export function CandidateCard({
+  candidate,
+  onClick,
+  onShortlist,
+  isUpdating,
+  displayPosition,
+}: CandidateCardProps) {
   const isShortlisted = candidate.state === "shortlisted";
-  const isDiscoveredPendingEnrichment = candidate.sourceType === "discovered" &&
+  const isHidden = candidate.state === "hidden";
+  const isDiscoveredPending =
+    candidate.sourceType === "discovered" &&
     candidate.enrichmentStatus !== "completed" &&
     candidate.enrichmentStatus !== "enriched";
-  const skills = Array.isArray(candidate.snapshot?.skillsNormalized)
-    ? (candidate.snapshot?.skillsNormalized as string[]).slice(0, 3)
+
+  const signals = candidate.cardSignals;
+  const aiSummary = candidate.aiSummary;
+
+  // Skill display: JD matched skills (amber) > Crustdata > fallback
+  const jdMatchedSkills = ((candidate.fitBreakdown as any)?.matchedSkills as string[]) || [];
+  const crustdataSkills = Array.isArray(candidate.crustdata?.skills?.professional_network_skills)
+    ? (candidate.crustdata!.skills!.professional_network_skills as string[])
     : [];
+  const fallbackSkills = candidate.cardSignals?.skillsTopN || [];
+  const skillsToUse = jdMatchedSkills.length > 0
+    ? jdMatchedSkills
+    : (crustdataSkills.length > 0 ? crustdataSkills : fallbackSkills);
+  const skills = skillsToUse.slice(0, 6);
+  const isJdMatched = jdMatchedSkills.length > 0;
+
+  const locConf = locationConfidence(
+    candidate.locationMatchType,
+    candidate.locationConfidenceNumeric,
+  );
+
+  const name = candidate.crustdata?.basic_profile?.name || "Unknown Candidate";
+  const headline = candidate.crustdata?.basic_profile?.headline || null;
+  const locationDisplay = candidate.crustdata?.basic_profile?.location?.full_location
+    || candidate.crustdata?.basic_profile?.location?.raw || null;
+
+  const currentRole = candidate.crustdata?.experience?.employment_details?.current?.[0];
+  const pastRole = candidate.crustdata?.experience?.employment_details?.past?.[0];
+
+  // Crustdata schema: company is .name not .company_name
+  const currentTitle = candidate.crustdata?.basic_profile?.current_title
+    || currentRole?.title || null;
+  const company = currentRole?.name || pastRole?.name || null;
+  const seniority = currentRole?.seniority_level || pastRole?.seniority_level || null;
+
+  // Compute total relevant experience from all roles
+  const allRoles = [
+    ...(candidate.crustdata?.experience?.employment_details?.current || []),
+    ...(candidate.crustdata?.experience?.employment_details?.past || []),
+  ];
+  const totalExpYears = allRoles.reduce((sum: number, r: any) => {
+    const y = r.years_at_company_raw ?? 0;
+    return sum + (typeof y === "number" ? y : 0);
+  }, 0);
+  const expYearsDisplay = totalExpYears > 0 ? `${totalExpYears} yrs` : null;
+
+  const pictureUrl = candidate.crustdata?.professional_network?.profile_picture_permalink || candidate.crustdata?.basic_profile?.profile_picture_permalink || null;
+
+  const initials = name
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   const enrichedText = freshnessText(candidate.freshness.enrichedDaysAgo, "enriched");
   const identityText = freshnessText(candidate.freshness.identityCheckDaysAgo, "identity");
   const serpText = freshnessText(candidate.searchSignals.serpDateDaysAgo, "serp");
-  const freshnessLine = [
-    enrichedText,
-    identityText,
-    !enrichedText ? serpText : null,
-  ].filter(Boolean).join(" \u00b7 ");
+  const freshnessLine = [enrichedText, identityText, !enrichedText ? serpText : null]
+    .filter(Boolean)
+    .join(" · ");
 
-  const locConf = locationConfidence(candidate.locationMatchType, candidate.locationConfidenceNumeric);
 
   return (
     <div
-      className={cn(
-        "p-4 rounded-lg border bg-card hover:shadow-sm transition-shadow cursor-pointer",
-        candidate.state === "hidden" && "opacity-60",
-        isShortlisted && "border-primary/30 bg-primary/5",
-      )}
       onClick={onClick}
+      className={cn(
+        // Base
+        "group relative rounded-xl border bg-card cursor-pointer",
+        "transition-all duration-200",
+        // Hover lift
+        "hover:-translate-y-[1px] hover:shadow-md hover:border-primary/20",
+        // States
+        isHidden && "opacity-50",
+        isShortlisted
+          ? "border-amber-300/60 bg-gradient-to-br from-amber-50/60 to-card shadow-sm"
+          : "border-border/60",
+      )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="font-semibold text-sm truncate max-w-[200px]">{candidate.nameHint || "Unknown Candidate"}</span>
-            <FitBadge score={candidate.fitScore} />
-            <TierBadge candidate={candidate} />
-            {candidate.engagementReady && (
-              <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                <CheckCircle2 className="h-3 w-3 mr-0.5" />
-                Ready
-              </Badge>
+      <div className="p-4 flex items-start gap-3">
+        {/* ── Avatar ── */}
+        <div className="shrink-0 relative">
+          <Avatar
+            className={cn(
+              "h-14 w-14 border-2 transition-all duration-200",
+              isShortlisted
+                ? "border-amber-300 ring-2 ring-amber-200/60"
+                : "border-border/50 group-hover:border-primary/30",
             )}
-            {isDiscoveredPendingEnrichment && (
-              <Badge variant="outline" className="text-xs bg-sky-50 text-sky-700 border-sky-200">
-                {enrichmentLabel("pending")}
-              </Badge>
-            )}
-            <IdentityBadge
-              status={candidate.identitySummary?.displayStatus}
-              confidence={candidate.identitySummary?.maxIdentityConfidence}
+          >
+            <AvatarImage
+              src={pictureUrl || undefined}
+              className="object-cover"
             />
-          </div>
-
-          <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
-            {candidate.headlineHint && <span className="truncate">{candidate.headlineHint}</span>}
-            {candidate.companyHint && (
-              <span className="flex items-center gap-1">
-                <Building className="h-3 w-3" />
-                {candidate.companyHint}
-              </span>
-            )}
-            {(candidate.locationHint || candidate.snapshot?.location) && (
-              <span className="flex items-center gap-1">
-                {locConf.dotColor && (
-                  <span className={cn("inline-block h-2 w-2 rounded-full shrink-0", locConf.dotColor)} />
-                )}
-                <MapPin className="h-3 w-3" />
-                {candidate.locationHint || candidate.snapshot?.location}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <FitChips breakdown={candidate.fitBreakdown} />
-            {skills.map((skill) => (
-              <Badge key={skill} variant="secondary" className="text-[10px] font-normal">
-                {skill}
-              </Badge>
-            ))}
-            {candidate.snapshot?.seniorityBand && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Briefcase className="h-3 w-3" />
-                {candidate.snapshot.seniorityBand}
-              </span>
-            )}
-          </div>
-
-          {freshnessLine && (
-            <p className="text-xs text-muted-foreground">{freshnessLine}</p>
+            <AvatarFallback
+              className={cn(
+                "text-sm font-bold",
+                isShortlisted
+                  ? "bg-amber-100 text-amber-800"
+                  : "bg-primary/8 text-primary",
+              )}
+            >
+              {initials}
+            </AvatarFallback>
+          </Avatar>
+          {/* rank bubble */}
+          {displayPosition != null && (
+            <span className="absolute -bottom-1 -right-1 inline-flex items-center justify-center h-4 w-4 rounded-full bg-muted border border-border text-[9px] font-bold text-muted-foreground">
+              {displayPosition}
+            </span>
           )}
         </div>
 
+        {/* ── Body ── */}
+        <div className="flex-1 min-w-0 space-y-2">
+
+          {/* Row 1: name + ready badge */}
+          <div className="flex items-center gap-2 flex-wrap w-full">
+            <span className="font-semibold text-lg leading-tight truncate shrink min-w-[100px] max-w-full">
+              {name}
+            </span>
+            {candidate.engagementReady && (
+              <Badge
+                variant="outline"
+                className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                Ready
+              </Badge>
+            )}
+          </div>
+
+          {/* Row 2: current role @ company */}
+          {(currentTitle || company) && (
+            <div className="flex items-center gap-1.5 text-sm text-foreground/80 w-full min-w-0">
+              {currentTitle && (
+                <span className="font-medium truncate shrink min-w-0">{currentTitle}</span>
+              )}
+              {currentTitle && company && <span className="text-muted-foreground shrink-0">@</span>}
+              {company && (
+                <span className="flex items-center gap-1 text-muted-foreground truncate shrink min-w-0">
+                  <Building className="h-4 w-4 shrink-0" />
+                  <span className="truncate">{company}</span>
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Row 3: seniority · exp · location */}
+          <div className="flex items-center gap-x-3 gap-y-1 text-sm text-muted-foreground flex-wrap">
+            {seniority && (
+              <span className="inline-flex items-center gap-1 bg-primary/5 text-primary/80 border border-primary/10 rounded-full px-2.5 py-0.5 text-xs font-medium">
+                <Briefcase className="h-3 w-3" />
+                {seniority}
+              </span>
+            )}
+            {expYearsDisplay && (
+              <span className="text-muted-foreground">{expYearsDisplay} exp</span>
+            )}
+            {locationDisplay && (
+              <span className="flex items-center gap-1 shrink-0">
+                {locConf.dotColor && (
+                  <span className={cn("inline-block h-2 w-2 rounded-full shrink-0", locConf.dotColor)} />
+                )}
+                <MapPin className="h-3.5 w-3.5" />
+                {locationDisplay}
+              </span>
+            )}
+          </div>
+
+          {/* Row 4: AI summary preview */}
+          {(aiSummary?.text || signals?.summaryShort) && (
+            <p className="text-xs text-muted-foreground line-clamp-2 leading-snug flex gap-1.5 pt-1">
+              <Sparkles className={cn("h-4 w-4 mt-0.5 shrink-0", aiSummary?.text ? "text-violet-400" : "text-blue-400")} />
+              <span>{aiSummary?.text || signals?.summaryShort}</span>
+            </p>
+          )}
+
+          {/* Row 5: matched skills (green if JD-matched) + other skills */}
+          {skills.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap pt-1">
+              {isJdMatched && (
+                <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider mr-1">Matched:</span>
+              )}
+              {skills.map((skill) => (
+                <Badge
+                  key={skill}
+                  variant="secondary"
+                  className={cn(
+                    "text-xs font-medium px-2 py-0.5",
+                    isJdMatched && "bg-emerald-50 text-emerald-700 border-emerald-200 border"
+                  )}
+                >
+                  {capSkill(skill)}
+                </Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Row 6: contact icons + freshness */}
+          <div className="flex items-center justify-between pt-3 mt-2 border-t border-border/40">
+            <div className="flex items-center gap-3">
+              {signals?.emailAvailable && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Mail className="h-4 w-4 text-blue-500" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    {signals.email ?? "Email available"}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {signals?.phoneAvailable && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Phone className="h-4 w-4 text-emerald-500" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    {signals.phone ?? "Phone available"}
+                  </TooltipContent>
+                </Tooltip>
+              )}
+              {signals?.github && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={signals.github}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Github className="h-4 w-4 text-slate-600 hover:text-slate-900 transition-colors" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">GitHub</TooltipContent>
+                </Tooltip>
+              )}
+              {signals?.twitter && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={signals.twitter}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Twitter className="h-4 w-4 text-sky-400 hover:text-sky-600 transition-colors" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Twitter/X</TooltipContent>
+                </Tooltip>
+              )}
+              {candidate.linkedinUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={candidate.linkedinUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Linkedin className="h-4 w-4 text-[#0A66C2] hover:text-[#004182] transition-colors" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">Open LinkedIn</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            {freshnessLine && (
+              <p className="text-xs text-muted-foreground/80 uppercase tracking-tight">
+                {freshnessLine}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── Shortlist button ── */}
         <Button
           variant="ghost"
           size="icon"
-          className="shrink-0"
+          className={cn(
+            "shrink-0 h-8 w-8 rounded-lg transition-all",
+            isShortlisted
+              ? "text-amber-500 hover:text-amber-600 hover:bg-amber-50"
+              : "text-muted-foreground/40 hover:text-amber-500 hover:bg-amber-50 opacity-0 group-hover:opacity-100",
+          )}
           disabled={isUpdating}
           onClick={(e) => {
             e.stopPropagation();
@@ -207,8 +386,8 @@ export function CandidateCard({ candidate, onClick, onShortlist, isUpdating }: C
         >
           <Star
             className={cn(
-              "h-5 w-5",
-              isShortlisted ? "fill-amber-400 text-amber-400" : "text-muted-foreground",
+              "h-4 w-4 transition-all",
+              isShortlisted ? "fill-amber-400 text-amber-400" : "",
             )}
           />
         </Button>

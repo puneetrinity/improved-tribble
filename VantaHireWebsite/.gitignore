@@ -40,3 +40,5 @@ Screenshot*
 
 # Windows Zone.Identifier NTFS metadata
 *:Zone.Identifier
+*.cjs
+*.mjs

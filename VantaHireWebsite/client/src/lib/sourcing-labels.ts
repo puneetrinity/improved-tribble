@@ -75,7 +75,11 @@ export const FIT_LABELS: Record<string, string> = {
   experienceScore: "Years of experience",
 };
 export const FIT_INTERNAL_KEYS = new Set([
-  "total", "locationBoost", "unknownLocationPromotion", "skillScoreMethod",
+  "total",
+  "locationBoost",
+  "unknownLocationPromotion",
+  "skillScoreMethod",
+  "matchedSkills"
 ]);
 
 export function fitDescription(scorePct: number): string {
