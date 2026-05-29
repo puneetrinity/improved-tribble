@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { insertJobSchema, type Client, type Job, type EmailTemplate, type PipelineStage } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCsrfToken } from "@/lib/csrf";
 import {
   Plus,
   X,
@@ -51,20 +52,18 @@ const countWords = (value: string): number =>
     .split(/\s+/)
     .filter(Boolean).length;
 
-// Step validation schemas
 const step1Schema = z.object({
-  title: z.string().min(3, "Job title must be at least 3 characters"),
-  location: z.string().min(2, "Location is required"),
-  type: z.enum(["full-time", "part-time", "contract", "remote"]),
-  deadline: z.string().optional(),
-});
-
-const step2Schema = z.object({
   description: z.string()
     .min(10, "Description is required")
     .refine((value) => countWords(value) >= MIN_DESCRIPTION_WORDS, {
       message: `Description must be at least ${MIN_DESCRIPTION_WORDS} words`,
     }),
+});
+
+const step2Schema = z.object({
+  title: z.string().min(3, "Job title must be at least 3 characters"),
+  location: z.string().min(2, "Location is required"),
+  type: z.enum(["full-time", "part-time", "contract", "remote"]),
   skills: z.array(z.string()).optional(),
   goodToHaveSkills: z.array(z.string()).optional(),
   salaryMin: z.string().optional(),
@@ -88,6 +87,32 @@ interface FieldError {
   message: string;
 }
 
+interface StructuredJobProfile {
+  roleTitle: string;
+  roleFamily: string;
+  seniority: string;
+  location: string;
+  country: string;
+  experienceYears: number | null;
+  mustHaveSkills: string[];
+  niceToHaveSkills: string[];
+  skillAliases: Record<string, string>;
+  suppressedSkills: string[];
+  allowedDomains: string[];
+  excludedDomains: string[];
+  adjacentBuckets: string[];
+  eliteSchools: string[];
+  locationRequired: boolean;
+  mustHaveGates: {
+    seniorityMin: string | null;
+    experienceMinYears: number | null;
+    minMustHaveSkillsMatched: number | null;
+    locationRequired: boolean;
+    rejectBuckets: string[];
+    rejectTitleRegex: string;
+  };
+}
+
 interface ExtractedDetails {
   title: string;
   location: string;
@@ -102,9 +127,15 @@ interface ExtractedDetails {
   keywords: string[];
 }
 
+interface JobExtractionResponse {
+  extracted: ExtractedDetails;
+  structuredJob: StructuredJobProfile;
+  descriptionJson: string;
+}
+
 const STEPS = [
-  { id: 1, title: "Basics", description: "Job title, location & type" },
-  { id: 2, title: "Details", description: "Skills & description" },
+  { id: 1, title: "Job Description", description: "Paste the original JD and extract structured details" },
+  { id: 2, title: "Details", description: "Review and edit extracted job details" },
   { id: 3, title: "Team", description: "Hiring manager & client" },
   { id: 4, title: "Setup", description: "Templates & pipeline" },
 ];
@@ -127,136 +158,6 @@ const dedupeStrings = (values: string[]): string[] => {
   return result;
 };
 
-const splitList = (value: string): string[] =>
-  dedupeStrings(
-    value
-      .replace(/\r?\n-\s*/g, "\n")
-      .split(/\r?\n|,|;|\u2022/)
-      .map((item) => item.replace(/^\-\s*/, "").replace(/^[\s:]+|[\s:]+$/g, ""))
-      .filter(Boolean),
-  );
-
-const normalizeJobType = (value: string): "full-time" | "part-time" | "contract" | "remote" => {
-  const normalized = value.trim().toLowerCase();
-
-  if (normalized.includes("part")) return "part-time";
-  if (normalized.includes("contract")) return "contract";
-  if (normalized.includes("remote")) return "remote";
-  return "full-time";
-};
-
-const parseExperienceYears = (value: string): string => {
-  const match = value.match(/\d+/);
-  return match ? match[0] : "";
-};
-
-const parseSalary = (value: string): Pick<ExtractedDetails, "salaryMin" | "salaryMax" | "salaryPeriod"> => {
-  const cleaned = value.trim();
-  const normalized = cleaned.toLowerCase();
-  const matches = cleaned.match(/\d+(?:[\d,.]*\d)?/g) ?? [];
-  const multiplier = normalized.includes("lpa") ? 100000 : 1;
-  const numbers = matches
-    .map((item) => {
-      const parsed = Number(item.replace(/,/g, ""));
-      if (!Number.isFinite(parsed)) {
-        return "";
-      }
-      return String(Math.round(parsed * multiplier));
-    })
-    .filter(Boolean);
-
-  return {
-    salaryMin: numbers[0] ?? "",
-    salaryMax: numbers[1] ?? "",
-    salaryPeriod: normalized.includes("month") ? "per_month" : "per_year",
-  };
-};
-
-const parseStructuredExtraction = (rawText: string): ExtractedDetails => {
-  const lines = rawText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-
-  const map = new Map<string, string>();
-
-  lines.forEach((line) => {
-    const separatorIndex = line.indexOf(":");
-    if (separatorIndex === -1) return;
-
-    const key = line.slice(0, separatorIndex).trim().toLowerCase();
-    const value = line.slice(separatorIndex + 1).trim();
-    map.set(key, value);
-  });
-
-  const salary = parseSalary(map.get("salary") ?? "");
-  const requiredSkills = splitList(map.get("required skills") ?? "");
-  const goodToHaveSkills = splitList(map.get("good to have skills") ?? "");
-  const explicitKeywords = splitList(map.get("keywords") ?? "");
-
-  return {
-    title: map.get("job title") ?? "",
-    location: map.get("location") ?? "",
-    type: normalizeJobType(map.get("job type") ?? ""),
-    experienceYears: parseExperienceYears(map.get("experience") ?? ""),
-    salaryMin: salary.salaryMin,
-    salaryMax: salary.salaryMax,
-    salaryPeriod: salary.salaryPeriod,
-    educationRequirement: map.get("education") ?? "",
-    skills: requiredSkills,
-    goodToHaveSkills,
-    keywords: dedupeStrings([...explicitKeywords, ...requiredSkills, ...goodToHaveSkills]),
-  };
-};
-
-const formatSalary = (salaryMin: string, salaryMax: string, salaryPeriod: "per_month" | "per_year"): string => {
-  if (!salaryMin && !salaryMax) {
-    return "";
-  }
-
-  const formatAmount = (value: string) => `INR ${Number(value).toLocaleString("en-IN")}`;
-  const periodLabel = salaryPeriod === "per_month" ? "per month" : "per year";
-
-  if (salaryMin && salaryMax) {
-    return `${formatAmount(salaryMin)} - ${formatAmount(salaryMax)} ${periodLabel}`;
-  }
-
-  if (salaryMin) {
-    return `${formatAmount(salaryMin)}+ ${periodLabel}`;
-  }
-
-  return `Up to ${formatAmount(salaryMax)} ${periodLabel}`;
-};
-
-const generateOptimizedJD = (input: {
-  title: string;
-  location: string;
-  experienceYears: string;
-  salaryMin: string;
-  salaryMax: string;
-  salaryPeriod: "per_month" | "per_year";
-  skills: string[];
-  goodToHaveSkills: string[];
-  keywords: string[];
-}): string => {
-  const requiredSkills = dedupeStrings(input.skills);
-  const keywordTerms = dedupeStrings([
-    ...requiredSkills,
-    ...input.goodToHaveSkills,
-    ...input.keywords,
-  ]);
-
-  return [
-    `Job Title: ${input.title.trim()}`,
-    `Location: ${input.location.trim()}`,
-    `Experience: ${input.experienceYears ? `${input.experienceYears}+ years` : ""}`,
-    `Salary: ${formatSalary(input.salaryMin, input.salaryMax, input.salaryPeriod)}`,
-    `Required Skills: ${requiredSkills.join(", ")}`,
-    "",
-    `Keywords:`,
-    keywordTerms.join(", "),
-  ].join("\n");
-};
 const DEFAULT_STAGES = [
   { name: "Applied", order: 1, color: "#6b7280" },
   { name: "Screening", order: 2, color: "#3b82f6" },
@@ -270,6 +171,11 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState<FieldError[]>([]);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState<string | null>(null);
+  const [hasExtractedDetails, setHasExtractedDetails] = useState(false);
+  const [structuredJobProfile, setStructuredJobProfile] = useState<StructuredJobProfile | null>(null);
+  const [extractedDescriptionJson, setExtractedDescriptionJson] = useState("");
 
   // Form state
   const [formData, setFormData] = useState<{
@@ -299,12 +205,60 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const [newSkill, setNewSkill] = useState("");
   const [goodToHaveSkills, setGoodToHaveSkills] = useState<string[]>([]);
   const [newGoodToHaveSkill, setNewGoodToHaveSkill] = useState("");
-  const keywords = dedupeStrings([...skills, ...goodToHaveSkills]);
   const [hiringManagerId, setHiringManagerId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
   const [showAiDrawer, setShowAiDrawer] = useState(false);
   const descriptionWordCount = countWords(formData.description);
   const descriptionWordsRemaining = Math.max(0, MIN_DESCRIPTION_WORDS - descriptionWordCount);
+
+  const clearGeneratedState = () => {
+    setHasExtractedDetails(false);
+    setExtractionError(null);
+    setStructuredJobProfile(null);
+    setExtractedDescriptionJson("");
+  };
+
+  const buildStructuredDescriptionForSubmit = (): string => {
+    const baseProfile = structuredJobProfile ?? {
+      roleTitle: "",
+      roleFamily: "other",
+      seniority: "mid",
+      location: "",
+      country: "",
+      experienceYears: null,
+      mustHaveSkills: [],
+      niceToHaveSkills: [],
+      skillAliases: {},
+      suppressedSkills: [],
+      allowedDomains: [],
+      excludedDomains: [],
+      adjacentBuckets: [],
+      eliteSchools: [],
+      locationRequired: false,
+      mustHaveGates: {
+        seniorityMin: null,
+        experienceMinYears: null,
+        minMustHaveSkillsMatched: null,
+        locationRequired: false,
+        rejectBuckets: [],
+        rejectTitleRegex: "",
+      },
+    };
+
+    return JSON.stringify({
+      ...baseProfile,
+      roleTitle: formData.title.trim(),
+      location: formData.location.trim(),
+      experienceYears: formData.experienceYears ? Number(formData.experienceYears) : null,
+      mustHaveSkills: dedupeStrings(skills).map((skill) => skill.toLowerCase()),
+      niceToHaveSkills: dedupeStrings(goodToHaveSkills).map((skill) => skill.toLowerCase()),
+      mustHaveGates: {
+        ...baseProfile.mustHaveGates,
+        experienceMinYears: formData.experienceYears ? Number(formData.experienceYears) : baseProfile.mustHaveGates.experienceMinYears,
+        minMustHaveSkillsMatched: skills.length > 0 ? Math.min(2, skills.length) : baseProfile.mustHaveGates.minMustHaveSkillsMatched,
+      },
+    }, null, 2);
+  };
 
   // Setup step state
   const [cloneFromJobId, setCloneFromJobId] = useState<string>("");
@@ -499,14 +453,13 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     try {
       if (step === 1) {
         step1Schema.parse({
-          title: formData.title,
-          location: formData.location,
-          type: formData.type,
-          deadline: formData.deadline || undefined,
+          description: formData.description,
         });
       } else if (step === 2) {
         step2Schema.parse({
-          description: formData.description,
+          title: formData.title,
+          location: formData.location,
+          type: formData.type,
           skills,
           goodToHaveSkills,
           salaryMin: formData.salaryMin || undefined,
@@ -538,7 +491,12 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   };
 
   // Handle next step
-  const handleNext = () => {
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      await handleExtractDetails();
+      return;
+    }
+
     if (validateStep(currentStep)) {
       setCurrentStep((prev) => Math.min(prev + 1, 4));
     }
@@ -549,28 +507,75 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
+  const handleExtractDetails = async () => {
+    if (!validateStep(1) || isExtracting) return;
+
+    try {
+      setIsExtracting(true);
+      setExtractionError(null);
+
+      const response = await fetch("/api/jobs/extract-keywords", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": await getCsrfToken(),
+        },
+        body: JSON.stringify({ description: formData.description }),
+      });
+
+      if (!response.ok) {
+        let message = "Failed to extract details";
+        try {
+          const payload = await response.json();
+          message = payload?.error || payload?.message || message;
+        } catch {
+          const text = await response.text();
+          message = text || message;
+        }
+        throw new Error(message);
+      }
+
+      const payload = await response.json() as JobExtractionResponse;
+      const parsed = payload.extracted;
+
+      setFormData((prev) => ({
+        ...prev,
+        title: parsed.title || prev.title,
+        location: parsed.location || prev.location,
+        type: parsed.type || prev.type,
+        salaryMin: parsed.salaryMin || prev.salaryMin,
+        salaryMax: parsed.salaryMax || prev.salaryMax,
+        salaryPeriod: parsed.salaryPeriod || prev.salaryPeriod,
+        educationRequirement: parsed.educationRequirement || prev.educationRequirement,
+        experienceYears: parsed.experienceYears || prev.experienceYears,
+      }));
+      setSkills(parsed.skills);
+      setGoodToHaveSkills(parsed.goodToHaveSkills);
+      setStructuredJobProfile(payload.structuredJob);
+      setExtractedDescriptionJson(payload.descriptionJson);
+      setHasExtractedDetails(true);
+      setCurrentStep(2);
+    } catch (error) {
+      setHasExtractedDetails(false);
+      setExtractionError(error instanceof Error ? error.message : "Failed to extract details");
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
   // Handle submit
   const handleSubmit = () => {
     if (!validateStep(4)) return;
 
     try {
-      const optimizedJD = generateOptimizedJD({
-        title: formData.title,
-        location: formData.location,
-        experienceYears: formData.experienceYears,
-        salaryMin: formData.salaryMin,
-        salaryMax: formData.salaryMax,
-        salaryPeriod: formData.salaryPeriod,
-        skills,
-        goodToHaveSkills,
-        keywords,
-      });
-
+      const structuredDescription = buildStructuredDescriptionForSubmit();
       const jobData = {
         title: formData.title,
         location: formData.location,
         type: formData.type,
-        description: formData.description,
+        description: structuredDescription,
+        original_JD: formData.description,
         skills,
         goodToHaveSkills: goodToHaveSkills.length > 0 ? goodToHaveSkills : undefined,
         deadline: formData.deadline || undefined,
@@ -583,13 +588,26 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         experienceYears: formData.experienceYears ? Number(formData.experienceYears) : undefined,
       };
 
-      insertJobSchema.parse(jobData);
+      if (!structuredJobProfile && !extractedDescriptionJson) {
+        throw new Error("Please extract the job details first.");
+      }
+
+      insertJobSchema.parse({
+        ...jobData,
+        originalJD: formData.description,
+      });
       jobMutation.mutate(jobData as any);
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast({
           title: "Validation error",
           description: error.errors[0]?.message || "Please check your input",
+          variant: "destructive",
+        });
+      } else if (error instanceof Error) {
+        toast({
+          title: "Extraction required",
+          description: error.message,
           variant: "destructive",
         });
       }
@@ -722,26 +740,88 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
           <CardDescription>{STEPS[currentStep - 1]?.description}</CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Step 1: Basics */}
+          {/* Step 1: Original JD */}
           {currentStep === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div>
-                <Label htmlFor="title" className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  Job Title *
-                </Label>
-                <Input
-                  id="title"
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  placeholder="e.g. Senior Software Engineer"
-                  className={cn(getFieldError("title") && "border-destructive")}
+                <div className="flex items-center justify-between mb-2">
+                  <Label htmlFor="description" className="flex items-center gap-2">
+                    Original Job Description *
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Paste the raw JD first. We will extract structured details from this and auto-fill the form for review.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
+                  <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
+                    Analyze JD (AI)
+                  </Button>
+                </div>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => {
+                    setFormData((prev) => ({ ...prev, description: e.target.value }));
+                    clearGeneratedState();
+                  }}
+                  placeholder="Paste the original job description here..."
+                  className={cn("min-h-[220px]", getFieldError("description") && "border-destructive")}
                 />
-                {renderFieldError("title")}
+                <div className="flex justify-between mt-1">
+                  {renderFieldError("description") || (
+                    <p className="text-sm text-muted-foreground">
+                      {descriptionWordCount}/{MIN_DESCRIPTION_WORDS} words
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {descriptionWordsRemaining > 0 ? `${descriptionWordsRemaining} more words needed` : ""}
+                  </p>
+                </div>
+                {descriptionWordCount > 0 && descriptionWordCount < MIN_DESCRIPTION_WORDS && (
+                  <div className="flex items-start gap-2 mt-2 p-2 bg-warning/10 border border-warning/30 rounded text-sm">
+                    <AlertCircle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
+                    <p className="text-warning-foreground">
+                      <strong>SEO tip:</strong> Descriptions under {MIN_DESCRIPTION_WORDS} words may not appear in Google Jobs search results.
+                      Add {descriptionWordsRemaining} more words for better visibility.
+                    </p>
+                  </div>
+                )}
+                {extractionError && (
+                  <p className="mt-2 flex items-center gap-1 text-sm text-destructive">
+                    <AlertCircle className="h-3 w-3" />
+                    {extractionError}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  We’ll extract the title, location, skills, experience, and other structured details from this JD.
+                </p>
               </div>
+            </div>
+          )}
 
+          {/* Step 2: Details */}
+          {currentStep === 2 && (
+            <div className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="title" className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    Job Title *
+                  </Label>
+                  <Input
+                    id="title"
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    placeholder="e.g. Senior Software Engineer"
+                    className={cn(getFieldError("title") && "border-destructive")}
+                  />
+                  {renderFieldError("title")}
+                </div>
+
                 <div>
                   <Label htmlFor="location" className="flex items-center gap-2 mb-2">
                     <MapPin className="h-4 w-4 text-muted-foreground" />
@@ -752,7 +832,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                     type="text"
                     value={formData.location}
                     onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder="e.g. San Francisco, CA"
+                    placeholder="e.g. Bengaluru, India"
                     className={cn(getFieldError("location") && "border-destructive")}
                   />
                   {renderFieldError("location")}
@@ -764,20 +844,9 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   </Label>
                   <Select
                     value={formData.type}
-                    onValueChange={(value: any) =>
-                      setFormData((prev) => {
-                        const nextType = value as typeof prev.type;
-                        let nextLocation = prev.location;
-                        if (nextType === "remote" && !nextLocation.trim()) {
-                          nextLocation = "Remote";
-                        } else if (prev.type === "remote" && nextType !== "remote" && nextLocation.trim().toLowerCase() === "remote") {
-                          nextLocation = "";
-                        }
-                        return { ...prev, type: nextType, location: nextLocation };
-                      })
-                    }
+                    onValueChange={(value: any) => setFormData((prev) => ({ ...prev, type: value as typeof prev.type }))}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className={cn(getFieldError("type") && "border-destructive")}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -787,28 +856,30 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                       <SelectItem value="remote">Remote</SelectItem>
                     </SelectContent>
                   </Select>
+                  {renderFieldError("type")}
+                </div>
+
+                <div>
+                  <Label htmlFor="deadline" className="flex items-center gap-2 mb-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    Application Deadline (Optional)
+                  </Label>
+                  <Input
+                    id="deadline"
+                    type="date"
+                    value={formData.deadline}
+                    onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
+                    min={new Date().toISOString().split("T")[0]}
+                  />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="deadline" className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground" />
-                  Application Deadline (Optional)
-                </Label>
-                <Input
-                  id="deadline"
-                  type="date"
-                  value={formData.deadline}
-                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                  min={new Date().toISOString().split("T")[0]}
-                />
-              </div>
-            </div>
-          )}
+              {hasExtractedDetails && (
+                <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success-foreground">
+                  Extracted details are ready. Review and edit anything before posting.
+                </div>
+              )}
 
-          {/* Step 2: Details */}
-          {currentStep === 2 && (
-            <div className="space-y-5">
               {/* Salary Section */}
               <div>
                 <Label className="flex items-center gap-2 mb-2">
@@ -1031,53 +1102,6 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 />
               </div>
 
-              {/* Job Description */}
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label htmlFor="description" className="flex items-center gap-2">
-                    Job Description *
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">
-                        <p>A detailed job description improves AI candidate matching. Include responsibilities, team culture, and specific requirements for best results.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </Label>
-                  <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
-                    Analyze JD (AI)
-                  </Button>
-                </div>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Describe the role, responsibilities, and what makes this opportunity exciting..."
-                  className={cn("min-h-[200px]", getFieldError("description") && "border-destructive")}
-                />
-                <div className="flex justify-between mt-1">
-                  {renderFieldError("description") || (
-                    <p className="text-sm text-muted-foreground">
-                      {descriptionWordCount}/{MIN_DESCRIPTION_WORDS} words
-                    </p>
-                  )}
-                  <p className="text-sm text-muted-foreground">
-                    {descriptionWordsRemaining > 0 ? `${descriptionWordsRemaining} more words needed` : ""}
-                  </p>
-                </div>
-                {/* SEO warning for short descriptions */}
-                {descriptionWordCount > 0 && descriptionWordCount < MIN_DESCRIPTION_WORDS && (
-                  <div className="flex items-start gap-2 mt-2 p-2 bg-warning/10 border border-warning/30 rounded text-sm">
-                    <AlertCircle className="h-4 w-4 text-warning mt-0.5 flex-shrink-0" />
-                    <p className="text-warning-foreground">
-                      <strong>SEO tip:</strong> Descriptions under {MIN_DESCRIPTION_WORDS} words may not appear in Google Jobs search results.
-                      Add {descriptionWordsRemaining} more words for better visibility.
-                    </p>
-                  </div>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">Clear, inclusive descriptions improve apply rates.</p>
-              </div>
             </div>
           )}
 
@@ -1460,8 +1484,8 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
             </Button>
 
             {currentStep < 4 ? (
-              <Button type="button" onClick={handleNext}>
-                Next
+              <Button type="button" onClick={handleNext} disabled={currentStep === 1 && isExtracting}>
+                {currentStep === 1 ? (isExtracting ? "Extracting..." : "Extract Details") : "Next"}
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (

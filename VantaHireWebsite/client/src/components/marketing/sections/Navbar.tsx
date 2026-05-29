@@ -29,6 +29,10 @@ export default function Navbar() {
     },
   });
 
+  const goToLogin = () => {
+    window.location.href = "/recruiter-auth";
+  };
+
   return (
     <>
       <motion.div
@@ -101,6 +105,7 @@ export default function Navbar() {
           <motion.button
             whileHover={{ scale: 1.02, boxShadow: "0 4px 30px rgba(75,142,240,0.45)" }}
             whileTap={{ scale: 0.97 }}
+            onClick={goToLogin}
             className="font-body text-xs text-white font-medium rounded-lg"
             style={{
               background: "#4B8EF0",
@@ -109,7 +114,7 @@ export default function Navbar() {
               cursor: "pointer",
             }}
           >
-            Get Started
+            Get Started -&gt;
           </motion.button>
         </div>
       </motion.div>
@@ -186,6 +191,7 @@ export default function Navbar() {
           <motion.button
             whileHover={{ scale: 1.02, boxShadow: "0 4px 30px rgba(75,142,240,0.45)" }}
             whileTap={{ scale: 0.97 }}
+            onClick={goToLogin}
             className="font-body text-white font-medium rounded-lg"
             style={{
               fontSize: "0.8rem",
@@ -196,7 +202,7 @@ export default function Navbar() {
               flexShrink: 0,
             }}
           >
-            Get Started
+            Get Started -&gt;
           </motion.button>
         </div>
       </motion.div>

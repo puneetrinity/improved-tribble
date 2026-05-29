@@ -171,7 +171,7 @@ async function processOneApplication(
   // Get or generate JD digest
   let jdDigest: JDDigest = app.job.jdDigest as JDDigest;
   if (!jdDigest || !app.job.jdDigestVersion || app.job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-    jdDigest = await generateJDDigest(app.job.title, app.job.description);
+    jdDigest = await generateJDDigest(app.job.title, app.job.originalJD || app.job.description);
     await db.update(jobs).set({
       jdDigest,
       jdDigestVersion: jdDigest.version,

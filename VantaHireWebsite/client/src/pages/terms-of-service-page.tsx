@@ -13,14 +13,14 @@ import {
 } from "@/lib/shared-styles";
 
 const highlightBoxPurple =
-  "flex items-center gap-[10px] py-[14px] px-[18px] rounded-[6px] text-[0.88rem] mt-4 bg-[rgba(124,58,237,0.06)] border border-[rgba(124,58,237,0.15)] text-hr-accent-hover";
+  "flex items-center gap-[10px] py-[14px] px-[18px] rounded-[14px] text-[0.88rem] mt-4 bg-[rgba(75,142,240,0.08)] border border-[rgba(75,142,240,0.18)] text-e-blue";
 
 const rolesGridCls =
   "grid grid-cols-3 gap-[10px] my-3 mb-4 max-md:grid-cols-1";
 const roleItemCls =
-  "flex flex-col gap-[3px] p-[14px] bg-hr-bg-elevated border border-white/[0.06] rounded-[6px]";
-const roleNameCls = "font-mono text-[0.72rem] font-medium tracking-[0.04em] text-hr-text";
-const roleDescCls = "text-[0.82rem] text-hr-text-muted leading-[1.4]";
+  "flex flex-col gap-[3px] p-[14px] bg-white/[0.04] border border-white/[0.08] rounded-[14px] backdrop-blur-xl";
+const roleNameCls = "font-mono text-[0.72rem] font-medium tracking-[0.04em] text-e-text";
+const roleDescCls = "text-[0.82rem] text-e-text3 leading-[1.4]";
 
 const sections: LegalSection[] = [
   {

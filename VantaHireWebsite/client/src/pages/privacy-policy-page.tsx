@@ -17,7 +17,7 @@ import {
 } from "@/lib/shared-styles";
 
 const highlightBoxGreen =
-  "flex items-center gap-[10px] py-[14px] px-[18px] rounded-[6px] text-[0.88rem] mt-4 bg-[rgba(16,185,129,0.06)] border border-[rgba(16,185,129,0.15)] text-hr-green";
+  "flex items-center gap-[10px] py-[14px] px-[18px] rounded-[14px] text-[0.88rem] mt-4 bg-[rgba(52,209,122,0.08)] border border-[rgba(52,209,122,0.18)] text-e-green";
 
 const infoGridCls =
   "grid grid-cols-2 gap-px bg-white/[0.06] border border-white/[0.06] rounded-lg overflow-hidden my-4 max-md:grid-cols-2 max-sm:grid-cols-1";
@@ -27,9 +27,9 @@ const securityGridCls =
 const rightsGridCls =
   "grid grid-cols-2 gap-[10px] my-3 mb-4 max-md:grid-cols-1";
 const rightItemCls =
-  "flex flex-col gap-[3px] p-[14px] bg-hr-bg-elevated border border-white/[0.06] rounded-[6px]";
-const rightNameCls = "font-mono text-[0.72rem] font-medium tracking-[0.04em] text-hr-text";
-const rightDescCls = "text-[0.82rem] text-hr-text-muted leading-[1.4]";
+  "flex flex-col gap-[3px] p-[14px] bg-white/[0.04] border border-white/[0.08] rounded-[14px] backdrop-blur-xl";
+const rightNameCls = "font-mono text-[0.72rem] font-medium tracking-[0.04em] text-e-text";
+const rightDescCls = "text-[0.82rem] text-e-text3 leading-[1.4]";
 
 const sections: LegalSection[] = [
   {
@@ -224,10 +224,10 @@ const sections: LegalSection[] = [
           comply with legal obligations. Specifically:
         </p>
         <ul className={listCls}>
-          <li><strong>Active accounts</strong> â€” Data retained while your account is active</li>
-          <li><strong>Inactive accounts</strong> â€” May be deleted after 2 years of inactivity</li>
-          <li><strong>Application data</strong> â€” Retained as long as the job posting is active plus 1 year</li>
-          <li><strong>Legal requirements</strong> â€” Data may be retained longer if required by law</li>
+          <li><strong>Active accounts</strong> - Data retained while your account is active</li>
+          <li><strong>Inactive accounts</strong> - May be deleted after 2 years of inactivity</li>
+          <li><strong>Application data</strong> - Retained as long as the job posting is active plus 1 year</li>
+          <li><strong>Legal requirements</strong> - Data may be retained longer if required by law</li>
         </ul>
       </>
     ),

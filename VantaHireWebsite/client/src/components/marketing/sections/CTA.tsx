@@ -3,6 +3,10 @@ import { motion } from "framer-motion";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
 
 export default function CTA() {
+  const goToLogin = () => {
+    window.location.href = "/recruiter-auth";
+  };
+
   return (
     <section style={{ padding: "140px 4rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
       <div
@@ -83,6 +87,7 @@ export default function CTA() {
           <motion.button
             whileHover={{ scale: 1.04, boxShadow: "0 8px 60px rgba(75,142,240,0.55)" }}
             whileTap={{ scale: 0.97 }}
+            onClick={goToLogin}
             style={{
               background: "#4B8EF0",
               color: "white",
@@ -96,7 +101,7 @@ export default function CTA() {
               boxShadow: "0 0 40px rgba(75,142,240,0.35)",
             }}
           >
-            Get Started →
+            Get Started -&gt;
           </motion.button>
         </motion.div>
       </div>

@@ -62,6 +62,7 @@ export const jobs = pgTable("jobs", {
   location: text("location").notNull(),
   type: text("type").notNull(), // full-time, part-time, contract, remote
   description: text("description").notNull(),
+  originalJD: text("original_jd"),
   skills: text("skills").array(),
   deadline: date("deadline"),
   postedBy: integer("posted_by").notNull().references(() => users.id),
@@ -1854,6 +1855,7 @@ export const insertJobSchema = createInsertSchema(jobs).pick({
   location: true,
   type: true,
   description: true,
+  originalJD: true,
   skills: true,
   deadline: true,
   clientId: true,
@@ -1868,9 +1870,8 @@ export const insertJobSchema = createInsertSchema(jobs).pick({
   title: z.string().min(1).max(100),
   location: z.string().min(1).max(100),
   type: z.enum(["full-time", "part-time", "contract", "remote"]),
-  description: z.string().min(10).max(5000).refine((value) => countWords(value) >= 200, {
-    message: "Description must be at least 200 words",
-  }),
+  description: z.string().min(10).max(20000),
+  originalJD: z.string().min(10).max(20000).optional(),
   skills: z.array(z.string().min(1).max(50)).max(20).optional(),
   deadline: z.string().transform(str => new Date(str)).optional(),
   clientId: z.number().int().positive().optional(),

@@ -5,6 +5,19 @@ import ealanaMoth from "@/assets/ealana-moth (1).svg";
 const words = ["Cut", "the", "noise.", "Find", "the"];
 
 export function HeroSection() {
+  const goToLogin = () => {
+    window.location.href = "/recruiter-auth";
+  };
+
+  const goToHowItWorks = () => {
+    if (window.location.pathname === "/") {
+      document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    window.location.href = "/#features";
+  };
+
   return (
     <section
       className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden text-center"
@@ -126,7 +139,7 @@ export function HeroSection() {
         className="relative z-10 mb-8 max-w-lg font-body leading-relaxed text-e-text2"
         style={{ fontSize: "1.05rem", fontWeight: 300 }}
       >
-        ealana finds candidates others miss, remembers every hiring decision, and executes outreach — all in one place.
+        ealana finds candidates others miss, remembers every hiring decision, and executes outreach - all in one place.
       </motion.p>
 
       <motion.div
@@ -140,8 +153,9 @@ export function HeroSection() {
           whileTap={{ scale: 0.97 }}
           className="font-body rounded-xl px-7 py-3 text-sm font-medium text-white"
           style={{ background: "#4B8EF0", boxShadow: "0 0 28px rgba(75,142,240,0.35)" }}
+          onClick={goToLogin}
         >
-          Get Started →
+          Get Started -&gt;
         </motion.button>
         <motion.button
           whileHover={{ borderColor: "rgba(255,255,255,0.18)", color: "#F4F5FA" }}
@@ -153,6 +167,7 @@ export function HeroSection() {
             border: "1px solid rgba(255,255,255,0.12)",
             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)",
           }}
+          onClick={goToHowItWorks}
         >
           See how it works
         </motion.button>
@@ -165,7 +180,7 @@ export function HeroSection() {
         className="relative z-10 font-body text-e-text3"
         style={{ fontSize: "0.75rem" }}
       >
-        Free to start · No credit card · Made in India
+        Free to start - No credit card - Made in India
       </motion.p>
     </section>
   );

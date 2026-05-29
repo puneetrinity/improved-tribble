@@ -57,16 +57,16 @@ export default function RecruitersDirectoryPage() {
   return (
     <>
       <Helmet>
-        <title>Recruiters Directory | ealana â€” Find Specialist Recruiters</title>
+        <title>Recruiters Directory | ealana - Find Specialist Recruiters</title>
         <meta name="description" content="Meet ealana's specialist recruiters. Industry experts in IT, telecom, automotive, fintech, and healthcare hiring across India and APAC." />
         <link rel="canonical" href="https://ealana.com/recruiters" />
-        <meta property="og:title" content="Recruiters Directory | ealana â€” Find Specialist Recruiters" />
+        <meta property="og:title" content="Recruiters Directory | ealana - Find Specialist Recruiters" />
         <meta property="og:description" content="Meet ealana's specialist recruiters. Industry experts across India and APAC." />
         <meta property="og:url" content="https://ealana.com/recruiters" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Recruiters Directory | ealana â€” Find Specialist Recruiters" />
+        <meta name="twitter:title" content="Recruiters Directory | ealana - Find Specialist Recruiters" />
         <meta name="twitter:description" content="Meet ealana's specialist recruiters. Industry experts across India and APAC." />
         <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
         <script type="application/ld+json">
@@ -193,7 +193,7 @@ export default function RecruitersDirectoryPage() {
                           {recruiter.jobCount} active {recruiter.jobCount === 1 ? "job" : "jobs"}
                         </span>
                         <span className="text-[0.78rem] text-hr-accent-hover opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                          View Profile â†’
+                          View Profile {"->"}
                         </span>
                       </div>
                     </div>

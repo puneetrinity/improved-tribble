@@ -20,19 +20,18 @@ interface LegalPageLayoutProps {
   children?: React.ReactNode;
 }
 
-/* ── Reusable class-name constants ── */
 const sidebarLinkBase =
-  "flex items-center gap-2 py-[7px] px-[10px] text-[0.78rem] font-normal text-hr-text-muted no-underline rounded-[4px] transition-colors duration-200";
-const sidebarLinkHover = "hover:text-hr-text-secondary hover:bg-white/[0.03]";
-const sidebarLinkActive = "text-hr-accent-hover bg-[rgba(124,58,237,0.08)]";
+  "flex items-center gap-2 py-[8px] px-[12px] text-[0.78rem] font-normal text-e-text3 no-underline rounded-xl transition-colors duration-200";
+const sidebarLinkHover = "hover:text-e-text2 hover:bg-white/[0.03]";
+const sidebarLinkActive = "text-e-blue bg-[rgba(75,142,240,0.1)]";
 
 const sectionIconBox =
-  "flex items-center justify-center w-[30px] h-[30px] rounded-[6px] bg-[rgba(124,58,237,0.1)] text-hr-accent-hover shrink-0";
+  "flex items-center justify-center w-[34px] h-[34px] rounded-xl bg-[rgba(75,142,240,0.12)] text-e-blue shrink-0";
 
 const sectionTitleCls =
-  "font-satoshi text-[1.35rem] font-medium text-hr-text tracking-[-0.01em]";
+  "font-display text-[1.45rem] font-medium text-e-text tracking-[-0.02em]";
 
-const sectionBodyCls = "text-hr-text-secondary text-sm leading-[1.75] [&>p]:mb-3 [&>p:last-child]:mb-0";
+const sectionBodyCls = "text-e-text2 text-sm leading-[1.8] [&>p]:mb-3 [&>p:last-child]:mb-0";
 
 export default function LegalPageLayout({
   sectionLabel,
@@ -62,30 +61,38 @@ export default function LegalPageLayout({
   }, []);
 
   return (
-    <div className="font-dm leading-normal bg-hr-bg text-hr-text antialiased public-theme min-h-screen">
+    <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme min-h-screen">
       <GridOverlay />
       <div className="relative z-10">
         <HomepageNav />
 
-        {/* Hero */}
-        <div className="pt-[140px] px-12 pb-[60px] text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-10">
-          <div className="font-mono text-[0.68rem] font-medium text-hr-accent-hover tracking-[0.12em] uppercase mb-[14px]">{sectionLabel}</div>
-          <h1 className="font-satoshi text-[clamp(2.4rem,5vw,3.4rem)] font-normal leading-[1.2] tracking-[-0.01em] mb-5 text-hr-text">{heroTitle}</h1>
-          <p className="text-base leading-[1.7] text-hr-text-secondary mx-auto max-w-[520px]">{heroDesc}</p>
-          <div className="font-mono text-[0.7rem] tracking-[0.08em] text-hr-text-muted mt-6 uppercase">
+        <div className="relative pt-[140px] px-12 pb-[60px] text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-10">
+          <div
+            className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[760px] -translate-x-1/2"
+            style={{
+              background: "radial-gradient(ellipse, rgba(75,142,240,0.12) 0%, rgba(52,209,122,0.05) 42%, transparent 72%)",
+              filter: "blur(80px)",
+            }}
+          />
+          <div className="relative font-mono text-[0.68rem] font-medium text-e-blue tracking-[0.12em] uppercase mb-[14px]">
+            {sectionLabel}
+          </div>
+          <h1 className="relative font-display text-[clamp(2.6rem,5vw,4rem)] font-medium leading-[1.08] tracking-[-0.03em] mb-5 text-e-text">
+            {heroTitle}
+          </h1>
+          <p className="relative text-base leading-[1.8] text-e-text2 mx-auto max-w-[560px]">{heroDesc}</p>
+          <div className="relative font-mono text-[0.7rem] tracking-[0.08em] text-e-text3 mt-6 uppercase">
             {lastUpdated}
           </div>
         </div>
 
-        {/* Content */}
-        <div className="grid grid-cols-[200px_1fr] gap-12 max-w-[1100px] mx-auto px-12 pb-[100px] max-md:grid-cols-1 max-md:gap-0 max-md:px-5 max-md:pb-[60px]">
-          {/* Sidebar Navigation */}
+        <div className="grid grid-cols-[220px_1fr] gap-12 max-w-[1100px] mx-auto px-12 pb-[100px] max-md:grid-cols-1 max-md:gap-0 max-md:px-5 max-md:pb-[60px]">
           <aside className="relative max-md:hidden">
             <div className="sticky top-[80px]">
-              <div className="font-mono text-[0.6rem] font-medium tracking-[0.12em] uppercase text-hr-text-muted mb-4 pl-1">
+              <div className="font-mono text-[0.6rem] font-medium tracking-[0.12em] uppercase text-e-text3 mb-4 pl-1">
                 On this page
               </div>
-              <nav className="flex flex-col gap-[2px]">
+              <nav className="flex flex-col gap-[4px]">
                 {sections.map((section) => (
                   <a
                     key={section.id}
@@ -112,25 +119,20 @@ export default function LegalPageLayout({
             </div>
           </aside>
 
-          {/* Main Content */}
-          <main className="flex flex-col">
+          <main className="flex flex-col rounded-[28px] border border-white/[0.08] bg-[linear-gradient(180deg,rgba(255,255,255,0.04)_0%,rgba(255,255,255,0.02)_100%)] backdrop-blur-xl px-8 max-md:px-0 max-md:bg-transparent max-md:border-0">
             {sections.map((section, index) => (
               <section
                 key={section.id}
                 id={section.id}
                 data-legal-section
                 className="py-9 border-b border-white/[0.06] last:border-b-0"
-                style={{
-                  animation: `hr-fade-up 0.6s ease-out ${index * 0.05}s both`,
-                }}
+                style={{ animation: `hr-fade-up 0.6s ease-out ${index * 0.05}s both` }}
               >
-                <div className="flex items-center gap-[10px] mb-5">
+                <div className="flex items-center gap-[12px] mb-5">
                   <span className={sectionIconBox}>{section.icon}</span>
                   <h2 className={sectionTitleCls}>{section.title}</h2>
                 </div>
-                <div className={sectionBodyCls}>
-                  {section.content}
-                </div>
+                <div className={sectionBodyCls}>{section.content}</div>
               </section>
             ))}
           </main>

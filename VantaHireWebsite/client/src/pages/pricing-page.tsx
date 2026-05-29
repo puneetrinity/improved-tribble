@@ -98,7 +98,7 @@ export default function PricingPage() {
 
   const formatMetric = (value?: number | null) => {
     if (typeof value !== "number" || value <= 0) {
-      return "â€”";
+      return "-";
     }
     return String(value);
   };
@@ -355,7 +355,7 @@ export default function PricingPage() {
                 <button className={planBtnSecondary} disabled>Current Plan</button>
               ) : (
                 <button className={planBtnSecondary} onClick={() => setLocation('/recruiter-auth')}>
-                  Get Started
+                  Get Started -&gt;
                 </button>
               )}
             </div>

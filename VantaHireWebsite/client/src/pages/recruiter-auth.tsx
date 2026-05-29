@@ -21,32 +21,30 @@ const brandBgStyle = { backgroundImage: `url(${recruiterAuthBg})` } as const;
 
 // --- Tailwind class constants ---
 
-// Border color: --hr-border = rgba(255,255,255,0.08)
-const hrBorder = "border-[rgba(255,255,255,0.08)]";
-// Border color: --hr-border-light = rgba(255,255,255,0.12)
-const hrBorderLight = "border-[rgba(255,255,255,0.12)]";
+const shellBorder = "border-white/10";
+const shellBorderLight = "border-white/12";
 
 // Shared input classes
 const inputCls =
-  `bg-hr-bg-elevated ${hrBorder} border rounded-[4px] px-3.5 py-2.5 font-dm text-[0.88rem] text-hr-text transition-[border-color] duration-200 outline-none w-full box-border placeholder:text-hr-text-muted placeholder:opacity-60 focus:border-hr-accent`;
+  `bg-white/[0.04] ${shellBorder} border rounded-xl px-3.5 py-2.5 font-ui text-[0.88rem] text-e-text transition-[border-color,box-shadow] duration-200 outline-none w-full box-border placeholder:text-e-text3 placeholder:opacity-70 focus:border-e-blue focus:shadow-[0_0_0_2px_rgba(75,142,240,0.22)]`;
 
 // Shared label classes
-const labelCls = "font-dm text-[0.78rem] font-medium text-hr-text-secondary tracking-[0.02em]";
+const labelCls = "font-ui text-[0.78rem] font-medium text-e-text2 tracking-[0.02em]";
 
 // Shared field classes
 const fieldCls = "flex flex-col gap-1.5";
 
 // Submit button
 const submitCls =
-  "bg-hr-accent text-white border-none py-3 px-6 rounded-none font-dm text-[0.875rem] font-medium cursor-pointer transition-colors duration-200 w-full mt-1 hover:bg-hr-accent-hover disabled:opacity-60 disabled:cursor-not-allowed";
+  "bg-e-blue text-white border-none py-3 px-6 rounded-xl font-ui text-[0.875rem] font-medium cursor-pointer transition-all duration-200 w-full mt-1 hover:brightness-110 hover:shadow-[0_10px_32px_rgba(75,142,240,0.28)] disabled:opacity-60 disabled:cursor-not-allowed";
 
 // Secondary button
 const secondaryCls =
-  `bg-transparent text-hr-text ${hrBorderLight} border py-2.5 px-6 rounded-none font-dm text-[0.85rem] font-medium cursor-pointer transition-all duration-200 w-full hover:border-[rgba(255,255,255,0.25)] disabled:opacity-60 disabled:cursor-not-allowed`;
+  `bg-transparent text-e-text ${shellBorderLight} border py-2.5 px-6 rounded-xl font-ui text-[0.85rem] font-medium cursor-pointer transition-all duration-200 w-full hover:border-white/25 hover:bg-white/[0.03] disabled:opacity-60 disabled:cursor-not-allowed`;
 
 // Ghost button
 const ghostCls =
-  "bg-transparent text-hr-text-muted border-none py-2.5 px-6 font-dm text-[0.82rem] font-normal cursor-pointer transition-colors duration-200 w-full hover:text-hr-text";
+  "bg-transparent text-e-text3 border-none py-2.5 px-6 font-ui text-[0.82rem] font-normal cursor-pointer transition-colors duration-200 w-full hover:text-e-text";
 
 // Ghost button with icon
 const ghostWithIconCls = `${ghostCls} flex items-center justify-center gap-1.5`;
@@ -262,14 +260,14 @@ export default function RecruiterAuth() {
     if (registrationSuccess) {
       return (
         <div className={stateCardCls}>
-          <div className={`${stateIconBaseCls} bg-[rgba(16,185,129,0.12)] text-hr-green`}>
+          <div className={`${stateIconBaseCls} bg-[rgba(52,209,122,0.12)] text-e-green`}>
             <CheckCircle size={28} />
           </div>
-          <div className="font-satoshi text-[1.2rem] font-medium text-hr-text">Check Your Email</div>
-          <div className="font-dm text-[0.88rem] text-hr-text-secondary leading-[1.6] max-w-[320px]">
-            We've sent a verification link to <span className="text-hr-text font-medium">{verificationEmail}</span>
+          <div className="font-display text-[1.2rem] font-medium text-e-text">Check Your Email</div>
+          <div className="font-ui text-[0.88rem] text-e-text2 leading-[1.6] max-w-[320px]">
+            We've sent a verification link to <span className="text-e-text font-medium">{verificationEmail}</span>
           </div>
-          <p className="text-[0.82rem] text-hr-text-muted leading-[1.6]">
+          <p className="text-[0.82rem] text-e-text3 leading-[1.6]">
             Click the link in the email to verify your account and start using ealana.
           </p>
           <div className="flex flex-col gap-2 w-full max-w-[280px] mt-2">
@@ -288,12 +286,12 @@ export default function RecruiterAuth() {
     if (verificationNeeded) {
       return (
         <div className={stateCardCls}>
-          <div className={`${stateIconBaseCls} bg-[rgba(245,158,11,0.12)] text-hr-yellow`}>
+          <div className={`${stateIconBaseCls} bg-[rgba(245,200,66,0.12)] text-e-amber`}>
             <Mail size={28} />
           </div>
-          <div className="font-satoshi text-[1.2rem] font-medium text-hr-text">Verify Your Email</div>
-          <div className="font-dm text-[0.88rem] text-hr-text-secondary leading-[1.6] max-w-[320px]">
-            Check your inbox at <span className="text-hr-text font-medium">{verificationEmail}</span> for a verification link.
+          <div className="font-display text-[1.2rem] font-medium text-e-text">Verify Your Email</div>
+          <div className="font-ui text-[0.88rem] text-e-text2 leading-[1.6] max-w-[320px]">
+            Check your inbox at <span className="text-e-text font-medium">{verificationEmail}</span> for a verification link.
           </div>
           <div className="flex flex-col gap-2 w-full max-w-[280px] mt-2">
             <button className={secondaryCls} onClick={handleResendVerification} disabled={resendLoading}>
@@ -312,12 +310,12 @@ export default function RecruiterAuth() {
       return (
         <form onSubmit={handleForgotPassword} className={formCls}>
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="w-[30px] h-[30px] rounded-[6px] bg-[rgba(124,58,237,0.1)] text-hr-accent-hover flex items-center justify-center shrink-0">
+            <div className="w-[30px] h-[30px] rounded-[10px] bg-[rgba(75,142,240,0.12)] text-e-blue flex items-center justify-center shrink-0">
               <Mail size={16} />
             </div>
-            <div className="font-satoshi text-[1.1rem] font-medium text-hr-text">Reset Password</div>
+            <div className="font-display text-[1.1rem] font-medium text-e-text">Reset Password</div>
           </div>
-          <div className="text-[0.82rem] text-hr-text-muted leading-[1.5]">
+          <div className="text-[0.82rem] text-e-text3 leading-[1.5]">
             Enter your email to receive a password reset link.
           </div>
           <div className={fieldCls}>
@@ -351,11 +349,11 @@ export default function RecruiterAuth() {
       <>
         {/* Invite Banner */}
         {inviteToken && inviteDetails && (
-          <div className="flex items-center gap-3 py-3.5 px-[18px] bg-[rgba(124,58,237,0.06)] border border-[rgba(124,58,237,0.12)] rounded-lg mb-6">
-            <div className="w-8 h-8 rounded-[6px] bg-[rgba(124,58,237,0.12)] text-hr-accent-hover flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-3 py-3.5 px-[18px] bg-[rgba(75,142,240,0.08)] border border-[rgba(75,142,240,0.16)] rounded-[18px] mb-6 backdrop-blur-xl">
+            <div className="w-8 h-8 rounded-[10px] bg-[rgba(75,142,240,0.12)] text-e-blue flex items-center justify-center shrink-0">
               <UserPlus size={16} />
             </div>
-            <div className="text-[0.82rem] text-hr-text-secondary leading-[1.4] [&_strong]:text-hr-accent-hover [&_strong]:font-medium [&_span]:block [&_span]:text-[0.72rem] [&_span]:text-hr-text-muted [&_span]:mt-0.5">
+            <div className="text-[0.82rem] text-e-text2 leading-[1.4] [&_strong]:text-e-blue [&_strong]:font-medium [&_span]:block [&_span]:text-[0.72rem] [&_span]:text-e-text3 [&_span]:mt-0.5">
               You've been invited to join <strong>{inviteDetails.organizationName}</strong>
               <span>Invited by {inviteDetails.inviterName} as {inviteDetails.role}</span>
             </div>
@@ -364,16 +362,16 @@ export default function RecruiterAuth() {
 
         {/* Invite Error */}
         {inviteToken && inviteError && (
-          <div className="py-3 px-[18px] bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.15)] rounded-lg text-[0.82rem] text-hr-red mb-6">
+          <div className="py-3 px-[18px] bg-[rgba(239,68,68,0.06)] border border-[rgba(239,68,68,0.15)] rounded-[18px] text-[0.82rem] text-red-400 mb-6">
             {(inviteError as Error).message || "Invalid or expired invite link"}
           </div>
         )}
 
         <div className="text-center mb-7">
-          <div className="font-satoshi text-2xl font-medium text-hr-text mb-2">
+          <div className="font-display text-2xl font-medium text-e-text mb-2">
             {inviteDetails ? "Create Your Account" : "Recruiter Access"}
           </div>
-          <div className="font-dm text-[0.85rem] text-hr-text-muted leading-[1.5]">
+          <div className="font-ui text-[0.85rem] text-e-text3 leading-[1.5]">
             {inviteDetails
               ? `Register to join ${inviteDetails.organizationName}`
               : "Sign in to your recruiter account or create a new one"
@@ -382,15 +380,15 @@ export default function RecruiterAuth() {
         </div>
 
         {/* Tab Switcher */}
-        <div className={`grid grid-cols-2 bg-hr-bg-elevated rounded-[4px] ${hrBorder} border overflow-hidden mb-6`}>
+        <div className={`grid grid-cols-2 bg-white/[0.04] rounded-xl ${shellBorder} border overflow-hidden mb-6`}>
           <button
-            className={`py-2.5 font-dm text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'login' ? 'bg-hr-accent text-white' : 'bg-transparent text-hr-text-muted hover:text-hr-text-secondary'}`}
+            className={`py-2.5 font-ui text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'login' ? 'bg-e-blue text-white' : 'bg-transparent text-e-text3 hover:text-e-text2'}`}
             onClick={() => setActiveTab('login')}
           >
             Sign In
           </button>
           <button
-            className={`py-2.5 font-dm text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'register' ? 'bg-hr-accent text-white' : 'bg-transparent text-hr-text-muted hover:text-hr-text-secondary'}`}
+            className={`py-2.5 font-ui text-[0.82rem] font-medium border-none cursor-pointer text-center transition-colors duration-200 ${activeTab === 'register' ? 'bg-e-blue text-white' : 'bg-transparent text-e-text3 hover:text-e-text2'}`}
             onClick={() => setActiveTab('register')}
           >
             Register
@@ -426,7 +424,7 @@ export default function RecruiterAuth() {
             <div className="text-right -mt-2">
               <button
                 type="button"
-                className="bg-none border-none font-dm text-[0.78rem] text-hr-accent-hover cursor-pointer p-0 transition-colors duration-200 hover:text-hr-text"
+                className="bg-none border-none font-ui text-[0.78rem] text-e-blue cursor-pointer p-0 transition-colors duration-200 hover:text-e-text"
                 onClick={() => setShowForgotPassword(true)}
               >
                 Forgot your password?
@@ -478,7 +476,7 @@ export default function RecruiterAuth() {
                 title={inviteDetails ? "Email is locked to the invite" : undefined}
               />
               {inviteDetails && (
-                <span className="text-[0.7rem] text-hr-text-muted">Email is locked to the invite</span>
+                <span className="text-[0.7rem] text-e-text3">Email is locked to the invite</span>
               )}
             </div>
             <div className={fieldCls}>
@@ -503,33 +501,33 @@ export default function RecruiterAuth() {
   };
 
   return (
-    <div className="grid grid-cols-2 min-h-screen bg-hr-bg max-[900px]:grid-cols-1">
+    <div className="grid grid-cols-2 min-h-screen bg-e-bg text-e-text max-[900px]:grid-cols-1">
       {/* Left Panel — Brand */}
       <div
-        className={`relative flex flex-col justify-start items-center pt-[140px] px-[60px] pb-20 bg-hr-bg-card bg-cover bg-center bg-no-repeat border-r ${hrBorder} overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[linear-gradient(to_bottom,rgba(12,12,16,0.92)_0%,rgba(12,12,16,0.45)_50%,rgba(12,12,16,0.25)_100%)] before:pointer-events-none max-[900px]:hidden`}
+        className={`relative flex flex-col justify-start items-center pt-[140px] px-[60px] pb-20 bg-cover bg-center bg-no-repeat border-r ${shellBorder} overflow-hidden before:content-[''] before:absolute before:inset-0 before:bg-[linear-gradient(to_bottom,rgba(8,10,20,0.9)_0%,rgba(8,10,20,0.48)_50%,rgba(8,10,20,0.2)_100%)] before:pointer-events-none max-[900px]:hidden`}
         style={brandBgStyle}
       >
         <div className="relative z-[1] text-center max-w-[400px] animate-hr-fade-up">
-          <h1 className="font-satoshi text-[clamp(1.8rem,3vw,2.6rem)] font-normal leading-[1.2] tracking-[-0.01em] text-hr-text mb-4">
-            AI-Powered Hiring<br />For Modern Teams
+          <h1 className="font-display text-[clamp(2.1rem,3vw,3rem)] font-medium leading-[1.08] tracking-[-0.03em] text-e-text mb-4">
+            Discover talent.<br />Flow with confidence.
           </h1>
 
-          <p className="font-dm text-sm leading-[1.7] text-hr-text-secondary mb-12">
-            Post jobs, review applications, and find the perfect candidates — all from one intelligent platform.
+          <p className="font-ui text-sm leading-[1.8] text-e-text2 mb-12">
+            Post jobs, review applications, and find the right candidates from one neural recruiting system.
           </p>
 
         </div>
       </div>
 
       {/* Right Panel — Auth Form */}
-      <div className="flex flex-col justify-center items-center py-[60px] px-12 relative max-[900px]:px-6 max-[900px]:pt-[100px] max-[900px]:pb-[60px] max-[900px]:min-h-screen max-sm:px-5 max-sm:pt-[90px] max-sm:pb-10">
+      <div className="relative flex flex-col justify-center items-center py-[60px] px-12 max-[900px]:px-6 max-[900px]:pt-[100px] max-[900px]:pb-[60px] max-[900px]:min-h-screen max-sm:px-5 max-sm:pt-[90px] max-sm:pb-10">
         <div
-          className="w-full max-w-[400px]"
+          className="w-full max-w-[420px] rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.03)_100%)] px-7 py-8 shadow-[0_20px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl max-sm:px-5"
           style={{ animation: "hr-fade-up 0.7s ease-out 0.12s both" }}
         >
           {renderFormContent()}
 
-          <div className="mt-8 text-center font-dm text-[0.72rem] text-hr-text-muted [&_a]:text-hr-accent-hover [&_a]:no-underline [&_a]:border-b [&_a]:border-[rgba(167,139,250,0.3)] [&_a]:transition-colors [&_a]:duration-200 [&_a:hover]:text-hr-text [&_a:hover]:border-hr-text">
+          <div className="mt-8 text-center font-ui text-[0.72rem] text-e-text3 [&_a]:text-e-blue [&_a]:no-underline [&_a]:border-b [&_a]:border-[rgba(75,142,240,0.28)] [&_a]:transition-colors [&_a]:duration-200 [&_a:hover]:text-e-text [&_a:hover]:border-e-text">
             By continuing, you agree to the <Link href="/terms-of-service">Terms of Service</Link> and <Link href="/privacy-policy">Privacy Policy</Link>
           </div>
         </div>

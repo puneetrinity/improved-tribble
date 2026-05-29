@@ -29,7 +29,9 @@ import { aiAnalysisRateLimit, jobPostingRateLimit } from './rateLimit';
 import type { CsrfMiddleware } from './types/routes';
 import { db } from './db';
 import { and, eq, gte, lte, inArray, or, desc, sql } from 'drizzle-orm';
+import { extractStructuredJobPosting } from './lib/structuredJobExtraction';
 
+const MIN_DESCRIPTION_WORDS = 200;
 const countWords = (value: string): number =>
   value
     .replace(/<[^>]+>/g, ' ')
@@ -100,18 +102,63 @@ export function registerJobsRoutes(
         : typeof req.body?.description === 'string'
           ? req.body.description
           : '';
-      const optimizedDescription = typeof req.body?.original_JD === 'string'
-        ? (typeof req.body?.description === 'string' ? req.body.description : undefined)
-        : typeof req.body?.optimizedDescription === 'string'
-          ? req.body.optimizedDescription
-          : undefined;
-      const optimizedJD = typeof req.body?.description === 'string' ? req.body.description : '';
-      console.log("Optimized JD:", optimizedJD);
+      const providedExtractedDescription = typeof req.body?.original_JD === 'string'
+        && typeof req.body?.description === 'string'
+        && req.body.description.trim() !== rawDescription.trim()
+        ? req.body.description
+        : undefined;
+
+      if (countWords(rawDescription) < 200) {
+        res.status(400).json({
+          error: 'Validation error',
+          details: [{ field: 'original_JD', message: 'Description must be at least 200 words' }],
+        });
+        return;
+      }
+
+      console.log('Original JD:', rawDescription);
+
+      if (providedExtractedDescription) {
+        console.log('Extracted JD:', providedExtractedDescription);
+
+        const jobData = insertJobSchema.parse({
+          ...req.body,
+          description: providedExtractedDescription,
+          originalJD: rawDescription,
+        });
+        const job = await storage.createJob({
+          ...jobData,
+          postedBy: req.user!.id,
+          organizationId,
+        });
+
+        queueMauticFirstJobCreatedSync(req.user!.id, organizationId);
+
+        res.status(201).json(job);
+        return;
+      }
+
+      const extractedResult = await extractStructuredJobPosting(rawDescription, {
+        title: typeof req.body?.title === 'string' ? req.body.title : undefined,
+        location: typeof req.body?.location === 'string' ? req.body.location : undefined,
+        skills: Array.isArray(req.body?.skills) ? req.body.skills : undefined,
+        goodToHaveSkills: Array.isArray(req.body?.goodToHaveSkills) ? req.body.goodToHaveSkills : undefined,
+        experienceYears: typeof req.body?.experienceYears === 'number' ? req.body.experienceYears : null,
+        educationRequirement: typeof req.body?.educationRequirement === 'string' ? req.body.educationRequirement : undefined,
+      });
+
+      console.log('Extracted JD:', extractedResult.descriptionJson);
+
       const jobData = insertJobSchema.parse({
         ...req.body,
-        description: rawDescription,
+        title: extractedResult.extracted.roleTitle || req.body.title,
+        location: extractedResult.extracted.location || req.body.location,
+        description: extractedResult.descriptionJson,
+        originalJD: rawDescription,
+        skills: extractedResult.extracted.mustHaveSkills,
+        goodToHaveSkills: extractedResult.extracted.niceToHaveSkills,
+        experienceYears: extractedResult.extracted.experienceYears ?? req.body.experienceYears,
       });
-      const mappedDescriptions = getMappedJobDescriptions(rawDescription, optimizedDescription);
       const job = await storage.createJob({
         ...jobData,
         postedBy: req.user!.id,
@@ -164,7 +211,10 @@ export function registerJobsRoutes(
       const result = await storage.getJobs(filters);
 
       res.json({
-        jobs: result.jobs,
+        jobs: result.jobs.map((job) => ({
+          ...job,
+          description: job.originalJD || job.description,
+        })),
         pagination: {
           page,
           limit,
@@ -265,6 +315,7 @@ export function registerJobsRoutes(
       // Return job with recruiter info for profile linking and client data for JSON-LD
       res.json({
         ...job,
+        description: job.originalJD || job.description,
         postedByName,
         postedById: recruiterPublicId || job.postedBy, // Prefer publicId for links
         isRecruiterProfilePublic, // Only show link if profile is public
@@ -552,7 +603,10 @@ export function registerJobsRoutes(
       // Super admins with an org stay scoped to that org and their own assignments.
       const userJobs = await storage.getJobsByUser(user.id, organizationId);
 
-      res.json(userJobs);
+      res.json(userJobs.map((job) => ({
+        ...job,
+        description: job.originalJD || job.description,
+      })));
       return;
     } catch (error) {
       next(error);
@@ -1655,6 +1709,43 @@ export function registerJobsRoutes(
         res.status(502).json({ error: 'AI service temporarily unavailable' });
         return;
       }
+      next(error);
+    }
+  });
+
+  app.post("/api/jobs/extract-keywords", csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), requireFeatureAccess(FEATURES.AI_CONTENT), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const description = typeof req.body?.description === 'string' ? req.body.description : '';
+
+      if (!description || countWords(description) < MIN_DESCRIPTION_WORDS) {
+        res.status(400).json({ error: `Description must be at least ${MIN_DESCRIPTION_WORDS} words` });
+        return;
+      }
+
+      const extractedResult = await extractStructuredJobPosting(description);
+
+      res.json({
+        extracted: {
+          title: extractedResult.extracted.roleTitle,
+          location: extractedResult.extracted.location,
+          type: 'full-time',
+          experienceYears: extractedResult.extracted.experienceYears != null ? String(extractedResult.extracted.experienceYears) : '',
+          salaryMin: '',
+          salaryMax: '',
+          salaryPeriod: 'per_year',
+          educationRequirement: '',
+          skills: extractedResult.extracted.mustHaveSkills,
+          goodToHaveSkills: extractedResult.extracted.niceToHaveSkills,
+          keywords: [...new Set([
+            ...extractedResult.extracted.mustHaveSkills,
+            ...extractedResult.extracted.niceToHaveSkills,
+          ])],
+        },
+        structuredJob: extractedResult.extracted,
+        descriptionJson: extractedResult.descriptionJson,
+      });
+      return;
+    } catch (error) {
       next(error);
     }
   });
