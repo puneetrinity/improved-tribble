@@ -297,8 +297,6 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       // Only block if there is NO digest at all (new job).
       let jdDigest = job.jdDigest as Record<string, unknown> | null;
       const digestSourceDescription = job.originalJD || job.description;
-      if (!jdDigest || !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-        let generated = await generateJDDigest(job.title, digestSourceDescription);
       const digestStale = !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION;
 
       if (!jdDigest) {
