@@ -1,6 +1,7 @@
 // @charset "utf-8"
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const TABS = ["Outreach", "Pipeline", "Schedule", "Feedback"] as const;
 type TabName = (typeof TABS)[number];
@@ -210,9 +211,10 @@ export function FlowPanel() {
 }
 
 export default function FlowFeature() {
+  const isMobile = useIsMobile();
   return (
-    <section style={{ padding: "120px 4rem" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5rem", alignItems: "center" }}>
+    <section style={{ padding: isMobile ? "72px 1.25rem" : "120px 4rem" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "5rem", alignItems: "center" }}>
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}

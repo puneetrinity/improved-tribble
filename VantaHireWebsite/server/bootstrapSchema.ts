@@ -1492,18 +1492,56 @@ export async function ensureAtsSchema(): Promise<void> {
       source_type TEXT NOT NULL,
       state TEXT NOT NULL DEFAULT 'new',
       candidate_summary JSONB,
+      found_email TEXT,
+      found_emails JSONB,
+      email_resolved_at TIMESTAMP,
+      email_resolve_status TEXT,
+      last_outreach_at TIMESTAMP,
+      last_outreach_status TEXT,
       converted_application_id INTEGER REFERENCES applications(id),
       last_synced_at TIMESTAMP DEFAULT NOW() NOT NULL,
       created_at TIMESTAMP DEFAULT NOW() NOT NULL,
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_email TEXT;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_emails JSONB;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolved_at TIMESTAMP;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_status TEXT;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_at TIMESTAMP;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_status TEXT;`);
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_sourced_candidates_job_candidate_idx ON job_sourced_candidates(job_id, signal_candidate_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_org_job_idx ON job_sourced_candidates(organization_id, job_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_request_idx ON job_sourced_candidates(request_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_state_idx ON job_sourced_candidates(state);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_fit_score_idx ON job_sourced_candidates(fit_score);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_source_type_idx ON job_sourced_candidates(source_type);`);
+
+  console.log('  Creating sourced_candidate_outreach_log table...');
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS sourced_candidate_outreach_log (
+      id SERIAL PRIMARY KEY,
+      organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      sourced_candidate_id INTEGER NOT NULL REFERENCES job_sourced_candidates(id) ON DELETE CASCADE,
+      campaign_id TEXT,
+      recipient_email TEXT NOT NULL,
+      recipient_name TEXT,
+      subject TEXT NOT NULL,
+      body TEXT NOT NULL,
+      ai_draft_body TEXT,
+      ai_draft_subject TEXT,
+      was_edited BOOLEAN NOT NULL DEFAULT FALSE,
+      status TEXT NOT NULL,
+      error_message TEXT,
+      sent_by INTEGER NOT NULL REFERENCES users(id),
+      sent_at TIMESTAMP DEFAULT NOW() NOT NULL
+    );
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_job_idx ON sourced_candidate_outreach_log(job_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_candidate_idx ON sourced_candidate_outreach_log(sourced_candidate_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_campaign_idx ON sourced_candidate_outreach_log(campaign_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_org_idx ON sourced_candidate_outreach_log(organization_id);`);
 
   // ActiveKG Graph Sync: Application resume sync jobs
   console.log('  Creating application_graph_sync_jobs table...');

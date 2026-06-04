@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const TABS = ["Recruitment Agencies", "Staffing Firms", "In-House Teams"];
 
@@ -92,14 +93,15 @@ function MetricCell({ num, label, animKey }: MetricCellProps) {
 
 export default function SolutionTabs() {
   const [activeTab, setActiveTab] = useState(0);
+  const isMobile = useIsMobile();
   const beforeItems = BEFORE[activeTab] ?? [];
   const afterItems = AFTER[activeTab] ?? [];
   const metrics = METRICS[activeTab] ?? [];
 
   return (
-    <section style={{ padding: "80px 4rem 120px" }}>
+    <section style={{ padding: isMobile ? "56px 1.25rem 80px" : "80px 4rem 120px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: "4rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: isMobile ? "2rem" : "4rem", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
           {TABS.map((tab, i) => {
             const isActive = activeTab === i;
             return (
@@ -113,7 +115,8 @@ export default function SolutionTabs() {
                   background: isActive ? "rgba(75,142,240,0.1)" : "rgba(255,255,255,0.03)",
                   border: `1px solid ${isActive ? "rgba(75,142,240,0.35)" : "rgba(255,255,255,0.07)"}`,
                   borderRadius: 100,
-                  padding: "10px 24px",
+                  padding: isMobile ? "10px 18px" : "10px 24px",
+                  whiteSpace: "nowrap",
                   cursor: "pointer",
                   transition: "all 0.2s",
                   boxShadow: isActive ? "0 0 20px rgba(75,142,240,0.1)" : "none",
@@ -145,8 +148,8 @@ export default function SolutionTabs() {
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "3rem", alignItems: "start" }}>
-              <div style={{ background: "#09091A", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 16, padding: "2rem", boxShadow: "0 0 40px rgba(239,68,68,0.04)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1rem" : "3rem", alignItems: "start" }}>
+              <div style={{ background: "#09091A", border: "1px solid rgba(239,68,68,0.15)", borderRadius: 16, padding: isMobile ? "1.25rem" : "2rem", boxShadow: "0 0 40px rgba(239,68,68,0.04)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1.5rem" }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 8px rgba(239,68,68,0.5)", flexShrink: 0 }} />
                   <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#EF4444", letterSpacing: "0.12em" }}>BEFORE EALANA</span>
@@ -159,7 +162,7 @@ export default function SolutionTabs() {
                 ))}
               </div>
 
-              <div style={{ background: "#09091A", border: "1px solid rgba(52,209,122,0.2)", borderRadius: 16, padding: "2rem", boxShadow: "0 0 40px rgba(52,209,122,0.06)" }}>
+              <div style={{ background: "#09091A", border: "1px solid rgba(52,209,122,0.2)", borderRadius: 16, padding: isMobile ? "1.25rem" : "2rem", boxShadow: "0 0 40px rgba(52,209,122,0.06)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1.5rem" }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34D17A", boxShadow: "0 0 8px rgba(52,209,122,0.5)", flexShrink: 0 }} />
                   <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#34D17A", letterSpacing: "0.12em" }}>WITH EALANA</span>
@@ -173,7 +176,7 @@ export default function SolutionTabs() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 1, marginTop: "2rem", background: "rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3,1fr)", gap: 1, marginTop: "1rem", background: "rgba(255,255,255,0.06)", borderRadius: 12, overflow: "hidden" }}>
               {metrics.map(({ num, label }) => (
                 <MetricCell key={num + label} num={num} label={label} animKey={activeTab} />
               ))}

@@ -3,8 +3,10 @@ import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import SolutionTabs from "@/components/marketing/sections/SolutionTabs";
 import SolutionsCTA from "@/components/marketing/sections/SolutionsCTA";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function UseCasesPage() {
+  const isMobile = useIsMobile();
   return (
     <>
       <Helmet>
@@ -14,7 +16,7 @@ export default function UseCasesPage() {
       <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#080A14', color: '#F4F5FA', minHeight: '100vh' }}>
         <HomepageNav />
         <div style={{ paddingTop: '64px' }}>
-          <div style={{ padding: '100px 4rem 60px', maxWidth: '1100px', margin: '0 auto', textAlign: 'center' }}>
+          <div style={{ padding: isMobile ? '96px 1.25rem 44px' : '100px 4rem 60px', maxWidth: '1100px', margin: '0 auto', textAlign: 'center' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 24 }}>
               <div style={{ height: 1, background: '#4B8EF0', opacity: 0.2, width: 60 }} />
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: '0.65rem', letterSpacing: '0.14em', color: '#4B8EF0', textTransform: 'uppercase' }}>Solutions</span>
@@ -24,7 +26,7 @@ export default function UseCasesPage() {
               Built for the way<br />
               <em style={{ fontStyle: 'italic', background: 'linear-gradient(135deg, #4B8EF0 0%, #34D17A 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>recruiters actually work.</em>
             </h1>
-            <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: '1.05rem', color: '#8891AA', fontWeight: 300, maxWidth: 520, margin: '0 auto', lineHeight: 1.75 }}>
+            <p style={{ fontFamily: "'DM Sans',sans-serif", fontSize: isMobile ? '0.98rem' : '1.05rem', color: '#8891AA', fontWeight: 300, maxWidth: 520, margin: '0 auto', lineHeight: 1.75 }}>
               Whether you run an agency, staff at scale, or hire in-house — ealana adapts to how your team works.
             </p>
           </div>

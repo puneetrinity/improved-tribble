@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const linkStyle = {
   fontFamily: '"DM Sans", sans-serif',
@@ -98,6 +99,7 @@ export default function HomepageNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [floated, setFloated] = useState(false);
   const [location] = useLocation();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -110,6 +112,15 @@ export default function HomepageNav() {
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
+  useEffect(() => {
+    if (!isMobile) return;
+
+    document.body.style.overflow = isMenuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen, isMobile]);
+
   const handleFeaturesClick = (e: MouseEvent<HTMLAnchorElement>) => {
     if (window.location.pathname === "/") {
       e.preventDefault();
@@ -121,7 +132,7 @@ export default function HomepageNav() {
     <>
       <div className="md:hidden fixed top-0 left-0 right-0 z-[1000]">
         <div
-          className="h-16 flex items-center justify-between px-5"
+          className="flex h-16 items-center justify-between px-4 sm:px-5"
           style={{
             background: "rgba(8,10,20,0.8)",
             backdropFilter: "blur(20px) saturate(180%)",
@@ -134,7 +145,7 @@ export default function HomepageNav() {
           </Link>
 
           <button
-            className="bg-transparent border-none text-[#F4F5FA] cursor-pointer p-1"
+            className="rounded-full border border-white/10 bg-white/[0.03] p-2 text-[#F4F5FA]"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle menu"
             data-testid="mobile-menu-button"
@@ -144,39 +155,51 @@ export default function HomepageNav() {
         </div>
 
         <div
-          className={`${isMenuOpen ? "flex" : "hidden"} flex-col gap-3 px-6 py-4`}
+          className={`${isMenuOpen ? "flex" : "hidden"} min-h-[calc(100svh-4rem)] flex-col gap-4 px-4 py-5`}
           style={{
-            background: "rgba(8,10,20,0.97)",
+            background: "linear-gradient(180deg, rgba(8,10,20,0.98) 0%, rgba(11,14,28,0.98) 100%)",
             backdropFilter: "blur(20px) saturate(180%)",
             WebkitBackdropFilter: "blur(20px) saturate(180%)",
             borderBottom: "1px solid rgba(255,255,255,0.07)",
           }}
           data-testid="mobile-nav"
         >
-          <a
-            href="/#features"
-            style={linkStyle}
-            onClick={(e) => {
-              setIsMenuOpen(false);
-              handleFeaturesClick(e);
-            }}
-          >
-            Features
-          </a>
-          <Link href="/solutions" style={linkStyle} onClick={() => setIsMenuOpen(false)}>
-            Solutions
-          </Link>
-          <Link href="/pricing" style={linkStyle} onClick={() => setIsMenuOpen(false)}>
-            Pricing
-          </Link>
-          <Link href="/jobs" style={linkStyle} onClick={() => setIsMenuOpen(false)}>
-            Jobs
-          </Link>
+          <div className="rounded-[28px] border border-white/8 bg-white/[0.03] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.25)]">
+            <div className="mb-3 px-2 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-[#4B8EF0]">
+              Explore
+            </div>
+            <div className="flex flex-col gap-2">
+              <a
+                href="/#features"
+                className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]"
+                onClick={(e) => {
+                  setIsMenuOpen(false);
+                  handleFeaturesClick(e);
+                }}
+              >
+                Features
+              </a>
+              <Link href="/solutions" className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" onClick={() => setIsMenuOpen(false)}>
+                Solutions
+              </Link>
+              <Link href="/pricing" className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" onClick={() => setIsMenuOpen(false)}>
+                Pricing
+              </Link>
+              <Link href="/jobs" className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" onClick={() => setIsMenuOpen(false)}>
+                Jobs
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-auto rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(75,142,240,0.10)_0%,rgba(255,255,255,0.03)_100%)] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+            <div className="mb-3 px-2 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-[#8891AA]">
+              Start Here
+            </div>
           <a
             href="https://cal.com/ealana/quick-connect"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ ...ghostButtonStyle, display: "block", textAlign: "center" }}
+            className="mb-2 block rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-center text-[0.95rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
             onClick={() => {
               setIsMenuOpen(false);
               trackEvent("cta_click", { location: "site_header_mobile", action: "book_demo" });
@@ -186,7 +209,7 @@ export default function HomepageNav() {
           </a>
           <a
             href="/recruiter-auth"
-            style={{ ...primaryButtonStyle, display: "block", textAlign: "center" }}
+            className="block rounded-2xl bg-[#4B8EF0] px-4 py-3 text-center text-[0.95rem] font-semibold text-white no-underline shadow-[0_12px_30px_rgba(75,142,240,0.28)] transition-transform hover:translate-y-[-1px]"
             onClick={() => {
               setIsMenuOpen(false);
               trackEvent("cta_click", { location: "site_header_mobile", action: "get_started" });
@@ -194,6 +217,7 @@ export default function HomepageNav() {
           >
             Get Started {"->"}
           </a>
+          </div>
         </div>
       </div>
 

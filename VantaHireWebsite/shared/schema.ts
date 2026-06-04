@@ -1050,6 +1050,12 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   sourceType: text("source_type").notNull(), // raw Signal values: 'pool_enriched' | 'pool' | 'discovered'
   state: text("state").notNull().default('new'), // new, shortlisted, hidden, converted
   candidateSummary: jsonb("candidate_summary"), // Signal intelligence snapshot for display
+  foundEmail: text("found_email"),
+  foundEmails: jsonb("found_emails"),
+  emailResolvedAt: timestamp("email_resolved_at"),
+  emailResolveStatus: text("email_resolve_status"),
+  lastOutreachAt: timestamp("last_outreach_at"),
+  lastOutreachStatus: text("last_outreach_status"),
   convertedApplicationId: integer("converted_application_id").references(() => applications.id),
   lastSyncedAt: timestamp("last_synced_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -1062,6 +1068,30 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   stateIdx: index("job_sourced_candidates_state_idx").on(table.state),
   fitScoreIdx: index("job_sourced_candidates_fit_score_idx").on(table.fitScore),
   sourceTypeIdx: index("job_sourced_candidates_source_type_idx").on(table.sourceType),
+}));
+
+export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_log", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+  sourcedCandidateId: integer("sourced_candidate_id").notNull().references(() => jobSourcedCandidates.id, { onDelete: 'cascade' }),
+  campaignId: text("campaign_id"),
+  recipientEmail: text("recipient_email").notNull(),
+  recipientName: text("recipient_name"),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  aiDraftBody: text("ai_draft_body"),
+  aiDraftSubject: text("ai_draft_subject"),
+  wasEdited: boolean("was_edited").notNull().default(false),
+  status: text("status").notNull(),
+  errorMessage: text("error_message"),
+  sentBy: integer("sent_by").notNull().references(() => users.id),
+  sentAt: timestamp("sent_at").defaultNow().notNull(),
+}, (table) => ({
+  jobIdx: index("scol_job_idx").on(table.jobId),
+  candidateIdx: index("scol_candidate_idx").on(table.sourcedCandidateId),
+  campaignIdx: index("scol_campaign_idx").on(table.campaignId),
+  orgIdx: index("scol_org_idx").on(table.organizationId),
 }));
 
 // =====================================================
@@ -1153,6 +1183,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   jobs: many(jobs),
   reviewedJobs: many(jobs, { relationName: "reviewedJobs" }),
   mauticContactLinks: many(mauticContactLinks),
+  sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
   profile: one(userProfiles, {
     fields: [users.id],
     references: [userProfiles.userId],
@@ -1193,6 +1224,7 @@ export const jobsRelations = relations(jobs, ({ one, many }) => ({
   shortlists: many(clientShortlists),
   sourcingRuns: many(jobSourcingRuns),
   sourcedCandidates: many(jobSourcedCandidates),
+  sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
 }));
 
 export const applicationsRelations = relations(applications, ({ one, many }) => ({
@@ -1558,6 +1590,7 @@ export const organizationsRelations = relations(organizations, ({ many, one }) =
   talentPool: many(talentPool),
   sourcingRuns: many(jobSourcingRuns),
   sourcedCandidates: many(jobSourcedCandidates),
+  sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
 }));
 
 export const organizationMembersRelations = relations(organizationMembers, ({ one }) => ({
@@ -1729,7 +1762,7 @@ export const jobSourcingRunsRelations = relations(jobSourcingRuns, ({ one, many 
   candidates: many(jobSourcedCandidates),
 }));
 
-export const jobSourcedCandidatesRelations = relations(jobSourcedCandidates, ({ one }) => ({
+export const jobSourcedCandidatesRelations = relations(jobSourcedCandidates, ({ one, many }) => ({
   organization: one(organizations, {
     fields: [jobSourcedCandidates.organizationId],
     references: [organizations.id],
@@ -1745,6 +1778,26 @@ export const jobSourcedCandidatesRelations = relations(jobSourcedCandidates, ({ 
   convertedApplication: one(applications, {
     fields: [jobSourcedCandidates.convertedApplicationId],
     references: [applications.id],
+  }),
+  outreachLogs: many(sourcedCandidateOutreachLog),
+}));
+
+export const sourcedCandidateOutreachLogRelations = relations(sourcedCandidateOutreachLog, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [sourcedCandidateOutreachLog.organizationId],
+    references: [organizations.id],
+  }),
+  job: one(jobs, {
+    fields: [sourcedCandidateOutreachLog.jobId],
+    references: [jobs.id],
+  }),
+  sourcedCandidate: one(jobSourcedCandidates, {
+    fields: [sourcedCandidateOutreachLog.sourcedCandidateId],
+    references: [jobSourcedCandidates.id],
+  }),
+  sender: one(users, {
+    fields: [sourcedCandidateOutreachLog.sentBy],
+    references: [users.id],
   }),
 }));
 
@@ -2561,6 +2614,12 @@ export const insertJobSourcedCandidateSchema = z.object({
   fitBreakdown: z.record(z.any()).optional(),
   sourceType: z.enum(signalSourceTypes),
   candidateSummary: z.record(z.any()).optional(),
+  foundEmail: z.string().email().optional(),
+  foundEmails: z.array(z.string().email()).optional(),
+  emailResolvedAt: z.date().optional(),
+  emailResolveStatus: z.enum(['pending', 'resolved', 'not_found', 'failed']).optional(),
+  lastOutreachAt: z.date().optional(),
+  lastOutreachStatus: z.enum(['sent', 'failed']).optional(),
 });
 
 export type JobSourcingRun = typeof jobSourcingRuns.$inferSelect;
@@ -2568,6 +2627,7 @@ export type InsertJobSourcingRun = z.infer<typeof insertJobSourcingRunSchema>;
 
 export type JobSourcedCandidate = typeof jobSourcedCandidates.$inferSelect;
 export type InsertJobSourcedCandidate = z.infer<typeof insertJobSourcedCandidateSchema>;
+export type SourcedCandidateOutreachLog = typeof sourcedCandidateOutreachLog.$inferSelect;
 
 // =====================================================
 // END SIGNAL SOURCING INSERT SCHEMAS & TYPES

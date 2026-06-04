@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Candidate {
   name: string;
@@ -45,6 +46,7 @@ const TABS = ["Search Tab 01 (84)", "ATS Backlog (23)", "Outreach.xlsx", "Naukri
 
 export function ProblemSection() {
   const sectionRef = useRef<HTMLDivElement | null>(null);
+  const isMobile = useIsMobile();
   const [phase, setPhase] = useState<Phase>("idle");
   const [paused, setPaused] = useState(false);
   const [, setScrollCount] = useState(0);
@@ -65,7 +67,7 @@ export function ProblemSection() {
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
-        if (entry.isIntersecting && phase === "idle") {
+        if (entry.isIntersecting && phase === "idle" && !isMobile) {
           document.body.style.overflow = "hidden";
           let count = 0;
           const onWheel = () => {
@@ -94,20 +96,20 @@ export function ProblemSection() {
       removeListener();
       unlock();
     };
-  }, [phase]);
+  }, [phase, isMobile]);
 
   const triggered = phase === "triggered" || phase === "unlocked";
 
   return (
     <section
       style={{
-        padding: "140px 0",
+        padding: isMobile ? "72px 0" : "140px 0",
         paddingBottom: triggered ? "120px" : "140px",
         marginBottom: triggered ? "-200px" : "0",
         transition: "margin 1s ease, padding 1s ease",
       }}
     >
-      <div style={{ maxWidth: 1300, margin: "0 auto", paddingLeft: "4rem", paddingRight: "4rem" }}>
+      <div style={{ maxWidth: 1300, margin: "0 auto", paddingLeft: isMobile ? "1.25rem" : "4rem", paddingRight: isMobile ? "1.25rem" : "4rem" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
           <span
             className="font-mono"
@@ -199,7 +201,7 @@ export function ProblemSection() {
             >
               RECRUITER DASHBOARD · Monday 9:14 AM
             </span>
-            <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+            <div style={{ marginLeft: "auto", display: isMobile ? "none" : "flex", gap: 6 }}>
               {["🔴 47 unread", "📋 127 to review", "⚠️ 3 errors"].map((text) => (
                 <span
                   key={text}
@@ -280,7 +282,7 @@ export function ProblemSection() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr 0.9fr", minHeight: 440 }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1.4fr 0.9fr", minHeight: isMobile ? "auto" : 440 }}>
               <div style={{ borderRight: "1px solid rgba(255,255,255,0.06)", overflow: "hidden" }}>
                 <div
                   style={{

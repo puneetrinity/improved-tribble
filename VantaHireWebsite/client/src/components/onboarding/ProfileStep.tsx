@@ -204,7 +204,7 @@ export default function ProfileStep({ onComplete }: ProfileStepProps) {
             Required
           </h3>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="firstName">First Name *</Label>
               <Input
@@ -225,7 +225,7 @@ export default function ProfileStep({ onComplete }: ProfileStepProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="company" className="flex items-center gap-2">
                 <Building className="h-4 w-4" />
