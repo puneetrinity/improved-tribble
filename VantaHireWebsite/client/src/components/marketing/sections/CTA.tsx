@@ -1,14 +1,16 @@
 // @charset "utf-8"
 import { motion } from "framer-motion";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function CTA() {
+  const isMobile = useIsMobile();
   const goToLogin = () => {
     window.location.href = "/recruiter-auth";
   };
 
   return (
-    <section style={{ padding: "140px 4rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
+    <section style={{ padding: isMobile ? "88px 1.25rem" : "140px 4rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
       <div
         style={{
           position: "absolute",
@@ -25,7 +27,7 @@ export default function CTA() {
       />
       <div style={{ position: "relative", zIndex: 1 }}>
         <motion.div
-          style={{ position: "relative", width: 90, height: 99, margin: "0 auto 2rem" }}
+          style={{ position: "relative", width: isMobile ? 68 : 90, height: isMobile ? 74 : 99, margin: "0 auto 1.5rem" }}
           animate={{ y: [0, -10, 0] }}
           transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
         >
@@ -42,7 +44,7 @@ export default function CTA() {
           <img
             src={ealanaMoth}
             alt="ealana moth"
-            style={{ position: "relative", zIndex: 1, width: 90, height: 99 }}
+            style={{ position: "relative", zIndex: 1, width: isMobile ? 68 : 90, height: isMobile ? 74 : 99 }}
           />
         </motion.div>
         <motion.h2
@@ -52,7 +54,7 @@ export default function CTA() {
           transition={{ duration: 0.7 }}
           style={{
             fontFamily: "'Outfit', sans-serif",
-            fontSize: "clamp(3.5rem, 6vw, 5.5rem)",
+            fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.1rem)" : "clamp(3.5rem, 6vw, 5.5rem)",
             color: "#F4F5FA",
             letterSpacing: "-0.025em",
             marginBottom: "1.25rem",
@@ -68,7 +70,7 @@ export default function CTA() {
           transition={{ duration: 0.7, delay: 0.15 }}
           style={{
             fontFamily: "'DM Sans', sans-serif",
-            fontSize: "1.05rem",
+            fontSize: isMobile ? "0.98rem" : "1.05rem",
             color: "#8891AA",
             fontWeight: 300,
             maxWidth: 460,
@@ -91,7 +93,7 @@ export default function CTA() {
             style={{
               background: "#4B8EF0",
               color: "white",
-              padding: "14px 36px",
+              padding: isMobile ? "14px 28px" : "14px 36px",
               borderRadius: 10,
               fontFamily: "'DM Sans', sans-serif",
               fontSize: "0.95rem",

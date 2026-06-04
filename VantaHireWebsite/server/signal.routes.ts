@@ -30,6 +30,75 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 
+type ContactResolutionStatus = 'pending' | 'resolved' | 'not_found' | 'failed';
+
+function normalizeResolvedEmails(emails: unknown): string[] {
+  if (!Array.isArray(emails)) {
+    return [];
+  }
+
+  const normalized = emails
+    .filter((email): email is string => typeof email === 'string')
+    .map((email) => email.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(normalized));
+}
+
+async function persistResolvedCandidateContact(
+  candidateId: number,
+  emails: string[],
+  status: 'resolved' | 'not_found',
+): Promise<void> {
+  await db
+    .update(jobSourcedCandidates)
+    .set({
+      foundEmail: emails[0] ?? null,
+      foundEmails: emails,
+      emailResolvedAt: new Date(),
+      emailResolveStatus: status,
+      updatedAt: new Date(),
+    })
+    .where(eq(jobSourcedCandidates.id, candidateId));
+}
+
+async function markCandidateContactResolutionFailed(candidateId: number): Promise<void> {
+  await db
+    .update(jobSourcedCandidates)
+    .set({
+      emailResolveStatus: 'failed',
+      emailResolvedAt: new Date(),
+      updatedAt: new Date(),
+    })
+    .where(eq(jobSourcedCandidates.id, candidateId));
+}
+
+async function resolveCandidateContactAsync(params: {
+  candidateId: number;
+  signalCandidateId: string;
+  signalTenantId: string;
+}): Promise<void> {
+  const { candidateId, signalCandidateId, signalTenantId } = params;
+
+  try {
+    const response = await findContact(signalTenantId, signalCandidateId);
+    const emails = normalizeResolvedEmails(response.emails);
+    await persistResolvedCandidateContact(
+      candidateId,
+      emails,
+      emails.length > 0 ? 'resolved' : 'not_found',
+    );
+  } catch (error) {
+    console.error('[SOURCING] Failed to resolve candidate contact (non-blocking):', {
+      candidateId,
+      signalCandidateId,
+      error: error instanceof Error ? error.message : error,
+    });
+
+    await markCandidateContactResolutionFailed(candidateId);
+  }
+}
+
 function normalizeSkillList(skills: unknown): string[] {
   if (!Array.isArray(skills)) {
     return [];
@@ -161,7 +230,7 @@ type AccessibleSignalJobContextResult =
   | { ok: true; context: AccessibleSignalJobContext }
   | { ok: false; error: 'NO_ORGANIZATION' | 'JOB_NOT_FOUND' | 'JOB_ORG_MISSING' };
 
-async function resolveAccessibleSignalJobContext(
+export async function resolveAccessibleSignalJobContext(
   user: SignalRouteUser,
   jobId: number,
 ): Promise<AccessibleSignalJobContextResult> {
@@ -297,13 +366,11 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       // Only block if there is NO digest at all (new job).
       let jdDigest = job.jdDigest as Record<string, unknown> | null;
       const digestSourceDescription = job.originalJD || job.description;
-      if (!jdDigest || !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-        let generated = await generateJDDigest(job.title, digestSourceDescription);
       const digestStale = !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION;
 
       if (!jdDigest) {
         // No digest at all — must generate synchronously so we have topSkills for sourcing.
-        let generated = await generateJDDigest(job.title, job.description);
+        let generated = await generateJDDigest(job.title, digestSourceDescription);
         if (generated.topSkills.length === 0) {
           generated = await generateJDDigest(job.title, digestSourceDescription);
         }
@@ -318,9 +385,9 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         // Stale digest — use existing version now, upgrade in background (non-blocking).
         setImmediate(async () => {
           try {
-            let generated = await generateJDDigest(job.title, job.description);
+            let generated = await generateJDDigest(job.title, digestSourceDescription);
             if (generated.topSkills.length === 0) {
-              generated = await generateJDDigest(job.title, job.description);
+              generated = await generateJDDigest(job.title, digestSourceDescription);
             }
             await db.update(jobs).set({
               jdDigest: generated,
@@ -947,9 +1014,19 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
 
+      const shouldStartEmailResolution =
+        newState === 'shortlisted'
+        && !candidate.foundEmail
+        && candidate.emailResolveStatus !== 'resolved'
+        && candidate.emailResolveStatus !== 'pending';
+
       await db
         .update(jobSourcedCandidates)
-        .set({ state: newState, updatedAt: new Date() })
+        .set({
+          state: newState,
+          ...(shouldStartEmailResolution ? { emailResolveStatus: 'pending' as ContactResolutionStatus } : {}),
+          updatedAt: new Date(),
+        })
         .where(eq(jobSourcedCandidates.id, candidateId));
 
       // Feedback capture (non-blocking, best-effort)
@@ -1027,6 +1104,14 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       }
 
       res.json({ success: true, id: candidate.id, state: newState });
+
+      if (shouldStartEmailResolution && signalTenantId && candidate.signalCandidateId) {
+        void resolveCandidateContactAsync({
+          candidateId: candidate.id,
+          signalCandidateId: candidate.signalCandidateId,
+          signalTenantId,
+        });
+      }
     } catch (error) {
       next(error);
     }
@@ -1111,9 +1196,32 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         res.status(400).json({ error: 'Candidate has no signal ID' });
         return;
       }
+      await db
+        .update(jobSourcedCandidates)
+        .set({
+          emailResolveStatus: 'pending',
+          updatedAt: new Date(),
+        })
+        .where(eq(jobSourcedCandidates.id, candidateId));
+
       const response = await findContact(signalTenantId, signalCandidateId);
+      const emails = normalizeResolvedEmails(response.emails);
+      await persistResolvedCandidateContact(
+        candidateId,
+        emails,
+        emails.length > 0 ? 'resolved' : 'not_found',
+      );
+
       res.json(response);
     } catch (error) {
+      const candidateId = parseInt(req.params.candidateId || '', 10);
+      if (!isNaN(candidateId)) {
+        try {
+          await markCandidateContactResolutionFailed(candidateId);
+        } catch (persistError) {
+          console.error('[SOURCING] Failed to persist contact lookup failure:', persistError);
+        }
+      }
       next(error);
     }
   });

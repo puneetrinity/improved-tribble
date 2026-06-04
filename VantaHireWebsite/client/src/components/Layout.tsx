@@ -188,7 +188,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
                         transition-opacity duration-500 ${scrollPosition > 50 ? 'opacity-100' : 'opacity-50'}`}>
         </div>
         
-        <nav className="container mx-auto px-4 flex items-center justify-between">
+        <nav className="container mx-auto flex items-center justify-between px-4 sm:px-5">
           {/* Logo */}
           <Link
             href="/"
@@ -338,7 +338,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
               onClick={toggleMenu}
               variant="ghost"
               size="sm"
-              className="text-white hover:bg-white/10"
+              className="h-10 w-10 px-0 text-white hover:bg-white/10"
             >
               {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </Button>
@@ -347,8 +347,8 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden fixed inset-0 z-50 p-6 transition-all duration-500 flex flex-col" style={{ backgroundColor: '#0d0d1a' }}>
-            <div className="flex justify-between items-center mb-8">
+          <div className="fixed inset-0 z-50 flex flex-col overflow-y-auto px-5 py-5 transition-all duration-500 md:hidden" style={{ backgroundColor: '#0d0d1a' }}>
+            <div className="mb-8 flex items-center justify-between gap-4">
               <Link
                 href="/"
                 className="flex items-center gap-2"
@@ -371,7 +371,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
                 <X className="h-6 w-6" />
               </button>
             </div>
-            <div className="flex flex-col space-y-6">
+            <div className="flex flex-1 flex-col space-y-5 pb-6">
               {isJobsRoute ? (
                 <>
                   <a 
@@ -419,7 +419,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
               
 
               {user ? (
-                <div className="space-y-6">
+                <div className="space-y-5 pt-2">
                   {(isRecruiter || isAdmin) && (
                     <>
                       <a
@@ -468,7 +468,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
                   </Button>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-5 pt-2">
                   <a
                     href="/candidate-auth"
                     rel="nofollow"
@@ -494,7 +494,7 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
       )}
 
       {/* Main Content */}
-      <main className="pt-20">
+      <main className="pt-[4.5rem] sm:pt-20">
         {children}
       </main>
 

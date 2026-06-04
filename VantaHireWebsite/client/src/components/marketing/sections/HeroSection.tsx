@@ -1,10 +1,12 @@
 // @charset "utf-8"
 import { motion } from "framer-motion";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const words = ["Cut", "the", "noise.", "Find", "the"];
 
 export function HeroSection() {
+  const isMobile = useIsMobile();
   const goToLogin = () => {
     window.location.href = "/recruiter-auth";
   };
@@ -20,8 +22,8 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden text-center"
-      style={{ paddingTop: 64 }}
+      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-5 text-center sm:px-6"
+      style={{ paddingTop: isMobile ? 92 : 64, paddingBottom: isMobile ? 48 : 24 }}
     >
       <div className="absolute inset-0 pointer-events-none">
         <div
@@ -62,7 +64,7 @@ export function HeroSection() {
         transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1] }}
         className="relative z-10 mb-8"
       >
-        <div style={{ position: "relative", width: 110, height: 121 }}>
+        <div style={{ position: "relative", width: isMobile ? 82 : 110, height: isMobile ? 90 : 121 }}>
           <div
             style={{
               position: "absolute",
@@ -77,7 +79,7 @@ export function HeroSection() {
           <motion.img
             src={ealanaMoth}
             alt="ealana moth"
-            style={{ position: "relative", zIndex: 1, width: 110, height: 121 }}
+            style={{ position: "relative", zIndex: 1, width: isMobile ? 82 : 110, height: isMobile ? 90 : 121 }}
             animate={{ y: [0, -10, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
           />
@@ -88,10 +90,10 @@ export function HeroSection() {
         initial="hidden"
         animate="visible"
         variants={{ visible: { transition: { staggerChildren: 0.09, delayChildren: 0.35 } } }}
-        className="relative z-10 mb-6 flex flex-wrap justify-center gap-x-[0.25em]"
+        className="relative z-10 mb-5 flex max-w-[18rem] flex-wrap justify-center gap-x-[0.25em] sm:mb-6 sm:max-w-none"
         style={{
           fontFamily: "'Outfit', sans-serif",
-          fontSize: "clamp(3.2rem, 6.5vw, 5.8rem)",
+          fontSize: isMobile ? "clamp(2.45rem, 12vw, 3.25rem)" : "clamp(3.2rem, 6.5vw, 5.8rem)",
           lineHeight: 1.08,
           letterSpacing: "-0.025em",
           color: "#F4F5FA",
@@ -136,8 +138,8 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 1.0 }}
-        className="relative z-10 mb-8 max-w-lg font-body leading-relaxed text-e-text2"
-        style={{ fontSize: "1.05rem", fontWeight: 300 }}
+        className="relative z-10 mb-8 max-w-xl font-body leading-relaxed text-e-text2"
+        style={{ fontSize: isMobile ? "0.98rem" : "1.05rem", fontWeight: 300 }}
       >
         ealana finds candidates others miss, remembers every hiring decision, and executes outreach - all in one place.
       </motion.p>
@@ -146,12 +148,12 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 1.15 }}
-        className="relative z-10 mb-6 flex items-center gap-3"
+        className="relative z-10 mb-6 flex w-full max-w-sm flex-col items-stretch gap-3 sm:max-w-none sm:flex-row sm:items-center sm:justify-center"
       >
         <motion.button
           whileHover={{ scale: 1.03, boxShadow: "0 8px 40px rgba(75,142,240,0.5)" }}
           whileTap={{ scale: 0.97 }}
-          className="font-body rounded-xl px-7 py-3 text-sm font-medium text-white"
+          className="font-body rounded-xl px-7 py-3 text-sm font-medium text-white sm:w-auto"
           style={{ background: "#4B8EF0", boxShadow: "0 0 28px rgba(75,142,240,0.35)" }}
           onClick={goToLogin}
         >
@@ -159,7 +161,7 @@ export function HeroSection() {
         </motion.button>
         <motion.button
           whileHover={{ borderColor: "rgba(255,255,255,0.18)", color: "#F4F5FA" }}
-          className="font-body rounded-xl px-6 py-3 text-sm text-e-text2 transition-all duration-200"
+          className="font-body rounded-xl px-6 py-3 text-sm text-e-text2 transition-all duration-200 sm:w-auto"
           style={{
             background: "rgba(255,255,255,0.06)",
             backdropFilter: "blur(12px) saturate(150%)",

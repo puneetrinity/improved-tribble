@@ -302,6 +302,12 @@ export interface SourcedCandidateForUI {
   sourceType: SignalSourceType;
   displayBucket: SourceDisplayBucket;
   state: 'new' | 'shortlisted' | 'hidden' | 'converted';
+  foundEmail: string | null;
+  foundEmails: string[] | null;
+  emailResolvedAt: string | null;
+  emailResolveStatus: 'pending' | 'resolved' | 'not_found' | 'failed' | null;
+  lastOutreachAt: string | null;
+  lastOutreachStatus: 'sent' | 'failed' | null;
 
   // Flattened from candidateSummary
   crustdata: Record<string, any> | null;
@@ -496,6 +502,12 @@ export function flattenCandidateForUI(row: {
   fitBreakdown: unknown;
   sourceType: string;
   state: string;
+  foundEmail?: string | null;
+  foundEmails?: unknown;
+  emailResolvedAt?: Date | string | null;
+  emailResolveStatus?: string | null;
+  lastOutreachAt?: Date | string | null;
+  lastOutreachStatus?: string | null;
   candidateSummary: unknown;
   lastSyncedAt: Date | string | null;
   createdAt: Date | string | null;
@@ -528,6 +540,21 @@ export function flattenCandidateForUI(row: {
     state: (['new', 'shortlisted', 'hidden', 'converted'].includes(row.state)
       ? row.state
       : 'new') as SourcedCandidateForUI['state'],
+    foundEmail: safeString(row.foundEmail),
+    foundEmails: Array.isArray(row.foundEmails)
+      ? row.foundEmails.filter((email): email is string => typeof email === 'string')
+      : null,
+    emailResolvedAt: safeString(row.emailResolvedAt),
+    emailResolveStatus: (row.emailResolveStatus === 'pending'
+      || row.emailResolveStatus === 'resolved'
+      || row.emailResolveStatus === 'not_found'
+      || row.emailResolveStatus === 'failed'
+      ? row.emailResolveStatus
+      : null) as SourcedCandidateForUI['emailResolveStatus'],
+    lastOutreachAt: safeString(row.lastOutreachAt),
+    lastOutreachStatus: (row.lastOutreachStatus === 'sent' || row.lastOutreachStatus === 'failed'
+      ? row.lastOutreachStatus
+      : null) as SourcedCandidateForUI['lastOutreachStatus'],
 
     crustdata: ((cs as any)?.candidate?.searchMeta?.crustdata as Record<string, unknown>) || null,
     linkedinUrl: safeString(cs.linkedinUrl) ?? safeString((cs.candidate as any)?.linkedinUrl),

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { DiscoverPanel } from "./DiscoverFeature";
 import { MemoryPanel } from "./MemoryFeature";
 import { FlowPanel } from "./FlowFeature";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TabConfig {
   label: string;
@@ -63,12 +64,13 @@ const TABS: TabConfig[] = [
 
 export default function HowItWorks() {
   const [activeTab, setActiveTab] = useState(0);
+  const isMobile = useIsMobile();
   const active = (TABS[activeTab] ?? TABS[0])!;
 
   return (
-    <section id="features" style={{ padding: "120px 4rem" }}>
+    <section id="features" style={{ padding: isMobile ? "72px 1.25rem" : "120px 4rem" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ marginBottom: "4rem", textAlign: "center" }}>
+        <div style={{ marginBottom: isMobile ? "2rem" : "4rem", textAlign: "center" }}>
           <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase", marginBottom: "1rem" }}>
             How Ealana Works
           </div>
@@ -77,7 +79,7 @@ export default function HowItWorks() {
           </h2>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: "3rem" }}>
+        <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: "2rem", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
           {TABS.map((tab, index) => {
             const isActive = index === activeTab;
             return (
@@ -91,7 +93,8 @@ export default function HowItWorks() {
                   background: isActive ? `${tab.accent}1f` : "rgba(255,255,255,0.03)",
                   border: `1px solid ${isActive ? `${tab.accent}66` : "rgba(255,255,255,0.07)"}`,
                   borderRadius: 100,
-                  padding: "10px 28px",
+                  padding: isMobile ? "10px 20px" : "10px 28px",
+                  whiteSpace: "nowrap",
                   cursor: "pointer",
                   transition: "all 0.25s",
                   boxShadow: isActive ? `0 0 20px ${tab.accent}1a` : "none",
@@ -110,7 +113,7 @@ export default function HowItWorks() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
             transition={{ duration: 0.35, ease: "easeInOut" }}
-            style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5rem", alignItems: "center" }}
+            style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "5rem", alignItems: "center" }}
           >
             <div>
               <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#3D4460", letterSpacing: "0.12em" }}>{active.layerNum}</div>

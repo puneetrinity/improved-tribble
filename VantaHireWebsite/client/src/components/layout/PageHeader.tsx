@@ -53,19 +53,19 @@ export function PageHeader({
     <div className={cn("mb-6", className)}>
       {/* Breadcrumbs */}
       {breadcrumbs && breadcrumbs.length > 0 && (
-        <nav className="flex items-center gap-1 text-sm text-muted-foreground mb-3">
+        <nav className="mb-3 flex flex-wrap items-center gap-1 text-xs text-muted-foreground sm:text-sm">
           {breadcrumbs.map((item, index) => (
-            <span key={index} className="flex items-center gap-1">
+            <span key={index} className="flex min-w-0 items-center gap-1">
               {index > 0 && <ChevronRight className="h-3.5 w-3.5" />}
               {item.href ? (
                 <Link
                   href={item.href}
-                  className="hover:text-foreground transition-colors"
+                  className="truncate transition-colors hover:text-foreground"
                 >
                   {item.label}
                 </Link>
               ) : (
-                <span className="text-foreground font-medium">{item.label}</span>
+                <span className="truncate font-medium text-foreground">{item.label}</span>
               )}
             </span>
           ))}
@@ -73,19 +73,19 @@ export function PageHeader({
       )}
 
       {/* Title row */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
           {Icon && (
-            <div className="flex-shrink-0 p-2 bg-primary/10 rounded-lg">
-              <Icon className="h-6 w-6 text-primary" />
+            <div className="flex-shrink-0 rounded-lg bg-primary/10 p-2">
+              <Icon className="h-5 w-5 text-primary sm:h-6 sm:w-6" />
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground truncate">
+            <h1 className="text-xl font-semibold text-foreground sm:text-2xl md:text-3xl">
               {title}
             </h1>
             {description && (
-              <p className="text-muted-foreground mt-1 text-sm md:text-base">
+              <p className="mt-1 max-w-3xl text-sm text-muted-foreground md:text-base">
                 {description}
               </p>
             )}
@@ -94,7 +94,7 @@ export function PageHeader({
 
         {/* Actions */}
         {actions && (
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:justify-end">
             {actions}
           </div>
         )}

@@ -43,6 +43,7 @@ import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import { sectionLabel } from "@/lib/shared-styles";
 import { apiRequest } from "@/lib/queryClient";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const planBtnBase = "block w-full py-3 px-6 rounded-xl font-ui text-[0.875rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
 const planBtnPrimary = `${planBtnBase} bg-e-blue text-white border-none hover:brightness-110`;
@@ -51,6 +52,7 @@ const planFeatureLi = "flex items-start gap-2.5 text-[0.88rem] text-e-text2 lead
 const marketingCard = "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.03)_100%)] shadow-[0_20px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl";
 
 export default function PricingPage() {
+  const isMobile = useIsMobile();
   const { user } = useAuth();
   const { data: organization } = useOrganization();
   const { data: commercialConfig } = useCommercialConfig();
@@ -297,7 +299,7 @@ export default function PricingPage() {
           <HomepageNav />
 
           {/* Hero */}
-          <div className="relative pt-[140px] px-12 pb-20 text-center max-w-[1100px] mx-auto animate-hr-fade-up max-md:pt-[100px] max-md:px-5 max-md:pb-12">
+          <div className="relative mx-auto max-w-[1100px] animate-hr-fade-up px-5 pb-14 pt-[96px] text-center sm:px-8 md:px-12 md:pb-20 md:pt-[140px]">
             <div
               className="pointer-events-none absolute left-1/2 top-0 h-[420px] w-[760px] -translate-x-1/2"
               style={{
@@ -327,11 +329,11 @@ export default function PricingPage() {
 
           {/* Pricing Cards */}
           <div
-            className="grid grid-cols-3 gap-5 max-w-[1100px] mx-auto mb-[100px] px-12 max-lg:gap-4 max-lg:px-8 max-md:grid-cols-1 max-md:max-w-[420px] max-md:px-5 max-md:gap-6"
+            className="mx-auto mb-16 grid max-w-[1100px] grid-cols-1 gap-5 px-5 sm:px-8 md:mb-[100px] md:grid-cols-3 md:px-12"
             style={{ animation: 'hr-fade-up 0.9s ease-out 0.15s both' }}
           >
             {/* Free Plan */}
-            <div className={`${marketingCard} py-8 px-7 flex flex-col relative transition-all duration-300 hover:border-white/20 hover:-translate-y-1`}>
+            <div className={`${marketingCard} relative flex flex-col px-5 py-7 transition-all duration-300 hover:border-white/20 hover:-translate-y-1 sm:px-7 sm:py-8`}>
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <Users size={18} style={{ color: '#8891AA' }} />
               </div>
@@ -361,7 +363,7 @@ export default function PricingPage() {
             </div>
 
             {/* Growth Plan */}
-            <div className="rounded-[26px] py-8 px-7 flex flex-col relative transition-all duration-300 max-md:-order-1 hover:-translate-y-1"
+            <div className="relative -order-1 flex flex-col rounded-[26px] px-5 py-7 transition-all duration-300 hover:-translate-y-1 md:order-none sm:px-7 sm:py-8"
               style={{
                 background: "linear-gradient(180deg, rgba(75,142,240,0.18) 0%, rgba(17,19,38,0.96) 24%, rgba(13,15,30,0.98) 100%)",
                 border: "1px solid rgba(75,142,240,0.4)",
@@ -400,7 +402,7 @@ export default function PricingPage() {
             </div>
 
             {/* Enterprise Plan */}
-            <div className={`${marketingCard} py-8 px-7 flex flex-col relative transition-all duration-300 hover:border-white/20 hover:-translate-y-1`}>
+            <div className={`${marketingCard} relative flex flex-col px-5 py-7 transition-all duration-300 hover:border-white/20 hover:-translate-y-1 sm:px-7 sm:py-8`}>
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center mb-4 shrink-0" style={{ background: 'rgba(255,255,255,0.05)' }}>
                 <Building2 size={18} style={{ color: '#8891AA' }} />
               </div>
@@ -429,7 +431,7 @@ export default function PricingPage() {
             <div></div>
             <div>
               <div
-                className="max-w-[1100px] mx-auto mb-[100px] px-12 max-md:px-5 max-md:overflow-x-auto"
+                className="mx-auto mb-16 max-w-[1100px] overflow-x-auto px-5 sm:px-8 md:mb-[100px] md:px-12"
                 style={{ animation: 'hr-fade-up 0.9s ease-out 0.3s both' }}
               >
                 <h2 className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-medium leading-[1.1] tracking-[-0.025em] mb-10 text-e-text text-center">Compare plans side by side</h2>
@@ -469,7 +471,7 @@ export default function PricingPage() {
             <div></div>
             <div>
               <div
-                className="max-w-[720px] mx-auto mb-[100px] px-12 max-md:px-5"
+                className="mx-auto mb-16 max-w-[720px] px-5 sm:px-8 md:mb-[100px] md:px-12"
                 style={{ animation: 'hr-fade-up 0.9s ease-out 0.4s both' }}
               >
                 <div className={`${sectionLabel} text-center text-e-blue`}>FAQ</div>
@@ -489,7 +491,7 @@ export default function PricingPage() {
           <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
             <div></div>
             <div>
-              <div className="text-center py-20 px-12 pb-[100px] border-t border-white/8 max-md:py-[60px] max-md:px-5">
+              <div className="border-t border-white/8 px-5 py-[60px] pb-16 text-center sm:px-8 md:px-12 md:py-20 md:pb-[100px]">
                 <div className={`${sectionLabel} text-e-blue`}>Get Started</div>
                 <h2 className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-medium leading-[1.1] tracking-[-0.025em] mb-4 text-e-text max-w-[480px] mx-auto">Start hiring with<br />the right plan.</h2>
                 <p className="text-base leading-[1.8] text-e-text2 max-w-[520px] mx-auto text-center mb-9">

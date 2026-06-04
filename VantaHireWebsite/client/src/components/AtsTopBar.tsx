@@ -227,13 +227,13 @@ export function AtsTopBar({
       <header className="sticky top-0 z-20 overflow-x-hidden border-b border-[#E6E9F2] bg-[rgba(248,249,252,0.82)] backdrop-blur-xl">
         <div className="relative">
           <div className="absolute inset-x-0 top-0 h-full bg-[radial-gradient(circle_at_top_left,_rgba(75,142,240,0.16),_transparent_35%),radial-gradient(circle_at_top_right,_rgba(52,209,122,0.12),_transparent_32%)]" />
-          <div className="relative flex h-[76px] min-w-0 items-center justify-between gap-4 px-4 md:px-6">
+          <div className="relative flex min-h-[68px] min-w-0 items-center justify-between gap-3 px-3 py-3 sm:h-[76px] sm:gap-4 sm:px-4 md:px-6">
             <div className="flex min-w-0 items-center gap-3 md:gap-4">
               <div className="min-w-0">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8B93A6]">
                   {currentRoute.section}
                 </div>
-                <div className="truncate text-xl font-extrabold tracking-[-0.03em] text-[#111827]">
+                <div className="truncate text-lg font-extrabold tracking-[-0.03em] text-[#111827] sm:text-xl">
                   {currentRoute.label}
                 </div>
                 <div className="hidden truncate text-[13px] text-[#6C7486] md:block">
@@ -258,7 +258,7 @@ export function AtsTopBar({
               <button
                 type="button"
                 onClick={() => setCommandOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#E6E9F2] bg-white text-[#5F6B85] shadow-[0_8px_24px_rgba(15,23,42,0.04)] hover:bg-[#F5F7FB] lg:hidden"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#E6E9F2] bg-white text-[#5F6B85] shadow-[0_8px_24px_rgba(15,23,42,0.04)] hover:bg-[#F5F7FB] sm:h-10 sm:w-10 sm:rounded-2xl lg:hidden"
                 aria-label="Open quick jump"
               >
                 <CommandIcon className="h-4 w-4" />
@@ -277,9 +277,9 @@ export function AtsTopBar({
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-3 rounded-[18px] border border-[#E6E9F2] bg-white/92 px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)] hover:bg-[#FCFCFE]"
+                    className="flex items-center gap-2 rounded-2xl border border-[#E6E9F2] bg-white/92 px-2 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)] hover:bg-[#FCFCFE] sm:gap-3 sm:px-2.5"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#D8E8FF_0%,#BFE7D1_100%)] text-sm font-semibold text-[#1F4E8C]">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#D8E8FF_0%,#BFE7D1_100%)] text-sm font-semibold text-[#1F4E8C] sm:h-10 sm:w-10 sm:rounded-2xl">
                       {initialsForUser(user)}
                     </div>
                     <div className="hidden min-w-0 text-left lg:block">

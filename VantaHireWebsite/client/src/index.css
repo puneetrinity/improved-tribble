@@ -292,9 +292,28 @@
     scroll-behavior: smooth;
   }
 
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   #root {
     max-width: 100%;
     overflow-x: hidden;
+  }
+
+  img,
+  svg,
+  video,
+  canvas {
+    max-width: 100%;
+  }
+
+  input,
+  select,
+  textarea {
+    min-width: 0;
   }
 
   /* Respect user's motion preferences */
@@ -317,6 +336,46 @@
   .recruiter-dashboard .interview-name { font-size: 13px; }
   .recruiter-dashboard .interview-role { font-size: 11px; }
   .recruiter-dashboard .nav-label { font-size: 13px; }
+
+  .container.mx-auto.px-4.py-8,
+  .container.mx-auto.px-4.py-10,
+  .container.mx-auto.px-4.py-16,
+  .max-w-7xl.mx-auto.p-6,
+  .max-w-7xl.mx-auto.p-6.space-y-6,
+  .max-w-7xl.mx-auto.p-6.space-y-8 {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .container.mx-auto.px-4.py-8,
+  .container.mx-auto.px-4.py-10,
+  .max-w-7xl.mx-auto.p-6,
+  .max-w-7xl.mx-auto.p-6.space-y-6,
+  .max-w-7xl.mx-auto.p-6.space-y-8 {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .container.mx-auto.px-4.py-16 {
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .max-w-7xl.mx-auto.p-6.flex.justify-center {
+    padding-top: 1rem;
+    padding-bottom: 0;
+  }
+
+  .container.mx-auto.px-4.pt-32.pb-16 {
+    padding-top: 6rem;
+    padding-bottom: 1rem;
+  }
+
+  .container.mx-auto.px-4.py-8 [class*="grid-cols-2"]:not(.sm\:grid-cols-2):not(.md\:grid-cols-2):not(.lg\:grid-cols-2),
+  .container.mx-auto.px-4.py-10 [class*="grid-cols-2"]:not(.sm\:grid-cols-2):not(.md\:grid-cols-2):not(.lg\:grid-cols-2),
+  .max-w-7xl.mx-auto.p-6 [class*="grid-cols-2"]:not(.sm\:grid-cols-2):not(.md\:grid-cols-2):not(.lg\:grid-cols-2) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 @layer components {

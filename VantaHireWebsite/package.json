@@ -7,14 +7,14 @@
     "node": ">=20 <21"
   },
   "scripts": {
-    "dev": "cross-env NODE_ENV=development tsx --env-file=.env server/index.ts",
+    "dev": "node ./scripts/run-with-node-env.mjs development tsx --env-file=.env server/index.ts",
     "build": "vite build && npm run build:ssr && npm run build:server",
     "build:ssr": "vite build --ssr src/entry-server.tsx --outDir ../dist/server",
     "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/worker.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/migrate.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/aiWorker.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
     "start": "npm run start:web",
-    "start:web": "cross-env NODE_ENV=production node dist/index.js",
-    "start:worker": "cross-env NODE_ENV=production node dist/worker.js",
-    "start:ai-worker": "cross-env NODE_ENV=production node dist/aiWorker.js",
+    "start:web": "node ./scripts/run-with-node-env.mjs production node dist/index.js",
+    "start:worker": "node ./scripts/run-with-node-env.mjs production node dist/worker.js",
+    "start:ai-worker": "node ./scripts/run-with-node-env.mjs production node dist/aiWorker.js",
     "check": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc --noEmit --incremental false",
     "check:server": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit --incremental false",
     "check:client": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit --incremental false",

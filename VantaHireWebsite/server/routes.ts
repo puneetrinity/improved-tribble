@@ -34,6 +34,7 @@ import { registerAdminSubscriptionRoutes } from "./admin-subscription.routes";
 import { registerCashfreeWebhook } from "./webhooks/cashfree.webhook";
 import { registerSignalWebhook } from "./webhooks/signal.webhook";
 import { registerSignalRoutes } from "./signal.routes";
+import { registerColdOutreachRoutes } from "./coldOutreach.routes";
 import { registerCandidateSemanticRoutes } from "./candidates.semantic.routes";
 import { registerRecruiterDashboardRoutes } from "./recruiterDashboard.routes";
 import { isExpectedDisconnectError } from "./monitoring";
@@ -497,6 +498,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Signal sourcing routes (recruiter-facing, with CSRF)
   registerSignalRoutes(app, doubleCsrfProtection);
+
+  // Register cold outreach routes for shortlisted sourced candidates
+  registerColdOutreachRoutes(app, doubleCsrfProtection);
 
   // Register candidate semantic search routes (ActiveKG-powered, with CSRF)
   registerCandidateSemanticRoutes(app, doubleCsrfProtection);
