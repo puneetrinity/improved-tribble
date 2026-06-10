@@ -356,6 +356,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
       const { job, organizationId } = contextResult.context;
+
       const signalTenantId = await requireSignalTenantId(organizationId);
 
       const externalJobId = `vanta:jobs:${job.id}`;

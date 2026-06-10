@@ -20,6 +20,15 @@ export interface SourcedCandidateForUI {
   sourceType: string;
   displayBucket: "talent_pool" | "newly_discovered";
   state: "new" | "shortlisted" | "hidden" | "converted";
+  foundEmail: string | null;
+  foundEmails: string[] | null;
+  emailResolvedAt: string | null;
+  emailResolveStatus: "pending" | "resolved" | "not_found" | "failed" | null;
+  outreachCount: number;
+  lastOutreachRound: number | null;
+  lastOutreachCampaignId: string | null;
+  lastOutreachAt: string | null;
+  lastOutreachStatus: "sent" | "failed" | null;
 
   crustdata: Record<string, any> | null;
   linkedinUrl: string | null;
@@ -167,6 +176,45 @@ export interface SourcedCandidatesResponse {
   };
 }
 
+export interface ColdOutreachDraft {
+  candidateId: number;
+  name: string;
+  email: string | null;
+  subject: string;
+  body: string;
+}
+
+export interface ColdOutreachHistoryResponse {
+  nextAvailableRound: 1 | 2 | 3 | null;
+  canStartAnyCampaign: boolean;
+  eligibleByRound: Record<1 | 2 | 3, {
+    count: number;
+    candidateIds: number[];
+  }>;
+  maxCampaigns: number;
+  campaigns: Array<{
+    campaignId: string;
+    campaignRound: number;
+    status: string;
+    launchedAt: string;
+    completedAt: string | null;
+    audienceCount: number;
+    sent: number;
+    failed: number;
+    subjectTemplate: string | null;
+    messages: Array<{
+      id: number;
+      sourcedCandidateId: number;
+      recipientEmail: string;
+      recipientName: string | null;
+      subject: string;
+      status: "sent" | "failed";
+      errorMessage: string | null;
+      sentAt: string;
+    }>;
+  }>;
+}
+
 const TERMINAL_STATUSES = new Set(["completed", "failed", "expired"]);
 function isTerminal(status: string | undefined): boolean {
   return !!status && TERMINAL_STATUSES.has(status);
@@ -261,6 +309,12 @@ export function useSourcedCandidates(jobId: number | undefined) {
     },
     enabled: !!jobId,
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => {
+      const candidates = query.state.data?.candidates ?? [];
+      return candidates.some((candidate) => candidate.emailResolveStatus === "pending")
+        ? 3000
+        : false;
+    },
   });
 }
 
@@ -554,7 +608,19 @@ export function useUpdateCandidateState(jobId: number | undefined) {
           {
             ...previous,
             candidates: previous.candidates.map((c) =>
-              c.id === candidateId ? { ...c, state } : c,
+              c.id === candidateId
+                ? {
+                    ...c,
+                    state,
+                    emailResolveStatus:
+                      state === "shortlisted"
+                      && !c.foundEmail
+                      && c.emailResolveStatus !== "resolved"
+                      && c.emailResolveStatus !== "pending"
+                        ? "pending"
+                        : c.emailResolveStatus,
+                  }
+                : c,
             ),
           },
         );
@@ -596,6 +662,9 @@ export function useUpdateCandidateState(jobId: number | undefined) {
       queryClient.invalidateQueries({
         queryKey: ["/api/jobs", jobId, "sourced-candidates"],
       });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/jobs", jobId, "cold-outreach-history"],
+      });
     },
   });
 
@@ -616,10 +685,11 @@ export function useFindContact() {
       return await res.json();
     },
     onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/jobs", variables.jobId, "sourced-candidates"],
+      });
+
       if (data.emails && data.emails.length > 0) {
-        queryClient.invalidateQueries({
-          queryKey: ["/api/jobs", variables.jobId, "sourced-candidates"],
-        });
         toast({
           title: "Contact Found",
           description: `Discovered ${data.emails.length} email(s) for this candidate!`,
@@ -632,7 +702,10 @@ export function useFindContact() {
         });
       }
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/jobs", variables.jobId, "sourced-candidates"],
+      });
       toast({
         title: "Contact Search Failed",
         description: error.message,
@@ -645,4 +718,110 @@ export function useFindContact() {
     findContact: mutation.mutate,
     isPending: mutation.isPending,
   };
+}
+
+export function useDraftOutreach(jobId: number | undefined) {
+  const { toast } = useToast();
+
+  const mutation = useMutation({
+    mutationFn: async (payload: {
+      candidateIds: number[];
+      campaignRound: 1 | 2 | 3;
+      extraContext?: string;
+    }) => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/cold-outreach/draft`, payload);
+      return await res.json() as {
+        campaignRound: number;
+        campaignLabel: string;
+        campaignSummary: string;
+        drafts: ColdOutreachDraft[];
+      };
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Draft generation failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return {
+    draftOutreach: mutation.mutateAsync,
+    isPending: mutation.isPending,
+  };
+}
+
+export function useSendOutreach(jobId: number | undefined) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const mutation = useMutation({
+    mutationFn: async (payload: {
+      campaignId: string;
+      campaignRound: 1 | 2 | 3;
+      extraContext?: string;
+      messages: Array<{
+        candidateId: number;
+        subject: string;
+        body: string;
+        wasEdited: boolean;
+        aiDraftSubject: string;
+        aiDraftBody: string;
+      }>;
+    }) => {
+      const res = await apiRequest("POST", `/api/jobs/${jobId}/cold-outreach/send`, payload);
+      return await res.json() as {
+        sent: number;
+        failed: number;
+        campaign: {
+          campaignId: string;
+          campaignRound: number;
+          audienceCount: number;
+        };
+        results: Array<{
+          candidateId: number;
+          email: string;
+          status: "sent" | "failed";
+          errorMessage: string | null;
+        }>;
+      };
+    },
+    onSuccess: (_data) => {
+      queryClient.invalidateQueries({
+        queryKey: ["/api/jobs", jobId, "sourced-candidates"],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["/api/jobs", jobId, "cold-outreach-history"],
+      });
+      toast({
+        title: "Outreach sent",
+        description: "Campaign results have been saved.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Send failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  return {
+    sendOutreach: mutation.mutateAsync,
+    isPending: mutation.isPending,
+  };
+}
+
+export function useOutreachHistory(jobId: number | undefined) {
+  return useQuery<ColdOutreachHistoryResponse>({
+    queryKey: ["/api/jobs", jobId, "cold-outreach-history"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/jobs/${jobId}/cold-outreach/history`);
+      return await res.json();
+    },
+    enabled: !!jobId,
+    refetchOnWindowFocus: false,
+  });
 }

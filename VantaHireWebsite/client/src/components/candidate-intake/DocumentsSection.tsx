@@ -34,11 +34,9 @@ export function DocumentsSection({
 }: DocumentsSectionProps) {
   const { toast } = useToast();
 
-  // Validate: resume is required
   useEffect(() => {
-    const hasResume = !!data.resumeFile;
-    onValidChange(hasResume);
-  }, [data.resumeFile, onValidChange]);
+    onValidChange(true);
+  }, [onValidChange]);
 
   const validateFile = useCallback((file: File): boolean => {
     const validTypes = [
@@ -162,12 +160,6 @@ export function DocumentsSection({
               PDF or Word document, max 5MB
             </p>
           </div>
-        )}
-        {!data.resumeFile && (
-          <p className="text-xs text-warning flex items-center gap-1">
-            <AlertCircle className="h-3 w-3" />
-            Resume is required to continue
-          </p>
         )}
       </div>
 

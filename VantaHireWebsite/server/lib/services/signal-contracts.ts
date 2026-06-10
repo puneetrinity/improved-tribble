@@ -306,6 +306,9 @@ export interface SourcedCandidateForUI {
   foundEmails: string[] | null;
   emailResolvedAt: string | null;
   emailResolveStatus: 'pending' | 'resolved' | 'not_found' | 'failed' | null;
+  outreachCount: number;
+  lastOutreachRound: number | null;
+  lastOutreachCampaignId: string | null;
   lastOutreachAt: string | null;
   lastOutreachStatus: 'sent' | 'failed' | null;
 
@@ -506,6 +509,9 @@ export function flattenCandidateForUI(row: {
   foundEmails?: unknown;
   emailResolvedAt?: Date | string | null;
   emailResolveStatus?: string | null;
+  outreachCount?: number | null;
+  lastOutreachRound?: number | null;
+  lastOutreachCampaignId?: string | null;
   lastOutreachAt?: Date | string | null;
   lastOutreachStatus?: string | null;
   candidateSummary: unknown;
@@ -551,6 +557,9 @@ export function flattenCandidateForUI(row: {
       || row.emailResolveStatus === 'failed'
       ? row.emailResolveStatus
       : null) as SourcedCandidateForUI['emailResolveStatus'],
+    outreachCount: typeof row.outreachCount === 'number' ? row.outreachCount : 0,
+    lastOutreachRound: typeof row.lastOutreachRound === 'number' ? row.lastOutreachRound : null,
+    lastOutreachCampaignId: safeString(row.lastOutreachCampaignId),
     lastOutreachAt: safeString(row.lastOutreachAt),
     lastOutreachStatus: (row.lastOutreachStatus === 'sent' || row.lastOutreachStatus === 'failed'
       ? row.lastOutreachStatus

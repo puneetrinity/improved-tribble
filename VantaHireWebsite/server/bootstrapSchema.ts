@@ -1496,9 +1496,15 @@ export async function ensureAtsSchema(): Promise<void> {
       found_emails JSONB,
       email_resolved_at TIMESTAMP,
       email_resolve_status TEXT,
+      outreach_count INTEGER NOT NULL DEFAULT 0,
+      last_outreach_round INTEGER,
+      last_outreach_campaign_id TEXT,
       last_outreach_at TIMESTAMP,
       last_outreach_status TEXT,
       converted_application_id INTEGER REFERENCES applications(id),
+      applied_at TIMESTAMP,
+      applied_from_campaign_id TEXT,
+      applied_after_round INTEGER,
       last_synced_at TIMESTAMP DEFAULT NOW() NOT NULL,
       created_at TIMESTAMP DEFAULT NOW() NOT NULL,
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
@@ -1508,14 +1514,60 @@ export async function ensureAtsSchema(): Promise<void> {
   await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_emails JSONB;`);
   await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolved_at TIMESTAMP;`);
   await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_status TEXT;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS outreach_count INTEGER NOT NULL DEFAULT 0;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_round INTEGER;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_campaign_id TEXT;`);
   await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_at TIMESTAMP;`);
   await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_status TEXT;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_at TIMESTAMP;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_from_campaign_id TEXT;`);
+  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_after_round INTEGER;`);
   await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_sourced_candidates_job_candidate_idx ON job_sourced_candidates(job_id, signal_candidate_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_org_job_idx ON job_sourced_candidates(organization_id, job_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_request_idx ON job_sourced_candidates(request_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_state_idx ON job_sourced_candidates(state);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_fit_score_idx ON job_sourced_candidates(fit_score);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_source_type_idx ON job_sourced_candidates(source_type);`);
+
+  console.log('  Creating sourced_candidate_outreach_campaigns table...');
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS sourced_candidate_outreach_campaigns (
+      id SERIAL PRIMARY KEY,
+      organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      campaign_id TEXT NOT NULL UNIQUE,
+      round INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'completed',
+      audience_count INTEGER NOT NULL DEFAULT 0,
+      sent_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      subject_template TEXT,
+      html_body_template TEXT,
+      extra_context TEXT,
+      launched_by INTEGER NOT NULL REFERENCES users(id),
+      launched_at TIMESTAMP DEFAULT NOW() NOT NULL,
+      completed_at TIMESTAMP
+    );
+  `);
+  await db.execute(sql`DROP INDEX IF EXISTS scoc_job_round_idx;`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_job_round_idx ON sourced_candidate_outreach_campaigns(job_id, round);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_job_idx ON sourced_candidate_outreach_campaigns(job_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_org_idx ON sourced_candidate_outreach_campaigns(organization_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_launched_by_idx ON sourced_candidate_outreach_campaigns(launched_by);`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS campaign_id TEXT;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS round INTEGER;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'completed';`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS audience_count INTEGER NOT NULL DEFAULT 0;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS sent_count INTEGER NOT NULL DEFAULT 0;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS failed_count INTEGER NOT NULL DEFAULT 0;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS subject_template TEXT;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS html_body_template TEXT;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS extra_context TEXT;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS launched_by INTEGER REFERENCES users(id);`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS launched_at TIMESTAMP DEFAULT NOW();`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ALTER COLUMN campaign_id SET NOT NULL;`);
+  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS scoc_campaign_id_idx ON sourced_candidate_outreach_campaigns(campaign_id);`);
 
   console.log('  Creating sourced_candidate_outreach_log table...');
   await db.execute(sql`
@@ -1525,10 +1577,12 @@ export async function ensureAtsSchema(): Promise<void> {
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
       sourced_candidate_id INTEGER NOT NULL REFERENCES job_sourced_candidates(id) ON DELETE CASCADE,
       campaign_id TEXT,
+      campaign_round INTEGER,
       recipient_email TEXT NOT NULL,
       recipient_name TEXT,
       subject TEXT NOT NULL,
       body TEXT NOT NULL,
+      body_html TEXT,
       ai_draft_body TEXT,
       ai_draft_subject TEXT,
       was_edited BOOLEAN NOT NULL DEFAULT FALSE,
@@ -1538,6 +1592,8 @@ export async function ensureAtsSchema(): Promise<void> {
       sent_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS campaign_round INTEGER;`);
+  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS body_html TEXT;`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_job_idx ON sourced_candidate_outreach_log(job_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_candidate_idx ON sourced_candidate_outreach_log(sourced_candidate_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_campaign_idx ON sourced_candidate_outreach_log(campaign_id);`);

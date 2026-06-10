@@ -7,11 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent } from "@/components/ui/card";
-import { Search, Loader2, AlertCircle, Sparkles, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, Loader2, AlertCircle, Sparkles, ChevronDown, ChevronRight, Mail } from "lucide-react";
 import {
   useSourcingStatus,
   useSourcedCandidates,
   useFindCandidates,
+  useFindContact,
+  useDraftOutreach,
+  useSendOutreach,
+  useOutreachHistory,
   useUpdateCandidateState,
   useSourcingProgress,
   // useBatchEnrich,
@@ -37,8 +41,11 @@ import {
 import { SourcingListSkeleton } from "@/components/skeletons";
 import { splitByTier, type TierModel } from "@/lib/sourcing-tiering";
 import { jobSourcingPageCopy } from "@/lib/internal-copy";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { ColdOutreachSidebar } from "@/components/outreach/ColdOutreachSidebar";
 
 type SortKey = "rank" | "fitScore" | "source" | "freshness";
+type ShortlistOutreachFilter = "all" | "fresh" | "first_sent" | "second_sent" | "completed";
 
 const SOURCE_PRIORITY: Record<string, number> = {
   pool_enriched: 0,
@@ -130,6 +137,22 @@ function getExpansionReasonText(reason?: string | null, requestedLocation?: stri
   }
 }
 
+function getCandidateOutreachCount(candidate: SourcedCandidateForUI): number {
+  return Math.max(0, Math.min(candidate.outreachCount ?? 0, 3));
+}
+
+function matchesShortlistOutreachFilter(
+  candidate: SourcedCandidateForUI,
+  filter: ShortlistOutreachFilter,
+): boolean {
+  const outreachCount = getCandidateOutreachCount(candidate);
+  if (filter === "all") return true;
+  if (filter === "fresh") return outreachCount === 0;
+  if (filter === "first_sent") return outreachCount === 1;
+  if (filter === "second_sent") return outreachCount === 2;
+  return outreachCount >= 3;
+}
+
 export default function JobSourcingPage() {
   const params = useParams<{ id: string }>();
   const jobId = params.id ? parseInt(params.id, 10) : undefined;
@@ -141,12 +164,20 @@ export default function JobSourcingPage() {
   const [bestMatchesOnly, setBestMatchesOnly] = useState(false);
   const [showBroader, setShowBroader] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
+  const [listMode, setListMode] = useState<"all" | "shortlisted">("all");
+  const [shortlistOutreachFilter, setShortlistOutreachFilter] = useState<ShortlistOutreachFilter>("fresh");
+  const [revealedEmails, setRevealedEmails] = useState<Record<number, boolean>>({});
+  const [outreachSidebarOpen, setOutreachSidebarOpen] = useState(false);
   const PAGE_SIZE = 25;
 
   const { data: status, isLoading: statusLoading, isPolling } = useSourcingStatus(jobId);
   const { data: candidatesData, isLoading: candidatesLoading } = useSourcedCandidates(jobId);
   const { trigger: findCandidatesBase, isPending: findPending } = useFindCandidates(jobId);
   const { update: updateState, isPending: updatePending } = useUpdateCandidateState(jobId);
+  const { findContact, isPending: contactLookupPending } = useFindContact();
+  const { draftOutreach, isPending: draftingOutreach } = useDraftOutreach(jobId);
+  const { sendOutreach, isPending: sendingOutreach } = useSendOutreach(jobId);
+  const { data: outreachHistory } = useOutreachHistory(jobId);
   const { progress, modalOpen, openModal, closeModal } = useSourcingProgress(jobId);
   // const { enrichBatch, isPending: enrichPending } = useBatchEnrich(jobId);
 
@@ -176,6 +207,75 @@ export default function JobSourcingPage() {
 
   const allCandidates = candidatesData?.candidates ?? [];
   const counts = candidatesData?.counts ?? { total: 0, talentPool: 0, newlyDiscovered: 0 };
+  const shortlistedCandidates = allCandidates.filter((candidate) => candidate.state === "shortlisted");
+  const shortlistedWithResolvedEmail = shortlistedCandidates.filter((candidate) => candidate.emailResolveStatus === "resolved" && candidate.foundEmail);
+  const shortlistCounts = {
+    all: shortlistedCandidates.length,
+    fresh: shortlistedCandidates.filter((candidate) => matchesShortlistOutreachFilter(candidate, "fresh")).length,
+    first_sent: shortlistedCandidates.filter((candidate) => matchesShortlistOutreachFilter(candidate, "first_sent")).length,
+    second_sent: shortlistedCandidates.filter((candidate) => matchesShortlistOutreachFilter(candidate, "second_sent")).length,
+    completed: shortlistedCandidates.filter((candidate) => matchesShortlistOutreachFilter(candidate, "completed")).length,
+  };
+  const selectedCampaignRound: 1 | 2 | 3 | null =
+    shortlistOutreachFilter === "fresh"
+      ? 1
+      : shortlistOutreachFilter === "first_sent"
+        ? 2
+        : shortlistOutreachFilter === "second_sent"
+          ? 3
+          : shortlistOutreachFilter === "all"
+            ? (outreachHistory?.nextAvailableRound ?? null)
+            : null;
+  const outreachEligibleCandidateIds = selectedCampaignRound
+    ? (
+      outreachHistory?.eligibleByRound?.[selectedCampaignRound]?.candidateIds
+      ?? shortlistedWithResolvedEmail
+        .filter((candidate) => getCandidateOutreachCount(candidate) === selectedCampaignRound - 1)
+        .map((candidate) => candidate.id)
+    )
+    : [];
+  const outreachEligibleCandidates = shortlistedWithResolvedEmail.filter((candidate) =>
+    outreachEligibleCandidateIds.includes(candidate.id),
+  );
+  const canStartOutreachCampaign = Boolean(selectedCampaignRound && outreachEligibleCandidates.length > 0);
+  const outreachButtonLabel =
+    selectedCampaignRound === 1
+      ? "Start First Campaign"
+      : selectedCampaignRound === 2
+        ? "Start Second Campaign"
+        : selectedCampaignRound === 3
+          ? "Start Final Campaign"
+          : "No Campaign Available";
+
+  useEffect(() => {
+    if (listMode !== "shortlisted") return;
+    if (shortlistOutreachFilter !== "all" && shortlistCounts[shortlistOutreachFilter] > 0) return;
+
+    if (shortlistCounts.fresh > 0) {
+      setShortlistOutreachFilter("fresh");
+      return;
+    }
+    if (shortlistCounts.first_sent > 0) {
+      setShortlistOutreachFilter("first_sent");
+      return;
+    }
+    if (shortlistCounts.second_sent > 0) {
+      setShortlistOutreachFilter("second_sent");
+      return;
+    }
+    if (shortlistCounts.completed > 0) {
+      setShortlistOutreachFilter("completed");
+      return;
+    }
+    setShortlistOutreachFilter("all");
+  }, [
+    listMode,
+    shortlistOutreachFilter,
+    shortlistCounts.completed,
+    shortlistCounts.first_sent,
+    shortlistCounts.fresh,
+    shortlistCounts.second_sent,
+  ]);
 
   useEffect(() => {
     const newCount = allCandidates.length;
@@ -186,9 +286,25 @@ export default function JobSourcingPage() {
   }, [allCandidates.length]);
 
 
+  const filteredSortedBase = useMemo(
+    () => sortCandidates(
+      filterCandidates(
+        allCandidates,
+        listMode === "shortlisted"
+          ? { ...filters, candidateState: "shortlisted" }
+          : filters,
+      ),
+      sortBy,
+    ),
+    [allCandidates, filters, sortBy, listMode],
+  );
   const filteredSorted = useMemo(
-    () => sortCandidates(filterCandidates(allCandidates, filters), sortBy),
-    [allCandidates, filters, sortBy],
+    () => (
+      listMode === "shortlisted"
+        ? filteredSortedBase.filter((candidate) => matchesShortlistOutreachFilter(candidate, shortlistOutreachFilter))
+        : filteredSortedBase
+    ),
+    [filteredSortedBase, listMode, shortlistOutreachFilter],
   );
 
   const grouped = useMemo(
@@ -348,6 +464,16 @@ export default function JobSourcingPage() {
               onClick={() => handleCardClick(c)}
               onShortlist={() => handleShortlistToggle(c)}
               isUpdating={updatePending}
+              shortlistMode={listMode === "shortlisted"}
+              emailRevealed={Boolean(revealedEmails[c.id])}
+              onToggleRevealEmail={() =>
+                setRevealedEmails((current) => ({ ...current, [c.id]: !current[c.id] }))
+              }
+              onRetryEmailLookup={() => {
+                if (!jobId) return;
+                findContact({ candidateId: c.id, jobId });
+              }}
+              isRetryingEmail={contactLookupPending}
               {...(pos != null ? { displayPosition: pos } : {})}
             />
           );
@@ -390,20 +516,19 @@ export default function JobSourcingPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
-            {!hasRun && (
-              <Button
-                onClick={() => findCandidates({ forceSourcing: true })}
-                disabled={findPending || isRunning}
-                size="sm"
-              >
-                {findPending || isRunning ? (
-                  <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4 mr-1.5" />
-                )}
-                {isRunning ? "Running..." : "Find Candidates"}
-              </Button>
-            )}
+            <Button
+              onClick={() => findCandidates({ forceSourcing: true })}
+              disabled={findPending || isRunning}
+              size="sm"
+              variant={hasRun ? "outline" : "default"}
+            >
+              {findPending || isRunning ? (
+                <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+              ) : (
+                <Search className="h-4 w-4 mr-1.5" />
+              )}
+              {isRunning ? "Running..." : hasRun ? "Find Candidates Again" : "Find Candidates"}
+            </Button>
           </div>
         </div>
 
@@ -413,6 +538,82 @@ export default function JobSourcingPage() {
             className="h-1.5 mb-4"
           />
         )}
+
+        <div className="mb-4 flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <ToggleGroup
+                type="single"
+                value={listMode}
+                onValueChange={(value) => {
+                  if (value === "all" || value === "shortlisted") {
+                    setListMode(value);
+                  }
+                }}
+              >
+                <ToggleGroupItem value="all" aria-label="Show all candidates">
+                  All candidates
+                </ToggleGroupItem>
+                <ToggleGroupItem value="shortlisted" aria-label="Show shortlisted candidates">
+                  Shortlisted ({shortlistedCandidates.length})
+                </ToggleGroupItem>
+              </ToggleGroup>
+              {listMode === "shortlisted" && (
+                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                  {outreachEligibleCandidates.length} ready for outreach
+                </Badge>
+              )}
+            </div>
+            {listMode === "shortlisted" && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  Filter shortlisted candidates by outreach stage, then launch the matching campaign for that cohort.
+                </p>
+                <ToggleGroup
+                  type="single"
+                  value={shortlistOutreachFilter}
+                  onValueChange={(value) => {
+                    if (
+                      value === "all"
+                      || value === "fresh"
+                      || value === "first_sent"
+                      || value === "second_sent"
+                      || value === "completed"
+                    ) {
+                      setShortlistOutreachFilter(value);
+                    }
+                  }}
+                >
+                  <ToggleGroupItem value="all" aria-label="Show all shortlisted candidates">
+                    All ({shortlistCounts.all})
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="fresh" aria-label="Show fresh shortlisted candidates">
+                    Fresh ({shortlistCounts.fresh})
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="first_sent" aria-label="Show candidates after first campaign">
+                    First sent ({shortlistCounts.first_sent})
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="second_sent" aria-label="Show candidates after second campaign">
+                    Second sent ({shortlistCounts.second_sent})
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="completed" aria-label="Show candidates who already got final outreach">
+                    Third sent ({shortlistCounts.completed})
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            )}
+          </div>
+
+          {listMode === "shortlisted" && (
+            <Button
+              disabled={!canStartOutreachCampaign}
+              onClick={() => setOutreachSidebarOpen(true)}
+            >
+              <Mail className="mr-1.5 h-4 w-4" />
+              {outreachButtonLabel}
+            </Button>
+          )}
+        </div>
 
         {/* {!isFailed && !isExpired && enrichmentInProgress && (
           <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3 mb-4">
@@ -669,6 +870,18 @@ export default function JobSourcingPage() {
         onClose={() => setDrawerOpen(false)}
         onUpdateState={(candidateId, state) => updateState({ candidateId, state })}
         isUpdating={updatePending}
+      />
+
+      <ColdOutreachSidebar
+        open={outreachSidebarOpen}
+        onOpenChange={setOutreachSidebarOpen}
+        candidates={shortlistedWithResolvedEmail}
+        campaignRound={selectedCampaignRound ?? 1}
+        {...(outreachHistory ? { history: outreachHistory } : {})}
+        onDraft={draftOutreach}
+        onSend={sendOutreach}
+        isDrafting={draftingOutreach}
+        isSending={sendingOutreach}
       />
 
       <SourcingProgressModal
