@@ -1599,6 +1599,29 @@ export async function ensureAtsSchema(): Promise<void> {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_campaign_idx ON sourced_candidate_outreach_log(campaign_id);`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_org_idx ON sourced_candidate_outreach_log(organization_id);`);
 
+  // Scheduled outreach campaigns (auto-send rounds 2 & 3 after 3-day intervals)
+  console.log('  Creating scheduled_outreach_campaigns table...');
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS scheduled_outreach_campaigns (
+      id SERIAL PRIMARY KEY,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      round INTEGER NOT NULL CHECK (round BETWEEN 2 AND 3),
+      scheduled_at TIMESTAMP NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      triggered_by INTEGER NOT NULL REFERENCES users(id),
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      sent_at TIMESTAMP,
+      result_campaign_id TEXT,
+      sent_count INTEGER NOT NULL DEFAULT 0,
+      failed_count INTEGER NOT NULL DEFAULT 0,
+      CONSTRAINT uq_scheduled_job_round UNIQUE (job_id, round)
+    );
+  `);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS soc_status_scheduled_idx ON scheduled_outreach_campaigns(status, scheduled_at);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS soc_job_idx ON scheduled_outreach_campaigns(job_id);`);
+  await db.execute(sql`CREATE INDEX IF NOT EXISTS soc_org_idx ON scheduled_outreach_campaigns(organization_id);`);
+
   // ActiveKG Graph Sync: Application resume sync jobs
   console.log('  Creating application_graph_sync_jobs table...');
   await db.execute(sql`

@@ -1099,6 +1099,24 @@ export const sourcedCandidateOutreachCampaigns = pgTable("sourced_candidate_outr
   launchedByIdx: index("scoc_launched_by_idx").on(table.launchedBy),
 }));
 
+// Auto-scheduled follow-up campaigns (rounds 2 & 3 fired automatically 3 days apart)
+export const scheduledOutreachCampaigns = pgTable("scheduled_outreach_campaigns", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  round: integer("round").notNull(),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  status: text("status").notNull().default("pending"), // pending | sent | cancelled | failed
+  triggeredBy: integer("triggered_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  sentAt: timestamp("sent_at"),
+  resultCampaignId: text("result_campaign_id"),
+  sentCount: integer("sent_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+});
+
+export type ScheduledOutreachCampaign = typeof scheduledOutreachCampaigns.$inferSelect;
+
 export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_log", {
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),

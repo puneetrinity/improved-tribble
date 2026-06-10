@@ -11,6 +11,7 @@ import { ensureAtsSchema } from "./bootstrapSchema";
 import { seedDefaultWhatsAppTemplates } from "./seedWhatsAppTemplates";
 import { startApplicationGraphSyncProcessor, stopApplicationGraphSyncProcessor } from "./lib/applicationGraphSyncProcessor";
 import { startResumeImportProcessor, stopResumeImportProcessor } from "./lib/resumeImportProcessor";
+import { startOutreachScheduler } from "./lib/outreachScheduler";
 import { captureServerException, initServerMonitoring, isExpectedDisconnectError, monitoringRequestContext } from "./monitoring";
 
 initServerMonitoring();
@@ -176,6 +177,9 @@ import { initWebSocketServer } from "./websocket";
 
     // Start job scheduler for automatic job expiration
     startJobScheduler();
+
+    // Start outreach campaign auto-scheduler (rounds 2 & 3 fire automatically)
+    startOutreachScheduler();
 
     // Start ActiveKG graph sync processor (if enabled)
     if (process.env.ACTIVEKG_SYNC_ENABLED === 'true') {

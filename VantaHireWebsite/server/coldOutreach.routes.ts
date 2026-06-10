@@ -22,6 +22,7 @@ import {
 import { flattenCandidateForUI } from './lib/services/signal-contracts';
 import { resolveAccessibleSignalJobContext } from './signal.routes';
 import type { CsrfMiddleware } from './types/routes';
+import { scheduleFollowUpCampaigns } from './lib/outreachScheduler';
 
 const MAX_OUTREACH_BATCH_SIZE = 50;
 const MAX_CAMPAIGN_ROUNDS = 3;
@@ -675,15 +676,24 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
           });
         }
 
+        const finalStatus = failed > 0 ? (sent > 0 ? 'completed_with_failures' : 'failed') : 'completed';
+
         await db
           .update(sourcedCandidateOutreachCampaigns)
           .set({
-            status: failed > 0 ? (sent > 0 ? 'completed_with_failures' : 'failed') : 'completed',
+            status: finalStatus,
             sentCount: sent,
             failedCount: failed,
             completedAt: new Date(),
           })
           .where(eq(sourcedCandidateOutreachCampaigns.campaignId, persistedCampaignId));
+
+        // Auto-schedule follow-up rounds after round 1 or 2 completes with at least some sends
+        if (sent > 0 && campaignRound < MAX_CAMPAIGN_ROUNDS) {
+          scheduleFollowUpCampaigns(jobId, organizationId, req.user!.id, campaignRound).catch((err) => {
+            console.error('[ColdOutreach] Failed to schedule follow-ups:', err);
+          });
+        }
 
         res.json({
           sent,
