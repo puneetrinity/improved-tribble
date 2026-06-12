@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Star, MapPin, Building, Briefcase, CheckCircle2,
-  Mail, Phone, Github, Twitter, Linkedin, Sparkles,
+  Mail, Phone, Github, Twitter, Linkedin, Sparkles, Loader2, RotateCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
@@ -24,6 +24,24 @@ interface CandidateCardProps {
   onShortlist: () => void;
   isUpdating: boolean;
   displayPosition?: number;
+  shortlistMode?: boolean;
+  emailRevealed?: boolean;
+  onToggleRevealEmail?: () => void;
+  onRetryEmailLookup?: () => void;
+  isRetryingEmail?: boolean;
+}
+
+function maskEmail(email: string | null): string {
+  if (!email || !email.includes("@")) return "•••••@•••••";
+  const [localPart = "", domain = ""] = email.split("@");
+  const maskedLocal = localPart.length <= 2
+    ? `${localPart[0] ?? "•"}•`
+    : `${localPart.slice(0, 2)}${"•".repeat(Math.max(3, localPart.length - 2))}`;
+  const [domainName = "", ...domainRest] = domain.split(".");
+  const maskedDomain = domainName.length <= 2
+    ? `${domainName[0] ?? "•"}•`
+    : `${domainName.slice(0, 2)}${"•".repeat(Math.max(3, domainName.length - 2))}`;
+  return `${maskedLocal}@${[maskedDomain, ...domainRest].filter(Boolean).join(".")}`;
 }
 
 // ─── Fit score badge ──────────────────────────────────────────────────────────
@@ -78,6 +96,11 @@ export function CandidateCard({
   onShortlist,
   isUpdating,
   displayPosition,
+  shortlistMode = false,
+  emailRevealed = false,
+  onToggleRevealEmail,
+  onRetryEmailLookup,
+  isRetryingEmail = false,
 }: CandidateCardProps) {
   const isShortlisted = candidate.state === "shortlisted";
   const isHidden = candidate.state === "hidden";
@@ -146,6 +169,14 @@ export function CandidateCard({
   const freshnessLine = [enrichedText, identityText, !enrichedText ? serpText : null]
     .filter(Boolean)
     .join(" · ");
+  const outreachDate = candidate.lastOutreachAt
+    ? new Date(candidate.lastOutreachAt).toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
+    : null;
+  const maskedEmail = maskEmail(candidate.foundEmail);
 
 
   return (
@@ -261,6 +292,69 @@ export function CandidateCard({
               <Sparkles className={cn("h-4 w-4 mt-0.5 shrink-0", aiSummary?.text ? "text-violet-400" : "text-blue-400")} />
               <span>{aiSummary?.text || signals?.summaryShort}</span>
             </p>
+          )}
+
+          {shortlistMode && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <div className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-1.5 text-xs">
+                <Mail className="h-3.5 w-3.5 text-amber-700" />
+                {candidate.emailResolveStatus === "pending" && (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-700" />
+                    <span className="font-medium text-amber-800">Finding email...</span>
+                  </>
+                )}
+                {candidate.emailResolveStatus === "resolved" && (
+                  <>
+                    <span className="font-medium text-amber-900">
+                      {emailRevealed ? candidate.foundEmail : maskedEmail}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleRevealEmail?.();
+                      }}
+                    >
+                      {emailRevealed ? "Hide" : "Reveal"}
+                    </Button>
+                  </>
+                )}
+                {(candidate.emailResolveStatus === "not_found" || candidate.emailResolveStatus === "failed") && (
+                  <>
+                    <span className="font-medium text-amber-900">
+                      {candidate.emailResolveStatus === "failed" ? "Lookup failed" : "No email found"}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={isRetryingEmail}
+                      className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRetryEmailLookup?.();
+                      }}
+                    >
+                      {isRetryingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5 mr-1" />}
+                      Retry
+                    </Button>
+                  </>
+                )}
+                {!candidate.emailResolveStatus && (
+                  <span className="font-medium text-amber-800">Email status unavailable</span>
+                )}
+              </div>
+
+              {outreachDate && (
+                <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                  Sent on {outreachDate}
+                </Badge>
+              )}
+            </div>
           )}
 
           {/* Row 5: matched skills (green if JD-matched) + other skills */}

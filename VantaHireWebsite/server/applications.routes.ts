@@ -13,7 +13,7 @@
 
 import type { Express, Request, Response, NextFunction } from 'express';
 import type { Multer } from 'multer';
-import { sql, eq, and, inArray } from 'drizzle-orm';
+import { sql, eq, and, inArray, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
 import { storage } from './storage';
@@ -29,6 +29,7 @@ import {
   insertPipelineStageSchema,
   insertApplicationFeedbackSchema,
   applications,
+  jobSourcedCandidates,
   pipelineStages,
   applicationStageHistory,
   candidateResumes,
@@ -77,6 +78,49 @@ const requestHiringManagerReviewSchema = z.object({
   applicationIds: z.array(z.number().int().positive()).min(1),
   note: z.string().max(1000).optional(),
 });
+
+function normalizeEmailAddress(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+async function matchApplicationToSourcedCandidate(params: {
+  applicationId: number;
+  applicationEmail: string;
+  jobId: number;
+  organizationId: number | null | undefined;
+  appliedAt: Date;
+}): Promise<void> {
+  const { applicationId, applicationEmail, jobId, organizationId, appliedAt } = params;
+  if (!organizationId) return;
+
+  const normalizedEmail = normalizeEmailAddress(applicationEmail);
+  if (!normalizedEmail) return;
+
+  const sourcedCandidate = await db.query.jobSourcedCandidates.findFirst({
+    where: and(
+      eq(jobSourcedCandidates.organizationId, organizationId),
+      eq(jobSourcedCandidates.jobId, jobId),
+      sql`LOWER(TRIM(${jobSourcedCandidates.foundEmail})) = ${normalizedEmail}`,
+    ),
+    orderBy: [desc(jobSourcedCandidates.lastOutreachAt), desc(jobSourcedCandidates.updatedAt), desc(jobSourcedCandidates.id)],
+  });
+
+  if (!sourcedCandidate) {
+    return;
+  }
+
+  await db
+    .update(jobSourcedCandidates)
+    .set({
+      state: 'converted',
+      convertedApplicationId: applicationId,
+      appliedAt,
+      appliedFromCampaignId: sourcedCandidate.lastOutreachCampaignId ?? null,
+      appliedAfterRound: sourcedCandidate.lastOutreachRound ?? null,
+      updatedAt: new Date(),
+    })
+    .where(eq(jobSourcedCandidates.id, sourcedCandidate.id));
+}
 
 /**
  * Register all application-related routes
@@ -177,17 +221,17 @@ export function registerApplicationsRoutes(
           resumeUrl = await uploadToGCS(req.file.buffer, req.file.originalname);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          console.error('[APPLICATION_SUBMIT] Resume upload failed:', {
+          console.error('[APPLICATION_SUBMIT] Resume upload failed (skipping):', {
             filename: req.file.originalname,
             mimetype: req.file.mimetype,
             size: req.file.size,
             error: message,
           });
-          const isValidationError = message.toLowerCase().includes('invalid file format');
-          res.status(isValidationError ? 400 : 503).json({
-            error: isValidationError ? message : 'Resume upload failed. Please try again.',
-          });
-          return;
+          if (message.toLowerCase().includes('invalid file format')) {
+            res.status(400).json({ error: message });
+            return;
+          }
+          // GCS not configured or unavailable — continue without resume URL
         }
         try {
           const extraction = await extractResumeText(req.file.buffer);
@@ -259,6 +303,13 @@ export function registerApplicationsRoutes(
           stageChangedBy: job.postedBy,
         }),
         ...(job.organizationId != null && { organizationId: job.organizationId }),
+      });
+      await matchApplicationToSourcedCandidate({
+        applicationId: application.id,
+        applicationEmail: application.email,
+        jobId,
+        organizationId: job.organizationId,
+        appliedAt: application.appliedAt ?? now,
       });
 
       if (req.user?.id && resumeCountForCompletion !== null) {
@@ -507,6 +558,13 @@ export function registerApplicationsRoutes(
             stageChangedBy: req.user!.id,
           }),
           ...(job.organizationId != null && { organizationId: job.organizationId }),
+        });
+        await matchApplicationToSourcedCandidate({
+          applicationId: application.id,
+          applicationEmail: application.email,
+          jobId,
+          organizationId: job.organizationId,
+          appliedAt: application.appliedAt ?? new Date(),
         });
 
         // Log initial stage assignment to history table

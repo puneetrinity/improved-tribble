@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
+import { useRef } from "react";
 import { Helmet } from "react-helmet-async";
 import { useAuth } from "@/hooks/use-auth";
 import { useOrganization } from "@/hooks/use-organization";
@@ -43,7 +44,6 @@ import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import { sectionLabel } from "@/lib/shared-styles";
 import { apiRequest } from "@/lib/queryClient";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 const planBtnBase = "block w-full py-3 px-6 rounded-xl font-ui text-[0.875rem] font-medium cursor-pointer text-center transition-all duration-200 no-underline disabled:opacity-50 disabled:cursor-not-allowed";
 const planBtnPrimary = `${planBtnBase} bg-e-blue text-white border-none hover:brightness-110`;
@@ -52,7 +52,6 @@ const planFeatureLi = "flex items-start gap-2.5 text-[0.88rem] text-e-text2 lead
 const marketingCard = "rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06)_0%,rgba(255,255,255,0.03)_100%)] shadow-[0_20px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl";
 
 export default function PricingPage() {
-  const isMobile = useIsMobile();
   const { user } = useAuth();
   const { data: organization } = useOrganization();
   const { data: commercialConfig } = useCommercialConfig();
@@ -66,6 +65,8 @@ export default function PricingPage() {
   const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
   const [seats, setSeats] = useState(1);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const comparisonScrollRef = useRef<HTMLDivElement | null>(null);
+  const [comparisonScrollProgress, setComparisonScrollProgress] = useState(0);
 
   // Public checkout fields (for non-logged-in users)
   const [email, setEmail] = useState('');
@@ -141,6 +142,29 @@ export default function PricingPage() {
   });
 
   useEffect(() => { setIsVisible(true); }, []);
+
+  useEffect(() => {
+    const container = comparisonScrollRef.current;
+    if (!container) return;
+
+    const updateProgress = () => {
+      const maxScroll = container.scrollWidth - container.clientWidth;
+      if (maxScroll <= 0) {
+        setComparisonScrollProgress(0);
+        return;
+      }
+      setComparisonScrollProgress(container.scrollLeft / maxScroll);
+    };
+
+    updateProgress();
+    container.addEventListener("scroll", updateProgress, { passive: true });
+    window.addEventListener("resize", updateProgress);
+
+    return () => {
+      container.removeEventListener("scroll", updateProgress);
+      window.removeEventListener("resize", updateProgress);
+    };
+  }, [comparisonRows.length]);
 
   const handleSelectPro = () => {
     if (!proPlan) return;
@@ -363,7 +387,7 @@ export default function PricingPage() {
             </div>
 
             {/* Growth Plan */}
-            <div className="relative -order-1 flex flex-col rounded-[26px] px-5 py-7 transition-all duration-300 hover:-translate-y-1 md:order-none sm:px-7 sm:py-8"
+            <div className="relative flex flex-col rounded-[26px] px-5 py-7 transition-all duration-300 hover:-translate-y-1 sm:px-7 sm:py-8"
               style={{
                 background: "linear-gradient(180deg, rgba(75,142,240,0.18) 0%, rgba(17,19,38,0.96) 24%, rgba(13,15,30,0.98) 100%)",
                 border: "1px solid rgba(75,142,240,0.4)",
@@ -431,18 +455,28 @@ export default function PricingPage() {
             <div></div>
             <div>
               <div
-                className="mx-auto mb-16 max-w-[1100px] overflow-x-auto px-5 sm:px-8 md:mb-[100px] md:px-12"
+                className="mx-auto mb-16 max-w-[1100px] px-5 sm:px-8 md:mb-[100px] md:px-12"
                 style={{ animation: 'hr-fade-up 0.9s ease-out 0.3s both' }}
               >
                 <h2 className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-medium leading-[1.1] tracking-[-0.025em] mb-10 text-e-text text-center">Compare plans side by side</h2>
-                <div style={{ overflowX: 'auto' }}>
-                  <table className="w-full border border-white/10 rounded-[24px] overflow-hidden border-separate max-md:min-w-[560px] bg-[rgba(255,255,255,0.03)] backdrop-blur-xl" style={{ borderSpacing: 0 }}>
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-3 text-[0.78rem] text-e-text2 md:hidden">
+                  <span>Swipe sideways to compare all plan columns.</span>
+                  <span className="font-mono text-[0.72rem] uppercase tracking-[0.12em] text-e-blue">Scroll</span>
+                </div>
+                <div className="max-w-full rounded-[28px] border border-white/10 bg-[rgba(255,255,255,0.03)] shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+                  <div
+                    ref={comparisonScrollRef}
+                    className="pricing-table-scroll max-w-full overflow-x-scroll overflow-y-hidden overscroll-x-contain rounded-[28px] pb-4 [touch-action:pan-x]"
+                    style={{ WebkitOverflowScrolling: "touch" }}
+                  >
+                  <div className="w-[860px] min-w-[860px]">
+                  <table className="w-[860px] border-separate bg-transparent backdrop-blur-xl" style={{ borderSpacing: 0 }}>
                     <thead>
                       <tr>
-                        <th className="py-4 px-5 text-left font-mono text-[0.72rem] font-semibold tracking-[0.06em] uppercase text-e-text3 bg-white/[0.05] border-b border-white/8">Feature</th>
-                        <th className="py-4 px-5 font-ui text-[0.82rem] font-semibold text-e-text text-center bg-white/[0.05] border-b border-white/8">Free</th>
-                        <th className="py-4 px-5 font-ui text-[0.82rem] font-semibold text-e-blue text-center bg-[rgba(75,142,240,0.09)] border-b border-white/8">Growth</th>
-                        <th className="py-4 px-5 font-ui text-[0.82rem] font-semibold text-e-text text-center bg-white/[0.05] border-b border-white/8">Enterprise</th>
+                        <th className="sticky left-0 z-[1] py-4 px-4 text-left font-mono text-[0.72rem] font-semibold tracking-[0.06em] uppercase text-e-text3 bg-[rgba(15,18,30,0.96)] border-b border-white/8 md:px-5">Feature</th>
+                        <th className="py-4 px-4 font-ui text-[0.82rem] font-semibold text-e-text text-center bg-white/[0.05] border-b border-white/8 md:px-5">Free</th>
+                        <th className="py-4 px-4 font-ui text-[0.82rem] font-semibold text-e-blue text-center bg-[rgba(75,142,240,0.09)] border-b border-white/8 md:px-5">Growth</th>
+                        <th className="py-4 px-4 font-ui text-[0.82rem] font-semibold text-e-text text-center bg-white/[0.05] border-b border-white/8 md:px-5">Enterprise</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -451,15 +485,40 @@ export default function PricingPage() {
                         const borderClass = isLast ? '' : 'border-b border-white/8';
                         return (
                           <tr key={feature.name} className="group">
-                            <td className={`py-3 px-5 text-[0.85rem] text-e-text font-normal text-left bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04]`}>{feature.name}</td>
-                            <td className={`py-3 px-5 text-[0.85rem] text-e-text2 text-center bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04]`}>{renderFeatureValue(feature.free)}</td>
-                            <td className={`py-3 px-5 text-[0.85rem] text-e-text2 text-center bg-[rgba(75,142,240,0.04)] ${borderClass} group-hover:bg-[rgba(75,142,240,0.08)]`}>{renderFeatureValue(feature.pro)}</td>
-                            <td className={`py-3 px-5 text-[0.85rem] text-e-text2 text-center bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04]`}>{renderFeatureValue(feature.business)}</td>
+                            <td className={`sticky left-0 z-[1] py-3 px-4 text-[0.85rem] text-e-text font-normal text-left bg-[rgba(15,18,30,0.96)] ${borderClass} group-hover:bg-[rgba(24,28,42,0.98)] md:px-5`}>{feature.name}</td>
+                            <td className={`py-3 px-4 text-[0.85rem] text-e-text2 text-center bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04] md:px-5`}>{renderFeatureValue(feature.free)}</td>
+                            <td className={`py-3 px-4 text-[0.85rem] text-e-text2 text-center bg-[rgba(75,142,240,0.04)] ${borderClass} group-hover:bg-[rgba(75,142,240,0.08)] md:px-5`}>{renderFeatureValue(feature.pro)}</td>
+                            <td className={`py-3 px-4 text-[0.85rem] text-e-text2 text-center bg-[rgba(255,255,255,0.02)] ${borderClass} group-hover:bg-white/[0.04] md:px-5`}>{renderFeatureValue(feature.business)}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
+                  </div>
+                  </div>
+                  <div className="border-t border-white/8 px-4 py-3">
+                    <div className="mb-2 flex items-center justify-between text-[0.72rem] text-e-text3 md:hidden">
+                      <span>Drag the table left and right to compare plans.</span>
+                      <span className="font-mono uppercase tracking-[0.14em] text-e-blue">Swipe</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-white/10 cursor-pointer overflow-hidden">
+                      <div
+                        className="h-2 rounded-full bg-[linear-gradient(90deg,#4B8EF0_0%,#34D17A_100%)] transition-all duration-150"
+                        style={{
+                          width: `${Math.round(
+                            (comparisonScrollRef.current
+                              ? (comparisonScrollRef.current.clientWidth / comparisonScrollRef.current.scrollWidth) * 100
+                              : 33)
+                          )}%`,
+                          marginLeft: `${comparisonScrollProgress * (100 - Math.round(
+                            comparisonScrollRef.current
+                              ? (comparisonScrollRef.current.clientWidth / comparisonScrollRef.current.scrollWidth) * 100
+                              : 33
+                          ))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

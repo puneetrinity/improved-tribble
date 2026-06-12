@@ -1,33 +1,20 @@
 import { useState, useEffect } from "react";
-import { HelpCircle, Play, RefreshCw, Check, X, Sparkles } from "lucide-react";
+import { Play, X, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
 import { useTour } from "@/components/TourProvider";
 import { useAuth } from "@/hooks/use-auth";
-import { cn } from "@/lib/utils";
 
 export function TourLauncher() {
   const { user } = useAuth();
   const {
     isRunning,
     startTour,
-    stopTour,
-    resetTours,
     availableTours,
-    completedTours,
     hasSeenFirstVisitTour,
     dismissFirstVisitTour,
   } = useTour();
 
   const [showWelcomePrompt, setShowWelcomePrompt] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Show welcome prompt for first-time users
   useEffect(() => {
@@ -43,7 +30,6 @@ export function TourLauncher() {
   const handleStartFullTour = () => {
     setShowWelcomePrompt(false);
     dismissFirstVisitTour();
-    setIsMenuOpen(false);
     setTimeout(() => {
       startTour();
     }, 100);
@@ -53,18 +39,6 @@ export function TourLauncher() {
     setShowWelcomePrompt(false);
     dismissFirstVisitTour();
   };
-
-  const handleStartSpecificTour = (tourId: string) => {
-    // Close menu first, then start tour after a brief delay
-    // This prevents the dropdown from interfering with the tour
-    setIsMenuOpen(false);
-    setTimeout(() => {
-      startTour(tourId);
-    }, 100);
-  };
-
-  const completedCount = completedTours.length;
-  const totalTours = availableTours.length;
 
   // Super admins are internal operators; keep product tours focused on end users.
   if (!user || user.role === "super_admin") {
@@ -131,112 +105,6 @@ export function TourLauncher() {
         </div>
       )}
 
-      {/* Persistent Guide Button */}
-      <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            className={cn(
-              "fixed bottom-6 right-6 z-[9998] rounded-full px-4 h-11 shadow-lg transition-all duration-300",
-              "bg-[linear-gradient(135deg,#4B8EF0_0%,#3679DB_100%)] hover:bg-[linear-gradient(135deg,#5B9AF5_0%,#4B8EF0_100%)]",
-              "border border-[rgba(75,142,240,0.26)] hover:border-[rgba(75,142,240,0.4)]",
-              "hover:scale-105 hover:shadow-[0_16px_36px_rgba(75,142,240,0.26)]",
-              "flex items-center gap-2"
-            )}
-            aria-label="Open help guide"
-          >
-            <HelpCircle className="h-4 w-4 text-white" />
-            <span className="text-white text-sm font-medium">Help</span>
-          </Button>
-        </DropdownMenuTrigger>
-
-        <DropdownMenuContent
-          align="end"
-          alignOffset={-8}
-          sideOffset={12}
-          className="w-72 border-[rgba(75,142,240,0.24)] bg-[#111326] text-white"
-        >
-          <DropdownMenuLabel className="flex items-center justify-between py-3 px-4">
-            <span className="text-base font-semibold">Help & Tours</span>
-            <span className="text-xs text-muted-foreground">
-              {completedCount}/{totalTours} completed
-            </span>
-          </DropdownMenuLabel>
-
-          <DropdownMenuSeparator className="bg-primary/20" />
-
-          {/* Recommended Tour Option */}
-          <DropdownMenuItem
-            onClick={handleStartFullTour}
-            className="py-3 px-4 cursor-pointer hover:bg-primary/20 focus:bg-primary/20"
-          >
-            <div className="flex items-center gap-3 w-full">
-              <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)]">
-                <Play className="h-4 w-4 text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm">Recommended Start</div>
-                <div className="text-xs text-muted-foreground">
-                  Short guided path for your role
-                </div>
-              </div>
-            </div>
-          </DropdownMenuItem>
-
-          <DropdownMenuSeparator className="bg-primary/20" />
-
-          <DropdownMenuLabel className="py-2 px-4 text-xs text-muted-foreground uppercase tracking-wide">
-            Page Guides
-          </DropdownMenuLabel>
-
-          {/* Individual Tour Options */}
-          {availableTours.map((tour) => {
-            const isCompleted = completedTours.includes(tour.id);
-            return (
-              <DropdownMenuItem
-                key={tour.id}
-                onClick={() => handleStartSpecificTour(tour.id)}
-                className="py-2.5 px-4 cursor-pointer hover:bg-primary/20 focus:bg-primary/20"
-              >
-                <div className="flex items-center gap-3 w-full">
-                  <div
-                    className={cn(
-                      "w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0",
-                      isCompleted
-                        ? "bg-success/20 text-success"
-                        : "bg-primary/20 text-primary"
-                    )}
-                  >
-                    {isCompleted ? (
-                      <Check className="h-3.5 w-3.5" />
-                    ) : (
-                      <Play className="h-3 w-3" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm truncate">{tour.title}</div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {tour.description}
-                    </div>
-                  </div>
-                </div>
-              </DropdownMenuItem>
-            );
-          })}
-
-          <DropdownMenuSeparator className="bg-primary/20" />
-
-          {/* Reset Tours Option */}
-          <DropdownMenuItem
-            onClick={resetTours}
-            className="py-2.5 px-4 cursor-pointer hover:bg-primary/20 focus:bg-primary/20 text-muted-foreground"
-          >
-            <div className="flex items-center gap-3">
-              <RefreshCw className="h-4 w-4" />
-              <span className="text-sm">Reset Guides</span>
-            </div>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </>
   );
 }

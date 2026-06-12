@@ -128,7 +128,9 @@ export async function extractLinksFromDocxBuffer(buffer: Buffer): Promise<string
   const urls: string[] = [];
   let match: RegExpExecArray | null;
   while ((match = HREF_REGEX.exec(html)) !== null) {
-    urls.push(match[1]);
+    if (match[1]) {
+      urls.push(match[1]);
+    }
   }
   return urls;
 }

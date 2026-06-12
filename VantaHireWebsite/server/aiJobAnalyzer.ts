@@ -216,7 +216,8 @@ export interface ColdOutreachDraftInput {
     name: string;
     email: string;
   };
-  tone?: 'friendly' | 'formal';
+  campaignRound: 1 | 2 | 3;
+  roundPrompt: string;
   extraContext?: string;
 }
 
@@ -307,9 +308,6 @@ export async function generateColdOutreachDraft(
 ): Promise<EmailDraftResult> {
   try {
     const client = getGroqClient();
-    const toneGuidance = input.tone === 'formal'
-      ? 'Use a concise, polished, professional tone.'
-      : 'Use a warm, confident, recruiter-friendly tone.';
 
     const prompt = `You are writing a personalized cold outreach email to a sourced candidate for a job opening.
 
@@ -336,17 +334,21 @@ Recruiter:
 - Name: ${input.recruiter.name}
 - Email: ${input.recruiter.email}
 
-Tone: ${toneGuidance}
+Campaign round: ${input.campaignRound}
+Round objective: ${input.roundPrompt}
 Extra context: ${input.extraContext?.trim() || 'None'}
 
 Instructions:
 1. Personalize the opening with one concrete candidate detail.
 2. Mention the job title and company.
 3. Explain why the role may be relevant.
-4. Keep the body between 80 and 150 words.
-5. End with a clear CTA that asks them to apply using the provided application URL.
-6. Sign off with the recruiter name only.
-7. Subject line must be concrete and 35-60 characters.
+4. The body must be valid HTML only. Use simple tags like <p>, <strong>, <ul>, <li>, and <a>.
+5. Keep the body between 90 and 170 words.
+6. End with a clear CTA that asks them to reply or apply using the provided application URL.
+7. Do not include <html>, <body>, or markdown fences.
+8. Subject line must be concrete and 35-60 characters.
+9. If Extra context is provided, you must clearly incorporate it into the subject or body, not ignore it.
+10. When Extra context contains exact wording, names, or special notes from the recruiter, preserve those details naturally in the email.
 
 Return valid JSON only with:
 - subject
@@ -357,7 +359,7 @@ Return valid JSON only with:
       messages: [
         {
           role: 'system',
-          content: 'You are an expert recruiter writing concise personalized cold outreach emails. Return valid JSON only.',
+          content: 'You are an expert recruiter writing concise personalized cold outreach emails in valid JSON only. The body field must be an HTML fragment.',
         },
         {
           role: 'user',
@@ -374,8 +376,8 @@ Return valid JSON only with:
     const usage = response.usage;
 
     return {
-      subject: result.subject,
-      body: result.body,
+      subject: result.subject ?? '',
+      body: result.body ?? '',
       model_version: 'llama-3.3-70b-versatile',
       tokensUsed: {
         input: usage?.prompt_tokens || 0,

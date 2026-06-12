@@ -4,7 +4,6 @@ import { Link, useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
-import { useIsMobile } from "@/hooks/use-mobile";
 
 const linkStyle = {
   fontFamily: '"DM Sans", sans-serif',
@@ -52,7 +51,7 @@ const pillButtonStyle = {
   fontSize: "0.8rem",
 } as const;
 
-function BrandMark({ compact = false }: { compact?: boolean }) {
+function BrandMark({ compact = false, showWord = true }: { compact?: boolean; showWord?: boolean }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: compact ? "0.55rem" : "0.7rem" }}>
       <span
@@ -79,18 +78,20 @@ function BrandMark({ compact = false }: { compact?: boolean }) {
           transition={{ duration: 4.8, repeat: Infinity, ease: "easeInOut" }}
         />
       </span>
-      <span
-        style={{
-          fontFamily: "Outfit, sans-serif",
-          fontSize: compact ? "1.02rem" : "1.08rem",
-          fontWeight: 600,
-          letterSpacing: "-0.03em",
-          color: "#F4F5FA",
-          textShadow: "0 0 24px rgba(75,142,240,0.18)",
-        }}
-      >
-        ealana
-      </span>
+      {showWord ? (
+        <span
+          style={{
+            fontFamily: "Outfit, sans-serif",
+            fontSize: compact ? "1.02rem" : "1.08rem",
+            fontWeight: 600,
+            letterSpacing: "-0.03em",
+            color: "#F4F5FA",
+            textShadow: "0 0 24px rgba(75,142,240,0.18)",
+          }}
+        >
+          ealana
+        </span>
+      ) : null}
     </span>
   );
 }
@@ -99,7 +100,6 @@ export default function HomepageNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [floated, setFloated] = useState(false);
   const [location] = useLocation();
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -113,13 +113,11 @@ export default function HomepageNav() {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) return;
-
     document.body.style.overflow = isMenuOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [isMenuOpen, isMobile]);
+  }, [isMenuOpen]);
 
   const handleFeaturesClick = (e: MouseEvent<HTMLAnchorElement>) => {
     if (window.location.pathname === "/") {
@@ -130,7 +128,7 @@ export default function HomepageNav() {
 
   return (
     <>
-      <div className="md:hidden fixed top-0 left-0 right-0 z-[1000]">
+      <div className="fixed top-0 left-0 right-0 z-[1000] md:hidden">
         <div
           className="flex h-16 items-center justify-between px-4 sm:px-5"
           style={{
@@ -141,11 +139,11 @@ export default function HomepageNav() {
           }}
         >
           <Link href="/" style={{ textDecoration: "none" }}>
-            <BrandMark />
+            <BrandMark showWord={false} />
           </Link>
 
           <button
-            className="rounded-full border border-white/10 bg-white/[0.03] p-2 text-[#F4F5FA]"
+            className="rounded-full border border-white/10 bg-white/[0.03] p-2 text-[#F4F5FA] shadow-[0_8px_24px_rgba(0,0,0,0.18)]"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             aria-label="Toggle menu"
             data-testid="mobile-menu-button"
@@ -155,7 +153,7 @@ export default function HomepageNav() {
         </div>
 
         <div
-          className={`${isMenuOpen ? "flex" : "hidden"} min-h-[calc(100svh-4rem)] flex-col gap-4 px-4 py-5`}
+          className={`${isMenuOpen ? "flex" : "hidden"} min-h-[calc(100svh-4rem)] flex-col gap-4 overflow-y-auto px-4 py-5`}
           style={{
             background: "linear-gradient(180deg, rgba(8,10,20,0.98) 0%, rgba(11,14,28,0.98) 100%)",
             backdropFilter: "blur(20px) saturate(180%)",
@@ -195,34 +193,34 @@ export default function HomepageNav() {
             <div className="mb-3 px-2 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-[#8891AA]">
               Start Here
             </div>
-          <a
-            href="https://cal.com/ealana/quick-connect"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mb-2 block rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-center text-[0.95rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
-            onClick={() => {
-              setIsMenuOpen(false);
-              trackEvent("cta_click", { location: "site_header_mobile", action: "book_demo" });
-            }}
-          >
-            Book a demo
-          </a>
-          <a
-            href="/recruiter-auth"
-            className="block rounded-2xl bg-[#4B8EF0] px-4 py-3 text-center text-[0.95rem] font-semibold text-white no-underline shadow-[0_12px_30px_rgba(75,142,240,0.28)] transition-transform hover:translate-y-[-1px]"
-            onClick={() => {
-              setIsMenuOpen(false);
-              trackEvent("cta_click", { location: "site_header_mobile", action: "get_started" });
-            }}
-          >
-            Get Started {"->"}
-          </a>
+            <a
+              href="https://cal.com/ealana/quick-connect"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mb-2 block rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-center text-[0.95rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
+              onClick={() => {
+                setIsMenuOpen(false);
+                trackEvent("cta_click", { location: "site_header_mobile", action: "book_demo" });
+              }}
+            >
+              Book a demo
+            </a>
+            <a
+              href="/recruiter-auth"
+              className="block rounded-2xl bg-[#4B8EF0] px-4 py-3 text-center text-[0.95rem] font-semibold text-white no-underline shadow-[0_12px_30px_rgba(75,142,240,0.28)] transition-transform hover:translate-y-[-1px]"
+              onClick={() => {
+                setIsMenuOpen(false);
+                trackEvent("cta_click", { location: "site_header_mobile", action: "get_started" });
+              }}
+            >
+              Get Started {"->"}
+            </a>
           </div>
         </div>
       </div>
 
       <motion.div
-        className="hidden md:flex"
+        className="hidden max-md:hidden md:flex"
         animate={{ opacity: floated ? 0 : 1, y: floated ? -10 : 0 }}
         transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
         style={{
@@ -306,7 +304,7 @@ export default function HomepageNav() {
       </motion.div>
 
       <motion.div
-        className="hidden md:flex"
+        className="hidden max-md:hidden md:flex"
         animate={{ opacity: floated ? 1 : 0, y: floated ? 0 : -10 }}
         transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
         style={{
@@ -314,7 +312,6 @@ export default function HomepageNav() {
           top: 16,
           left: 0,
           right: 0,
-          display: "flex",
           justifyContent: "center",
           zIndex: 1000,
           pointerEvents: floated ? "all" : "none",

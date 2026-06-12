@@ -1054,9 +1054,15 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   foundEmails: jsonb("found_emails"),
   emailResolvedAt: timestamp("email_resolved_at"),
   emailResolveStatus: text("email_resolve_status"),
+  outreachCount: integer("outreach_count").notNull().default(0),
+  lastOutreachRound: integer("last_outreach_round"),
+  lastOutreachCampaignId: text("last_outreach_campaign_id"),
   lastOutreachAt: timestamp("last_outreach_at"),
   lastOutreachStatus: text("last_outreach_status"),
   convertedApplicationId: integer("converted_application_id").references(() => applications.id),
+  appliedAt: timestamp("applied_at"),
+  appliedFromCampaignId: text("applied_from_campaign_id"),
+  appliedAfterRound: integer("applied_after_round"),
   lastSyncedAt: timestamp("last_synced_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -1070,16 +1076,59 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   sourceTypeIdx: index("job_sourced_candidates_source_type_idx").on(table.sourceType),
 }));
 
+export const sourcedCandidateOutreachCampaigns = pgTable("sourced_candidate_outreach_campaigns", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+  campaignId: text("campaign_id").notNull().unique(),
+  round: integer("round").notNull(),
+  status: text("status").notNull().default("completed"),
+  audienceCount: integer("audience_count").notNull().default(0),
+  sentCount: integer("sent_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+  subjectTemplate: text("subject_template"),
+  htmlBodyTemplate: text("html_body_template"),
+  extraContext: text("extra_context"),
+  launchedBy: integer("launched_by").notNull().references(() => users.id),
+  launchedAt: timestamp("launched_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+}, (table) => ({
+  jobRoundIdx: index("scoc_job_round_idx").on(table.jobId, table.round),
+  jobIdx: index("scoc_job_idx").on(table.jobId),
+  orgIdx: index("scoc_org_idx").on(table.organizationId),
+  launchedByIdx: index("scoc_launched_by_idx").on(table.launchedBy),
+}));
+
+// Auto-scheduled follow-up campaigns (rounds 2 & 3 fired automatically 3 days apart)
+export const scheduledOutreachCampaigns = pgTable("scheduled_outreach_campaigns", {
+  id: serial("id").primaryKey(),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  round: integer("round").notNull(),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  status: text("status").notNull().default("pending"), // pending | sent | cancelled | failed
+  triggeredBy: integer("triggered_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  sentAt: timestamp("sent_at"),
+  resultCampaignId: text("result_campaign_id"),
+  sentCount: integer("sent_count").notNull().default(0),
+  failedCount: integer("failed_count").notNull().default(0),
+});
+
+export type ScheduledOutreachCampaign = typeof scheduledOutreachCampaigns.$inferSelect;
+
 export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_log", {
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
   sourcedCandidateId: integer("sourced_candidate_id").notNull().references(() => jobSourcedCandidates.id, { onDelete: 'cascade' }),
   campaignId: text("campaign_id"),
+  campaignRound: integer("campaign_round"),
   recipientEmail: text("recipient_email").notNull(),
   recipientName: text("recipient_name"),
   subject: text("subject").notNull(),
   body: text("body").notNull(),
+  bodyHtml: text("body_html"),
   aiDraftBody: text("ai_draft_body"),
   aiDraftSubject: text("ai_draft_subject"),
   wasEdited: boolean("was_edited").notNull().default(false),
@@ -1183,6 +1232,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   jobs: many(jobs),
   reviewedJobs: many(jobs, { relationName: "reviewedJobs" }),
   mauticContactLinks: many(mauticContactLinks),
+  sourcedCandidateOutreachCampaigns: many(sourcedCandidateOutreachCampaigns),
   sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
   profile: one(userProfiles, {
     fields: [users.id],
@@ -1224,6 +1274,7 @@ export const jobsRelations = relations(jobs, ({ one, many }) => ({
   shortlists: many(clientShortlists),
   sourcingRuns: many(jobSourcingRuns),
   sourcedCandidates: many(jobSourcedCandidates),
+  sourcedCandidateOutreachCampaigns: many(sourcedCandidateOutreachCampaigns),
   sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
 }));
 
@@ -1590,6 +1641,7 @@ export const organizationsRelations = relations(organizations, ({ many, one }) =
   talentPool: many(talentPool),
   sourcingRuns: many(jobSourcingRuns),
   sourcedCandidates: many(jobSourcedCandidates),
+  sourcedCandidateOutreachCampaigns: many(sourcedCandidateOutreachCampaigns),
   sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
 }));
 
@@ -1779,6 +1831,26 @@ export const jobSourcedCandidatesRelations = relations(jobSourcedCandidates, ({ 
     fields: [jobSourcedCandidates.convertedApplicationId],
     references: [applications.id],
   }),
+  outreachCampaign: one(sourcedCandidateOutreachCampaigns, {
+    fields: [jobSourcedCandidates.lastOutreachCampaignId],
+    references: [sourcedCandidateOutreachCampaigns.campaignId],
+  }),
+  outreachLogs: many(sourcedCandidateOutreachLog),
+}));
+
+export const sourcedCandidateOutreachCampaignsRelations = relations(sourcedCandidateOutreachCampaigns, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [sourcedCandidateOutreachCampaigns.organizationId],
+    references: [organizations.id],
+  }),
+  job: one(jobs, {
+    fields: [sourcedCandidateOutreachCampaigns.jobId],
+    references: [jobs.id],
+  }),
+  launcher: one(users, {
+    fields: [sourcedCandidateOutreachCampaigns.launchedBy],
+    references: [users.id],
+  }),
   outreachLogs: many(sourcedCandidateOutreachLog),
 }));
 
@@ -1794,6 +1866,10 @@ export const sourcedCandidateOutreachLogRelations = relations(sourcedCandidateOu
   sourcedCandidate: one(jobSourcedCandidates, {
     fields: [sourcedCandidateOutreachLog.sourcedCandidateId],
     references: [jobSourcedCandidates.id],
+  }),
+  campaign: one(sourcedCandidateOutreachCampaigns, {
+    fields: [sourcedCandidateOutreachLog.campaignId],
+    references: [sourcedCandidateOutreachCampaigns.campaignId],
   }),
   sender: one(users, {
     fields: [sourcedCandidateOutreachLog.sentBy],
@@ -2618,8 +2694,14 @@ export const insertJobSourcedCandidateSchema = z.object({
   foundEmails: z.array(z.string().email()).optional(),
   emailResolvedAt: z.date().optional(),
   emailResolveStatus: z.enum(['pending', 'resolved', 'not_found', 'failed']).optional(),
+  outreachCount: z.number().int().min(0).max(3).optional(),
+  lastOutreachRound: z.number().int().min(1).max(3).optional(),
+  lastOutreachCampaignId: z.string().min(1).max(255).optional(),
   lastOutreachAt: z.date().optional(),
   lastOutreachStatus: z.enum(['sent', 'failed']).optional(),
+  appliedAt: z.date().optional(),
+  appliedFromCampaignId: z.string().min(1).max(255).optional(),
+  appliedAfterRound: z.number().int().min(1).max(3).optional(),
 });
 
 export type JobSourcingRun = typeof jobSourcingRuns.$inferSelect;
@@ -2627,6 +2709,7 @@ export type InsertJobSourcingRun = z.infer<typeof insertJobSourcingRunSchema>;
 
 export type JobSourcedCandidate = typeof jobSourcedCandidates.$inferSelect;
 export type InsertJobSourcedCandidate = z.infer<typeof insertJobSourcedCandidateSchema>;
+export type SourcedCandidateOutreachCampaign = typeof sourcedCandidateOutreachCampaigns.$inferSelect;
 export type SourcedCandidateOutreachLog = typeof sourcedCandidateOutreachLog.$inferSelect;
 
 // =====================================================
