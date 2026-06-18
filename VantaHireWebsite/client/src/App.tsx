@@ -6,12 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/hooks/use-auth";
 import { ProtectedRoute } from "@/lib/protected-route";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import FullPageLoader from "@/components/FullPageLoader";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import UseCasesPage from "@/pages/use-cases-page";
 import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
-import React, { lazy, Suspense, useEffect, useState } from "react";
+import React, { lazy, Suspense, useEffect, useState, useRef } from "react";
 
 const RecruiterAuth = lazy(() => import("@/pages/recruiter-auth"));
 const CandidateAuth = lazy(() => import("@/pages/candidate-auth"));
@@ -168,30 +167,63 @@ function Router() {
   );
 }
 
+function NavProgressBar() {
+  const [width, setWidth] = useState(0);
+
+  useEffect(() => {
+    // Quickly animate 0 → 85%, then on unmount the parent removes it (meaning page is ready)
+    const t1 = window.setTimeout(() => setWidth(40), 10);
+    const t2 = window.setTimeout(() => setWidth(72), 120);
+    const t3 = window.setTimeout(() => setWidth(85), 260);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, []);
+
+  return (
+    <div className="fixed top-0 left-0 right-0 z-[9999] h-[2px] pointer-events-none">
+      <div
+        className="h-full bg-[linear-gradient(90deg,#4B8EF0_0%,#34D17A_100%)] transition-all duration-200 ease-out"
+        style={{ width: `${width}%` }}
+      />
+    </div>
+  );
+}
+
+function MinimalPageFallback() {
+  return (
+    <div className="fixed inset-0 bg-[#080A14] flex items-center justify-center">
+      <div className="w-5 h-5 rounded-full border-2 border-white/10 border-t-[#4B8EF0] animate-spin" />
+    </div>
+  );
+}
+
 function RouteScopedBoundary() {
   const [location] = useLocation();
-  const [isNavigating, setIsNavigating] = useState(true);
+  const isFirstRender = useRef(true);
+  const [showBar, setShowBar] = useState(false);
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    setIsNavigating(true);
-    const timeoutId = window.setTimeout(() => {
-      setIsNavigating(false);
-    }, 300);
 
-    return () => window.clearTimeout(timeoutId);
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+
+    setShowBar(true);
+    const id = window.setTimeout(() => setShowBar(false), 500);
+    return () => window.clearTimeout(id);
   }, [location]);
 
   return (
     <ErrorBoundary key={location}>
-      <Suspense fallback={<FullPageLoader />}>
+      {showBar && <NavProgressBar />}
+      <Suspense fallback={<MinimalPageFallback />}>
         <Router />
       </Suspense>
-      {isNavigating ? (
-        <div className="fixed inset-0 z-50">
-          <FullPageLoader />
-        </div>
-      ) : null}
     </ErrorBoundary>
   );
 }
@@ -201,7 +233,7 @@ function AuthenticatedTours({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   if (!user) return <>{children}</>;
   return (
-    <Suspense fallback={<FullPageLoader />}>
+    <Suspense fallback={<>{children}</>}>
       <TourProvider>
         {children}
         <TourLauncher />

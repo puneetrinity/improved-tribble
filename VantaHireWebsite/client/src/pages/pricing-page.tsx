@@ -61,6 +61,7 @@ export default function PricingPage() {
   const [, setLocation] = useLocation();
   const [isVisible, setIsVisible] = useState(false);
 
+  const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
   const [seats, setSeats] = useState(1);
@@ -353,7 +354,7 @@ export default function PricingPage() {
 
           {/* Pricing Cards */}
           <div
-            className="mx-auto mb-16 grid max-w-[1100px] grid-cols-1 gap-5 px-5 sm:px-8 md:mb-[100px] md:grid-cols-3 md:px-12"
+            className="mx-auto mb-16 grid max-w-[1100px] grid-cols-1 gap-5 px-5 sm:px-8 md:mb-[100px] md:px-10 lg:grid-cols-3 lg:px-12"
             style={{ animation: 'hr-fade-up 0.9s ease-out 0.15s both' }}
           >
             {/* Free Plan */}
@@ -466,11 +467,11 @@ export default function PricingPage() {
                 <div className="max-w-full rounded-[28px] border border-white/10 bg-[rgba(255,255,255,0.03)] shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
                   <div
                     ref={comparisonScrollRef}
-                    className="pricing-table-scroll max-w-full overflow-x-scroll overflow-y-hidden overscroll-x-contain rounded-[28px] pb-4 [touch-action:pan-x]"
+                    className="pricing-table-scroll max-w-full overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-[28px] pb-4 [touch-action:pan-x]"
                     style={{ WebkitOverflowScrolling: "touch" }}
                   >
-                  <div className="w-[860px] min-w-[860px]">
-                  <table className="w-[860px] border-separate bg-transparent backdrop-blur-xl" style={{ borderSpacing: 0 }}>
+                  <div className="min-w-[700px] w-full">
+                  <table className="w-full border-separate bg-transparent backdrop-blur-xl" style={{ borderSpacing: 0 }}>
                     <thead>
                       <tr>
                         <th className="sticky left-0 z-[1] py-4 px-4 text-left font-mono text-[0.72rem] font-semibold tracking-[0.06em] uppercase text-e-text3 bg-[rgba(15,18,30,0.96)] border-b border-white/8 md:px-5">Feature</th>
@@ -536,9 +537,19 @@ export default function PricingPage() {
                 <div className={`${sectionLabel} text-center text-e-blue`}>FAQ</div>
                 <h2 className="font-display text-[clamp(2.2rem,4vw,3.2rem)] font-medium leading-[1.1] tracking-[-0.025em] mb-10 text-e-text text-center">Pricing questions, answered.</h2>
                 {faqs.map((faq, i) => (
-                  <div key={i} className={`${marketingCard} py-6 px-7 mb-3 transition-all duration-200 hover:border-white/20`}>
-                    <h3 className="font-display text-base font-medium text-e-text mb-2">{faq.question}</h3>
-                    <p className="text-[0.875rem] text-e-text2 leading-[1.8]">{faq.answer}</p>
+                  <div key={i} className={`${marketingCard} mb-3 transition-all duration-200 hover:border-white/20 overflow-hidden`}>
+                    <button
+                      className="w-full flex items-center justify-between gap-4 py-5 px-7 text-left cursor-pointer bg-transparent border-none"
+                      onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
+                    >
+                      <h3 className="font-display text-base font-medium text-e-text">{faq.question}</h3>
+                      <span className="text-e-text3 shrink-0 transition-transform duration-200" style={{ transform: openFaqIndex === i ? "rotate(45deg)" : "rotate(0deg)", fontSize: "1.4rem", lineHeight: 1 }}>+</span>
+                    </button>
+                    {openFaqIndex === i && (
+                      <div className="px-7 pb-5">
+                        <p className="text-[0.875rem] text-e-text2 leading-[1.8]">{faq.answer}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

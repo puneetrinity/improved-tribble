@@ -321,7 +321,7 @@ export default function JobsPage() {
             <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
               <div></div>
               <div>
-                <div className="max-w-[1100px] mx-auto pb-20 grid grid-cols-[260px_1fr] gap-8 max-lg:grid-cols-1 max-lg:pb-[60px] max-md:pb-[60px]">
+                <div className="max-w-[1100px] mx-auto pb-20 grid grid-cols-[260px_1fr] gap-8 px-4 sm:px-6 md:px-0 max-lg:grid-cols-1 max-lg:pb-[60px] max-md:pb-[60px]">
                   {/* Desktop sidebar */}
                   <aside className="sticky top-20 self-start max-lg:hidden">
                     <div className="rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05)_0%,rgba(255,255,255,0.03)_100%)] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.24)] backdrop-blur-xl">
