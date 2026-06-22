@@ -169,7 +169,8 @@ export default function HomepageNav() {
             <div className="flex flex-col gap-2">
               <a
                 href="/#features"
-                className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]"
+                className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]"
+                style={{ fontFamily: '"DM Sans", sans-serif' }}
                 onClick={(e) => {
                   setIsMenuOpen(false);
                   handleFeaturesClick(e);
@@ -177,13 +178,13 @@ export default function HomepageNav() {
               >
                 Features
               </a>
-              <Link href="/solutions" className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" onClick={() => setIsMenuOpen(false)}>
+              <Link href="/solutions" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
                 Solutions
               </Link>
-              <Link href="/pricing" className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" onClick={() => setIsMenuOpen(false)}>
+              <Link href="/pricing" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
                 Pricing
               </Link>
-              <Link href="/jobs" className="rounded-2xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.98rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" onClick={() => setIsMenuOpen(false)}>
+              <Link href="/jobs" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
                 Jobs
               </Link>
             </div>
@@ -197,7 +198,8 @@ export default function HomepageNav() {
               href="https://cal.com/ealana/quick-connect"
               target="_blank"
               rel="noopener noreferrer"
-              className="mb-2 block rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-center text-[0.95rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
+              className="mb-2 block rounded-lg border border-white/12 bg-white/[0.04] px-4 py-[9px] text-center text-[0.82rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
+              style={{ fontFamily: '"DM Sans", sans-serif' }}
               onClick={() => {
                 setIsMenuOpen(false);
                 trackEvent("cta_click", { location: "site_header_mobile", action: "book_demo" });
@@ -207,7 +209,8 @@ export default function HomepageNav() {
             </a>
             <a
               href="/recruiter-auth"
-              className="block rounded-2xl bg-[#4B8EF0] px-4 py-3 text-center text-[0.95rem] font-semibold text-white no-underline shadow-[0_12px_30px_rgba(75,142,240,0.28)] transition-transform hover:translate-y-[-1px]"
+              className="block rounded-lg bg-[#4B8EF0] px-4 py-[9px] text-center text-[0.82rem] font-medium text-white no-underline shadow-[0_12px_30px_rgba(75,142,240,0.28)] transition-transform hover:translate-y-[-1px]"
+              style={{ fontFamily: '"DM Sans", sans-serif' }}
               onClick={() => {
                 setIsMenuOpen(false);
                 trackEvent("cta_click", { location: "site_header_mobile", action: "get_started" });
