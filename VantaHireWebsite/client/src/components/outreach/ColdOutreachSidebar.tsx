@@ -91,6 +91,7 @@ interface ColdOutreachSidebarProps {
   onSend: (payload: SendPayload) => Promise<{
     sent: number;
     failed: number;
+    skipped: number;
     campaign: {
       campaignId: string;
       campaignRound: number;
@@ -99,7 +100,7 @@ interface ColdOutreachSidebarProps {
     results: Array<{
       candidateId: number;
       email: string;
-      status: "sent" | "failed";
+      status: "sent" | "failed" | "skipped";
       errorMessage: string | null;
     }>;
   }>;
@@ -137,7 +138,7 @@ export function ColdOutreachSidebar({
   const [drafts, setDrafts] = useState<OutreachDraftItem[]>([]);
   const [campaignLabel, setCampaignLabel] = useState("First Campaign");
   const [campaignSummary, setCampaignSummary] = useState("");
-  const [sendSummary, setSendSummary] = useState<{ sent: number; failed: number } | null>(null);
+  const [sendSummary, setSendSummary] = useState<{ sent: number; failed: number; skipped: number } | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -222,7 +223,7 @@ export function ColdOutreachSidebar({
       }
       const result = await onSend(payload);
 
-      setSendSummary({ sent: result.sent, failed: result.failed });
+      setSendSummary({ sent: result.sent, failed: result.failed, skipped: result.skipped ?? 0 });
       setStage("done");
     } catch {
       setStage("review");
@@ -278,7 +279,11 @@ export function ColdOutreachSidebar({
                   <div key={candidate.id} className="flex items-center justify-between rounded-lg border p-3">
                     <div className="min-w-0">
                       <p className="font-medium truncate">{candidate.crustdata?.basic_profile?.name || "Candidate"}</p>
-                      <p className="text-xs text-muted-foreground truncate">{candidate.foundEmail}</p>
+                      {candidate.foundEmail ? (
+                        <p className="text-xs text-muted-foreground truncate">{candidate.foundEmail}</p>
+                      ) : (
+                        <p className="text-xs text-amber-500 truncate">⏳ Email lookup in progress</p>
+                      )}
                     </div>
                     <Badge variant="outline">
                       {candidate.outreachCount === 0 ? "New" : `${candidate.outreachCount}/3 sent`}
@@ -351,13 +356,20 @@ export function ColdOutreachSidebar({
           {stage === "done" && (
             <div className="rounded-xl border p-5 space-y-3">
               <p className="text-base font-semibold">Campaign complete</p>
-              <div className="flex gap-3">
+              <div className="flex flex-wrap gap-3">
                 <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
                   {sendSummary?.sent ?? 0} sent
                 </Badge>
-                <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700">
-                  {sendSummary?.failed ?? 0} failed
-                </Badge>
+                {(sendSummary?.failed ?? 0) > 0 && (
+                  <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-700">
+                    {sendSummary?.failed ?? 0} failed
+                  </Badge>
+                )}
+                {(sendSummary?.skipped ?? 0) > 0 && (
+                  <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                    {sendSummary?.skipped ?? 0} skipped (no email found)
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">
                 Candidate outreach counters and campaign history were saved successfully.

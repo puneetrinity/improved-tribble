@@ -1,6 +1,6 @@
 // @charset "utf-8"
-import { useState, type ChangeEvent, type MouseEvent } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState, type ChangeEvent, type MouseEvent } from "react";
+import { AnimatePresence, motion, useInView } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface CandidateRecord {
@@ -68,35 +68,74 @@ export function DiscoverPanel() {
   const [candidates, setCandidates] = useState<CandidateRecord[]>([]);
   const [thinking, setThinking] = useState(false);
   const [inputVal, setInputVal] = useState("");
+  const [hintChip, setHintChip] = useState<string | null>(null);
+
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(rootRef, { once: true, amount: 0.4 });
+  const interactedRef = useRef(false);
+  const timersRef = useRef<number[]>([]);
 
   function triggerSearch(chip: string) {
     if (thinking) return;
     setActiveChip(chip);
     setThinking(true);
     setCandidates([]);
-    setTimeout(() => {
+    const id = window.setTimeout(() => {
       setThinking(false);
       setCandidates(DATASETS[chip] || []);
     }, 900);
+    timersRef.current.push(id);
   }
 
+  function stopAutoplay() {
+    interactedRef.current = true;
+    setHintChip(null);
+  }
+
+  // Auto-demo when the panel scrolls into view: run the first search, then
+  // pulse the next role chip to show it's interactive. Cancelled the instant
+  // the user does anything; timers cleared on unmount.
+  useEffect(() => {
+    if (!inView) return;
+    const t1 = window.setTimeout(() => {
+      if (interactedRef.current) return;
+      triggerSearch(CHIPS[0]!);
+    }, 600);
+    const t2 = window.setTimeout(() => {
+      if (interactedRef.current) return;
+      setHintChip(CHIPS[1]!);
+    }, 2200);
+    timersRef.current.push(t1, t2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView]);
+
+  useEffect(() => () => {
+    timersRef.current.forEach((id) => window.clearTimeout(id));
+    timersRef.current = [];
+  }, []);
+
   function handleInput(event: ChangeEvent<HTMLInputElement>) {
+    stopAutoplay();
     const val = event.target.value;
     setInputVal(val);
     const match = CHIPS.find((chip) => chip.toLowerCase().includes(val.toLowerCase()) && val.length > 2);
     if (match) triggerSearch(match);
   }
 
-  function handleChipEnter(event: MouseEvent<HTMLButtonElement>, isActive: boolean) {
-    if (!isActive) {
+  function handleChipEnter(event: MouseEvent<HTMLButtonElement>, highlight: boolean) {
+    if (!highlight) {
       event.currentTarget.style.color = "#4B8EF0";
       event.currentTarget.style.borderColor = "rgba(75,142,240,0.3)";
       event.currentTarget.style.background = "rgba(75,142,240,0.08)";
     }
   }
 
-  function handleChipLeave(event: MouseEvent<HTMLButtonElement>, isActive: boolean) {
-    if (!isActive) {
+  function handleChipLeave(event: MouseEvent<HTMLButtonElement>, highlight: boolean) {
+    if (highlight) {
+      event.currentTarget.style.color = "#4B8EF0";
+      event.currentTarget.style.borderColor = "rgba(75,142,240,0.3)";
+      event.currentTarget.style.background = "rgba(75,142,240,0.08)";
+    } else {
       event.currentTarget.style.color = "#4B5563";
       event.currentTarget.style.borderColor = "rgba(0,0,0,0.07)";
       event.currentTarget.style.background = "#FFFFFF";
@@ -107,6 +146,7 @@ export function DiscoverPanel() {
 
   return (
     <motion.div
+      ref={rootRef}
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
@@ -156,26 +196,32 @@ export function DiscoverPanel() {
       <div style={{ padding: "8px 14px", borderBottom: "1px solid rgba(0,0,0,0.07)", display: "flex", gap: 6, flexWrap: "wrap" }}>
         {CHIPS.map((chip) => {
           const isActive = activeChip === chip;
+          const isHint = hintChip === chip;
+          const highlight = isActive || isHint;
           return (
-            <button
+            <motion.button
               key={chip}
-              onClick={() => triggerSearch(chip)}
+              onClick={() => { stopAutoplay(); triggerSearch(chip); }}
+              animate={isHint
+                ? { boxShadow: ["0 0 0 0 rgba(75,142,240,0.45)", "0 0 0 8px rgba(75,142,240,0)"] }
+                : { boxShadow: "0 0 0 0 rgba(75,142,240,0)" }}
+              transition={isHint ? { duration: 1.5, repeat: Infinity, ease: "easeOut" } : { duration: 0.3 }}
               style={{
                 fontFamily: "var(--font-mono, monospace)",
                 fontSize: "0.6rem",
-                color: isActive ? "#4B8EF0" : "#4B5563",
-                background: isActive ? "rgba(75,142,240,0.08)" : "#FFFFFF",
-                border: `1px solid ${isActive ? "rgba(75,142,240,0.3)" : "rgba(0,0,0,0.07)"}`,
+                color: highlight ? "#4B8EF0" : "#4B5563",
+                background: highlight ? "rgba(75,142,240,0.08)" : "#FFFFFF",
+                border: `1px solid ${highlight ? "rgba(75,142,240,0.3)" : "rgba(0,0,0,0.07)"}`,
                 borderRadius: 100,
                 padding: "4px 12px",
                 cursor: "pointer",
-                transition: "all 0.2s",
+                transition: "color 0.2s, background 0.2s, border-color 0.2s",
               }}
-              onMouseEnter={(event) => handleChipEnter(event, isActive)}
-              onMouseLeave={(event) => handleChipLeave(event, isActive)}
+              onMouseEnter={(event) => handleChipEnter(event, highlight)}
+              onMouseLeave={(event) => handleChipLeave(event, highlight)}
             >
               {chip}
-            </button>
+            </motion.button>
           );
         })}
       </div>

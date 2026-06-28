@@ -43,7 +43,6 @@ export function JobSubNav({
       label: "Sourcing",
       path: `/jobs/${jobId}/sourcing`,
       icon: <Search className="h-4 w-4" />,
-      badge: "Beta",
     },
     {
       id: "pipeline",

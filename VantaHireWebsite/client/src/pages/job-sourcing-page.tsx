@@ -491,13 +491,7 @@ export default function JobSourcingPage() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-xl font-semibold">{jobSourcingPageCopy.header.title}</h1>
-              <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-700">
-                {jobSourcingPageCopy.header.betaBadge}
-              </Badge>
             </div>
-            <p className="mt-1 text-sm text-amber-700">
-              {jobSourcingPageCopy.header.betaHint}
-            </p>
             {isPolling && (
               <div className="flex items-center gap-2 mt-1">
                 <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />

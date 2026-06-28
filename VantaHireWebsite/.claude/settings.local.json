@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"D:\\\\\\\\Coding\\\\\\\\Vantahire Work\\\\\\\\improved-tribble\\\\\\\\VantaHireWebsite\")",
+      "Bash(xargs grep -l \"POST\\\\|PUT\\\\|update.*set\")",
+      "Bash(xargs grep -l \"cold.*outreach\\\\|campaign.*draft\\\\|campaign.*send\")"
+    ]
+  }
+}

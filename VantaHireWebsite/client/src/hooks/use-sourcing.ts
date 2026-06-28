@@ -774,6 +774,7 @@ export function useSendOutreach(jobId: number | undefined) {
       return await res.json() as {
         sent: number;
         failed: number;
+        skipped: number;
         campaign: {
           campaignId: string;
           campaignRound: number;
@@ -782,7 +783,7 @@ export function useSendOutreach(jobId: number | undefined) {
         results: Array<{
           candidateId: number;
           email: string;
-          status: "sent" | "failed";
+          status: "sent" | "failed" | "skipped";
           errorMessage: string | null;
         }>;
       };

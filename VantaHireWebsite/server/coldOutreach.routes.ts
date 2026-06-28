@@ -308,6 +308,45 @@ async function getEffectiveOutreachCountMapForCandidates(
   );
 }
 
+/**
+ * Waits until the number of candidates whose email enrichment has settled
+ * (status is anything other than 'pending') equals the total candidate count.
+ * This is count-driven, not time-driven — it fires the moment all findContact
+ * API calls have responded (found or not found), instead of waiting a fixed
+ * number of seconds. A 10-minute safety-net ceiling exists only to prevent
+ * hanging forever if the enrichment service is completely unreachable.
+ */
+async function waitForEnrichmentCompletion(
+  candidateIds: number[],
+  safetyTimeoutMs = 10 * 60 * 1000, // 10-min ceiling, not the primary trigger
+  pollIntervalMs = 1_000,
+): Promise<Map<number, string | null>> {
+  const total = candidateIds.length;
+  const deadline = Date.now() + safetyTimeoutMs;
+
+  while (Date.now() < deadline) {
+    const rows = await db.query.jobSourcedCandidates.findMany({
+      where: inArray(jobSourcedCandidates.id, candidateIds),
+    });
+
+    // Primary trigger: settled count === total candidate count
+    const settledCount = rows.filter((c: JobSourcedCandidate) => c.emailResolveStatus !== 'pending').length;
+    if (settledCount >= total) {
+      return new Map(rows.map((c: JobSourcedCandidate) => [c.id, c.foundEmail ?? null]));
+    }
+
+    console.log(`[ColdOutreach] Enrichment progress: ${settledCount}/${total} settled — waiting...`);
+    await new Promise<void>((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  // Safety-net ceiling hit — send to whoever has an email now
+  console.warn('[ColdOutreach] Enrichment safety timeout reached — firing with available emails');
+  const rows = await db.query.jobSourcedCandidates.findMany({
+    where: inArray(jobSourcedCandidates.id, candidateIds),
+  });
+  return new Map(rows.map((c: JobSourcedCandidate) => [c.id, c.foundEmail ?? null]));
+}
+
 export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMiddleware): void {
   app.post(
     '/api/jobs/:id/cold-outreach/draft',
@@ -374,11 +413,11 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         }
 
         const effectiveCountMap = await getEffectiveOutreachCountMapForCandidates(jobId, organizationId, candidates);
+        // Only block on outreach-count mismatch — email resolution is no longer required
+        // at draft time; unresolved candidates will be handled at send time.
         const blockedCandidates = candidates.filter(
           (candidate) =>
-            candidate.emailResolveStatus !== 'resolved'
-            || !candidate.foundEmail
-            || (effectiveCountMap.get(candidate.id) ?? 0) !== campaignRound - 1,
+            (effectiveCountMap.get(candidate.id) ?? 0) !== campaignRound - 1,
         );
         if (blockedCandidates.length > 0) {
           res.status(400).json({ error: `All selected candidates must be ready for campaign round ${campaignRound}` });
@@ -538,16 +577,24 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         }
 
         const effectiveCountMap = await getEffectiveOutreachCountMapForCandidates(jobId, organizationId, candidates);
+        // Only block on outreach-count mismatch — email resolution is handled below.
         const blockedCandidates = candidates.filter(
           (candidate) =>
-            candidate.emailResolveStatus !== 'resolved'
-            || !candidate.foundEmail
-            || (effectiveCountMap.get(candidate.id) ?? 0) !== campaignRound - 1,
+            (effectiveCountMap.get(candidate.id) ?? 0) !== campaignRound - 1,
         );
         if (blockedCandidates.length > 0) {
           res.status(400).json({ error: `All selected candidates must be ready for campaign round ${campaignRound}` });
           return;
         }
+
+        // Wait until ALL candidates' findContact API calls have responded.
+        // Primary trigger: settled count === total candidate count (count-based, not time-based).
+        // If every candidate already has a settled status, this returns immediately.
+        const allCandidateIds = candidates.map((c) => c.id);
+        const hasPendingEnrichment = candidates.some((c) => c.emailResolveStatus === 'pending');
+        const resolvedEmailMap: Map<number, string | null> = hasPendingEnrichment
+          ? await waitForEnrichmentCompletion(allCandidateIds)
+          : new Map(candidates.map((c) => [c.id, c.foundEmail ?? null]));
 
         const candidateMap = new Map(candidates.map((candidate) => [candidate.id, candidate]));
         const recruiterName = recruiterDisplayName(req.user!);
@@ -579,22 +626,33 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         const results: Array<{
           candidateId: number;
           email: string;
-          status: 'sent' | 'failed';
+          status: 'sent' | 'failed' | 'skipped';
           errorMessage: string | null;
         }> = [];
         let sent = 0;
         let failed = 0;
+        let skipped = 0;
 
         for (const message of messages) {
           const candidate = candidateMap.get(message.candidateId);
-          if (!candidate || candidate.emailResolveStatus !== 'resolved' || !candidate.foundEmail) {
-            res.status(400).json({ error: `Candidate ${message.candidateId} does not have a resolved email` });
-            return;
-          }
+          if (!candidate) continue;
+
           const effectiveCount = effectiveCountMap.get(candidate.id) ?? candidate.outreachCount ?? 0;
-          if (effectiveCount !== campaignRound - 1) {
-            res.status(400).json({ error: `Candidate ${message.candidateId} is not eligible for campaign round ${campaignRound}` });
-            return;
+          if (effectiveCount !== campaignRound - 1) continue;
+
+          // Use the email resolved during the wait phase (or the one already on the candidate).
+          const recipientEmail = resolvedEmailMap.get(candidate.id) ?? candidate.foundEmail ?? null;
+
+          if (!recipientEmail) {
+            // Email was not found — skip this candidate, do not log to outreach log.
+            results.push({
+              candidateId: candidate.id,
+              email: '',
+              status: 'skipped',
+              errorMessage: 'Email not found',
+            });
+            skipped += 1;
+            continue;
           }
 
           const finalHtml = buildCampaignEmailHtml({
@@ -617,7 +675,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
 
           try {
             const sendResult = await emailService.sendEmail({
-              to: candidate.foundEmail,
+              to: recipientEmail,
               subject: message.subject,
               text: finalText,
               html: finalHtml,
@@ -639,7 +697,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
             sourcedCandidateId: candidate.id,
             campaignId: persistedCampaignId,
             campaignRound,
-            recipientEmail: candidate.foundEmail,
+            recipientEmail,
             recipientName: getCandidateName(candidate),
             subject: message.subject,
             body: finalText,
@@ -670,7 +728,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
 
           results.push({
             candidateId: candidate.id,
-            email: candidate.foundEmail,
+            email: recipientEmail,
             status,
             errorMessage,
           });
@@ -698,6 +756,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         res.json({
           sent,
           failed,
+          skipped,
           campaign: {
             campaignId: persistedCampaignId,
             campaignRound,

@@ -43,6 +43,8 @@ import {
   Home,
   Inbox,
   LogOut,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search,
   Settings,
   Shield,
@@ -281,15 +283,15 @@ export default function AtsSidebar({
           <button
             type="button"
             onClick={toggleSidebar}
-            className="hidden mt-1 shrink-0 rounded-xl border border-transparent text-sidebar-foreground/60 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-primary group-data-[collapsible=icon]:mt-0 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:w-10 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:justify-center"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-sidebar-foreground/60 transition-colors hover:border-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-primary"
             aria-label={isCollapsed ? "Open sidebar" : "Collapse sidebar"}
             title={isCollapsed ? "Open sidebar" : "Collapse sidebar"}
           >
-            <img
-              src={ealanaMoth}
-              alt="ealana moth"
-              className="h-5 w-5 object-contain"
-            />
+            {isCollapsed ? (
+              <PanelLeftOpen className="h-5 w-5" />
+            ) : (
+              <PanelLeftClose className="h-5 w-5" />
+            )}
           </button>
         </div>
       </SidebarHeader>

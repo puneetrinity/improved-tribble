@@ -127,7 +127,11 @@ export function HeroSection() {
             fontStyle: "italic",
             background: "linear-gradient(135deg, #4B8EF0 0%, #34D17A 100%)",
             WebkitBackgroundClip: "text",
+            backgroundClip: "text",
             WebkitTextFillColor: "transparent",
+            display: "inline-block",
+            lineHeight: 1.15,
+            paddingBottom: "0.12em",
           }}
         >
           signal.
