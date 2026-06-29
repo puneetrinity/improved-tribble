@@ -1213,6 +1213,23 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         emails.length > 0 ? 'resolved' : 'not_found',
       );
 
+      // Also persist the found emails onto the candidate profile so the
+      // CandidateDrawer (which reads crustdata.emails) shows them after refresh.
+      if (emails.length > 0) {
+        const cs = (candidate.candidateSummary as any) || {};
+        if (!cs.candidate) cs.candidate = {};
+        if (!cs.candidate.searchMeta) cs.candidate.searchMeta = {};
+        if (!cs.candidate.searchMeta.crustdata) cs.candidate.searchMeta.crustdata = {};
+        if (!cs.candidate.searchMeta.crustdata.contact) cs.candidate.searchMeta.crustdata.contact = {};
+
+        cs.candidate.searchMeta.crustdata.contact.has_personal_email = true;
+        cs.candidate.searchMeta.crustdata.emails = emails;
+
+        await db.update(jobSourcedCandidates)
+          .set({ candidateSummary: cs })
+          .where(eq(jobSourcedCandidates.id, candidateId));
+      }
+
       res.json(response);
     } catch (error) {
       const candidateId = parseInt(req.params.candidateId || '', 10);

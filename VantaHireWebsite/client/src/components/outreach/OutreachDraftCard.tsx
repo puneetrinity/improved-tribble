@@ -48,7 +48,11 @@ export function OutreachDraftCard({ draft, onChange }: OutreachDraftCardProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-medium truncate">{draft.name}</p>
-          <p className="text-xs text-muted-foreground truncate">{draft.email}</p>
+          {draft.email ? (
+            <p className="text-xs text-muted-foreground truncate">{draft.email}</p>
+          ) : (
+            <p className="text-xs text-amber-500 truncate">⏳ Email lookup in progress — will send when found</p>
+          )}
         </div>
         <Badge variant="outline">{statusLabel}</Badge>
       </div>

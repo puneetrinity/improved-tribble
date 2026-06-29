@@ -1,6 +1,6 @@
 // @charset "utf-8"
-import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useInView } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface TimelineEntry {
@@ -43,12 +43,46 @@ const bullets = [
 
 export function MemoryPanel() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [hintIndex, setHintIndex] = useState<number | null>(null);
   const panelTimeline = TIMELINE.slice(0, 4);
   const selectedTimeline = selectedIndex !== null ? TIMELINE[selectedIndex] : null;
   const selectedResurfaced = selectedIndex !== null ? RESURFACED[selectedIndex] : null;
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inView = useInView(rootRef, { once: true, amount: 0.4 });
+  const interactedRef = useRef(false);
+  const timersRef = useRef<number[]>([]);
+
+  function selectCandidate(index: number) {
+    interactedRef.current = true;
+    setHintIndex(null);
+    setSelectedIndex((current) => (current === index ? null : index));
+  }
+
+  // Auto-demo: open the first past candidate, then pulse the second to invite
+  // a click. Cancelled on any user interaction; timers cleared on unmount.
+  useEffect(() => {
+    if (!inView) return;
+    const t1 = window.setTimeout(() => {
+      if (interactedRef.current) return;
+      setSelectedIndex(0);
+    }, 700);
+    const t2 = window.setTimeout(() => {
+      if (interactedRef.current) return;
+      setHintIndex(1);
+    }, 2300);
+    timersRef.current.push(t1, t2);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inView]);
+
+  useEffect(() => () => {
+    timersRef.current.forEach((id) => window.clearTimeout(id));
+    timersRef.current = [];
+  }, []);
+
   return (
     <motion.div
+      ref={rootRef}
       initial={{ opacity: 0, y: 30 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }}
@@ -78,26 +112,30 @@ export function MemoryPanel() {
 
           {panelTimeline.map((entry, index) => {
             const isSelected = selectedIndex === index;
+            const isHint = hintIndex === index;
+            const highlight = isSelected || isHint;
             return (
               <div key={entry.name} style={{ display: "flex", gap: 10, paddingBottom: 14, position: "relative" }}>
                 <div style={{ width: 14, display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${isSelected ? "#34D17A" : "#9CA3AF"}`, background: "#F8F9FC", flexShrink: 0, transition: "border-color 0.3s" }} />
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", border: `2px solid ${highlight ? "#34D17A" : "#9CA3AF"}`, background: "#F8F9FC", flexShrink: 0, transition: "border-color 0.3s" }} />
                   {index < panelTimeline.length - 1 && <div style={{ flex: 1, width: 1, background: "rgba(0,0,0,0.08)", marginTop: 2 }} />}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.55rem", color: "#9CA3AF", marginBottom: 4 }}>{entry.date}</div>
-                  <div
-                    onClick={() => {
-                      setSelectedIndex(isSelected ? null : index);
-                    }}
+                  <motion.div
+                    onClick={() => selectCandidate(index)}
+                    animate={isHint
+                      ? { boxShadow: ["0 0 0 0 rgba(52,209,122,0.45)", "0 0 0 8px rgba(52,209,122,0)"] }
+                      : { boxShadow: "0 0 0 0 rgba(52,209,122,0)" }}
+                    transition={isHint ? { duration: 1.5, repeat: Infinity, ease: "easeOut" } : { duration: 0.3 }}
                     style={{
-                      background: isSelected ? "rgba(52,209,122,0.08)" : "#FFFFFF",
-                      border: `1px solid ${isSelected ? "rgba(52,209,122,0.3)" : "rgba(0,0,0,0.07)"}`,
+                      background: highlight ? "rgba(52,209,122,0.08)" : "#FFFFFF",
+                      border: `1px solid ${highlight ? "rgba(52,209,122,0.3)" : "rgba(0,0,0,0.07)"}`,
                       borderRadius: 7,
                       padding: "8px 10px",
                       cursor: "pointer",
-                      transition: "all 0.3s",
+                      transition: "background 0.3s, border-color 0.3s",
                     }}
                   >
                     <div style={{ fontFamily: "var(--font-body)", fontSize: "0.75rem", fontWeight: 500, color: "#111827" }}>{entry.name}</div>
@@ -105,7 +143,7 @@ export function MemoryPanel() {
                     <div style={{ display: "inline-block", marginTop: 5, fontFamily: "var(--font-mono, monospace)", fontSize: "0.55rem", background: entry.tagBg, color: entry.tagColor, borderRadius: 4, padding: "2px 7px" }}>
                       {entry.tag}
                     </div>
-                  </div>
+                  </motion.div>
                 </div>
               </div>
             );
