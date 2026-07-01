@@ -43,10 +43,10 @@ const Footer = ({ minimal = false }: FooterProps) => {
                 Cookie Policy
               </Link>
               <a
-                href="mailto:hello@ealana.com"
+                href="mailto:info@ealana.com"
                 className="text-white/70 text-sm hover:text-warning transition-colors"
               >
-                hello@ealana.com
+                info@ealana.com
               </a>
             </div>
           </div>
@@ -163,10 +163,10 @@ const Footer = ({ minimal = false }: FooterProps) => {
                 Cookie Policy
               </Link>
               <a
-                href="mailto:hello@ealana.com"
+                href="mailto:info@ealana.com"
                 className="text-[var(--text-secondary)] text-sm hover:text-warning transition-colors"
               >
-                hello@ealana.com
+                info@ealana.com
               </a>
             </div>
           </div>

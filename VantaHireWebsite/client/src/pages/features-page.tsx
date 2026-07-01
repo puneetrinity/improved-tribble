@@ -35,17 +35,17 @@ export default function FeaturesPage() {
   return (
     <>
       <Helmet>
-        <title>Features | ealana - Six Pillars of AI-Native Recruiting</title>
-        <meta name="description" content="Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center. All the capabilities recruiters need." />
+        <title>Features | ealana — Discover, Memory, Flow</title>
+        <meta name="description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
         <link rel="canonical" href="https://ealana.com/features" />
-        <meta property="og:title" content="Features | ealana - Six Pillars of AI-Native Recruiting" />
-        <meta property="og:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center - every capability recruiters need." />
+        <meta property="og:title" content="Features | ealana — Discover, Memory, Flow" />
+        <meta property="og:description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
         <meta property="og:url" content="https://ealana.com/features" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Features | ealana - Six Pillars of AI-Native Recruiting" />
-        <meta name="twitter:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center." />
+        <meta name="twitter:title" content="Features | ealana — Discover, Memory, Flow" />
+        <meta name="twitter:description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
         <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
         <script type="application/ld+json">{breadcrumbJsonLd}</script>
       </Helmet>
@@ -62,23 +62,23 @@ export default function FeaturesPage() {
                 <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.65rem", color: "#4B8EF0", letterSpacing: "0.14em", textTransform: "uppercase" }}>FEATURES</span>
                 <div style={{ height: 1, width: 60, background: "#4B8EF0", opacity: 0.2 }} />
               </div>
-              <motion.div variants={wordVariants} initial="hidden" animate="visible" style={{ marginBottom: "1.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
+              <motion.h1 variants={wordVariants} initial="hidden" animate="visible" style={{ marginTop: 0, marginBottom: "1.5rem" }}>
+                <span style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
                   {words1.map((word) => (
                     <motion.span key={word} variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
                       {word}
                     </motion.span>
                   ))}
-                </div>
-                <div style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
+                </span>
+                <span style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
                   <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
                     One
                   </motion.span>
                   <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, fontStyle: "italic", background: "linear-gradient(135deg, #4B8EF0, #34D17A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                     signal.
                   </motion.span>
-                </div>
-              </motion.div>
+                </span>
+              </motion.h1>
               <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.9, ease: [0.25, 0.1, 0.25, 1] }} style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, maxWidth: 520, margin: "0 auto", lineHeight: 1.75 }}>
                 Discover finds the right people. Memory keeps everything your team learns. Flow gets the outreach done.
               </motion.p>

@@ -292,7 +292,7 @@ export default function PricingPage() {
   const isCheckoutPending = publicCheckout.isPending || createOrgCheckout.isPending || createCheckout.isPending;
 
   const handleContactSales = () => {
-    window.location.href = 'mailto:sales@ealana.com?subject=ealana%20Business%20Plan%20Inquiry';
+    window.location.href = 'mailto:info@ealana.com?subject=ealana%20Business%20Plan%20Inquiry';
   };
 
   const renderFeatureValue = (value: boolean | string) => {

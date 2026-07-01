@@ -299,7 +299,7 @@ const sections: LegalSection[] = [
           </div>
           <div className={contactRowCls}>
             <Mail size={13} />
-            <span>legal@ealana.com</span>
+            <span>info@ealana.com</span>
           </div>
           <div className={contactSubjectCls}>Subject: Terms of Service Inquiry</div>
         </div>
