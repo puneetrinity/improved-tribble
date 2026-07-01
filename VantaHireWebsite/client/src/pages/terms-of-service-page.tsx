@@ -32,7 +32,7 @@ const sections: LegalSection[] = [
       <>
         <p>
           These Terms of Service ("Terms") govern your access to and use of ealana, an applicant
-          tracking system and recruitment platform operated by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a>
+          tracking system and recruitment platform operated by Ealana Platforms Private Limited
           {" "}("ealana," "we," "us," or "our").
         </p>
         <p>
@@ -131,7 +131,7 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Our Content</h4>
           <p>
-            ealana's platform, design, features, and functionality are owned by <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> and are protected by copyright, trademark, and other intellectual
+            ealana's platform, design, features, and functionality are owned by Ealana Platforms Private Limited and are protected by copyright, trademark, and other intellectual
             property laws. You may not copy, modify, or distribute our content without permission.
           </p>
         </div>
@@ -212,7 +212,7 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Limitation of Liability</h4>
           <p>
-            To the maximum extent permitted by law, <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> shall
+            To the maximum extent permitted by law, Ealana Platforms Private Limited shall
             not be liable for any indirect, incidental, special, consequential, or punitive damages
             arising from your use of ealana.
           </p>
@@ -239,7 +239,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          You agree to indemnify and hold harmless <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a>,
+          You agree to indemnify and hold harmless Ealana Platforms Private Limited,
           its officers, directors, employees, and agents from any claims, damages, losses, or
           expenses arising from:
         </p>
@@ -295,7 +295,7 @@ const sections: LegalSection[] = [
         </p>
         <div className={contactCardCls}>
           <div className={contactOrgCls}>
-            <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer">Airevolabs LLP</a>
+            Ealana Platforms Private Limited
           </div>
           <div className={contactRowCls}>
             <Mail size={13} />

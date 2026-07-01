@@ -40,7 +40,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          ealana, a brand of <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer" className={linkCls}>Airevolabs LLP</a> ("we," "our," or "us"),
+          ealana, operated by Ealana Platforms Private Limited ("we," "our," or "us"),
           is committed to protecting your privacy. This Privacy Policy explains how we collect,
           use, disclose, and safeguard your information when you use our applicant tracking system
           and recruitment platform.
@@ -292,7 +292,7 @@ const sections: LegalSection[] = [
         </p>
         <div className={contactCardCls}>
           <div className={contactOrgCls}>
-            <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer">Airevolabs LLP</a>
+            Ealana Platforms Private Limited
           </div>
           <div className={contactRowCls}>
             <Mail size={13} />

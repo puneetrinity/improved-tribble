@@ -322,7 +322,7 @@ const sections: LegalSection[] = [
         </p>
         <div className={contactCardCls}>
           <div className={contactOrgCls}>
-            <a href="https://www.airevolabs.com" target="_blank" rel="noopener noreferrer">Airevolabs LLP</a>
+            Ealana Platforms Private Limited
           </div>
           <div className={contactRowCls}>
             <Mail size={13} />
