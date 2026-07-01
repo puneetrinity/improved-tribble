@@ -62,23 +62,23 @@ export default function FeaturesPage() {
                 <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.65rem", color: "#4B8EF0", letterSpacing: "0.14em", textTransform: "uppercase" }}>FEATURES</span>
                 <div style={{ height: 1, width: 60, background: "#4B8EF0", opacity: 0.2 }} />
               </div>
-              <motion.div variants={wordVariants} initial="hidden" animate="visible" style={{ marginBottom: "1.5rem" }}>
-                <div style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
+              <motion.h1 variants={wordVariants} initial="hidden" animate="visible" style={{ marginTop: 0, marginBottom: "1.5rem" }}>
+                <span style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
                   {words1.map((word) => (
                     <motion.span key={word} variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
                       {word}
                     </motion.span>
                   ))}
-                </div>
-                <div style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
+                </span>
+                <span style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
                   <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
                     One
                   </motion.span>
                   <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, fontStyle: "italic", background: "linear-gradient(135deg, #4B8EF0, #34D17A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                     signal.
                   </motion.span>
-                </div>
-              </motion.div>
+                </span>
+              </motion.h1>
               <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.9, ease: [0.25, 0.1, 0.25, 1] }} style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, maxWidth: 520, margin: "0 auto", lineHeight: 1.75 }}>
                 Discover finds the right people. Memory keeps everything your team learns. Flow gets the outreach done.
               </motion.p>

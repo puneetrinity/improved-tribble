@@ -145,7 +145,7 @@ export default function PlanSelectionStep({ onComplete }: PlanSelectionStepProps
     completeOnboardingAsync().catch(() => {
       // Ignore errors
     });
-    window.location.href = 'mailto:sales@ealana.com?subject=ealana%20Business%20Plan%20Inquiry';
+    window.location.href = 'mailto:info@ealana.com?subject=ealana%20Business%20Plan%20Inquiry';
   };
 
   if (plansLoading) {

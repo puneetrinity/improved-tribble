@@ -108,7 +108,7 @@ export class SMTPEmailService implements EmailService {
 // Ethereal test email service (development fallback)
 export class TestEmailService implements EmailService {
   private transporter: nodemailer.Transporter | null = null;
-  private fromEmail: string = 'no-reply@vantahire.com';
+  private fromEmail: string = 'info@ealana.com';
   private fromName: string = 'VantaHire';
   private notificationsTo?: string;
 
