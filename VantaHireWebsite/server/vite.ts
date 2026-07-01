@@ -536,7 +536,7 @@ export async function serveStatic(app: Express) {
       }
 
       res.setHeader('Content-Type', 'text/html');
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=3600, max-age=0');
+      res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=86400, max-age=0');
       res.setHeader('X-SSR-Status', ssrRender ? 'active' : 'disabled');
       res.send(html);
     } catch (error) {
@@ -679,7 +679,7 @@ export async function serveStatic(app: Express) {
 
       // Serve the modified HTML
       res.setHeader('Content-Type', 'text/html');
-      res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=3600, max-age=0');
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600, max-age=0');
       res.setHeader('Vary', 'User-Agent');
       res.send(html);
     } catch (error) {
