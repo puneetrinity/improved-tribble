@@ -4,7 +4,7 @@
 
 import { Job } from "@shared/schema";
 
-export const DEFAULT_SITE_URL = "https://vantahire.com";
+export const DEFAULT_SITE_URL = "https://ealana.com";
 
 /**
  * Strip HTML tags and normalize whitespace for meta descriptions.
@@ -205,7 +205,7 @@ export function generateJobPostingJsonLd(job: JobWithClientData, baseUrl: string
     : `${baseUrl}/jobs/${job.id}`;
 
   // Determine hiring organization (prefer client if available, fallback to company)
-  const orgName = job.clientName || job.company || 'VantaHire';
+  const orgName = job.clientName || job.company || 'ealana';
   const hiringOrganization: any = {
     '@type': 'Organization',
     name: orgName,

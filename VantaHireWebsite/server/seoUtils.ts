@@ -306,13 +306,17 @@ export function generateJobPostingSchema(job: {
   salaryPeriod?: string | null;
   experienceYears?: number | null;
   educationRequirement?: string | null;
-}, baseUrl: string = 'https://vantahire.com') {
+}, baseUrl: string = 'https://ealana.com') {
   // Validate required fields
   const errors = validateJobPosting(job);
   if (errors.length > 0) {
     console.warn(`JobPosting validation errors for job ${job.id}:`, errors);
     return null;
   }
+
+  // Normalize base URL so a trailing slash (e.g. from BASE_URL env) never
+  // produces double slashes in generated job/logo URLs.
+  baseUrl = baseUrl.replace(/\/+$/, '');
 
   // Preserve HTML in description for Google Jobs
   const htmlDescription = sanitizeDescription(job.description);
@@ -337,7 +341,7 @@ export function generateJobPostingSchema(job: {
     : `${baseUrl}/jobs/${job.id}`;
 
   // Determine hiring organization (prefer client if available)
-  const orgName = job.clientName || job.company || 'VantaHire';
+  const orgName = job.clientName || job.company || 'ealana';
   const hiringOrganization: any = {
     '@type': 'Organization',
     name: orgName,
@@ -442,7 +446,7 @@ export function generateJobsSitemapXML(jobs: Array<{
   slug?: string | null;
   updatedAt?: Date | string;
   createdAt: Date | string;
-}>, baseUrl: string = 'https://vantahire.com'): string {
+}>, baseUrl: string = 'https://ealana.com'): string {
   const normalizedBase = baseUrl.replace(/\/+$/, '');
   const urlEntries = jobs.map(job => {
     // Prefer pure slug for SEO-friendly URLs

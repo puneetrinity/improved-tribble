@@ -12,7 +12,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 
 // Company details for invoices
-const COMPANY_LEGAL_NAME = process.env.COMPANY_LEGAL_NAME || 'Airevolabs LLP';
+const COMPANY_LEGAL_NAME = process.env.COMPANY_LEGAL_NAME || 'Ealana Platforms Private Limited';
 const COMPANY_GSTIN = process.env.COMPANY_GSTIN || '';
 const COMPANY_ADDRESS = process.env.COMPANY_ADDRESS || '';
 const COMPANY_STATE = process.env.COMPANY_STATE || 'Maharashtra';
