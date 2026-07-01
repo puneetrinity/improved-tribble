@@ -146,10 +146,10 @@ export async function setupVite(app: Express, server: Server) {
   // SSR meta injection for marketing pages (dev mode)
   const MARKETING_PAGES_DEV: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
-      title: 'ealana — AI Recruiting Platform | Discover, Memory, Flow',
-      description: 'ealana finds the candidates others miss, remembers every hiring decision, and runs your outreach — AI sourcing, shared hiring memory, and WhatsApp + email in one platform. Start free.',
+      title: 'ealana — The Neural OS for Talent',
+      description: 'ealana is the Neural OS for Talent — it finds the candidates others miss, remembers every hiring decision, and runs your outreach. AI sourcing, shared hiring memory, and WhatsApp + email in one system. Start free.',
       canonical: 'https://ealana.com/',
-      keywords: 'AI recruiting platform, applicant tracking system India, AI candidate sourcing, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
+      keywords: 'Neural OS for Talent, AI candidate sourcing, applicant tracking system India, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
       title: 'Features | ealana — Discover, Memory, Flow',
@@ -420,10 +420,10 @@ export async function serveStatic(app: Express) {
   // to prevent express.static from intercepting routes that match directories)
   const MARKETING_PAGES: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
-      title: 'ealana — AI Recruiting Platform | Discover, Memory, Flow',
-      description: 'ealana finds the candidates others miss, remembers every hiring decision, and runs your outreach — AI sourcing, shared hiring memory, and WhatsApp + email in one platform. Start free.',
+      title: 'ealana — The Neural OS for Talent',
+      description: 'ealana is the Neural OS for Talent — it finds the candidates others miss, remembers every hiring decision, and runs your outreach. AI sourcing, shared hiring memory, and WhatsApp + email in one system. Start free.',
       canonical: 'https://ealana.com/',
-      keywords: 'AI recruiting platform, applicant tracking system India, AI candidate sourcing, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
+      keywords: 'Neural OS for Talent, AI candidate sourcing, applicant tracking system India, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
       title: 'Features | ealana — Discover, Memory, Flow',

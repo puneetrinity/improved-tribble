@@ -1,8 +1,8 @@
 # ealana
 
-> AI-native recruiting platform for startups and recruiting agencies.
+> The Neural OS for Talent — for startups and recruiting agencies.
 
-ealana is an AI-native recruiting platform that helps teams find, rank, and engage the right candidates faster. It combines AI sourcing, pipeline management, WhatsApp outreach, and client collaboration in one platform.
+ealana is the Neural OS for Talent — it helps teams find, rank, and engage the right candidates faster, combining AI sourcing, shared hiring memory, WhatsApp outreach, and client collaboration in one system.
 
 ## Core Capabilities
 
