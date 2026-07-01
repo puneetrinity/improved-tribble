@@ -24,7 +24,7 @@ Three layers power ealana:
 ## Pricing
 
 - **Free**: $0/mo â€” up to limited active jobs, AI sourcing, talent search, email outreach, basic analytics.
-- **Growth**: â‚¹1,999/seat/mo + taxes â€” unlimited jobs, unlimited AI sourcing, WhatsApp outreach, client portal, advanced analytics.
+- **Growth**: â‚¹8,999/seat/mo + taxes â€” unlimited jobs, unlimited AI sourcing, WhatsApp outreach, client portal, advanced analytics.
 - **Enterprise**: Custom pricing â€” SSO/SAML, API access, custom integrations, dedicated account manager.
 
 ## Geographic Focus
