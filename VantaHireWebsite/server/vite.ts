@@ -146,71 +146,71 @@ export async function setupVite(app: Express, server: Server) {
   // SSR meta injection for marketing pages (dev mode)
   const MARKETING_PAGES_DEV: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
-      title: 'VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration',
+      title: 'ealana — AI-Native Recruiting Platform | Human Decisions, AI Acceleration',
       description: 'The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free.',
-      canonical: 'https://vantahire.com/',
+      canonical: 'https://ealana.com/',
       keywords: 'AI recruiting platform, applicant tracking system India, AI candidate sourcing, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
-      title: 'Features | VantaHire — Six Pillars of AI-Native Recruiting',
+      title: 'Features | ealana — Six Pillars of AI-Native Recruiting',
       description: 'Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center.',
-      canonical: 'https://vantahire.com/features',
+      canonical: 'https://ealana.com/features',
       keywords: 'resume knowledge graph, AI candidate discovery, WhatsApp email outreach, client feedback portal, recruiter dashboard, job command center',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://vantahire.com/features" }] }],
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
-      title: 'Pricing | VantaHire — Simple, Transparent Pricing for Recruiting Teams',
+      title: 'Pricing | ealana — Simple, Transparent Pricing for Recruiting Teams',
       description: 'Start free, upgrade when your team grows. AI sourcing, WhatsApp outreach, client portal, and pipeline management. No long contracts, no hidden fees.',
-      canonical: 'https://vantahire.com/pricing',
-      keywords: 'VantaHire pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
+      canonical: 'https://ealana.com/pricing',
+      keywords: 'ealana pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
       jsonLd: [
-        { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Pricing", "item": "https://vantahire.com/pricing" }] },
+        { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Pricing", "item": "https://ealana.com/pricing" }] },
         { "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
-          { "@type": "Question", "name": "Is there really a free plan?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. No credit card required. No time limit. Start using VantaHire today and upgrade when you need more capacity." } },
+          { "@type": "Question", "name": "Is there really a free plan?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. No credit card required. No time limit. Start using ealana today and upgrade when you need more capacity." } },
           { "@type": "Question", "name": "Can I switch plans anytime?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Upgrade or downgrade from billing at any time. Paid access is purchased for the selected monthly or annual term." } },
           { "@type": "Question", "name": "How does seat-based pricing work?", "acceptedAnswer": { "@type": "Answer", "text": "You pay per recruiter who actively uses the platform. Team members who only view reports or dashboards do not count as seats." } },
           { "@type": "Question", "name": "Do you offer annual discounts?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Annual billing saves compared to monthly. Toggle between monthly and annual to see the difference." } },
           { "@type": "Question", "name": "What payment methods do you accept?", "acceptedAnswer": { "@type": "Answer", "text": "Credit card and UPI for Growth via Cashfree. Enterprise customers can pay by invoice. GST-compliant invoicing is available for India." } },
-          { "@type": "Question", "name": "Is my data safe?", "acceptedAnswer": { "@type": "Answer", "text": "VantaHire enforces a three-tier privacy model. Your uploaded resumes and candidate data stay private to your organization. Only candidates who opt in are discoverable by other customers." } },
+          { "@type": "Question", "name": "Is my data safe?", "acceptedAnswer": { "@type": "Answer", "text": "ealana enforces a three-tier privacy model. Your uploaded resumes and candidate data stay private to your organization. Only candidates who opt in are discoverable by other customers." } },
           { "@type": "Question", "name": "Can I cancel anytime?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Cancel from your account settings. No cancellation fees. Your data remains accessible for 30 days after cancellation." } },
         ] },
       ],
     },
     '/solutions': {
-      title: 'Solutions | VantaHire — Built for Startups, Agencies & HR Teams',
-      description: 'See how startups, recruiting agencies, enterprises, and HR teams use VantaHire to hire faster. AI sourcing, client portal, and pipeline management for every team size.',
-      canonical: 'https://vantahire.com/solutions',
+      title: 'Solutions | ealana — Built for Startups, Agencies & HR Teams',
+      description: 'See how startups, recruiting agencies, enterprises, and HR teams use ealana to hire faster. AI sourcing, client portal, and pipeline management for every team size.',
+      canonical: 'https://ealana.com/solutions',
       keywords: 'startup hiring platform, ATS for startups, staffing agency ATS, recruiting agency platform, HR team recruiting, AI recruiting',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://vantahire.com/solutions" }] }],
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://ealana.com/solutions" }] }],
     },
     '/jobs': {
-      title: 'Browse Jobs | VantaHire — Find Your Next Role',
-      description: 'Browse open positions across technology, consulting, and more. Apply directly through VantaHire with AI-powered matching and fit scoring.',
-      canonical: 'https://vantahire.com/jobs',
-      keywords: 'jobs India, tech jobs Bangalore, IT jobs APAC, apply online, VantaHire jobs',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Jobs", "item": "https://vantahire.com/jobs" }] }],
+      title: 'Browse Jobs | ealana — Find Your Next Role',
+      description: 'Browse open positions across technology, consulting, and more. Apply directly through ealana with AI-powered matching and fit scoring.',
+      canonical: 'https://ealana.com/jobs',
+      keywords: 'jobs India, tech jobs Bangalore, IT jobs APAC, apply online, ealana jobs',
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Jobs", "item": "https://ealana.com/jobs" }] }],
     },
     '/recruiters': {
-      title: 'Recruiters Directory | VantaHire — Find Specialist Recruiters',
-      description: 'Meet VantaHire\'s specialist recruiters. Industry experts in IT, telecom, automotive, fintech, and healthcare hiring across India and APAC.',
-      canonical: 'https://vantahire.com/recruiters',
+      title: 'Recruiters Directory | ealana — Find Specialist Recruiters',
+      description: 'Meet ealana\'s specialist recruiters. Industry experts in IT, telecom, automotive, fintech, and healthcare hiring across India and APAC.',
+      canonical: 'https://ealana.com/recruiters',
       keywords: 'specialist recruiters India, IT recruiters, telecom recruiters, healthcare recruiters APAC',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://vantahire.com/recruiters" }] }],
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://ealana.com/recruiters" }] }],
     },
     '/privacy-policy': {
-      title: 'Privacy Policy | VantaHire',
-      description: 'How VantaHire collects, uses, and protects your data. Read our privacy policy covering candidate data, recruiter data, and platform usage.',
-      canonical: 'https://vantahire.com/privacy-policy',
+      title: 'Privacy Policy | ealana',
+      description: 'How ealana collects, uses, and protects your data. Read our privacy policy covering candidate data, recruiter data, and platform usage.',
+      canonical: 'https://ealana.com/privacy-policy',
     },
     '/terms-of-service': {
-      title: 'Terms of Service | VantaHire',
-      description: 'Terms and conditions for using the VantaHire recruiting platform. Covers account usage, data ownership, and service agreements.',
-      canonical: 'https://vantahire.com/terms-of-service',
+      title: 'Terms of Service | ealana',
+      description: 'Terms and conditions for using the ealana recruiting platform. Covers account usage, data ownership, and service agreements.',
+      canonical: 'https://ealana.com/terms-of-service',
     },
     '/cookie-policy': {
-      title: 'Cookie Policy | VantaHire',
-      description: 'How VantaHire uses cookies and similar technologies. Learn about the cookies we use and how to manage your preferences.',
-      canonical: 'https://vantahire.com/cookie-policy',
+      title: 'Cookie Policy | ealana',
+      description: 'How ealana uses cookies and similar technologies. Learn about the cookies we use and how to manage your preferences.',
+      canonical: 'https://ealana.com/cookie-policy',
     },
   };
 
@@ -239,7 +239,7 @@ export async function setupVite(app: Express, server: Server) {
       // Inject marketing page meta in dev mode
       const pageMeta = MARKETING_PAGES_DEV[routePath];
       if (pageMeta) {
-        const baseUrl = (process.env.BASE_URL || 'https://vantahire.com').replace(/\/$/, '');
+        const baseUrl = (process.env.BASE_URL || 'https://ealana.com').replace(/\/$/, '');
         template = upsertTitle(template, pageMeta.title);
         template = upsertMetaTag(template, 'name', 'title', pageMeta.title);
         template = upsertMetaTag(template, 'name', 'description', pageMeta.description);
@@ -420,71 +420,71 @@ export async function serveStatic(app: Express) {
   // to prevent express.static from intercepting routes that match directories)
   const MARKETING_PAGES: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
-      title: 'VantaHire — AI-Native Recruiting Platform | Human Decisions, AI Acceleration',
+      title: 'ealana — AI-Native Recruiting Platform | Human Decisions, AI Acceleration',
       description: 'The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free.',
-      canonical: 'https://vantahire.com/',
+      canonical: 'https://ealana.com/',
       keywords: 'AI recruiting platform, applicant tracking system India, AI candidate sourcing, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
-      title: 'Features | VantaHire — Six Pillars of AI-Native Recruiting',
+      title: 'Features | ealana — Six Pillars of AI-Native Recruiting',
       description: 'Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center.',
-      canonical: 'https://vantahire.com/features',
+      canonical: 'https://ealana.com/features',
       keywords: 'resume knowledge graph, AI candidate discovery, WhatsApp email outreach, client feedback portal, recruiter dashboard, job command center',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://vantahire.com/features" }] }],
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
-      title: 'Pricing | VantaHire — Simple, Transparent Pricing for Recruiting Teams',
+      title: 'Pricing | ealana — Simple, Transparent Pricing for Recruiting Teams',
       description: 'Start free, upgrade when your team grows. AI sourcing, WhatsApp outreach, client portal, and pipeline management. No long contracts, no hidden fees.',
-      canonical: 'https://vantahire.com/pricing',
-      keywords: 'VantaHire pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
+      canonical: 'https://ealana.com/pricing',
+      keywords: 'ealana pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
       jsonLd: [
-        { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Pricing", "item": "https://vantahire.com/pricing" }] },
+        { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Pricing", "item": "https://ealana.com/pricing" }] },
         { "@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
-          { "@type": "Question", "name": "Is there really a free plan?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. No credit card required. No time limit. Start using VantaHire today and upgrade when you need more capacity." } },
+          { "@type": "Question", "name": "Is there really a free plan?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. No credit card required. No time limit. Start using ealana today and upgrade when you need more capacity." } },
           { "@type": "Question", "name": "Can I switch plans anytime?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Upgrade or downgrade from billing at any time. Paid access is purchased for the selected monthly or annual term." } },
           { "@type": "Question", "name": "How does seat-based pricing work?", "acceptedAnswer": { "@type": "Answer", "text": "You pay per recruiter who actively uses the platform. Team members who only view reports or dashboards do not count as seats." } },
           { "@type": "Question", "name": "Do you offer annual discounts?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Annual billing saves compared to monthly. Toggle between monthly and annual to see the difference." } },
           { "@type": "Question", "name": "What payment methods do you accept?", "acceptedAnswer": { "@type": "Answer", "text": "Credit card and UPI for Growth via Cashfree. Enterprise customers can pay by invoice. GST-compliant invoicing is available for India." } },
-          { "@type": "Question", "name": "Is my data safe?", "acceptedAnswer": { "@type": "Answer", "text": "VantaHire enforces a three-tier privacy model. Your uploaded resumes and candidate data stay private to your organization. Only candidates who opt in are discoverable by other customers." } },
+          { "@type": "Question", "name": "Is my data safe?", "acceptedAnswer": { "@type": "Answer", "text": "ealana enforces a three-tier privacy model. Your uploaded resumes and candidate data stay private to your organization. Only candidates who opt in are discoverable by other customers." } },
           { "@type": "Question", "name": "Can I cancel anytime?", "acceptedAnswer": { "@type": "Answer", "text": "Yes. Cancel from your account settings. No cancellation fees. Your data remains accessible for 30 days after cancellation." } },
         ] },
       ],
     },
     '/solutions': {
-      title: 'Solutions | VantaHire — Built for Startups, Agencies & HR Teams',
-      description: 'See how startups, recruiting agencies, enterprises, and HR teams use VantaHire to hire faster. AI sourcing, client portal, and pipeline management for every team size.',
-      canonical: 'https://vantahire.com/solutions',
+      title: 'Solutions | ealana — Built for Startups, Agencies & HR Teams',
+      description: 'See how startups, recruiting agencies, enterprises, and HR teams use ealana to hire faster. AI sourcing, client portal, and pipeline management for every team size.',
+      canonical: 'https://ealana.com/solutions',
       keywords: 'startup hiring platform, ATS for startups, staffing agency ATS, recruiting agency platform, HR team recruiting, AI recruiting',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://vantahire.com/solutions" }] }],
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://ealana.com/solutions" }] }],
     },
     '/jobs': {
-      title: 'Browse Jobs | VantaHire — Find Your Next Role',
-      description: 'Browse open positions across technology, consulting, and more. Apply directly through VantaHire with AI-powered matching and fit scoring.',
-      canonical: 'https://vantahire.com/jobs',
-      keywords: 'jobs India, tech jobs Bangalore, IT jobs APAC, apply online, VantaHire jobs',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Jobs", "item": "https://vantahire.com/jobs" }] }],
+      title: 'Browse Jobs | ealana — Find Your Next Role',
+      description: 'Browse open positions across technology, consulting, and more. Apply directly through ealana with AI-powered matching and fit scoring.',
+      canonical: 'https://ealana.com/jobs',
+      keywords: 'jobs India, tech jobs Bangalore, IT jobs APAC, apply online, ealana jobs',
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Jobs", "item": "https://ealana.com/jobs" }] }],
     },
     '/recruiters': {
-      title: 'Recruiters Directory | VantaHire — Find Specialist Recruiters',
-      description: 'Meet VantaHire\'s specialist recruiters. Industry experts in IT, telecom, automotive, fintech, and healthcare hiring across India and APAC.',
-      canonical: 'https://vantahire.com/recruiters',
+      title: 'Recruiters Directory | ealana — Find Specialist Recruiters',
+      description: 'Meet ealana\'s specialist recruiters. Industry experts in IT, telecom, automotive, fintech, and healthcare hiring across India and APAC.',
+      canonical: 'https://ealana.com/recruiters',
       keywords: 'specialist recruiters India, IT recruiters, telecom recruiters, healthcare recruiters APAC',
-      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://vantahire.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://vantahire.com/recruiters" }] }],
+      jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://ealana.com/recruiters" }] }],
     },
     '/privacy-policy': {
-      title: 'Privacy Policy | VantaHire',
-      description: 'How VantaHire collects, uses, and protects your data. Read our privacy policy covering candidate data, recruiter data, and platform usage.',
-      canonical: 'https://vantahire.com/privacy-policy',
+      title: 'Privacy Policy | ealana',
+      description: 'How ealana collects, uses, and protects your data. Read our privacy policy covering candidate data, recruiter data, and platform usage.',
+      canonical: 'https://ealana.com/privacy-policy',
     },
     '/terms-of-service': {
-      title: 'Terms of Service | VantaHire',
-      description: 'Terms and conditions for using the VantaHire recruiting platform. Covers account usage, data ownership, and service agreements.',
-      canonical: 'https://vantahire.com/terms-of-service',
+      title: 'Terms of Service | ealana',
+      description: 'Terms and conditions for using the ealana recruiting platform. Covers account usage, data ownership, and service agreements.',
+      canonical: 'https://ealana.com/terms-of-service',
     },
     '/cookie-policy': {
-      title: 'Cookie Policy | VantaHire',
-      description: 'How VantaHire uses cookies and similar technologies. Learn about the cookies we use and how to manage your preferences.',
-      canonical: 'https://vantahire.com/cookie-policy',
+      title: 'Cookie Policy | ealana',
+      description: 'How ealana uses cookies and similar technologies. Learn about the cookies we use and how to manage your preferences.',
+      canonical: 'https://ealana.com/cookie-policy',
     },
   };
 
@@ -496,7 +496,7 @@ export async function serveStatic(app: Express) {
       const indexPath = path.resolve(distPath, "index.html");
       let html = await fs.promises.readFile(indexPath, "utf-8");
 
-      const baseUrl = (process.env.BASE_URL || 'https://vantahire.com').replace(/\/$/, '');
+      const baseUrl = (process.env.BASE_URL || 'https://ealana.com').replace(/\/$/, '');
 
       html = upsertTitle(html, pageMeta.title);
       html = upsertMetaTag(html, 'name', 'title', pageMeta.title);
@@ -612,9 +612,9 @@ export async function serveStatic(app: Express) {
       let html = await fs.promises.readFile(indexPath, "utf-8");
 
       // Generate JSON-LD
-      const baseUrl = process.env.BASE_URL || 'https://vantahire.com';
+      const baseUrl = process.env.BASE_URL || 'https://ealana.com';
       const jobUrl = job.slug ? `${baseUrl}/jobs/${job.slug}` : `${baseUrl}/jobs/${job.id}`;
-      const pageTitle = `${job.title} | VantaHire`;
+      const pageTitle = `${job.title} | ealana`;
       const metaDescription = truncateText(
         `Apply for ${job.title} at ${job.location}. ${stripHtml(job.description)}`,
         155

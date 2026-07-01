@@ -314,6 +314,10 @@ export function generateJobPostingSchema(job: {
     return null;
   }
 
+  // Normalize base URL so a trailing slash (e.g. from BASE_URL env) never
+  // produces double slashes in generated job/logo URLs.
+  baseUrl = baseUrl.replace(/\/+$/, '');
+
   // Preserve HTML in description for Google Jobs
   const htmlDescription = sanitizeDescription(job.description);
 

@@ -196,7 +196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit: 50000, // Google sitemap limit
       });
 
-      const baseUrl = (process.env.BASE_URL || 'https://vantahire.com').replace(/\/$/, '');
+      const baseUrl = (process.env.BASE_URL || 'https://ealana.com').replace(/\/$/, '');
       const sitemapXML = generateJobsSitemapXML(activeJobs, baseUrl);
 
       res.header('Content-Type', 'application/xml');

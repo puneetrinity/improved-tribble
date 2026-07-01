@@ -1,4 +1,4 @@
-﻿# ealana
+# ealana
 
 > AI-native recruiting platform for startups and recruiting agencies.
 
