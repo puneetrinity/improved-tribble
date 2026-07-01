@@ -146,16 +146,16 @@ export async function setupVite(app: Express, server: Server) {
   // SSR meta injection for marketing pages (dev mode)
   const MARKETING_PAGES_DEV: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
-      title: 'ealana — AI-Native Recruiting Platform | Human Decisions, AI Acceleration',
-      description: 'The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free.',
+      title: 'ealana — AI Recruiting Platform | Discover, Memory, Flow',
+      description: 'ealana finds the candidates others miss, remembers every hiring decision, and runs your outreach — AI sourcing, shared hiring memory, and WhatsApp + email in one platform. Start free.',
       canonical: 'https://ealana.com/',
       keywords: 'AI recruiting platform, applicant tracking system India, AI candidate sourcing, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
-      title: 'Features | ealana — Six Pillars of AI-Native Recruiting',
-      description: 'Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center.',
+      title: 'Features | ealana — Discover, Memory, Flow',
+      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling.',
       canonical: 'https://ealana.com/features',
-      keywords: 'resume knowledge graph, AI candidate discovery, WhatsApp email outreach, client feedback portal, recruiter dashboard, job command center',
+      keywords: 'AI candidate discovery, hiring memory, recruiter outreach, WhatsApp email outreach, AI-ranked shortlist, candidate fit scoring, client feedback portal',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
@@ -177,8 +177,8 @@ export async function setupVite(app: Express, server: Server) {
       ],
     },
     '/solutions': {
-      title: 'Solutions | ealana — Built for Startups, Agencies & HR Teams',
-      description: 'See how startups, recruiting agencies, enterprises, and HR teams use ealana to hire faster. AI sourcing, client portal, and pipeline management for every team size.',
+      title: 'Solutions — ealana | Built for how recruiters work',
+      description: 'Whether you run an agency, staff at scale, or hire in-house — ealana adapts to how your team works. AI sourcing, shared hiring memory, and outreach in one platform.',
       canonical: 'https://ealana.com/solutions',
       keywords: 'startup hiring platform, ATS for startups, staffing agency ATS, recruiting agency platform, HR team recruiting, AI recruiting',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://ealana.com/solutions" }] }],
@@ -420,16 +420,16 @@ export async function serveStatic(app: Express) {
   // to prevent express.static from intercepting routes that match directories)
   const MARKETING_PAGES: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
-      title: 'ealana — AI-Native Recruiting Platform | Human Decisions, AI Acceleration',
-      description: 'The AI-native recruiting platform for startups and agencies. AI candidate sourcing, WhatsApp outreach, client portal, and pipeline management. Start free.',
+      title: 'ealana — AI Recruiting Platform | Discover, Memory, Flow',
+      description: 'ealana finds the candidates others miss, remembers every hiring decision, and runs your outreach — AI sourcing, shared hiring memory, and WhatsApp + email in one platform. Start free.',
       canonical: 'https://ealana.com/',
       keywords: 'AI recruiting platform, applicant tracking system India, AI candidate sourcing, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
-      title: 'Features | ealana — Six Pillars of AI-Native Recruiting',
-      description: 'Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center.',
+      title: 'Features | ealana — Discover, Memory, Flow',
+      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling.',
       canonical: 'https://ealana.com/features',
-      keywords: 'resume knowledge graph, AI candidate discovery, WhatsApp email outreach, client feedback portal, recruiter dashboard, job command center',
+      keywords: 'AI candidate discovery, hiring memory, recruiter outreach, WhatsApp email outreach, AI-ranked shortlist, candidate fit scoring, client feedback portal',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
@@ -451,8 +451,8 @@ export async function serveStatic(app: Express) {
       ],
     },
     '/solutions': {
-      title: 'Solutions | ealana — Built for Startups, Agencies & HR Teams',
-      description: 'See how startups, recruiting agencies, enterprises, and HR teams use ealana to hire faster. AI sourcing, client portal, and pipeline management for every team size.',
+      title: 'Solutions — ealana | Built for how recruiters work',
+      description: 'Whether you run an agency, staff at scale, or hire in-house — ealana adapts to how your team works. AI sourcing, shared hiring memory, and outreach in one platform.',
       canonical: 'https://ealana.com/solutions',
       keywords: 'startup hiring platform, ATS for startups, staffing agency ATS, recruiting agency platform, HR team recruiting, AI recruiting',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Solutions", "item": "https://ealana.com/solutions" }] }],

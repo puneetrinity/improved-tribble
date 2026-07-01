@@ -35,17 +35,17 @@ export default function FeaturesPage() {
   return (
     <>
       <Helmet>
-        <title>Features | ealana - Six Pillars of AI-Native Recruiting</title>
-        <meta name="description" content="Resume Knowledge Graph, AI Candidate Discovery, WhatsApp + Email Outreach, Client Feedback Portal, Recruiter Dashboard, and Job Command Center. All the capabilities recruiters need." />
+        <title>Features | ealana — Discover, Memory, Flow</title>
+        <meta name="description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
         <link rel="canonical" href="https://ealana.com/features" />
-        <meta property="og:title" content="Features | ealana - Six Pillars of AI-Native Recruiting" />
-        <meta property="og:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center - every capability recruiters need." />
+        <meta property="og:title" content="Features | ealana — Discover, Memory, Flow" />
+        <meta property="og:description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
         <meta property="og:url" content="https://ealana.com/features" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Features | ealana - Six Pillars of AI-Native Recruiting" />
-        <meta name="twitter:description" content="Resume Knowledge Graph, AI Discovery, WhatsApp Outreach, Client Portal, Dashboard, and Command Center." />
+        <meta name="twitter:title" content="Features | ealana — Discover, Memory, Flow" />
+        <meta name="twitter:description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
         <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
         <script type="application/ld+json">{breadcrumbJsonLd}</script>
       </Helmet>
