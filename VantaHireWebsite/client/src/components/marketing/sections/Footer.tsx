@@ -39,7 +39,7 @@ export default function Footer() {
               <span style={{ color: "#3D4460" }}> · </span>
               <span style={{ color: "#F5C842" }}>Flow</span>
             </div>
-            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "0.82rem", color: "#3D4460", maxWidth: 200, lineHeight: 1.65, marginTop: "0.75rem" }}>The neural OS for talent acquisition.</div>
+            <div style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "0.82rem", color: "#3D4460", maxWidth: 200, lineHeight: 1.65, marginTop: "0.75rem" }}>The Neural OS for Talent.</div>
           </div>
           <div>
             <div style={colTitle}>Product</div>

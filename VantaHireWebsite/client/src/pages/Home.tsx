@@ -14,17 +14,17 @@ const Home = () => {
   return (
     <>
       <Helmet>
-        <title>ealana — AI Recruiting Platform | Discover, Memory, Flow</title>
-        <meta name="description" content="ealana finds the candidates others miss, remembers every hiring decision, and runs your outreach — AI sourcing, shared hiring memory, and WhatsApp + email in one platform. Start free." />
+        <title>ealana — The Neural OS for Talent</title>
+        <meta name="description" content="ealana is the Neural OS for Talent — it finds the candidates others miss, remembers every hiring decision, and runs your outreach. AI sourcing, shared hiring memory, and WhatsApp + email in one system. Start free." />
         <link rel="canonical" href="https://ealana.com/" />
-        <meta property="og:title" content="Cut the noise. Find the signal. — ealana" />
-        <meta property="og:description" content="ealana finds the candidates others miss, remembers every hiring decision, and runs your outreach — AI sourcing, shared hiring memory, and WhatsApp + email in one platform. Start free." />
+        <meta property="og:title" content="ealana — The Neural OS for Talent" />
+        <meta property="og:description" content="ealana is the Neural OS for Talent — it finds the candidates others miss, remembers every hiring decision, and runs your outreach. AI sourcing, shared hiring memory, and WhatsApp + email in one system. Start free." />
         <meta property="og:url" content="https://ealana.com/" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Cut the noise. Find the signal. — ealana" />
-        <meta name="twitter:description" content="ealana finds the candidates others miss, remembers every hiring decision, and runs your outreach — AI sourcing, shared hiring memory, and WhatsApp + email in one platform. Start free." />
+        <meta name="twitter:title" content="ealana — The Neural OS for Talent" />
+        <meta name="twitter:description" content="ealana is the Neural OS for Talent — it finds the candidates others miss, remembers every hiring decision, and runs your outreach. AI sourcing, shared hiring memory, and WhatsApp + email in one system. Start free." />
         <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
       </Helmet>
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme min-h-screen">
