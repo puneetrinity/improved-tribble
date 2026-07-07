@@ -71,12 +71,14 @@ export default function HowItWorks() {
 
   // ── Scroll-jack state (refs so listeners never see stale values) ──
   const stepRef = useRef(0);          // current layer index
-  const lockedRef = useRef(false);    // is page scroll currently hijacked
+  // phase: idle → engaging (smoothly easing into center) → locked (stepping)
+  const phaseRef = useRef<"idle" | "engaging" | "locked">("idle");
   const canEngageRef = useRef(true);  // hysteresis guard against instant re-lock
-  const lockYRef = useRef(0);         // scrollY the page is frozen at while locked
+  const lockYRef = useRef(0);         // scrollY the page rests at while locked
   const accumRef = useRef(0);         // wheel delta accumulator
   const lastStepRef = useRef(0);      // timestamp of last step (cooldown)
   const prevDeltaRef = useRef(Number.POSITIVE_INFINITY); // previous center-delta
+  const rafRef = useRef<number | null>(null); // in-flight smooth-scroll animation
 
   const setStep = (n: number) => {
     stepRef.current = n;
@@ -94,9 +96,10 @@ export default function HowItWorks() {
 
     const STEP_THRESHOLD = 60;  // wheel delta needed to count as one "hard scroll"
     const COOLDOWN = 700;       // ms between steps so one gesture = one layer
-    const ENTER_TH = 0.1;       // engage when section center within 10% vh of center
-    const EXIT_TH = 0.45;       // re-arm only after section leaves center by 45% vh
+    const ENTER_TH = 0.2;       // engage when section center within 20% vh of center
+    const EXIT_TH = 0.5;        // re-arm only after section leaves center by 50% vh
     const TOUCH_THRESHOLD = 44; // px of swipe to count as one step
+    const ENGAGE_MS = 520;      // duration of the smooth "settle into center" glide
 
     const getCenterDelta = () => {
       const el = sectionRef.current;
@@ -105,24 +108,54 @@ export default function HowItWorks() {
       return rect.top + rect.height / 2 - window.innerHeight / 2;
     };
 
+    // Eased glide to a target scrollY (easeOutCubic). Replaces the old instant
+    // snap — this is what makes the section arrive smoothly instead of popping.
+    const smoothScrollTo = (targetY: number, onDone: () => void) => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      const startY = window.scrollY;
+      const dist = targetY - startY;
+      if (Math.abs(dist) < 2) {
+        window.scrollTo(0, targetY);
+        onDone();
+        return;
+      }
+      const startT = performance.now();
+      const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+      const frame = (now: number) => {
+        const t = Math.min((now - startT) / ENGAGE_MS, 1);
+        window.scrollTo(0, Math.round(startY + dist * ease(t)));
+        if (t < 1) {
+          rafRef.current = requestAnimationFrame(frame);
+        } else {
+          rafRef.current = null;
+          onDone();
+        }
+      };
+      rafRef.current = requestAnimationFrame(frame);
+    };
+
     const engage = (dir: "down" | "up") => {
       const el = sectionRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const targetY = window.scrollY + rect.top + rect.height / 2 - window.innerHeight / 2;
-      lockedRef.current = true;
-      lockYRef.current = targetY;
+      phaseRef.current = "engaging";
       accumRef.current = 0;
       lastStepRef.current = Date.now();
-      window.scrollTo({ top: targetY, behavior: "auto" });
+      lockYRef.current = targetY;
       setStep(dir === "down" ? 0 : stepCount - 1);
+      smoothScrollTo(targetY, () => {
+        lockYRef.current = window.scrollY;
+        lastStepRef.current = Date.now(); // brief settle before first step counts
+        phaseRef.current = "locked";
+      });
     };
 
-    const release = (dir: 1 | -1) => {
-      lockedRef.current = false;
-      canEngageRef.current = false; // don't immediately re-lock
-      // nudge just past the freeze point so the next gesture scrolls the page
-      window.scrollTo(0, lockYRef.current + dir * 8);
+    const release = () => {
+      if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      phaseRef.current = "idle";
+      canEngageRef.current = false; // don't immediately re-lock (hysteresis)
+      accumRef.current = 0;
     };
 
     const doStep = (dir: 1 | -1) => {
@@ -132,14 +165,14 @@ export default function HowItWorks() {
           setStep(stepRef.current + 1);
           lastStepRef.current = Date.now();
         } else {
-          release(1);
+          release();
         }
       } else {
         if (stepRef.current > 0) {
           setStep(stepRef.current - 1);
           lastStepRef.current = Date.now();
         } else {
-          release(-1);
+          release();
         }
       }
     };
@@ -148,8 +181,9 @@ export default function HowItWorks() {
       const vh = window.innerHeight;
       const d = getCenterDelta();
 
-      if (lockedRef.current) {
-        window.scrollTo(0, lockYRef.current); // keep frozen
+      // While engaging or locked we never fight the scroll — no re-pinning.
+      // (Wheel/touch/keys are blocked, so the page stays put on its own.)
+      if (phaseRef.current !== "idle") {
         prevDeltaRef.current = d;
         return;
       }
@@ -167,8 +201,9 @@ export default function HowItWorks() {
     };
 
     const onWheel = (e: WheelEvent) => {
-      if (!lockedRef.current) return;
-      e.preventDefault();
+      if (phaseRef.current === "idle") return;
+      e.preventDefault(); // hold the page during both the glide and the lock
+      if (phaseRef.current !== "locked") return; // no stepping mid-glide
       if (Date.now() - lastStepRef.current < COOLDOWN) {
         accumRef.current = 0;
         return;
@@ -181,13 +216,12 @@ export default function HowItWorks() {
     };
 
     const onKey = (e: KeyboardEvent) => {
-      if (!lockedRef.current) return;
-      if (["ArrowDown", "PageDown", " "].includes(e.key)) {
+      if (phaseRef.current === "idle") return;
+      if (["ArrowDown", "PageDown", " ", "ArrowUp", "PageUp"].includes(e.key)) {
         e.preventDefault();
-        doStep(1);
-      } else if (["ArrowUp", "PageUp"].includes(e.key)) {
-        e.preventDefault();
-        doStep(-1);
+        if (phaseRef.current !== "locked") return;
+        if (["ArrowDown", "PageDown", " "].includes(e.key)) doStep(1);
+        else doStep(-1);
       }
     };
 
@@ -196,8 +230,9 @@ export default function HowItWorks() {
       touchStartY = e.touches[0]?.clientY ?? 0;
     };
     const onTouchMove = (e: TouchEvent) => {
-      if (!lockedRef.current) return;
+      if (phaseRef.current === "idle") return;
       e.preventDefault();
+      if (phaseRef.current !== "locked") return;
       const y = e.touches[0]?.clientY ?? 0;
       const dy = touchStartY - y;
       if (Math.abs(dy) < TOUCH_THRESHOLD) return;
@@ -213,6 +248,7 @@ export default function HowItWorks() {
     window.addEventListener("touchmove", onTouchMove, { passive: false });
     window.addEventListener("resize", onScroll);
     return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKey);
@@ -222,7 +258,7 @@ export default function HowItWorks() {
     };
   }, [isMobile, stepCount]);
 
-  // Clicking a tab centers the section, locks, and jumps straight to that layer.
+  // Clicking a tab smoothly centers the section, locks, and jumps to that layer.
   const goToStep = (index: number) => {
     const el = sectionRef.current;
     if (isMobile || !el) {
@@ -231,12 +267,12 @@ export default function HowItWorks() {
     }
     const rect = el.getBoundingClientRect();
     const targetY = window.scrollY + rect.top + rect.height / 2 - window.innerHeight / 2;
-    lockedRef.current = true;
+    phaseRef.current = "locked";
     lockYRef.current = targetY;
     canEngageRef.current = false;
     accumRef.current = 0;
     lastStepRef.current = Date.now();
-    window.scrollTo({ top: targetY, behavior: "auto" });
+    window.scrollTo({ top: targetY, behavior: "smooth" });
     setStep(index);
   };
 
@@ -327,7 +363,7 @@ export default function HowItWorks() {
                 pointerEvents: "none",
               }}
             >
-              <span style={{ fontSize: "0.7rem" }}>👆</span> Try it out here
+              <span style={{ fontSize: "0.7rem" }}>👇</span> Try it out here
             </motion.div>
             {active.panel}
           </div>
