@@ -25,10 +25,29 @@ export async function ensureAtsSchema(): Promise<void> {
   await db.transaction(async (db: any) => {
     await db.execute(sql`SELECT pg_advisory_xact_lock(${lockId});`);
 
+    // Resilient per-statement execution: each DDL runs inside its own
+    // SAVEPOINT so one failure rolls back only that statement and the
+    // bootstrap continues (all statements are idempotent IF NOT EXISTS).
+    // Without this, a single failing statement aborts the whole transaction
+    // and every column after it silently never gets created (the exact cause
+    // of the Jul-2026 prod schema drift).
+    let bootstrapFailures = 0;
+    const execSafe = async (query: any): Promise<void> => {
+      await db.execute(sql`SAVEPOINT bootstrap_sp;`);
+      try {
+        await db.execute(query);
+        await db.execute(sql`RELEASE SAVEPOINT bootstrap_sp;`);
+      } catch (e) {
+        await db.execute(sql`ROLLBACK TO SAVEPOINT bootstrap_sp;`);
+        bootstrapFailures++;
+        console.error(`[bootstrap] statement failed (continuing): ${(e as Error).message}`);
+      }
+    };
+
     // Create base tables first (from schema.ts)
     console.log('  Creating base tables (users, jobs, applications, etc.)...');
 
-    await db.execute(sql`
+    await execSafe(sql`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username TEXT NOT NULL UNIQUE,
@@ -39,7 +58,7 @@ export async function ensureAtsSchema(): Promise<void> {
       );
     `);
 
-    await db.execute(sql`
+    await execSafe(sql`
       CREATE TABLE IF NOT EXISTS contact_submissions (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -52,7 +71,7 @@ export async function ensureAtsSchema(): Promise<void> {
       );
     `);
 
-    await db.execute(sql`
+    await execSafe(sql`
       CREATE TABLE IF NOT EXISTS jobs (
         id SERIAL PRIMARY KEY,
         title TEXT NOT NULL,
@@ -74,7 +93,7 @@ export async function ensureAtsSchema(): Promise<void> {
       );
     `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS user_profiles (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id),
@@ -87,7 +106,7 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS applications (
       id SERIAL PRIMARY KEY,
       job_id INTEGER NOT NULL REFERENCES jobs(id),
@@ -123,7 +142,7 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS job_analytics (
       id SERIAL PRIMARY KEY,
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -138,7 +157,7 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   // Create ATS tables if they do not exist
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS pipeline_stages (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -150,7 +169,7 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS email_templates (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -163,7 +182,7 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS application_stage_history (
       id SERIAL PRIMARY KEY,
       application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -175,7 +194,7 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS email_audit_log (
       id SERIAL PRIMARY KEY,
       application_id INTEGER REFERENCES applications(id) ON DELETE CASCADE,
@@ -191,7 +210,7 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS automation_settings (
       id SERIAL PRIMARY KEY,
       setting_key TEXT NOT NULL UNIQUE,
@@ -202,7 +221,7 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS consultants (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -219,75 +238,75 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   // Add ATS columns to applications table if missing
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS current_stage INTEGER;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_date TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_time TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_location TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_notes TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS recruiter_notes TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS hm_review_requested_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS hm_review_requested_by INTEGER REFERENCES users(id);`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS hm_review_note TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS rating INTEGER;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS tags TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage_changed_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage_changed_by INTEGER;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS current_stage INTEGER;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_date TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_time TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_location TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS interview_notes TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS recruiter_notes TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS hm_review_requested_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS hm_review_requested_by INTEGER REFERENCES users(id);`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS hm_review_note TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS rating INTEGER;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS tags TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage_changed_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS stage_changed_by INTEGER;`);
 
   // Phase 5: Add userId column for robust candidate authorization (binds applications to user accounts)
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);`);
 
   // Add resumeFilename column for proper file download headers
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_filename TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS extracted_resume_text TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_filename TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS extracted_resume_text TEXT;`);
 
   // Add recruiter metadata columns for "Add Candidate" feature
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS submitted_by_recruiter BOOLEAN DEFAULT FALSE;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id);`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'public_apply';`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS source_metadata JSONB;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS submitted_by_recruiter BOOLEAN DEFAULT FALSE;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS created_by_user_id INTEGER REFERENCES users(id);`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS source TEXT DEFAULT 'public_apply';`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS source_metadata JSONB;`);
 
   // Phase 5: Create performance indexes for hotspot queries
   // Jobs table indexes (status, postedBy, isActive for filtering)
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs(status);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS jobs_posted_by_idx ON jobs(posted_by);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS jobs_is_active_idx ON jobs(is_active);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS jobs_status_idx ON jobs(status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS jobs_posted_by_idx ON jobs(posted_by);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS jobs_is_active_idx ON jobs(is_active);`);
 
   // Applications table indexes (userId for auth, status for filtering)
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS applications_user_id_idx ON applications(user_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS applications_status_idx ON applications(status);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS applications_hm_review_requested_at_idx ON applications(hm_review_requested_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS applications_user_id_idx ON applications(user_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS applications_status_idx ON applications(status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS applications_hm_review_requested_at_idx ON applications(hm_review_requested_at);`);
 
   // Functional index for case-insensitive duplicate detection (recruiter-add)
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS applications_job_email_idx ON applications(job_id, LOWER(email));`);
-  await db.execute(sql`
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS applications_job_email_idx ON applications(job_id, LOWER(email));`);
+  await execSafe(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS applications_job_lower_email_unique
     ON applications(job_id, LOWER(email));
   `);
 
   // Fix jobs table: pending jobs should not be active by default
-  await db.execute(sql`ALTER TABLE jobs ALTER COLUMN is_active SET DEFAULT FALSE;`);
+  await execSafe(sql`ALTER TABLE jobs ALTER COLUMN is_active SET DEFAULT FALSE;`);
 
   // Clean up existing data: pending jobs should not be active
-  await db.execute(sql`UPDATE jobs SET is_active = FALSE WHERE status = 'pending' AND is_active = TRUE;`);
+  await execSafe(sql`UPDATE jobs SET is_active = FALSE WHERE status = 'pending' AND is_active = TRUE;`);
 
   // Phase 2 (SEO): Add slug and updatedAt columns for SEO-friendly URLs
   console.log('  Adding SEO columns to jobs table...');
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS slug TEXT;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW() NOT NULL;`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS jobs_slug_idx ON jobs(slug);`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS slug TEXT;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW() NOT NULL;`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS jobs_slug_idx ON jobs(slug);`);
 
   // Phase 7 (Job Lifecycle): Add deactivation/reactivation tracking columns
   console.log('  Adding job lifecycle tracking columns...');
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS reactivated_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS reactivation_count INTEGER DEFAULT 0 NOT NULL;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deactivation_reason TEXT;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS warning_email_sent BOOLEAN DEFAULT FALSE NOT NULL;`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS jobs_deactivated_at_idx ON jobs(deactivated_at);`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS reactivated_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS reactivation_count INTEGER DEFAULT 0 NOT NULL;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS deactivation_reason TEXT;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS warning_email_sent BOOLEAN DEFAULT FALSE NOT NULL;`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS jobs_deactivated_at_idx ON jobs(deactivated_at);`);
 
   // Backfill deactivatedAt for existing inactive jobs
   console.log('  Backfilling deactivation timestamps for existing inactive jobs...');
-  await db.execute(sql`
+  await execSafe(sql`
     UPDATE jobs
     SET deactivated_at = updated_at,
         deactivation_reason = 'manual'
@@ -298,7 +317,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Phase 7 (Job Audit): Create audit log table for compliance and debugging
   console.log('  Creating job audit log table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS job_audit_log (
       id SERIAL PRIMARY KEY,
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -310,15 +329,15 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_audit_log_job_id_idx ON job_audit_log(job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_audit_log_timestamp_idx ON job_audit_log(timestamp);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_audit_log_action_idx ON job_audit_log(action);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_audit_log_job_id_idx ON job_audit_log(job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_audit_log_timestamp_idx ON job_audit_log(timestamp);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_audit_log_action_idx ON job_audit_log(action);`);
 
   // Forms Feature: Create forms tables in dependency order
   console.log('  Creating forms tables...');
 
   // 1. forms table (no dependencies)
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS forms (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -331,7 +350,7 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   // 2. form_fields table (depends on forms)
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS form_fields (
       id SERIAL PRIMARY KEY,
       form_id INTEGER NOT NULL REFERENCES forms(id) ON DELETE CASCADE,
@@ -344,7 +363,7 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   // 3. form_invitations table (depends on forms, applications)
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS form_invitations (
       id SERIAL PRIMARY KEY,
       application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -365,7 +384,7 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   // 4. form_responses table (depends on form_invitations, applications)
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS form_responses (
       id SERIAL PRIMARY KEY,
       invitation_id INTEGER NOT NULL REFERENCES form_invitations(id) ON DELETE CASCADE UNIQUE,
@@ -375,7 +394,7 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   // 5. form_response_answers table (depends on form_responses, form_fields)
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS form_response_answers (
       id SERIAL PRIMARY KEY,
       response_id INTEGER NOT NULL REFERENCES form_responses(id) ON DELETE CASCADE,
@@ -387,19 +406,19 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Forms Feature: Create indexes
   console.log('  Creating forms indexes...');
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS forms_created_by_idx ON forms(created_by);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS forms_is_published_idx ON forms(is_published);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_fields_form_id_order_idx ON form_fields(form_id, "order");`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_invitations_token_idx ON form_invitations(token);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_invitations_app_status_idx ON form_invitations(application_id, status);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_invitations_created_at_idx ON form_invitations(created_at);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_invitations_form_id_idx ON form_invitations(form_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_responses_application_id_idx ON form_responses(application_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_response_answers_response_id_idx ON form_response_answers(response_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS forms_created_by_idx ON forms(created_by);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS forms_is_published_idx ON forms(is_published);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_fields_form_id_order_idx ON form_fields(form_id, "order");`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_invitations_token_idx ON form_invitations(token);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_invitations_app_status_idx ON form_invitations(application_id, status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_invitations_created_at_idx ON form_invitations(created_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_invitations_form_id_idx ON form_invitations(form_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_responses_application_id_idx ON form_responses(application_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_response_answers_response_id_idx ON form_response_answers(response_id);`);
 
   // Forms Feature: Create partial unique index for active invitations (prevents duplicates)
   console.log('  Creating partial unique index for active form invitations...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS form_invitations_active_unique
     ON form_invitations (application_id, form_id)
     WHERE status IN ('pending', 'sent', 'viewed');
@@ -408,13 +427,13 @@ export async function ensureAtsSchema(): Promise<void> {
   // External Invites Feature: Add columns to form_invitations for external candidate invites
   console.log('  Adding external invite columns to form_invitations...');
   // Make application_id nullable (external invites have no application yet)
-  await db.execute(sql`ALTER TABLE form_invitations ALTER COLUMN application_id DROP NOT NULL;`);
+  await execSafe(sql`ALTER TABLE form_invitations ALTER COLUMN application_id DROP NOT NULL;`);
   // Add email column for external candidate
-  await db.execute(sql`ALTER TABLE form_invitations ADD COLUMN IF NOT EXISTS email TEXT;`);
+  await execSafe(sql`ALTER TABLE form_invitations ADD COLUMN IF NOT EXISTS email TEXT;`);
   // Add candidate_name column for external candidate
-  await db.execute(sql`ALTER TABLE form_invitations ADD COLUMN IF NOT EXISTS candidate_name TEXT;`);
+  await execSafe(sql`ALTER TABLE form_invitations ADD COLUMN IF NOT EXISTS candidate_name TEXT;`);
   // Add job_id column for optional job association
-  await db.execute(sql`
+  await execSafe(sql`
     DO $$
     BEGIN
       IF NOT EXISTS (
@@ -427,11 +446,11 @@ export async function ensureAtsSchema(): Promise<void> {
     END $$;
   `);
   // Create index for external invite lookups by email
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS form_invitations_email_idx ON form_invitations(email);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS form_invitations_email_idx ON form_invitations(email);`);
 
   // Talent Pool Feature: Create talent_pool table for managing external candidates
   console.log('  Creating talent_pool table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS talent_pool (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL,
@@ -449,12 +468,12 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Talent Pool: Create indexes
   console.log('  Creating talent_pool indexes...');
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS talent_pool_recruiter_id_idx ON talent_pool(recruiter_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS talent_pool_email_idx ON talent_pool(email);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS talent_pool_source_idx ON talent_pool(source);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS talent_pool_recruiter_id_idx ON talent_pool(recruiter_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS talent_pool_email_idx ON talent_pool(email);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS talent_pool_source_idx ON talent_pool(source);`);
 
   // Talent Pool: Create unique index for email per recruiter
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS talent_pool_recruiter_email_unique
     ON talent_pool(recruiter_id, LOWER(email));
   `);
@@ -463,53 +482,53 @@ export async function ensureAtsSchema(): Promise<void> {
   console.log('  Adding AI matching columns to existing tables...');
 
   // Users table: AI feature tracking
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_content_free_used BOOLEAN DEFAULT FALSE;`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_onboarded_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_content_free_used BOOLEAN DEFAULT FALSE;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_onboarded_at TIMESTAMP;`);
 
   // Users table: Profile completion tracking
   console.log('  Adding profile completion columns to users table...');
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_prompt_snooze_until TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_completed_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_prompt_snooze_until TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_completed_at TIMESTAMP;`);
 
   // Users table: Onboarding tracking
   console.log('  Adding onboarding tracking column to users table...');
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_skipped_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completed_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_skipped_at TIMESTAMP;`);
 
   // Jobs table: JD digest caching
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS jd_digest JSONB;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS jd_digest_version INTEGER DEFAULT 1;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS jd_digest JSONB;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS jd_digest_version INTEGER DEFAULT 1;`);
 
   // Applications table: AI fit scoring
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_fit_score INTEGER;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_fit_label TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_fit_reasons JSONB;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_model_version TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_computed_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_stale_reason TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_digest_version_used INTEGER;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary_version INTEGER DEFAULT 1;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_suggested_action TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_suggested_action_reason TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary_computed_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary_model_version TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_strengths TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_concerns TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_key_highlights TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_matched TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_missing TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_match_percentage INTEGER;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_depth_notes TEXT;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_good_to_have_skills_matched TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_good_to_have_skills_missing TEXT[];`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_id INTEGER;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_fit_score INTEGER;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_fit_label TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_fit_reasons JSONB;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_model_version TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_computed_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_stale_reason TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_digest_version_used INTEGER;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary_version INTEGER DEFAULT 1;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_suggested_action TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_suggested_action_reason TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary_computed_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_summary_model_version TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_strengths TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_concerns TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_key_highlights TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_matched TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_missing TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_match_percentage INTEGER;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_required_skills_depth_notes TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_good_to_have_skills_matched TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS ai_good_to_have_skills_missing TEXT[];`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS resume_id INTEGER;`);
 
   // AI Matching Feature: Create new tables
   console.log('  Creating AI matching tables...');
 
   // Candidate resumes table
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS candidate_resumes (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -523,7 +542,7 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   // User AI usage tracking table
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS user_ai_usage (
       id SERIAL PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -538,14 +557,14 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // AI Matching Feature: Create indexes
   console.log('  Creating AI matching indexes...');
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS candidate_resumes_user_id_idx ON candidate_resumes(user_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS user_ai_usage_user_id_idx ON user_ai_usage(user_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS user_ai_usage_kind_idx ON user_ai_usage(kind);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS user_ai_usage_computed_at_idx ON user_ai_usage(computed_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS candidate_resumes_user_id_idx ON candidate_resumes(user_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS user_ai_usage_user_id_idx ON user_ai_usage(user_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS user_ai_usage_kind_idx ON user_ai_usage(kind);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS user_ai_usage_computed_at_idx ON user_ai_usage(computed_at);`);
 
   // AI Matching Feature: Create partial unique index for default resume
   console.log('  Creating partial unique index for default resume per user...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS candidate_resumes_unique_default_per_user
     ON candidate_resumes(user_id)
     WHERE is_default = true;
@@ -553,7 +572,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // AI Matching Feature: Create trigger to enforce max 3 resumes per user
   console.log('  Creating trigger to enforce max 3 resumes per user...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE OR REPLACE FUNCTION check_resume_limit()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -565,7 +584,7 @@ export async function ensureAtsSchema(): Promise<void> {
     $$ LANGUAGE plpgsql;
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     DO $$
     BEGIN
       IF NOT EXISTS (
@@ -581,7 +600,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // AI Matching Feature: Add foreign key constraint for resume_id in applications
   console.log('  Adding foreign key constraint for resume_id in applications...');
-  await db.execute(sql`
+  await execSafe(sql`
     DO $$
     BEGIN
       IF NOT EXISTS (
@@ -597,7 +616,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // ATS: Application feedback (hiring manager feedback)
   console.log('  Creating application_feedback table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS application_feedback (
       id SERIAL PRIMARY KEY,
       application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -610,17 +629,17 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS application_feedback_application_id_idx ON application_feedback(application_id);
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS application_feedback_author_id_idx ON application_feedback(author_id);
   `);
 
   // Consulting/Agency Feature: Clients
   console.log('  Creating clients table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS clients (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -633,13 +652,13 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS clients_created_by_idx ON clients(created_by);
   `);
 
   // Consulting/Agency Feature: Client Shortlists
   console.log('  Creating client_shortlists table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS client_shortlists (
       id SERIAL PRIMARY KEY,
       client_id INTEGER NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
@@ -654,21 +673,21 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_shortlists_client_id_idx ON client_shortlists(client_id);
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_shortlists_job_id_idx ON client_shortlists(job_id);
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_shortlists_token_idx ON client_shortlists(token);
   `);
 
   // Consulting/Agency Feature: Client Shortlist Items
   console.log('  Creating client_shortlist_items table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS client_shortlist_items (
       id SERIAL PRIMARY KEY,
       shortlist_id INTEGER NOT NULL REFERENCES client_shortlists(id) ON DELETE CASCADE,
@@ -679,17 +698,17 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_shortlist_items_shortlist_id_idx ON client_shortlist_items(shortlist_id);
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_shortlist_items_application_id_idx ON client_shortlist_items(application_id);
   `);
 
   // Consulting/Agency Feature: Client Feedback
   console.log('  Creating client_feedback table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS client_feedback (
       id SERIAL PRIMARY KEY,
       application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE,
@@ -702,21 +721,21 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_feedback_application_id_idx ON client_feedback(application_id);
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_feedback_client_id_idx ON client_feedback(client_id);
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS client_feedback_shortlist_id_idx ON client_feedback(shortlist_id);
   `);
 
   // ATS: Add hiring_manager_id column to jobs table
   console.log('  Adding hiring_manager_id column to jobs table...');
-  await db.execute(sql`
+  await execSafe(sql`
     DO $$
     BEGIN
       IF NOT EXISTS (
@@ -731,7 +750,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Consulting/Agency Feature: Add clientId column to jobs table
   console.log('  Adding client_id column to jobs table...');
-  await db.execute(sql`
+  await execSafe(sql`
     DO $$
     BEGIN
       IF NOT EXISTS (
@@ -746,35 +765,35 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Migration: Rename admin role to super_admin (idempotent)
   console.log('  Migrating admin role to super_admin...');
-  await db.execute(sql`
+  await execSafe(sql`
     UPDATE users SET role = 'super_admin' WHERE role = 'admin';
   `);
 
   // Migration: Update admin username to email format for login compatibility
   console.log('  Updating admin username to email format...');
-  await db.execute(sql`
+  await execSafe(sql`
     UPDATE users SET username = 'admin@vantahire.local'
     WHERE username = 'admin' AND role = 'super_admin';
   `);
 
   // Operations Command Center: Add rejection_reason column to applications
   console.log('  Adding rejection_reason column to applications table...');
-  await db.execute(sql`
+  await execSafe(sql`
     ALTER TABLE applications ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS applications_rejection_reason_idx ON applications(rejection_reason);
   `);
 
   // WhatsApp consent: Add whatsapp_consent column to applications
   console.log('  Adding whatsapp_consent column to applications table...');
-  await db.execute(sql`
+  await execSafe(sql`
     ALTER TABLE applications ADD COLUMN IF NOT EXISTS whatsapp_consent BOOLEAN NOT NULL DEFAULT TRUE;
   `);
 
   // Operations Command Center: Create automation_events table for tracking automation activity
   console.log('  Creating automation_events table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS automation_events (
       id SERIAL PRIMARY KEY,
       automation_key TEXT NOT NULL,
@@ -788,16 +807,16 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
 
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS automation_events_key_idx ON automation_events(automation_key);
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS automation_events_target_type_idx ON automation_events(target_type);
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS automation_events_triggered_at_idx ON automation_events(triggered_at);
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS automation_events_outcome_idx ON automation_events(outcome);
   `);
 
@@ -814,7 +833,7 @@ export async function ensureAtsSchema(): Promise<void> {
   ];
 
   for (const setting of defaultSettings) {
-    await db.execute(sql`
+    await execSafe(sql`
       INSERT INTO automation_settings (setting_key, setting_value, description)
       VALUES (${setting.key}, false, ${setting.description})
       ON CONFLICT (setting_key) DO NOTHING
@@ -823,31 +842,31 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Email Verification: Add verification columns to users table
   console.log('  Adding email verification columns to users table...');
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token TEXT;`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT FALSE;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_token TEXT;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verification_expires TIMESTAMP;`);
 
   // Password Reset: Add password reset columns to users table
   console.log('  Adding password reset columns to users table...');
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token TEXT;`);
-  await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token TEXT;`);
+  await execSafe(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires TIMESTAMP;`);
 
   // Recruiter Profiles: Add profile columns to user_profiles table
   console.log('  Adding recruiter profile columns to user_profiles table...');
-  await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS display_name TEXT;`);
-  await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS company TEXT;`);
-  await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone TEXT;`);
-  await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS photo_url TEXT;`);
-  await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;`);
+  await execSafe(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS display_name TEXT;`);
+  await execSafe(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS company TEXT;`);
+  await execSafe(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS phone TEXT;`);
+  await execSafe(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS photo_url TEXT;`);
+  await execSafe(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;`);
 
   // URL Security: Add publicId column for non-enumerable recruiter URLs
   console.log('  Adding publicId column to user_profiles table...');
-  await db.execute(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS public_id TEXT;`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_profiles_public_id_idx ON user_profiles(public_id);`);
+  await execSafe(sql`ALTER TABLE user_profiles ADD COLUMN IF NOT EXISTS public_id TEXT;`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS user_profiles_public_id_idx ON user_profiles(public_id);`);
 
   // WhatsApp Integration: Create WhatsApp templates table
   console.log('  Creating whatsapp_templates table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS whatsapp_templates (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -865,16 +884,16 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // WhatsApp Integration: Create indexes for whatsapp_templates
   console.log('  Creating whatsapp_templates indexes...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS whatsapp_templates_type_idx ON whatsapp_templates(template_type);
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS whatsapp_templates_status_idx ON whatsapp_templates(status);
   `);
 
   // WhatsApp Integration: Create WhatsApp audit log table
   console.log('  Creating whatsapp_audit_log table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS whatsapp_audit_log (
       id SERIAL PRIMARY KEY,
       application_id INTEGER REFERENCES applications(id) ON DELETE CASCADE,
@@ -895,22 +914,22 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // WhatsApp Integration: Create indexes for whatsapp_audit_log
   console.log('  Creating whatsapp_audit_log indexes...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS whatsapp_audit_log_application_id_idx ON whatsapp_audit_log(application_id);
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS whatsapp_audit_log_status_idx ON whatsapp_audit_log(status);
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS whatsapp_audit_log_message_id_idx ON whatsapp_audit_log(message_id);
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE INDEX IF NOT EXISTS whatsapp_audit_log_sent_at_idx ON whatsapp_audit_log(sent_at);
   `);
 
   // Hiring Manager Invitations: Create table for inviting hiring managers
   console.log('  Creating hiring_manager_invitations table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS hiring_manager_invitations (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL,
@@ -927,14 +946,14 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Hiring Manager Invitations: Create indexes
   console.log('  Creating hiring_manager_invitations indexes...');
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS hm_invitations_email_idx ON hiring_manager_invitations(email);`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS hm_invitations_token_idx ON hiring_manager_invitations(token);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS hm_invitations_invited_by_idx ON hiring_manager_invitations(invited_by);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS hm_invitations_status_idx ON hiring_manager_invitations(status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS hm_invitations_email_idx ON hiring_manager_invitations(email);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS hm_invitations_token_idx ON hiring_manager_invitations(token);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS hm_invitations_invited_by_idx ON hiring_manager_invitations(invited_by);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS hm_invitations_status_idx ON hiring_manager_invitations(status);`);
 
   // Job Recruiters: Many-to-many table for co-recruiters on jobs
   console.log('  Creating job_recruiters table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS job_recruiters (
       id SERIAL PRIMARY KEY,
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -946,13 +965,13 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Job Recruiters: Create indexes
   console.log('  Creating job_recruiters indexes...');
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_recruiter_unique_idx ON job_recruiters(job_id, recruiter_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_recruiters_job_idx ON job_recruiters(job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_recruiters_recruiter_idx ON job_recruiters(recruiter_id);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_recruiter_unique_idx ON job_recruiters(job_id, recruiter_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_recruiters_job_idx ON job_recruiters(job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_recruiters_recruiter_idx ON job_recruiters(recruiter_id);`);
 
   // Co-Recruiter Invitations: Invite recruiters to collaborate on jobs
   console.log('  Creating co_recruiter_invitations table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS co_recruiter_invitations (
       id SERIAL PRIMARY KEY,
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -970,13 +989,13 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Co-Recruiter Invitations: Create indexes
   console.log('  Creating co_recruiter_invitations indexes...');
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS co_recruiter_invite_token_idx ON co_recruiter_invitations(token);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS co_recruiter_invite_job_email_idx ON co_recruiter_invitations(job_id, email);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS co_recruiter_invite_status_idx ON co_recruiter_invitations(status);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS co_recruiter_invite_token_idx ON co_recruiter_invitations(token);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS co_recruiter_invite_job_email_idx ON co_recruiter_invitations(job_id, email);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS co_recruiter_invite_status_idx ON co_recruiter_invitations(status);`);
 
   // AI Fit Jobs: Async job processing for AI fit scoring
   console.log('  Creating ai_fit_jobs table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS ai_fit_jobs (
       id SERIAL PRIMARY KEY,
       bull_job_id TEXT NOT NULL,
@@ -999,31 +1018,31 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // AI Fit Jobs: Create indexes
   console.log('  Creating ai_fit_jobs indexes...');
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS ai_fit_jobs_bull_job_id_idx ON ai_fit_jobs(bull_job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_fit_jobs_user_status_idx ON ai_fit_jobs(user_id, status);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_fit_jobs_application_id_idx ON ai_fit_jobs(application_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS ai_fit_jobs_created_at_idx ON ai_fit_jobs(created_at);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS ai_fit_jobs_bull_job_id_idx ON ai_fit_jobs(bull_job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS ai_fit_jobs_user_status_idx ON ai_fit_jobs(user_id, status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS ai_fit_jobs_application_id_idx ON ai_fit_jobs(application_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS ai_fit_jobs_created_at_idx ON ai_fit_jobs(created_at);`);
 
   // Client Shortlists: Add missing columns for existing tables
   console.log('  Adding missing columns to client_shortlists table...');
-  await db.execute(sql`ALTER TABLE client_shortlists ADD COLUMN IF NOT EXISTS title TEXT;`);
-  await db.execute(sql`ALTER TABLE client_shortlists ADD COLUMN IF NOT EXISTS message TEXT;`);
+  await execSafe(sql`ALTER TABLE client_shortlists ADD COLUMN IF NOT EXISTS title TEXT;`);
+  await execSafe(sql`ALTER TABLE client_shortlists ADD COLUMN IF NOT EXISTS message TEXT;`);
 
   // Structured Job Requirements: Add salary, skills, education, experience columns
   console.log('  Adding structured job requirement columns to jobs table...');
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_min INTEGER;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_max INTEGER;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_period TEXT;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS good_to_have_skills TEXT[];`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS education_requirement TEXT;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS experience_years INTEGER;`);
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS original_jd TEXT;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_min INTEGER;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_max INTEGER;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary_period TEXT;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS good_to_have_skills TEXT[];`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS education_requirement TEXT;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS experience_years INTEGER;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS original_jd TEXT;`);
 
   // ============= ORGANIZATION & SUBSCRIPTION TABLES =============
 
   // Organizations table
   console.log('  Creating organizations table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS organizations (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
@@ -1050,7 +1069,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Organization Members table
   console.log('  Creating organization_members table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS organization_members (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1067,11 +1086,11 @@ export async function ensureAtsSchema(): Promise<void> {
       invited_by INTEGER REFERENCES users(id)
     );
   `);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_members_org_user_idx ON organization_members(organization_id, user_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS org_members_user_idx ON organization_members(user_id);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_members_org_user_idx ON organization_members(organization_id, user_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS org_members_user_idx ON organization_members(user_id);`);
 
   console.log('  Creating mautic_contact_links table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS mautic_contact_links (
       id SERIAL PRIMARY KEY,
       user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -1087,14 +1106,14 @@ export async function ensureAtsSchema(): Promise<void> {
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS mautic_contact_links_email_idx ON mautic_contact_links(email);`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS mautic_contact_links_user_idx ON mautic_contact_links(user_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS mautic_contact_links_contact_idx ON mautic_contact_links(mautic_contact_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS mautic_contact_links_org_idx ON mautic_contact_links(organization_id);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS mautic_contact_links_email_idx ON mautic_contact_links(email);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS mautic_contact_links_user_idx ON mautic_contact_links(user_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS mautic_contact_links_contact_idx ON mautic_contact_links(mautic_contact_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS mautic_contact_links_org_idx ON mautic_contact_links(organization_id);`);
 
   // Organization Invites table
   console.log('  Creating organization_invites table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS organization_invites (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1108,11 +1127,11 @@ export async function ensureAtsSchema(): Promise<void> {
       created_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_invites_org_email_idx ON organization_invites(organization_id, email);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_invites_org_email_idx ON organization_invites(organization_id, email);`);
 
   // Organization Join Requests table
   console.log('  Creating organization_join_requests table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS organization_join_requests (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1127,7 +1146,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Domain Claim Requests table
   console.log('  Creating domain_claim_requests table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS domain_claim_requests (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1143,7 +1162,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Subscription Plans table
   console.log('  Creating subscription_plans table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS subscription_plans (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL UNIQUE,
@@ -1162,7 +1181,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Organization Subscriptions table
   console.log('  Creating organization_subscriptions table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS organization_subscriptions (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1190,7 +1209,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Organization Credit Balances table
   console.log('  Creating organization_credit_balances table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS organization_credit_balances (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL UNIQUE REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1205,11 +1224,11 @@ export async function ensureAtsSchema(): Promise<void> {
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`ALTER TABLE organization_credit_balances ADD COLUMN IF NOT EXISTS purchased_used INTEGER NOT NULL DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE organization_credit_balances ADD COLUMN IF NOT EXISTS purchased_used INTEGER NOT NULL DEFAULT 0;`);
 
   // Organization Credit Transactions table
   console.log('  Creating organization_credit_transactions table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS organization_credit_transactions (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1220,13 +1239,13 @@ export async function ensureAtsSchema(): Promise<void> {
       created_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_credit_balances_org_idx ON organization_credit_balances(organization_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS org_credit_transactions_org_idx ON organization_credit_transactions(organization_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS org_credit_transactions_type_idx ON organization_credit_transactions(type);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS org_credit_balances_org_idx ON organization_credit_balances(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS org_credit_transactions_org_idx ON organization_credit_transactions(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS org_credit_transactions_type_idx ON organization_credit_transactions(type);`);
 
   // Payment Transactions table
   console.log('  Creating payment_transactions table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS payment_transactions (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id),
@@ -1251,7 +1270,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Webhook Events table (for idempotency)
   console.log('  Creating webhook_events table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS webhook_events (
       id SERIAL PRIMARY KEY,
       provider TEXT NOT NULL,
@@ -1263,11 +1282,11 @@ export async function ensureAtsSchema(): Promise<void> {
       error_message TEXT
     );
   `);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS webhook_events_event_id_idx ON webhook_events(provider, event_id);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS webhook_events_event_id_idx ON webhook_events(provider, event_id);`);
 
   // Subscription Alerts table
   console.log('  Creating subscription_alerts table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS subscription_alerts (
       id SERIAL PRIMARY KEY,
       subscription_id INTEGER NOT NULL REFERENCES organization_subscriptions(id),
@@ -1280,7 +1299,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Subscription Audit Log table
   console.log('  Creating subscription_audit_log table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS subscription_audit_log (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id),
@@ -1296,7 +1315,7 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Checkout Intents table (for public checkout flow)
   console.log('  Creating checkout_intents table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS checkout_intents (
       id SERIAL PRIMARY KEY,
       email TEXT NOT NULL,
@@ -1323,39 +1342,39 @@ export async function ensureAtsSchema(): Promise<void> {
     );
   `);
   console.log('  Creating checkout_intents indexes...');
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS checkout_intents_email_idx ON checkout_intents(email);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS checkout_intents_status_idx ON checkout_intents(status);`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS checkout_intents_claim_token_idx ON checkout_intents(claim_token) WHERE claim_token IS NOT NULL;`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS checkout_intents_cashfree_order_idx ON checkout_intents(cashfree_order_id) WHERE cashfree_order_id IS NOT NULL;`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS checkout_intents_expires_at_idx ON checkout_intents(expires_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS checkout_intents_email_idx ON checkout_intents(email);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS checkout_intents_status_idx ON checkout_intents(status);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS checkout_intents_claim_token_idx ON checkout_intents(claim_token) WHERE claim_token IS NOT NULL;`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS checkout_intents_cashfree_order_idx ON checkout_intents(cashfree_order_id) WHERE cashfree_order_id IS NOT NULL;`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS checkout_intents_expires_at_idx ON checkout_intents(expires_at);`);
 
   // Add organizationId to existing tables
   console.log('  Adding organization_id to existing tables...');
-  await db.execute(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE forms ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE form_invitations ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE automation_settings ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE talent_pool ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE user_ai_usage ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE job_analytics ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE job_audit_log ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE co_recruiter_invitations ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE job_recruiters ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE automation_events ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE client_feedback ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE client_shortlist_items ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
-  await db.execute(sql`ALTER TABLE client_shortlists ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE clients ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE forms ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE form_invitations ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE form_responses ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE email_templates ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE pipeline_stages ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE automation_settings ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE talent_pool ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE user_ai_usage ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE job_analytics ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE job_audit_log ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE co_recruiter_invitations ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE job_recruiters ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE automation_events ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE client_feedback ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE client_shortlist_items ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
+  await execSafe(sql`ALTER TABLE client_shortlists ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id);`);
 
   // Create indexes for organization_id columns
   console.log('  Creating organization indexes...');
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS jobs_org_idx ON jobs(organization_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS applications_org_idx ON applications(organization_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS clients_org_idx ON clients(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS jobs_org_idx ON jobs(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS applications_org_idx ON applications(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS clients_org_idx ON clients(organization_id);`);
 
   // Seed default subscription plans
   console.log('  Seeding default subscription plans...');
@@ -1392,7 +1411,7 @@ export async function ensureAtsSchema(): Promise<void> {
     apiAccess: true,
     prioritySupport: true,
   });
-  await db.execute(sql`
+  await execSafe(sql`
     INSERT INTO subscription_plans (
       name,
       display_name,
@@ -1422,7 +1441,7 @@ export async function ensureAtsSchema(): Promise<void> {
   // Fix duplicate job slugs by prepending job ID (e.g., "123-relationship-manager")
   // ID-first format allows the router to extract ID for direct lookup
   console.log('  Fixing duplicate job slugs...');
-  await db.execute(sql`
+  await execSafe(sql`
     UPDATE jobs
     SET slug = CONCAT(id::text, '-', slug)
     WHERE slug IS NOT NULL
@@ -1431,25 +1450,25 @@ export async function ensureAtsSchema(): Promise<void> {
 
   // Admin Org Controls: Add bonus credits fields to organization_subscriptions
   console.log('  Adding bonus credits columns to organization_subscriptions...');
-  await db.execute(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits INTEGER DEFAULT 0;`);
-  await db.execute(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits_granted_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits_reason TEXT;`);
-  await db.execute(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits_granted_by INTEGER REFERENCES users(id);`);
-  await db.execute(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS custom_credit_limit INTEGER;`);
+  await execSafe(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits INTEGER DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits_granted_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits_reason TEXT;`);
+  await execSafe(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS bonus_credits_granted_by INTEGER REFERENCES users(id);`);
+  await execSafe(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS custom_credit_limit INTEGER;`);
 
   // Add paid_seats column for accurate MRR calculation (tracks seats actually paid for)
   console.log('  Adding paid_seats column to organization_subscriptions...');
-  await db.execute(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS paid_seats INTEGER NOT NULL DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE organization_subscriptions ADD COLUMN IF NOT EXISTS paid_seats INTEGER NOT NULL DEFAULT 0;`);
 
   // ============= SIGNAL SOURCING TABLES =============
 
   // Add signal_tenant_id to organizations
   console.log('  Adding signal_tenant_id to organizations...');
-  await db.execute(sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS signal_tenant_id TEXT UNIQUE;`);
+  await execSafe(sql`ALTER TABLE organizations ADD COLUMN IF NOT EXISTS signal_tenant_id TEXT UNIQUE;`);
 
   // Job Sourcing Runs table
   console.log('  Creating job_sourcing_runs table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS job_sourcing_runs (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1469,18 +1488,18 @@ export async function ensureAtsSchema(): Promise<void> {
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourcing_runs_org_job_idx ON job_sourcing_runs(organization_id, job_id);`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_sourcing_runs_request_id_idx ON job_sourcing_runs(request_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourcing_runs_status_idx ON job_sourcing_runs(status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourcing_runs_org_job_idx ON job_sourcing_runs(organization_id, job_id);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_sourcing_runs_request_id_idx ON job_sourcing_runs(request_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourcing_runs_status_idx ON job_sourcing_runs(status);`);
   // Partial unique: only one non-terminal run per org+job+context. Terminal runs (completed/failed/expired) don't block reruns.
   // DROP first: IF NOT EXISTS won't replace an existing non-partial index with the same name.
-  await db.execute(sql`DROP INDEX IF EXISTS job_sourcing_runs_active_idx;`);
-  await db.execute(sql`CREATE UNIQUE INDEX job_sourcing_runs_active_idx ON job_sourcing_runs(organization_id, external_job_id, context_hash) WHERE status NOT IN ('completed', 'failed', 'expired');`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourcing_runs_expires_at_idx ON job_sourcing_runs(expires_at);`);
+  await execSafe(sql`DROP INDEX IF EXISTS job_sourcing_runs_active_idx;`);
+  await execSafe(sql`CREATE UNIQUE INDEX job_sourcing_runs_active_idx ON job_sourcing_runs(organization_id, external_job_id, context_hash) WHERE status NOT IN ('completed', 'failed', 'expired');`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourcing_runs_expires_at_idx ON job_sourcing_runs(expires_at);`);
 
   // Job Sourced Candidates table
   console.log('  Creating job_sourced_candidates table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS job_sourced_candidates (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1510,27 +1529,27 @@ export async function ensureAtsSchema(): Promise<void> {
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_email TEXT;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_emails JSONB;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolved_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_status TEXT;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS outreach_count INTEGER NOT NULL DEFAULT 0;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_round INTEGER;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_campaign_id TEXT;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_status TEXT;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_from_campaign_id TEXT;`);
-  await db.execute(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_after_round INTEGER;`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_sourced_candidates_job_candidate_idx ON job_sourced_candidates(job_id, signal_candidate_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_org_job_idx ON job_sourced_candidates(organization_id, job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_request_idx ON job_sourced_candidates(request_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_state_idx ON job_sourced_candidates(state);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_fit_score_idx ON job_sourced_candidates(fit_score);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_source_type_idx ON job_sourced_candidates(source_type);`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_email TEXT;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_emails JSONB;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolved_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_status TEXT;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS outreach_count INTEGER NOT NULL DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_round INTEGER;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_campaign_id TEXT;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_status TEXT;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_from_campaign_id TEXT;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS applied_after_round INTEGER;`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_sourced_candidates_job_candidate_idx ON job_sourced_candidates(job_id, signal_candidate_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_org_job_idx ON job_sourced_candidates(organization_id, job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_request_idx ON job_sourced_candidates(request_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_state_idx ON job_sourced_candidates(state);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_fit_score_idx ON job_sourced_candidates(fit_score);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_source_type_idx ON job_sourced_candidates(source_type);`);
 
   console.log('  Creating sourced_candidate_outreach_campaigns table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS sourced_candidate_outreach_campaigns (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1549,28 +1568,28 @@ export async function ensureAtsSchema(): Promise<void> {
       completed_at TIMESTAMP
     );
   `);
-  await db.execute(sql`DROP INDEX IF EXISTS scoc_job_round_idx;`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_job_round_idx ON sourced_candidate_outreach_campaigns(job_id, round);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_job_idx ON sourced_candidate_outreach_campaigns(job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_org_idx ON sourced_candidate_outreach_campaigns(organization_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scoc_launched_by_idx ON sourced_candidate_outreach_campaigns(launched_by);`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS campaign_id TEXT;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS round INTEGER;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'completed';`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS audience_count INTEGER NOT NULL DEFAULT 0;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS sent_count INTEGER NOT NULL DEFAULT 0;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS failed_count INTEGER NOT NULL DEFAULT 0;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS subject_template TEXT;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS html_body_template TEXT;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS extra_context TEXT;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS launched_by INTEGER REFERENCES users(id);`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS launched_at TIMESTAMP DEFAULT NOW();`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_campaigns ALTER COLUMN campaign_id SET NOT NULL;`);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS scoc_campaign_id_idx ON sourced_candidate_outreach_campaigns(campaign_id);`);
+  await execSafe(sql`DROP INDEX IF EXISTS scoc_job_round_idx;`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scoc_job_round_idx ON sourced_candidate_outreach_campaigns(job_id, round);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scoc_job_idx ON sourced_candidate_outreach_campaigns(job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scoc_org_idx ON sourced_candidate_outreach_campaigns(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scoc_launched_by_idx ON sourced_candidate_outreach_campaigns(launched_by);`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS campaign_id TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS round INTEGER;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'completed';`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS audience_count INTEGER NOT NULL DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS sent_count INTEGER NOT NULL DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS failed_count INTEGER NOT NULL DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS subject_template TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS html_body_template TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS extra_context TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS launched_by INTEGER REFERENCES users(id);`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS launched_at TIMESTAMP DEFAULT NOW();`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_campaigns ALTER COLUMN campaign_id SET NOT NULL;`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS scoc_campaign_id_idx ON sourced_candidate_outreach_campaigns(campaign_id);`);
 
   console.log('  Creating sourced_candidate_outreach_log table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS sourced_candidate_outreach_log (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1592,16 +1611,16 @@ export async function ensureAtsSchema(): Promise<void> {
       sent_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS campaign_round INTEGER;`);
-  await db.execute(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS body_html TEXT;`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_job_idx ON sourced_candidate_outreach_log(job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_candidate_idx ON sourced_candidate_outreach_log(sourced_candidate_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_campaign_idx ON sourced_candidate_outreach_log(campaign_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS scol_org_idx ON sourced_candidate_outreach_log(organization_id);`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS campaign_round INTEGER;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS body_html TEXT;`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_job_idx ON sourced_candidate_outreach_log(job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_candidate_idx ON sourced_candidate_outreach_log(sourced_candidate_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_campaign_idx ON sourced_candidate_outreach_log(campaign_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_org_idx ON sourced_candidate_outreach_log(organization_id);`);
 
   // Scheduled outreach campaigns (auto-send rounds 2 & 3 after 3-day intervals)
   console.log('  Creating scheduled_outreach_campaigns table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS scheduled_outreach_campaigns (
       id SERIAL PRIMARY KEY,
       job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
@@ -1618,13 +1637,13 @@ export async function ensureAtsSchema(): Promise<void> {
       CONSTRAINT uq_scheduled_job_round UNIQUE (job_id, round)
     );
   `);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS soc_status_scheduled_idx ON scheduled_outreach_campaigns(status, scheduled_at);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS soc_job_idx ON scheduled_outreach_campaigns(job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS soc_org_idx ON scheduled_outreach_campaigns(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS soc_status_scheduled_idx ON scheduled_outreach_campaigns(status, scheduled_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS soc_job_idx ON scheduled_outreach_campaigns(job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS soc_org_idx ON scheduled_outreach_campaigns(organization_id);`);
 
   // ActiveKG Graph Sync: Application resume sync jobs
   console.log('  Creating application_graph_sync_jobs table...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS application_graph_sync_jobs (
       id SERIAL PRIMARY KEY,
       application_id INTEGER NOT NULL REFERENCES applications(id) ON DELETE CASCADE UNIQUE,
@@ -1644,12 +1663,12 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
 
   console.log('  Creating application_graph_sync_jobs indexes...');
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS app_graph_sync_status_next_attempt_idx ON application_graph_sync_jobs(status, next_attempt_at);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS app_graph_sync_org_idx ON application_graph_sync_jobs(organization_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS app_graph_sync_recruiter_idx ON application_graph_sync_jobs(effective_recruiter_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS app_graph_sync_status_next_attempt_idx ON application_graph_sync_jobs(status, next_attempt_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS app_graph_sync_org_idx ON application_graph_sync_jobs(organization_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS app_graph_sync_recruiter_idx ON application_graph_sync_jobs(effective_recruiter_id);`);
 
   console.log('  Creating resume import staging tables...');
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS resume_import_batches (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1665,7 +1684,7 @@ export async function ensureAtsSchema(): Promise<void> {
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS resume_import_items (
       id SERIAL PRIMARY KEY,
       batch_id INTEGER NOT NULL REFERENCES resume_import_batches(id) ON DELETE CASCADE,
@@ -1691,26 +1710,26 @@ export async function ensureAtsSchema(): Promise<void> {
       updated_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_batches_org_job_idx ON resume_import_batches(organization_id, job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_batches_uploader_idx ON resume_import_batches(uploaded_by_user_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_batches_status_idx ON resume_import_batches(status);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_items_batch_idx ON resume_import_items(batch_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_items_status_attempt_idx ON resume_import_items(status, next_attempt_at);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_items_batch_status_idx ON resume_import_items(batch_id, status);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_items_job_email_idx ON resume_import_items(job_id, parsed_email);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_items_content_hash_idx ON resume_import_items(batch_id, content_hash);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS resume_import_items_application_idx ON resume_import_items(application_id);`);
-  await db.execute(sql`
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_batches_org_job_idx ON resume_import_batches(organization_id, job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_batches_uploader_idx ON resume_import_batches(uploaded_by_user_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_batches_status_idx ON resume_import_batches(status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_items_batch_idx ON resume_import_items(batch_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_items_status_attempt_idx ON resume_import_items(status, next_attempt_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_items_batch_status_idx ON resume_import_items(batch_id, status);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_items_job_email_idx ON resume_import_items(job_id, parsed_email);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_items_content_hash_idx ON resume_import_items(batch_id, content_hash);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS resume_import_items_application_idx ON resume_import_items(application_id);`);
+  await execSafe(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS resume_import_items_batch_content_hash_unique
     ON resume_import_items(batch_id, content_hash)
     WHERE content_hash IS NOT NULL;
   `);
 
   // Migration 005: Add sync_skipped_reason to applications
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS sync_skipped_reason TEXT;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS sync_skipped_reason TEXT;`);
 
   // Migration 006: Recruiter feedback events + platform discovery consent
-  await db.execute(sql`
+  await execSafe(sql`
     CREATE TABLE IF NOT EXISTS recruiter_feedback_events (
       id SERIAL PRIMARY KEY,
       organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
@@ -1731,13 +1750,13 @@ export async function ensureAtsSchema(): Promise<void> {
       created_at TIMESTAMP DEFAULT NOW() NOT NULL
     );
   `);
-  await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS rfb_event_id_idx ON recruiter_feedback_events(event_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS rfb_org_job_idx ON recruiter_feedback_events(organization_id, job_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS rfb_candidate_idx ON recruiter_feedback_events(signal_candidate_id);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS rfb_action_idx ON recruiter_feedback_events(action);`);
-  await db.execute(sql`CREATE INDEX IF NOT EXISTS rfb_unsynced_idx ON recruiter_feedback_events(synced_to_signal_at);`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS platform_discovery_consent BOOLEAN DEFAULT FALSE;`);
-  await db.execute(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS consent_captured_at TIMESTAMP;`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS rfb_event_id_idx ON recruiter_feedback_events(event_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS rfb_org_job_idx ON recruiter_feedback_events(organization_id, job_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS rfb_candidate_idx ON recruiter_feedback_events(signal_candidate_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS rfb_action_idx ON recruiter_feedback_events(action);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS rfb_unsynced_idx ON recruiter_feedback_events(synced_to_signal_at);`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS platform_discovery_consent BOOLEAN DEFAULT FALSE;`);
+  await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS consent_captured_at TIMESTAMP;`);
 
   });
 
