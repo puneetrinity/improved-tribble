@@ -47,7 +47,7 @@ const HomepageFooter = () => {
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Company</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li><a href="https://cal.com/ealana/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
-                <li><a href="mailto:hello@ealana.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
+                <li><a href="mailto:info@ealana.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
               </ul>
             </div>
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">

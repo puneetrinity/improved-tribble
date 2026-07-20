@@ -368,10 +368,10 @@ const Contact = () => {
                         <Mail className="h-5 w-5 text-white" />
                       </div>
                       <a
-                        href="mailto:hello@ealana.com"
+                        href="mailto:info@ealana.com"
                         className="font-medium text-white/90 hover:text-[#FF5BA8] transition-all duration-300 group-hover:tracking-wide"
                       >
-                        hello@ealana.com
+                        info@ealana.com
                       </a>
                     </div>
                     <div className="flex items-center group transition-all duration-300 hover:translate-x-2">

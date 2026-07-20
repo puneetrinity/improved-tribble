@@ -348,7 +348,7 @@ export async function getUnseatedMemberInfo(userId: number): Promise<{
 
   return {
     organizationName: membership.organization.name,
-    ownerEmail: owner?.user?.username || 'support@vantahire.com',
+    ownerEmail: owner?.user?.username || 'info@ealana.com',
     reason: 'Your seat has been removed due to subscription changes.',
   };
 }

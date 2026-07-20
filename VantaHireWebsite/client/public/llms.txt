@@ -1,8 +1,8 @@
 # ealana
 
-> AI-native recruiting platform for startups and recruiting agencies.
+> The Neural OS for Talent — for startups and recruiting agencies.
 
-ealana is an AI-native recruiting platform that helps teams find, rank, and engage the right candidates faster. It combines AI sourcing, pipeline management, WhatsApp outreach, and client collaboration in one platform.
+ealana is the Neural OS for Talent — it helps teams find, rank, and engage the right candidates faster, combining AI sourcing, shared hiring memory, WhatsApp outreach, and client collaboration in one system.
 
 ## Core Capabilities
 
@@ -24,7 +24,7 @@ Three layers power ealana:
 ## Pricing
 
 - **Free**: $0/mo â€” up to limited active jobs, AI sourcing, talent search, email outreach, basic analytics.
-- **Growth**: â‚¹1,999/seat/mo + taxes â€” unlimited jobs, unlimited AI sourcing, WhatsApp outreach, client portal, advanced analytics.
+- **Growth**: â‚¹8,999/seat/mo + taxes â€” unlimited jobs, unlimited AI sourcing, WhatsApp outreach, client portal, advanced analytics.
 - **Enterprise**: Custom pricing â€” SSO/SAML, API access, custom integrations, dedicated account manager.
 
 ## Geographic Focus
@@ -52,7 +52,7 @@ Headquartered in Bangalore, India. Serving companies across India and the Asia-P
 ## Contact Information
 
 - Website: https://ealana.com
-- Email: hello@ealana.com
+- Email: info@ealana.com
 - Phone: +91-9742944825
 - LinkedIn: https://www.linkedin.com/company/ealana/
 - Location: Bangalore, Karnataka, India

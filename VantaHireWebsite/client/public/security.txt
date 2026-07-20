@@ -1,4 +1,4 @@
-﻿Contact: mailto:security@ealana.com
+﻿Contact: mailto:info@ealana.com
 Policy: https://ealana.com/security
 Preferred-Languages: en
 Hiring: https://ealana.com/careers

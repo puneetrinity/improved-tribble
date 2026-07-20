@@ -86,11 +86,11 @@ export function HeroSection() {
         </div>
       </motion.div>
 
-      <motion.div
+      <motion.h1
         initial="hidden"
         animate="visible"
         variants={{ visible: { transition: { staggerChildren: 0.09, delayChildren: 0.35 } } }}
-        className="relative z-10 mb-5 flex max-w-[18rem] flex-wrap justify-center gap-x-[0.25em] sm:mb-6 sm:max-w-none"
+        className="relative z-10 mb-5 mt-0 flex max-w-[18rem] flex-wrap justify-center gap-x-[0.25em] font-normal sm:mb-6 sm:max-w-none"
         style={{
           fontFamily: "'Outfit', sans-serif",
           fontSize: isMobile ? "clamp(2.45rem, 12vw, 3.25rem)" : "clamp(3.2rem, 6.5vw, 5.8rem)",
@@ -136,7 +136,7 @@ export function HeroSection() {
         >
           signal.
         </motion.span>
-      </motion.div>
+      </motion.h1>
 
       <motion.p
         initial={{ opacity: 0, y: 16 }}

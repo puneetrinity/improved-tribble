@@ -56,13 +56,13 @@ const Hero = () => {
             <span className="absolute w-2.5 h-2.5 border-[rgba(255,255,255,0.35)] border-solid border-t-2 border-r-2 border-l-0 border-b-0 -top-1 -right-1"></span>
             <span className="absolute w-2.5 h-2.5 border-[rgba(255,255,255,0.35)] border-solid border-b-2 border-l-2 border-t-0 border-r-0 -bottom-1 -left-1"></span>
             <span className="absolute w-2.5 h-2.5 border-[rgba(255,255,255,0.35)] border-solid border-b-2 border-r-2 border-t-0 border-l-0 -bottom-1 -right-1"></span>
-            UNIFIED RECRUITMENT PLATFORM
+            THE NEURAL OS FOR TALENT
           </div>
 
           <h1 className="font-satoshi text-[clamp(2.8rem,5.5vw,4rem)] max-md:text-[clamp(2rem,8vw,2.8rem)] max-sm:text-[1.85rem] font-normal leading-[1.15] tracking-tight text-hr-text mb-7">Make better hires, faster.</h1>
 
           <p className="text-base leading-[1.7] text-hr-text-secondary max-w-[520px] mx-auto mb-9 font-normal max-md:text-[0.88rem]">
-            ealana is the ATS that understands who you're looking for. Level up your team with intelligent matching and seamless workflows.
+            ealana is the Neural OS for Talent — it understands who you're looking for, remembers every decision, and runs your outreach.
           </p>
 
           <div className="flex items-center justify-center gap-3 mb-[18px] max-md:flex-col max-md:w-full">
