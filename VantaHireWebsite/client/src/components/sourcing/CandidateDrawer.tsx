@@ -184,7 +184,6 @@ export function CandidateDrawer({
   const languages = c.crustdata?.basic_profile?.languages || [];
   const certifications = c.crustdata?.certifications || [];
   const honors = c.crustdata?.honors || [];
-  const contactFlags = c.crustdata?.contact || {};
   const socialHandles = c.crustdata?.social_handles || {};
 
   return (
@@ -336,11 +335,6 @@ export function CandidateDrawer({
                         </div>
                       ))}
                     </div>
-                  ) : (contactFlags as any)?.has_business_email || (contactFlags as any)?.has_personal_email ? (
-                    <Badge variant="outline" className="mt-1 bg-green-50 text-green-700 border-green-200 text-xs w-fit">
-                      <CheckCircle2 className="h-3 w-3 mr-1" />
-                      Available via Enrichment
-                    </Badge>
                   ) : (
                     <div className="mt-1">
                       <Button
@@ -350,7 +344,7 @@ export function CandidateDrawer({
                         disabled={contactPending}
                         onClick={() => findContact({ candidateId: c.id, jobId: c.jobId })}
                       >
-                        {contactPending ? "Finding..." : "Find Professional Email"}
+                        {contactPending ? "Finding..." : "Find Personal Email"}
                       </Button>
                     </div>
                   )}
