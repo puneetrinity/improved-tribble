@@ -71,6 +71,7 @@ const step2Schema = z.object({
   salaryPeriod: z.enum(["per_month", "per_year"]).optional(),
   educationRequirement: z.string().max(500).optional(),
   experienceYears: z.string().optional(),
+  experienceYearsMax: z.string().optional(),
 });
 
 const step3Schema = z.object({
@@ -118,6 +119,7 @@ interface ExtractedDetails {
   location: string;
   type: "full-time" | "part-time" | "contract" | "remote";
   experienceYears: string;
+  experienceYearsMax?: string; // manual field, not AI-extracted
   salaryMin: string;
   salaryMax: string;
   salaryPeriod: "per_month" | "per_year";
@@ -189,6 +191,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     salaryPeriod: "per_month" | "per_year";
     educationRequirement: string;
     experienceYears: string;
+  experienceYearsMax: string;
   }>({
     title: "",
     location: "",
@@ -200,6 +203,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     salaryPeriod: "per_month",
     educationRequirement: "",
     experienceYears: "",
+    experienceYearsMax: "",
   });
   const [skills, setSkills] = useState<string[]>([]);
   const [newSkill, setNewSkill] = useState("");
@@ -250,6 +254,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       roleTitle: formData.title.trim(),
       location: formData.location.trim(),
       experienceYears: formData.experienceYears ? Number(formData.experienceYears) : null,
+      experienceYearsMax: formData.experienceYearsMax ? Number(formData.experienceYearsMax) : null,
       mustHaveSkills: dedupeStrings(skills).map((skill) => skill.toLowerCase()),
       niceToHaveSkills: dedupeStrings(goodToHaveSkills).map((skill) => skill.toLowerCase()),
       mustHaveGates: {
@@ -343,6 +348,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       salaryPeriod: (sourceJob.salaryPeriod as "per_month" | "per_year") || "per_month",
       educationRequirement: sourceJob.educationRequirement || "",
       experienceYears: sourceJob.experienceYears ? sourceJob.experienceYears.toString() : "",
+      experienceYearsMax: (sourceJob as any).experienceYearsMax ? (sourceJob as any).experienceYearsMax.toString() : "",
     });
 
     // Prefill skills
@@ -467,6 +473,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
           salaryPeriod: formData.salaryPeriod || undefined,
           educationRequirement: formData.educationRequirement || undefined,
           experienceYears: formData.experienceYears || undefined,
+          experienceYearsMax: formData.experienceYearsMax || undefined,
         });
       } else if (step === 3) {
         step3Schema.parse({
@@ -586,6 +593,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         salaryPeriod: formData.salaryPeriod || undefined,
         educationRequirement: formData.educationRequirement || undefined,
         experienceYears: formData.experienceYears ? Number(formData.experienceYears) : undefined,
+        experienceYearsMax: formData.experienceYearsMax ? Number(formData.experienceYearsMax) : undefined,
       };
 
       if (!structuredJobProfile && !extractedDescriptionJson) {
@@ -1077,29 +1085,41 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 />
               </div>
 
-              {/* Experience Years */}
+              {/* Experience Years (min–max range) */}
               <div>
                 <Label className="flex items-center gap-2 mb-2">
                   <Briefcase className="h-4 w-4 text-muted-foreground" />
-                  Preferred Experience (Years)
+                  Experience (Years)
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      <p>AI uses experience requirements to match candidates at the right seniority level for this role.</p>
+                      <p>Set the minimum and (optionally) maximum years of experience. Sourcing uses this to match candidates at the right seniority — and the maximum prevents over-qualified candidates from being surfaced.</p>
                     </TooltipContent>
                   </Tooltip>
                 </Label>
-                <Input
-                  type="number"
-                  min="0"
-                  max="50"
-                  value={formData.experienceYears}
-                  onChange={(e) => setFormData({ ...formData, experienceYears: e.target.value })}
-                  placeholder="e.g., 3"
-                  className="w-32"
-                />
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={formData.experienceYears}
+                    onChange={(e) => setFormData({ ...formData, experienceYears: e.target.value })}
+                    placeholder="Min (e.g., 3)"
+                    className="w-32"
+                  />
+                  <span className="text-muted-foreground text-sm">to</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    max="50"
+                    value={formData.experienceYearsMax}
+                    onChange={(e) => setFormData({ ...formData, experienceYearsMax: e.target.value })}
+                    placeholder="Max (e.g., 8)"
+                    className="w-32"
+                  />
+                </div>
               </div>
 
             </div>

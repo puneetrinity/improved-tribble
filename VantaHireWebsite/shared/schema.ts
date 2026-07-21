@@ -92,7 +92,8 @@ export const jobs = pgTable("jobs", {
   salaryPeriod: text("salary_period"), // 'per_month' | 'per_year'
   goodToHaveSkills: text("good_to_have_skills").array(), // Nice-to-have skills (existing 'skills' field is for required skills)
   educationRequirement: text("education_requirement"), // Education requirement
-  experienceYears: integer("experience_years"), // Preferred years of experience
+  experienceYears: integer("experience_years"), // Minimum / preferred years of experience
+  experienceYearsMax: integer("experience_years_max"), // Maximum years of experience (upper bound)
 }, (table) => ({
   // Indexes for performance hotspots
   orgIdx: index("jobs_org_idx").on(table.organizationId),
@@ -1995,6 +1996,7 @@ export const insertJobSchema = createInsertSchema(jobs).pick({
   goodToHaveSkills: true,
   educationRequirement: true,
   experienceYears: true,
+  experienceYearsMax: true,
 }).extend({
   title: z.string().min(1).max(100),
   location: z.string().min(1).max(100),
@@ -2011,6 +2013,7 @@ export const insertJobSchema = createInsertSchema(jobs).pick({
   goodToHaveSkills: z.array(z.string().min(1).max(50)).max(20).optional(),
   educationRequirement: z.string().max(500).optional(),
   experienceYears: z.number().int().min(0).max(50).optional(),
+  experienceYearsMax: z.number().int().min(0).max(50).optional(),
 });
 
 export const insertApplicationSchema = createInsertSchema(applications).pick({

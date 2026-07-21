@@ -1036,6 +1036,7 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS good_to_have_skills TEXT[];`);
   await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS education_requirement TEXT;`);
   await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS experience_years INTEGER;`);
+  await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS experience_years_max INTEGER;`);
   await execSafe(sql`ALTER TABLE jobs ADD COLUMN IF NOT EXISTS original_jd TEXT;`);
 
   // ============= ORGANIZATION & SUBSCRIPTION TABLES =============
