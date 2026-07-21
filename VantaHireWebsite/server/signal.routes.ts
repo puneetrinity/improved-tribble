@@ -446,6 +446,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           goodToHaveSkills: signalGoodToHaveSkills,
           location: job.location,
           ...(job.experienceYears != null ? { experienceYears: job.experienceYears } : {}),
+          ...(job.experienceYearsMax != null ? { experienceYearsMax: job.experienceYearsMax } : {}),
           ...(job.educationRequirement ? { education: job.educationRequirement } : {}),
           ...(req.body.refresh ? { refresh: true } : {}),
           ...(req.body.forceSourcing ? { forceSourcing: true } : {}),

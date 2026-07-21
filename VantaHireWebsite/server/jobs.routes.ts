@@ -158,6 +158,7 @@ export function registerJobsRoutes(
         skills: extractedResult.extracted.mustHaveSkills,
         goodToHaveSkills: extractedResult.extracted.niceToHaveSkills,
         experienceYears: extractedResult.extracted.experienceYears ?? req.body.experienceYears,
+        experienceYearsMax: typeof req.body?.experienceYearsMax === 'number' ? req.body.experienceYearsMax : undefined,
       });
       const job = await storage.createJob({
         ...jobData,
@@ -366,7 +367,7 @@ export function registerJobsRoutes(
       // Validate and extract allowed fields
       const {
         title, description, location, type, skills, hiringManagerId, clientId,
-        salaryMin, salaryMax, salaryPeriod, goodToHaveSkills, educationRequirement, experienceYears
+        salaryMin, salaryMax, salaryPeriod, goodToHaveSkills, educationRequirement, experienceYears, experienceYearsMax
       } = req.body;
       const updates: Partial<{
         title: string;
@@ -382,6 +383,7 @@ export function registerJobsRoutes(
         goodToHaveSkills: string[] | null;
         educationRequirement: string | null;
         experienceYears: number | null;
+        experienceYearsMax: number | null;
         jdDigest: any;
         jdDigestVersion: any;
       }> = {};
@@ -516,6 +518,17 @@ export function registerJobsRoutes(
           updates.experienceYears = experienceYears;
         } else {
           res.status(400).json({ error: 'experienceYears must be an integer between 0-50 or null' });
+          return;
+        }
+      }
+
+      if (experienceYearsMax !== undefined) {
+        if (experienceYearsMax === null) {
+          updates.experienceYearsMax = null;
+        } else if (Number.isInteger(experienceYearsMax) && experienceYearsMax >= 0 && experienceYearsMax <= 50) {
+          updates.experienceYearsMax = experienceYearsMax;
+        } else {
+          res.status(400).json({ error: 'experienceYearsMax must be an integer between 0-50 or null' });
           return;
         }
       }
