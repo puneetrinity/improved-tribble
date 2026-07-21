@@ -4,6 +4,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { computeTotalExperienceYears } from "@/lib/sourcing-experience";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -159,15 +160,9 @@ export function CandidateDrawer({
   const followerCount = c.crustdata?.professional_network?.followers || null;
   const connections = c.crustdata?.professional_network?.connections || null;
 
-  // Compute total experience from all roles' years_at_company_raw
-  const allExpRoles = [
-    ...(c.crustdata?.experience?.employment_details?.current || []),
-    ...(c.crustdata?.experience?.employment_details?.past || []),
-  ];
-  const totalExpYears = allExpRoles.reduce((sum: number, r: any) => {
-    const y = r.years_at_company_raw ?? 0;
-    return sum + (typeof y === "number" ? y : 0);
-  }, 0);
+  // Total experience, deduped by company (Crustdata repeats full company tenure
+  // per title, so a naive sum inflates it — e.g. 6 yrs shown as 18).
+  const totalExpYears = computeTotalExperienceYears(c.crustdata) ?? 0;
   const experienceYears = totalExpYears > 0 ? totalExpYears : null;
 
   const industry = currentRole?.company_professional_network_industry

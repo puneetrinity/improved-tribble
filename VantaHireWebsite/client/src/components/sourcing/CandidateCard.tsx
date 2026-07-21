@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { computeTotalExperienceYears } from "@/lib/sourcing-experience";
 import { Button } from "@/components/ui/button";
 import {
   Star, MapPin, Building, Briefcase, CheckCircle2,
@@ -143,15 +144,9 @@ export function CandidateCard({
   const company = currentRole?.name || pastRole?.name || null;
   const seniority = currentRole?.seniority_level || pastRole?.seniority_level || null;
 
-  // Compute total relevant experience from all roles
-  const allRoles = [
-    ...(candidate.crustdata?.experience?.employment_details?.current || []),
-    ...(candidate.crustdata?.experience?.employment_details?.past || []),
-  ];
-  const totalExpYears = allRoles.reduce((sum: number, r: any) => {
-    const y = r.years_at_company_raw ?? 0;
-    return sum + (typeof y === "number" ? y : 0);
-  }, 0);
+  // Total experience, deduped by company (see computeTotalExperienceYears —
+  // Crustdata repeats full company tenure per title, so a naive sum inflates it).
+  const totalExpYears = computeTotalExperienceYears(candidate.crustdata) ?? 0;
   const expYearsDisplay = totalExpYears > 0 ? `${totalExpYears} yrs` : null;
 
   const pictureUrl = candidate.crustdata?.professional_network?.profile_picture_permalink || candidate.crustdata?.basic_profile?.profile_picture_permalink || null;
