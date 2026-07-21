@@ -32,6 +32,7 @@ export const JDDigestResponseSchema = z.object({
   domain: z.string().default('General'),
   constraints: z.array(z.string()).max(10).default([]),
   keyResponsibilities: z.array(z.string()).max(5).default([]),
+  titleSearchTerms: z.array(z.string()).max(6).default([]),
 });
 export type JDDigestResponse = z.infer<typeof JDDigestResponseSchema>;
 
