@@ -218,6 +218,17 @@ export function CandidateDrawer({
                     LinkedIn Profile
                   </a>
                 )}
+                {(c as any).resumeApplicationId && (
+                  <a
+                    href={`/api/applications/${(c as any).resumeApplicationId}/resume`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 hover:text-emerald-700 transition-colors"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    View Resume
+                  </a>
+                )}
               </div>
 
               {/* Premium Enrichlayer Stats Row */}

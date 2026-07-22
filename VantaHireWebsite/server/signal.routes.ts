@@ -735,6 +735,38 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         candidates.map((c: JobSourcedCandidate) => flattenCandidateForUI(c)),
       );
 
+      // Stage-5B: attach canonical resume pointers. Memory knows which of
+      // these people applied (same tenant) — surface the resume through the
+      // existing permission-gated /api/applications/:id/resume streamer.
+      // Best-effort: any failure leaves hasResume undefined, never blocks.
+      try {
+        const slugOf = (url: string | null): string | null => {
+          if (!url) return null;
+          const m = /linkedin\.com\/in\/([^/?#]+)/i.exec(url);
+          return m ? m[1].toLowerCase() : null;
+        };
+        const slugs = Array.from(new Set(
+          enriched.map((c) => slugOf(c.linkedinUrl)).filter((s): s is string => !!s),
+        ));
+        if (slugs.length > 0) {
+          const { getResumeRefs } = await import('./lib/services/activekg-client');
+          const tenantId = resolveActiveKGTenantId(organizationId);
+          const refs = await getResumeRefs(tenantId, slugs);
+          if (refs && Object.keys(refs).length > 0) {
+            for (const c of enriched) {
+              const slug = slugOf(c.linkedinUrl);
+              const ref = slug ? refs[slug] : undefined;
+              if (ref?.application_id != null) {
+                (c as any).hasResume = true;
+                (c as any).resumeApplicationId = Number(ref.application_id) || null;
+              }
+            }
+          }
+        }
+      } catch (resumeErr) {
+        console.warn('[SOURCED_CANDIDATES] resume-ref enrichment failed (non-blocking):', String(resumeErr));
+      }
+
       const counts = {
         total: enriched.length,
         talentPool: enriched.filter((c) => c.displayBucket === 'talent_pool').length,

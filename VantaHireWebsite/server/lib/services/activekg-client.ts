@@ -21,6 +21,7 @@ export const ACTIVEKG_SCOPES = {
   SEARCH: 'search:read',
   ASK: 'ask:read',
   WRITE: 'kg:write',
+  KG_READ: 'kg:read',
 } as const;
 
 // =====================================================
@@ -396,4 +397,39 @@ export async function ingestFeedbackEvents(
   }
 
   return body as FeedbackIngestResponse;
+}
+
+
+// =====================================================
+// Resume refs (Stage-5B): which sourced candidates have a
+// resume this tenant may see? Returns Flow application
+// pointers keyed by lowercase linkedin slug.
+// =====================================================
+
+export interface ActiveKGResumeRef {
+  application_id: string | number;
+  org_id: string | number | null;
+  resume_node_id: string | null;
+  source_type: string;
+}
+
+export async function getResumeRefs(
+  tenantId: string,
+  linkedinIds: string[],
+  requestId?: string,
+): Promise<Record<string, ActiveKGResumeRef>> {
+  if (linkedinIds.length === 0) return {};
+  const res = await activekgFetch('/global-candidates/resume-refs', {
+    method: 'POST',
+    tenantId,
+    scopes: ACTIVEKG_SCOPES.KG_READ,
+    requestId,
+    body: { linkedin_ids: linkedinIds },
+  });
+  if (!res.ok) {
+    // 503 = global memory disabled; treat as "no resumes known", never fail the page.
+    return {};
+  }
+  const body: any = await res.json().catch(() => null);
+  return (body && body.refs) || {};
 }
