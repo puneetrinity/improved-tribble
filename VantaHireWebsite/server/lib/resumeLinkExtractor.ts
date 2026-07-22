@@ -85,27 +85,31 @@ function classifyUrls(urls: string[]): ResumeLinks {
  * pagerender callback, which exposes the underlying pdf.js page proxy.
  */
 export async function extractLinksFromPdfBuffer(buffer: Buffer): Promise<string[]> {
-  const mod: any = await import('pdf-parse-debugging-disabled');
-  const parse = mod.default || mod;
-
+  // pdfjs-dist with a fresh per-call document (see resumeExtractor.extractPDF:
+  // the previous pdf-parse pagerender callback shares pdf.js state across
+  // concurrent requests and can deliver ANOTHER request's pages to this
+  // closure — link/text cross-contamination between applicants).
+  const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const doc = await pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    isEvalSupported: false,
+    useSystemFonts: true,
+  }).promise;
   const collectedUrls: string[] = [];
-
-  await parse(buffer, {
-    max: 10,
-    pagerender: async (pageData: any) => {
-      if (typeof pageData.getAnnotations === 'function') {
-        const annotations = await pageData.getAnnotations();
-        for (const annotation of annotations) {
-          if (annotation.subtype === 'Link' && annotation.url) {
-            collectedUrls.push(annotation.url);
-          }
+  try {
+    const maxPages = Math.min(doc.numPages, 10);
+    for (let p = 1; p <= maxPages; p++) {
+      const page = await doc.getPage(p);
+      const annotations = await page.getAnnotations();
+      for (const annotation of annotations) {
+        if (annotation.subtype === 'Link' && annotation.url) {
+          collectedUrls.push(annotation.url);
         }
       }
-      // Return empty string — we don't need the text from this pass
-      return '';
-    },
-  });
-
+    }
+  } finally {
+    await doc.destroy();
+  }
   return collectedUrls;
 }
 

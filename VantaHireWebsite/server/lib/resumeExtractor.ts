@@ -67,11 +67,30 @@ export function stripPII(text: string): string {
  * Extract text from PDF buffer
  */
 async function extractPDF(buffer: Buffer): Promise<string> {
-  const mod: any = await import('pdf-parse-debugging-disabled');
-  // pdf-parse-debugging-disabled exports a function as default
-  const parse = mod.default || mod;
-  const pdfData = await parse(buffer, { max: 10 });
-  return pdfData.text;
+  // pdfjs-dist with a FRESH document per call. The previous library
+  // (pdf-parse-debugging-disabled) shares internal pdf.js state across
+  // invocations and cross-contaminates text between requests — application B
+  // stored applicant A's resume text, which then propagated into the talent
+  // graph (wrong resume attached to the wrong canonical person). Repro:
+  // concurrent extracts returned the same document's text for 3 of 5 files.
+  const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const doc = await pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    isEvalSupported: false,
+    useSystemFonts: true,
+  }).promise;
+  try {
+    const maxPages = Math.min(doc.numPages, 10);
+    const pages: string[] = [];
+    for (let p = 1; p <= maxPages; p++) {
+      const page = await doc.getPage(p);
+      const tc = await page.getTextContent();
+      pages.push(tc.items.map((i: any) => i.str).join(' '));
+    }
+    return pages.join('\n');
+  } finally {
+    await doc.destroy();
+  }
 }
 
 /**

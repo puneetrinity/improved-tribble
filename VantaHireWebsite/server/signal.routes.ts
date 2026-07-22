@@ -744,7 +744,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         const slugOf = (url: string | null): string | null => {
           if (!url) return null;
           const m = /linkedin\.com\/in\/([^/?#]+)/i.exec(url);
-          return m ? m[1].toLowerCase() : null;
+          return m?.[1] ? m[1].toLowerCase() : null;
         };
         const slugs = Array.from(new Set(
           enriched.map((c) => slugOf(c.linkedinUrl)).filter((s): s is string => !!s),
