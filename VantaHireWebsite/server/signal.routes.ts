@@ -29,6 +29,7 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
+import { resolveActiveKGTenantId } from './lib/activekgTenant';
 
 type ContactResolutionStatus = 'pending' | 'resolved' | 'not_found' | 'failed';
 
