@@ -171,11 +171,11 @@ export default function CandidatesPage() {
   return (
     <InternalPageShell>
       <InternalHero
-        eyebrow="Discover"
+        eyebrow="Memory"
         title={talentSearchPageCopy.header.title}
         subtitle={talentSearchPageCopy.header.subtitle}
         icon={Sparkles}
-        badge="Powered by Memory"
+        badge="Compounds with every search"
         stats={[
           {
             label: "Search Mode",

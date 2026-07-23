@@ -40,7 +40,7 @@ export function JobSubNav({
     },
     {
       id: "sourcing",
-      label: "Sourcing",
+      label: "Discover",
       path: `/jobs/${jobId}/sourcing`,
       icon: <Search className="h-4 w-4" />,
     },
