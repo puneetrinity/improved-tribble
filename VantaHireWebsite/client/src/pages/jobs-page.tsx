@@ -301,7 +301,7 @@ export default function JobsPage() {
         <div className="relative z-10">
           <HomepageNav />
 
-          <div className="pt-[60px] min-h-screen">
+          <div className="pt-[60px] min-h-screen overflow-x-clip">
             {/* Header */}
             <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
               <div></div>
@@ -339,7 +339,7 @@ export default function JobsPage() {
                   {/* Results area */}
                   <main>
                     {/* Toolbar */}
-                    <div className="flex items-center justify-between mb-5 gap-4 max-md:flex-col max-md:items-start">
+                    <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
                       <div className="flex items-center gap-2.5">
                         {/* Mobile filter trigger */}
                         <button
