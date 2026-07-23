@@ -101,7 +101,11 @@ export default function SolutionTabs() {
   return (
     <section style={{ padding: isMobile ? "56px 1.25rem 80px" : "80px 4rem 120px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: isMobile ? "2rem" : "4rem", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
+        <div
+          className="[scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          style={{ overflowX: "auto", marginBottom: isMobile ? "2rem" : "4rem", paddingBottom: 4 }}
+        >
+          <div style={{ display: "flex", gap: 8, width: "max-content", margin: "0 auto", padding: "0 1.25rem" }}>
           {TABS.map((tab, i) => {
             const isActive = activeTab === i;
             return (
@@ -138,6 +142,7 @@ export default function SolutionTabs() {
               </button>
             );
           })}
+          </div>
         </div>
 
         <AnimatePresence mode="wait">

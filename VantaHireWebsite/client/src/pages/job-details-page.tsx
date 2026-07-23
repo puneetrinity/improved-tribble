@@ -26,6 +26,10 @@ interface AuditLogEntry {
   createdAt: string;
 }
 
+
+const titleCase = (t: string) =>
+  t.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+
 const emptyStateCls = "flex flex-col items-center justify-center min-h-[60vh] text-center py-[60px] px-5 gap-3 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-e-text3 [&>svg]:mb-2";
 const btnApplyCls = "bg-e-blue text-white border-none py-3 px-8 rounded-xl font-ui text-[0.875rem] font-medium cursor-pointer transition-all duration-200 whitespace-nowrap hover:brightness-110 hover:shadow-[0_10px_36px_rgba(75,142,240,0.28)] disabled:opacity-50 disabled:cursor-not-allowed";
 const btnSecondaryCls = "flex items-center gap-1.5 bg-transparent border border-white/10 text-e-text2 py-2 px-4 rounded-xl font-ui text-[0.82rem] font-normal cursor-pointer transition-all duration-200 whitespace-nowrap [&>svg]:w-3.5 [&>svg]:h-3.5 hover:border-white/20 hover:text-e-text hover:bg-white/[0.03] max-md:flex-1 max-md:justify-center";
@@ -296,10 +300,10 @@ export default function JobDetailsPage() {
         <GridOverlay />
 
         {/* Page wrapper */}
-        <div className="pt-[60px] min-h-screen">
+        <div className="pt-[60px] min-h-screen overflow-x-clip">
           <div className="grid grid-cols-[28px_1fr_28px] max-md:grid-cols-[0px_1fr_0px]">
             <div></div>
-            <div className="pl-8 pr-8 max-w-[1200px] mx-auto max-md:pl-0 max-md:pr-0">
+            <div className="pl-8 pr-8 max-w-[1200px] mx-auto max-md:pl-4 max-md:pr-4">
 
               {/* Breadcrumb */}
               <nav
@@ -310,7 +314,7 @@ export default function JobDetailsPage() {
                 <ChevronRight />
                 <Link href="/jobs">Jobs</Link>
                 <ChevronRight />
-                <span className="text-e-text2">{job.title}</span>
+                <span className="text-e-text2">{titleCase(job.title)}</span>
               </nav>
 
               {/* Hero header */}
@@ -320,15 +324,15 @@ export default function JobDetailsPage() {
               >
                 <div className="flex-1 min-w-0">
                   <div className={sectionLabel}>Job Opening</div>
-                  <h1 className="font-display text-[clamp(2rem,4vw,3rem)] max-md:text-[1.7rem] font-medium leading-[1.08] tracking-[-0.03em] text-e-text mb-4">{job.title}</h1>
+                  <h1 className="font-display text-[clamp(2rem,4vw,3rem)] max-md:text-[1.7rem] font-medium leading-[1.08] tracking-[-0.03em] text-e-text mb-4">{titleCase(job.title)}</h1>
                   <div className="flex flex-wrap gap-[18px] mb-4">
                     <span className={metaItemCls}>
-                      <MapPin /> {job.location}
+                      <MapPin /> {titleCase(job.location)}
                     </span>
                     <span className={metaItemCls}>
                       <Clock /> Posted {formatDate(job.createdAt)}
                     </span>
-                    {job.postedByName && (
+                    {job.postedByName && !/system|admin/i.test(job.postedByName) && (
                       <span className={metaItemCls}>
                         <User />
                         {job.postedById && job.isRecruiterProfilePublic ? (
