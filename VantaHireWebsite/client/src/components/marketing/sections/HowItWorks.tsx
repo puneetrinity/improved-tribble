@@ -52,9 +52,10 @@ const TABS: TabConfig[] = [
     layerNum: "Layer 03",
     title: "Flow",
     hook: "Act on the signal",
-    description: "WhatsApp, email, scheduling — all from one screen. No tab switching. No copy-pasting. Just one place to move candidates through your pipeline.",
+    description: "Email outreach, WhatsApp status updates, interview scheduling — all from one screen. No tab switching. No copy-pasting. Just one place to move candidates through your pipeline.",
     bullets: [
-      "WhatsApp + email outreach with delivery tracking",
+      "Email outreach with delivery tracking",
+      "WhatsApp status updates to staged candidates",
       "Interview scheduling with calendar links",
       "Hiring manager feedback in one structured place",
     ],
