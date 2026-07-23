@@ -25,7 +25,12 @@
   --border-subtle: rgba(139, 92, 246, 0.2);
 
   line-height: 1.6;
+  /* clip, not hidden: overflow-x hidden makes this wrapper a scroll container
+     and silently disables position:sticky descendants (the pinned
+     Discover/Memory/Flow showcase). clip guards horizontal overflow without
+     creating a scroll container. */
   overflow-x: hidden;
+  overflow-x: clip;
   min-height: 100vh;
 }
 
