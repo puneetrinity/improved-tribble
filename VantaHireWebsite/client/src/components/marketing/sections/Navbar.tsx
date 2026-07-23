@@ -62,7 +62,7 @@ export default function Navbar() {
           className="text-e-text"
           style={{ display: "flex", alignItems: "center" }}
         >
-          <img src={logo} alt="ealana" style={{ height: 32 }} />
+          <img src={logo} alt="ealana" width={110} height={32} style={{ height: 32, width: "auto" }} />
         </Link>
         <div style={{ display: "flex", alignItems: "center", gap: "2.5rem" }}>
           <Link
