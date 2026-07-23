@@ -88,6 +88,10 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      {/* Interim: /features renders Home (SSR serves features metas; the SPA
+          router previously 404'd after hydration — soft-404 on a core page).
+          Real features page is queued. */}
+      <Route path="/features" component={Home} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/claim/:token" component={ClaimPage} />
       <Route path="/solutions" component={UseCasesPage} />
