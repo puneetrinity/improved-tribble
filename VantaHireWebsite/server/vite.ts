@@ -147,20 +147,20 @@ export async function setupVite(app: Express, server: Server) {
   const MARKETING_PAGES_DEV: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
       title: 'ealana — The Neural OS for Talent',
-      description: 'ealana is the Neural OS for Talent — it finds the candidates others miss, remembers every hiring decision, and runs your outreach. AI sourcing, shared hiring memory, and WhatsApp + email in one system. Start free.',
+      description: 'ealana remembers every candidate, every search — so your next hire starts smarter than your last. The Neural OS for Talent. Start free.',
       canonical: 'https://ealana.com/',
       keywords: 'Neural OS for Talent, AI candidate sourcing, applicant tracking system India, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
       title: 'Features | ealana — Discover, Memory, Flow',
-      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling.',
+      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate searchable and ever-fresher, and Flow runs email outreach with delivery tracking, WhatsApp status updates, client feedback, and interview scheduling.',
       canonical: 'https://ealana.com/features',
       keywords: 'AI candidate discovery, hiring memory, recruiter outreach, WhatsApp email outreach, AI-ranked shortlist, candidate fit scoring, client feedback portal',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
       title: 'Pricing | ealana — Simple, Transparent Pricing for Recruiting Teams',
-      description: 'Start free, upgrade when your team grows. AI sourcing, WhatsApp outreach, client portal, and pipeline management. No long contracts, no hidden fees.',
+      description: 'Start free, upgrade when your team grows. AI sourcing, email outreach with WhatsApp status updates, client portal, and pipeline management. No long contracts, no hidden fees.',
       canonical: 'https://ealana.com/pricing',
       keywords: 'ealana pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
       jsonLd: [
@@ -421,20 +421,20 @@ export async function serveStatic(app: Express) {
   const MARKETING_PAGES: Record<string, { title: string; description: string; canonical: string; keywords?: string; jsonLd?: object[] }> = {
     '/': {
       title: 'ealana — The Neural OS for Talent',
-      description: 'ealana is the Neural OS for Talent — it finds the candidates others miss, remembers every hiring decision, and runs your outreach. AI sourcing, shared hiring memory, and WhatsApp + email in one system. Start free.',
+      description: 'ealana remembers every candidate, every search — so your next hire starts smarter than your last. The Neural OS for Talent. Start free.',
       canonical: 'https://ealana.com/',
       keywords: 'Neural OS for Talent, AI candidate sourcing, applicant tracking system India, WhatsApp recruitment, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
       title: 'Features | ealana — Discover, Memory, Flow',
-      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling.',
+      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate searchable and ever-fresher, and Flow runs email outreach with delivery tracking, WhatsApp status updates, client feedback, and interview scheduling.',
       canonical: 'https://ealana.com/features',
       keywords: 'AI candidate discovery, hiring memory, recruiter outreach, WhatsApp email outreach, AI-ranked shortlist, candidate fit scoring, client feedback portal',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
       title: 'Pricing | ealana — Simple, Transparent Pricing for Recruiting Teams',
-      description: 'Start free, upgrade when your team grows. AI sourcing, WhatsApp outreach, client portal, and pipeline management. No long contracts, no hidden fees.',
+      description: 'Start free, upgrade when your team grows. AI sourcing, email outreach with WhatsApp status updates, client portal, and pipeline management. No long contracts, no hidden fees.',
       canonical: 'https://ealana.com/pricing',
       keywords: 'ealana pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
       jsonLd: [
