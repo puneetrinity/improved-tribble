@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import UseCasesPage from "@/pages/use-cases-page";
 import AboutPage from "@/pages/about-page";
+import FeaturesPage from "@/pages/features-page";
 import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
 import React, { lazy, Suspense, useEffect, useState, useRef } from "react";
 
@@ -89,10 +90,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
-      {/* Interim: /features renders Home (SSR serves features metas; the SPA
-          router previously 404'd after hydration — soft-404 on a core page).
-          Real features page is queued. */}
-      <Route path="/features" component={Home} />
+      <Route path="/features" component={FeaturesPage} />
       <Route path="/pricing" component={PricingPage} />
       <Route path="/claim/:token" component={ClaimPage} />
       <Route path="/solutions" component={UseCasesPage} />

@@ -18,7 +18,7 @@ const breadcrumbJsonLd = JSON.stringify({
   ],
 });
 
-const words1 = ["Three", "layers."];
+const words1 = ["Decision", "intelligence"];
 const wordVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.09 } } };
 const wordItem = {
   hidden: { y: 28, opacity: 0 },
@@ -35,17 +35,17 @@ export default function FeaturesPage() {
   return (
     <>
       <Helmet>
-        <title>Features | ealana — Discover, Memory, Flow</title>
-        <meta name="description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
+        <title>Features | ealana — Decision Intelligence for Recruiting</title>
+        <meta name="description" content="ealana turns recruiting into decision intelligence: Discover ranks candidates by real fit, Memory compounds what your team learns, and Flow runs the outreach." />
         <link rel="canonical" href="https://ealana.com/features" />
-        <meta property="og:title" content="Features | ealana — Discover, Memory, Flow" />
-        <meta property="og:description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
+        <meta property="og:title" content="Features | ealana — Decision Intelligence for Recruiting" />
+        <meta property="og:description" content="ealana turns recruiting into decision intelligence: Discover ranks candidates by real fit, Memory compounds what your team learns, and Flow runs the outreach." />
         <meta property="og:url" content="https://ealana.com/features" />
         <meta property="og:type" content="website" />
         <meta property="og:image" content="https://ealana.com/og-image.jpg" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Features | ealana — Discover, Memory, Flow" />
-        <meta name="twitter:description" content="Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate and hiring decision searchable, and Flow runs WhatsApp + email outreach, client feedback, and interview scheduling." />
+        <meta name="twitter:title" content="Features | ealana — Decision Intelligence for Recruiting" />
+        <meta name="twitter:description" content="ealana turns recruiting into decision intelligence: Discover ranks candidates by real fit, Memory compounds what your team learns, and Flow runs the outreach." />
         <meta name="twitter:image" content="https://ealana.com/twitter-image.jpg" />
         <script type="application/ld+json">{breadcrumbJsonLd}</script>
       </Helmet>
@@ -72,10 +72,10 @@ export default function FeaturesPage() {
                 </span>
                 <span style={{ display: "flex", justifyContent: "center", gap: "0.3em", flexWrap: "wrap" }}>
                   <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
-                    One
+                    for
                   </motion.span>
                   <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, fontStyle: "italic", background: "linear-gradient(135deg, #4B8EF0, #34D17A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                    signal.
+                    recruiting.
                   </motion.span>
                 </span>
               </motion.h1>
@@ -97,6 +97,49 @@ export default function FeaturesPage() {
           <MemoryFeature />
           <div style={{ height: 1, background: "rgba(255,255,255,0.04)", maxWidth: 1100, margin: "0 auto" }} />
           <FlowFeature />
+          <section style={{ padding: isMobile ? "56px 1.25rem" : "96px 4rem", position: "relative" }}>
+            <div style={{ maxWidth: 900, margin: "0 auto" }}>
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: isMobile ? "1.7rem" : "2.3rem", fontWeight: 600, letterSpacing: "-0.02em", color: "#F4F5FA", textAlign: "center", marginBottom: "1.25rem" }}>
+                What is decision intelligence?
+              </h2>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, lineHeight: 1.75, textAlign: "center", maxWidth: 720, margin: "0 auto" }}>
+                Decision intelligence in recruiting is the layer above talent intelligence. Talent
+                intelligence tells you who exists; decision intelligence ranks, remembers, and
+                recommends — so recruiters act on evidence instead of instinct, and every hiring
+                cycle starts smarter than the last. ealana delivers it as three connected layers:
+                Discover, Memory, and Flow.
+              </p>
+
+              <h2 style={{ fontFamily: "var(--font-display)", fontSize: isMobile ? "1.7rem" : "2.3rem", fontWeight: 600, letterSpacing: "-0.02em", color: "#F4F5FA", textAlign: "center", margin: "4rem 0 1.75rem" }}>
+                ealana vs a traditional ATS
+              </h2>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse", fontFamily: "var(--font-body)", fontSize: "0.93rem", lineHeight: 1.6 }}>
+                  <thead>
+                    <tr>
+                      {["", "Traditional ATS", "ealana"].map((h) => (
+                        <th key={h} style={{ textAlign: "left", padding: "12px 16px", color: h === "ealana" ? "#4B8EF0" : "#8891AA", fontWeight: 600, borderBottom: "1px solid rgba(255,255,255,0.1)", fontSize: "0.8rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ["Where candidates come from", "Waits for applicants to arrive", "Discover searches the market and ranks the top 100 by real fit"],
+                      ["What the system remembers", "Static records you dig through", "Memory compounds every search and candidate — your next hire starts smarter than your last"],
+                      ["How outreach happens", "Manual emails and follow-ups", "Email outreach with delivery tracking; WhatsApp status updates to staged candidates"],
+                      ["How decisions get made", "Gut feel and scattered notes", "Fit scores with evidence, in one pipeline"],
+                    ].map(([dim, ats, eal]) => (
+                      <tr key={dim}>
+                        <td style={{ padding: "14px 16px", color: "#F4F5FA", fontWeight: 500, borderBottom: "1px solid rgba(255,255,255,0.05)", verticalAlign: "top" }}>{dim}</td>
+                        <td style={{ padding: "14px 16px", color: "#8891AA", fontWeight: 300, borderBottom: "1px solid rgba(255,255,255,0.05)", verticalAlign: "top" }}>{ats}</td>
+                        <td style={{ padding: "14px 16px", color: "#C7CDDE", fontWeight: 400, borderBottom: "1px solid rgba(255,255,255,0.05)", verticalAlign: "top", background: "rgba(75,142,240,0.05)" }}>{eal}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
           <CTA />
           <HomepageFooter />
         </div>
