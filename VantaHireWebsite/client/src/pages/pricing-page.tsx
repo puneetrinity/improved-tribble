@@ -309,7 +309,7 @@ export default function PricingPage() {
   return (
     <>
       <Helmet>
-        <title>Pricing | ealana - Simple, Transparent Pricing</title>
+        <title>Pricing | ealana — Start Free, Upgrade as You Grow</title>
         <meta name="description" content="Simple pricing. No surprises. Start free, upgrade when your team grows. No long contracts. AI sourcing, WhatsApp outreach, client portal, and pipeline management included." />
         <link rel="canonical" href="https://ealana.com/pricing" />
         <meta property="og:title" content="Pricing | ealana - Simple, Transparent Pricing" />

@@ -53,6 +53,16 @@ app.use((req, res, next) => {
     return next();
   }
 
+  // Canonical-host redirect: Railway origin domain -> ealana.com
+  if (process.env.NODE_ENV === 'production' && /\.railway\.app$/i.test(host)) {
+    return res.redirect(301, `https://ealana.com${req.url}`);
+  }
+
+  // HSTS (only meaningful over HTTPS; Railway terminates TLS upstream)
+  if ((req.headers['x-forwarded-proto'] || '') === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
   // Define allowed hosts (customize for your domain)
   const allowedHosts = process.env.ALLOWED_HOSTS
     ? process.env.ALLOWED_HOSTS.split(',')

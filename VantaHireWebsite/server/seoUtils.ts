@@ -287,6 +287,11 @@ export function validateJobPosting(job: {
 /**
  * Generate JobPosting structured data for Google Jobs
  */
+function toTitleCase(title: string): string {
+  if (title !== title.toLowerCase() && title !== title.toUpperCase()) return title; // already mixed case
+  return title.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 export function generateJobPostingSchema(job: {
   id: number;
   title: string;
@@ -333,7 +338,9 @@ export function generateJobPostingSchema(job: {
 
   // Format dates
   const datePosted = formatISODate(job.createdAt);
-  const validThrough = formatISODate(job.expiresAt || job.deadline);
+  // Google requires validThrough; fall back to 60 days after posting
+  const fallbackExpiry = new Date(new Date(job.createdAt).getTime() + 60 * 24 * 60 * 60 * 1000);
+  const validThrough = formatISODate(job.expiresAt || job.deadline || fallbackExpiry);
 
   // Build canonical URL with slug if available (prefer pure slug for SEO)
   const jobUrl = job.slug
@@ -347,6 +354,9 @@ export function generateJobPostingSchema(job: {
     name: orgName,
     logo: `${baseUrl}/logo.png`,
   };
+  if (orgName === 'ealana') {
+    hiringOrganization['@id'] = 'https://ealana.com/#organization';
+  }
 
   // Add client domain as sameAs if available
   if (job.clientDomain) {
@@ -358,7 +368,7 @@ export function generateJobPostingSchema(job: {
   const jobPosting: any = {
     '@context': 'https://schema.org',
     '@type': 'JobPosting',
-    title: job.title,
+    title: toTitleCase(job.title),
     description: htmlDescription,
     datePosted,
     hiringOrganization,

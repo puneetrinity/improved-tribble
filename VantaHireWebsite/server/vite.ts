@@ -159,7 +159,7 @@ export async function setupVite(app: Express, server: Server) {
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
-      title: 'Pricing | ealana — Simple, Transparent Pricing for Recruiting Teams',
+      title: 'Pricing | ealana — Start Free, Upgrade as You Grow',
       description: 'Start free, upgrade when your team grows. AI sourcing, email outreach with WhatsApp status updates, client portal, and pipeline management. No long contracts, no hidden fees.',
       canonical: 'https://ealana.com/pricing',
       keywords: 'ealana pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
@@ -452,7 +452,7 @@ export async function serveStatic(app: Express) {
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
     },
     '/pricing': {
-      title: 'Pricing | ealana — Simple, Transparent Pricing for Recruiting Teams',
+      title: 'Pricing | ealana — Start Free, Upgrade as You Grow',
       description: 'Start free, upgrade when your team grows. AI sourcing, email outreach with WhatsApp status updates, client portal, and pipeline management. No long contracts, no hidden fees.',
       canonical: 'https://ealana.com/pricing',
       keywords: 'ealana pricing, ATS pricing India, recruiting software cost, free ATS plan, Growth plan, enterprise recruiting',
