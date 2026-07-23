@@ -312,7 +312,7 @@ export default function DiscoverFeature() {
             Find the signal others miss
           </div>
           <p style={{ fontFamily: "var(--font-body)", fontSize: "0.97rem", color: "#8891AA", lineHeight: 1.8, marginBottom: "2rem" }}>
-            Most tools search one database and hand you 5,000 names. ealana aggregates from 25+ sources, merges scattered profiles into one view, and ranks them by real fit. You get reachout-ready candidates — not a pile of maybes.
+            Most tools search one database and hand you 5,000 names. ealana aggregates from 25+ sources, merges scattered profiles into one view, and ranks a top-100 by real fit — precision-filtered by title, seniority, and experience, in seconds. Reachout-ready candidates, not a pile of maybes.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {bullets.map((bullet) => (

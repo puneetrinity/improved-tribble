@@ -1,59 +1,22 @@
-# ealana
+# ealana — The Neural OS for Talent
+> From talent intelligence to decision intelligence.
 
-> The Neural OS for Talent — for startups and recruiting agencies.
+ealana is a recruiting OS with three layers: Discover (AI sourcing that ranks
+a top-100 from 25+ sources in seconds), Memory (talent intelligence — a
+living, verified profile of every candidate ever sourced or applied, so the
+pool compounds and repeat searches serve from memory, not credits), and Flow
+(pipeline + outreach).
 
-ealana is the Neural OS for Talent — it helps teams find, rank, and engage the right candidates faster, combining AI sourcing, shared hiring memory, WhatsApp outreach, and client collaboration in one system.
+## Definitions
+- Talent intelligence: a living, verified memory of every candidate a company
+  has ever encountered — sourced, applied, or enriched — that makes each
+  future search smarter than the last.
+- Decision intelligence: recruiting that learns from hiring outcomes — who
+  was contacted, replied, and succeeded — to recommend who to hire next,
+  without inheriting past bias.
 
-## Core Capabilities
-
-- **AI Candidate Discovery**: AI sourcing engine that returns ranked candidates with fit scores, skill breakdowns, and identity confidence.
-- **Resume Knowledge Graph**: Semantic knowledge graph that indexes every resume â€” past candidates become searchable and reusable for new roles.
-- **WhatsApp + Email Outreach**: Native email and WhatsApp outreach with templates, stage-based automation, and compliance audit trail.
-- **Client Feedback Portal**: Shareable shortlists with structured client feedback â€” no spreadsheets, no email chains.
-- **Recruiter Dashboard**: Pipeline velocity, source performance, and recruiter productivity metrics in one view.
-- **Job Command Center**: Kanban pipeline per job with bulk actions, automation triggers, and stale candidate alerts.
-
-## Architecture
-
-Three layers power ealana:
-
-1. **Intelligence Layer**: AI sourcing, fit scoring, skill breakdowns, resume parsing, knowledge graph.
-2. **Outreach Layer**: WhatsApp Cloud API, email templates, stage-based triggers, audit trail.
-3. **Operations Layer**: Pipeline management, client portal, analytics, team collaboration.
-
-## Pricing
-
-- **Free**: $0/mo â€” up to limited active jobs, AI sourcing, talent search, email outreach, basic analytics.
-- **Growth**: â‚¹8,999/seat/mo + taxes â€” unlimited jobs, unlimited AI sourcing, WhatsApp outreach, client portal, advanced analytics.
-- **Enterprise**: Custom pricing â€” SSO/SAML, API access, custom integrations, dedicated account manager.
-
-## Geographic Focus
-
-Headquartered in Bangalore, India. Serving companies across India and the Asia-Pacific (APAC) region including Singapore, Malaysia, Indonesia, Thailand, Philippines, Vietnam, and Australia.
-
-## What Makes ealana Different
-
-- **AI-native, not AI-bolted-on**: AI is the foundation, not an add-on. Every workflow is designed around intelligent automation.
-- **Recruiter-first design**: Built for how recruiters actually work â€” pipeline-centric, not form-centric.
-- **One platform replaces many**: AI sourcing + ATS + outreach + client portal + analytics in a single login.
-- **Privacy by design**: Three-tier privacy model â€” your data stays yours. Only opt-in candidates are discoverable.
-
-## Website Sections
-
-- `/` â€” Homepage: "Human decisions. AI acceleration."
-- `/product` â€” Three-layer architecture overview
-- `/features` â€” Six pillars of AI-native recruiting
-- `/pricing` â€” Free, Growth, and Enterprise plans
-- `/jobs` â€” Public job board with AI-powered search
-- `/compare` â€” Comparison with legacy ATS platforms
-- `/use-cases` â€” Solutions for startups, agencies, and enterprise
-- `/about` â€” Company mission and team
-
-## Contact Information
-
-- Website: https://ealana.com
-- Email: info@ealana.com
-- Phone: +91-9742944825
-- LinkedIn: https://www.linkedin.com/company/ealana/
-- Location: Bangalore, Karnataka, India
-- Founded: 2024
+## Key pages
+- https://ealana.com/ — product overview
+- https://ealana.com/pricing — pricing
+- https://ealana.com/features — features
+Contact: info@ealana.com
