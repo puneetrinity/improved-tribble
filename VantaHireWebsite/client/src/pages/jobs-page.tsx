@@ -146,7 +146,7 @@ export default function JobsPage() {
   const metaData = useMemo(() => {
     const baseUrl = DEFAULT_SITE_URL;
     const count = data?.pagination.total || 0;
-    let title = "Find Jobs";
+    let title = "Browse Jobs";
     if (location) title += ` in ${location}`;
     if (type && type !== "all") {
       const typeLabel = type.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase());
