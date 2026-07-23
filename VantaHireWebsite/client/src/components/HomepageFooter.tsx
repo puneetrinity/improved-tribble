@@ -11,7 +11,7 @@ const HomepageFooter = () => {
       <div></div>
       <div className="border-b border-[rgba(255,255,255,0.07)]">
         <footer className="border-t-0 px-5 pb-6 pt-12 sm:px-8 lg:px-12">
-          <div className="mx-auto mb-8 grid max-w-[1100px] gap-4 sm:gap-5 lg:grid-cols-[2.2fr_repeat(3,1fr)] lg:gap-10">
+          <div className="mx-auto mb-8 grid max-w-[1100px] gap-4 sm:gap-5 lg:grid-cols-[2fr_repeat(4,1fr)] lg:gap-10">
             <div>
               <div className="flex items-center gap-2.5 font-bold text-base text-hr-text mb-3 no-underline">
                 <div className="relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[radial-gradient(circle_at_30%_30%,rgba(75,142,240,0.22),transparent_58%),radial-gradient(circle_at_70%_70%,rgba(52,209,122,0.18),transparent_62%),rgba(255,255,255,0.03)] shadow-[0_0_30px_rgba(75,142,240,0.12)]">
@@ -38,6 +38,7 @@ const HomepageFooter = () => {
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Product</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
+                <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Features</Link></li>
                 <li><Link href="/solutions" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Solutions</Link></li>
                 <li><Link href="/pricing" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Pricing</Link></li>
                 <li><Link href="/jobs" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Browse Jobs</Link></li>
@@ -46,8 +47,16 @@ const HomepageFooter = () => {
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Company</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
+                <li><Link href="/about" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">About</Link></li>
                 <li><a href="https://cal.com/ealana/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
                 <li><a href="mailto:info@ealana.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
+              </ul>
+            </div>
+            <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
+              <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Learn</h5>
+              <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
+                <li><Link href="/what-is-decision-intelligence" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">What is Decision Intelligence?</Link></li>
+                <li><Link href="/talent-intelligence-vs-ats" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Talent Intelligence vs ATS</Link></li>
               </ul>
             </div>
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
