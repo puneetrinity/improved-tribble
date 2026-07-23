@@ -10,6 +10,10 @@ import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import { useAIFeatures } from "@/hooks/use-ai-features";
 
+
+const titleCase = (t: string) =>
+  t.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+
 interface JobWithRecruiter extends Job {
   postedByName?: string;
   postedById?: number | string;
@@ -445,11 +449,11 @@ export default function JobsPage() {
                                 <div className="flex justify-between items-start gap-4 mb-3 max-md:flex-col max-md:gap-2">
                                   <div>
                                     <div className="font-display text-[1.1rem] font-medium text-e-text mb-2">
-                                      <Link href={`/jobs/${job.slug || job.id}`} className="text-inherit no-underline transition-colors duration-200 hover:text-e-blue">{job.title}</Link>
+                                      <Link href={`/jobs/${job.slug || job.id}`} className="text-inherit no-underline transition-colors duration-200 hover:text-e-blue">{titleCase(job.title)}</Link>
                                     </div>
                                     <div className="flex flex-wrap gap-4 items-center max-md:gap-2.5">
                                       <span className={metaItemCls}>
-                                        <MapPin /> {job.location}
+                                        <MapPin /> {titleCase(job.location)}
                                       </span>
                                       {salaryDisplay && (
                                         <span className={metaItemCls}>{salaryDisplay}</span>
@@ -457,7 +461,7 @@ export default function JobsPage() {
                                       <span className={metaItemCls}>
                                         <Clock /> Posted {formatDate(job.createdAt)}
                                       </span>
-                                      {job.postedByName && (
+                                      {job.postedByName && !/system|admin/i.test(job.postedByName) && (
                                         <span className={metaItemCls}>
                                           <User />
                                           {job.postedById && job.isRecruiterProfilePublic ? (

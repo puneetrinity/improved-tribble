@@ -70,6 +70,10 @@ const HomepageFooter = () => {
           </div>
           <div className="mx-auto flex max-w-[1100px] flex-col gap-2 border-t border-[rgba(255,255,255,0.08)] pt-5 text-center text-[0.78rem] text-hr-text-muted sm:flex-row sm:items-center sm:justify-between sm:text-left">
             <span>Copyright 2026 ealana. All rights reserved.</span>
+            <span style={{ display: "inline-flex", gap: 14, marginLeft: 16 }}>
+              <a href="https://www.linkedin.com/company/ealana-com" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>LinkedIn</a>
+              <a href="https://www.instagram.com/ealana.ai/" target="_blank" rel="noopener noreferrer" style={{ color: "inherit", textDecoration: "none" }}>Instagram</a>
+            </span>
             <span>Made in India.</span>
           </div>
         </footer>

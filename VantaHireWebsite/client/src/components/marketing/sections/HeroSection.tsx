@@ -142,7 +142,7 @@ export function HeroSection() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 1.0 }}
-        className="relative z-10 mb-8 max-w-xl font-body leading-relaxed text-e-text2"
+        className="relative z-10 mb-8 max-w-3xl font-body leading-relaxed text-e-text2"
         style={{ fontSize: isMobile ? "0.98rem" : "1.05rem", fontWeight: 300 }}
       >
         <span className="block">
