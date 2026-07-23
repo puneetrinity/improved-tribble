@@ -30,8 +30,8 @@ export const atsShellCopy = {
       section: "Workspace",
     },
     talentSearch: {
-      label: "Discover",
-      description: "Find the signal others miss across your talent pool",
+      label: "Memory",
+      description: "Search every candidate your team has already met",
       section: "Workspace",
     },
     myJobs: {
@@ -318,7 +318,7 @@ export const talentSearchPageCopy = {
     whyMatched: "Why this matched",
     addToJob: "Add to Job",
     resume: "Resume",
-    emptyTitle: "Discover",
+    emptyTitle: "Memory",
     resumePreviewFallback: "Resume Preview",
     resumePreviewFrameTitle: "Resume Preview",
     openInNewTab: "Open in New Tab",
