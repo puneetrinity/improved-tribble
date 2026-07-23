@@ -63,16 +63,16 @@ export default function FeaturesPage() {
               <motion.h1 variants={wordVariants} initial="hidden" animate="visible" style={{ marginTop: 0, marginBottom: "1.5rem" }}>
                 <span style={{ display: "flex", justifyContent: "center", gap: isMobile ? "clamp(0.6rem, 3vw, 0.9rem)" : "clamp(0.9rem, 1.6vw, 1.5rem)", flexWrap: "wrap" }}>
                   {words1.map((word) => (
-                    <motion.span key={word} variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
+                    <motion.span key={word} variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 400, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
                       {word}
                     </motion.span>
                   ))}
                 </span>
                 <span style={{ display: "flex", justifyContent: "center", gap: isMobile ? "clamp(0.6rem, 3vw, 0.9rem)" : "clamp(0.9rem, 1.6vw, 1.5rem)", flexWrap: "wrap" }}>
-                  <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
+                  <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 400, letterSpacing: "-0.025em", lineHeight: 1.1, color: "#F4F5FA" }}>
                     for
                   </motion.span>
-                  <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 700, letterSpacing: "-0.025em", lineHeight: 1.1, fontStyle: "italic", background: "linear-gradient(135deg, #4B8EF0, #34D17A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                  <motion.span variants={wordItem} style={{ display: "inline-block", fontFamily: "var(--font-display)", fontSize: isMobile ? "clamp(2.5rem, 12vw, 3.3rem)" : "clamp(3.5rem, 6vw, 5.5rem)", fontWeight: 400, letterSpacing: "-0.025em", lineHeight: 1.1, fontStyle: "italic", background: "linear-gradient(135deg, #4B8EF0, #34D17A)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
                     recruiting.
                   </motion.span>
                 </span>
