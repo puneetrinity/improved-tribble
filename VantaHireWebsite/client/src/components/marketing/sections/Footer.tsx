@@ -56,6 +56,10 @@ export default function Footer() {
         </div>
         <div style={{ marginTop: "2.5rem", paddingTop: "1.5rem", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", justifyContent: "space-between" }}>
           <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "0.78rem", color: "#3D4460" }}>© 2026 ealana. All rights reserved.</span>
+          <span style={{ display: "inline-flex", gap: 14, marginLeft: 16 }}>
+            <a href="https://www.linkedin.com/company/ealana-com" target="_blank" rel="noopener noreferrer" style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "0.78rem", color: "#8891AA", textDecoration: "none" }}>LinkedIn</a>
+            <a href="https://www.instagram.com/ealana.ai/" target="_blank" rel="noopener noreferrer" style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "0.78rem", color: "#8891AA", textDecoration: "none" }}>Instagram</a>
+          </span>
           <span style={{ fontFamily: "'DM Sans',sans-serif", fontSize: "0.78rem", color: "#3D4460" }}>Made in India 🇮🇳</span>
         </div>
       </div>
