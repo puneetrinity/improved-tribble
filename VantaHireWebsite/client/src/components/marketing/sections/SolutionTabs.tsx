@@ -35,7 +35,7 @@ const AFTER = [
   [
     "AI ranking cuts shortlisting from days to hours",
     "Shared memory flags duplicates across all placements",
-    "WhatsApp + email outreach from one unified screen",
+    "Email outreach and WhatsApp status updates from one screen",
     "Source analytics show exactly what's working",
   ],
   [

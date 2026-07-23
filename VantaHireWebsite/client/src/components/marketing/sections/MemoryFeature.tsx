@@ -226,7 +226,7 @@ export default function MemoryFeature() {
             We remember everything for you
           </div>
           <p style={{ fontFamily: "var(--font-body)", fontSize: "0.97rem", color: "#8891AA", lineHeight: 1.8, marginBottom: "2rem" }}>
-            Every sourced candidate and every applicant becomes one verified profile — resume, skills, and history connected. Your pool compounds: repeat searches serve from memory, not credits, so you never pay twice for the same candidate. When the right role opens months later, the right person resurfaces automatically.
+            Every sourced candidate and every applicant becomes one verified profile — resume, skills, and history connected. Your pool compounds: repeat searches serve from memory, not credits, so you never pay twice for the same candidate. When the right role opens months later, the right person resurfaces automatically. What compounds globally is knowledge of the public talent market — your applicants, your uploads, and your decisions stay yours.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {bullets.map((bullet) => (

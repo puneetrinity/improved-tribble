@@ -143,7 +143,7 @@ export function ProblemSection() {
           </h2>
 
           <p className="font-body" style={{ fontSize: "1rem", color: "#8891AA", fontWeight: 300, lineHeight: 1.75, marginBottom: 32 }}>
-            Same candidates, same roles — but one system that finds the signal, remembers every decision, and acts on it.
+            Same candidates, same roles — but one system that finds the signal, remembers every candidate, and acts on it.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -189,7 +189,7 @@ export function ProblemSection() {
             </h2>
 
             <p className="font-body" style={{ fontSize: "1rem", color: "#8891AA", fontWeight: 300, lineHeight: 1.75, maxWidth: 420, marginBottom: 28 }}>
-              One system that finds the signal, remembers every decision, and keeps your whole pipeline in sync.
+              One system that finds the signal, remembers every candidate, and keeps your whole pipeline in sync.
             </p>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>

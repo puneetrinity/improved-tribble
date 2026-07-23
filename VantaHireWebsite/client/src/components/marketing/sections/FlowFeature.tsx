@@ -11,7 +11,8 @@ type StageCardStyle = {
 };
 
 const bullets = [
-  "WhatsApp + email outreach with delivery tracking",
+  "Email outreach with delivery tracking",
+  "WhatsApp status updates to staged candidates",
   "Recruiter dashboard — every job, every candidate, every stage",
   "Client feedback portal for hiring manager input",
   "Self-serve interview scheduling with calendar links",
@@ -260,7 +261,7 @@ export default function FlowFeature() {
           <div style={{ fontFamily: "var(--font-display)", fontStyle: "italic", fontSize: "3rem", color: "#F5C842", marginBottom: "0.25rem", lineHeight: 1.1 }}>Flow</div>
           <div style={{ fontFamily: "var(--font-body)", fontSize: "0.9rem", fontStyle: "italic", color: "#F5C842", opacity: 0.7, marginBottom: "1.5rem" }}>Act on the signal</div>
           <p style={{ fontFamily: "var(--font-body)", fontSize: "0.97rem", color: "#8891AA", lineHeight: 1.8, marginBottom: "2rem" }}>
-            Shortlist ready? Reach out on WhatsApp, send an email sequence, schedule an interview — all from the same screen. No tab-switching. No copy-pasting. Just one place to move candidates through your pipeline.
+            Shortlist ready? Send an email sequence, keep candidates posted on WhatsApp, schedule an interview — all from the same screen. No tab-switching. No copy-pasting. Just one place to move candidates through your pipeline.
           </p>
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {bullets.map((bullet) => (
