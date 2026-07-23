@@ -12,8 +12,8 @@ interface CountUpProps {
 
 const STATS = [
   { value: 25, suffix: "+", label: "sources aggregated", accent: "#4B8EF0", countUp: true },
-  { value: "3×", label: "faster shortlisting", accent: "#34D17A", countUp: false },
-  { value: 60, suffix: "%", label: "lower per-hire cost", accent: "#F5C842", countUp: true },
+  { value: "Top 100", label: "ranked candidates per role", accent: "#34D17A", countUp: false },
+  { value: "Seconds", label: "to an AI-ranked shortlist", accent: "#F5C842", countUp: false },
   { value: "Zero", label: "tab-switching required", accent: "#4B8EF0", countUp: false },
 ] as const;
 
