@@ -285,14 +285,6 @@ export default function HowItWorks() {
         <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.2rem,4.2vw,3.2rem)", lineHeight: 1.1, color: "#F4F5FA", fontWeight: 400, margin: 0 }}>
           Three layers. One right hire.
         </h2>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: "0.88rem", color: "#8891AA", lineHeight: 1.6, maxWidth: 760, margin: "0.85rem auto 0" }}>
-          <strong>What is talent intelligence?</strong> A living, verified memory of every
-          candidate a company has ever encountered — sourced, applied, or enriched — that
-          makes each future search smarter than the last.{" "}
-          <strong>What is decision intelligence?</strong> Recruiting that learns from hiring
-          outcomes — who was contacted, replied, and succeeded — to recommend who to hire
-          next, without inheriting past bias.
-        </p>
       </div>
 
       <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: "1.25rem", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
