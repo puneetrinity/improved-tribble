@@ -66,6 +66,7 @@ export default function HowItWorks() {
   const [activeTab, setActiveTab] = useState(0);
   const isMobile = useIsMobile();
   const sectionRef = useRef<HTMLElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
   const stepCount = TABS.length;
   const active = (TABS[activeTab] ?? TABS[0])!;
 
@@ -76,7 +77,7 @@ export default function HowItWorks() {
   // three layers — they're the product — without wheel-hijacking: momentum,
   // trackpads, keyboard, and scrollbars all keep working, so no stutter.
   const { scrollYProgress } = useScroll({
-    target: sectionRef as React.RefObject<HTMLElement>,
+    target: trackRef as React.RefObject<HTMLElement>,
     offset: ["start start", "end end"],
   });
   useMotionValueEvent(scrollYProgress, "change", (v) => {
@@ -87,28 +88,30 @@ export default function HowItWorks() {
 
   // Clicking a tab scrolls to that layer's slice of the pinned track.
   const goToStep = (index: number) => {
-    if (isMobile || !sectionRef.current) {
+    if (isMobile || !trackRef.current) {
       setActiveTab(index);
       return;
     }
-    const el = sectionRef.current;
+    const el = trackRef.current;
     const top = window.scrollY + el.getBoundingClientRect().top;
     const track = el.offsetHeight - window.innerHeight;
     const target = top + ((index + 0.5) / stepCount) * track;
     window.scrollTo({ top: target, behavior: "smooth" });
   };
 
-  const innerContent = (
-    <div style={{ maxWidth: 1100, margin: "0 auto", width: "100%" }}>
-      <div style={{ marginBottom: isMobile ? "1.5rem" : "1.75rem", textAlign: "center" }}>
-        <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase", marginBottom: "1rem" }}>
-          How Ealana Works
-        </div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.2rem,4.2vw,3.2rem)", lineHeight: 1.1, color: "#F4F5FA", fontWeight: 400, margin: 0 }}>
-          Three layers. One right hire.
-        </h2>
+  const headerBlock = (
+    <div style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center", padding: isMobile ? "0 0 2rem" : "110px 4rem 56px" }}>
+      <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase", marginBottom: "1rem" }}>
+        How ealana Works
       </div>
+      <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.2rem,4.2vw,3.2rem)", lineHeight: 1.1, color: "#F4F5FA", fontWeight: 400, margin: 0 }}>
+        Three layers. One right hire.
+      </h2>
+    </div>
+  );
 
+  const innerContent = (
+    <div style={{ maxWidth: 1180, margin: "0 auto", width: "100%" }}>
       <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: "1.25rem", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
         {TABS.map((tab, index) => {
           const isActive = index === activeTab;
@@ -187,9 +190,11 @@ export default function HowItWorks() {
             >
               <span style={{ fontSize: "0.7rem" }}>👇</span> Try it out here
             </motion.div>
-            <div style={{ height: isMobile ? "auto" : "min(calc(100vh - 380px), 640px)", overflow: "hidden", position: "relative", borderRadius: 16 }}>
+            {/* Fixed-height stage keeps tab switches reflow-free; NO clipping —
+                the mock windows fit the stage and their large soft drop-shadows
+                must fade naturally (clipping turns them into hard slabs). */}
+            <div style={{ height: isMobile ? "auto" : "min(calc(100vh - 240px), 760px)", position: "relative" }}>
               {active.panel}
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 32, background: "linear-gradient(to bottom, transparent, rgba(5,6,14,0.85))", pointerEvents: "none" }} />
             </div>
           </div>
         </motion.div>
@@ -200,30 +205,33 @@ export default function HowItWorks() {
   if (isMobile) {
     return (
       <section id="features" style={{ padding: "72px 1.25rem" }}>
+        {headerBlock}
         {innerContent}
       </section>
     );
   }
 
+  // Header scrolls away in normal flow; the pin then gives the tabs + demo the
+  // full viewport (the header was eating ~350px of the pinned screen and the
+  // mocks looked small — user feedback).
   return (
-    <section
-      id="features"
-      ref={sectionRef}
-      style={{ height: `${stepCount * 100}vh`, position: "relative" }}
-    >
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          height: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          overflow: "hidden",
-          padding: "96px 4rem 36px",
-        }}
-      >
-        {innerContent}
+    <section id="features" ref={sectionRef}>
+      {headerBlock}
+      <div ref={trackRef} style={{ height: `${stepCount * 100}vh`, position: "relative" }}>
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            height: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            overflow: "hidden",
+            padding: "88px 4rem 28px",
+          }}
+        >
+          {innerContent}
+        </div>
       </div>
     </section>
   );
