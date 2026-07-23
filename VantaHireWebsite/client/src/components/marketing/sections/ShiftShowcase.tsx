@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useInView, useMotionValueEvent, useReducedMotion, useScroll } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const MOCK_WINDOW: React.CSSProperties = {
@@ -200,6 +200,8 @@ export default function ShiftShowcase() {
   const isMobile = useIsMobile();
   const reducedMotion = useReducedMotion();
   const trackRef = useRef<HTMLDivElement>(null);
+  const mobileStageRef = useRef<HTMLDivElement>(null);
+  const [userTookControl, setUserTookControl] = useState(false);
   const stepCount = BEATS.length;
   const active = (BEATS[activeTab] ?? BEATS[0])!;
 
@@ -216,8 +218,20 @@ export default function ShiftShowcase() {
     setActiveTab((t) => (t === idx ? t : idx));
   });
 
+  // Mobile: auto-advance the story while the section is in view, so scrollers
+  // see TI and DI without the desktop pin. Stops at the DI beat; any manual
+  // tab tap hands control to the user permanently. Reduced motion: static.
+  const mobileInView = useInView(mobileStageRef, { amount: 0.35 });
+  useEffect(() => {
+    if (!isMobile || userTookControl || reducedMotion || !mobileInView) return;
+    if (activeTab >= stepCount - 1) return;
+    const t = setTimeout(() => setActiveTab((a) => Math.min(stepCount - 1, a + 1)), 5000);
+    return () => clearTimeout(t);
+  }, [isMobile, userTookControl, reducedMotion, mobileInView, activeTab, stepCount]);
+
   const goToBeat = (index: number) => {
     if (isMobile || !trackRef.current) {
+      setUserTookControl(true);
       setActiveTab(index);
       return;
     }
@@ -315,7 +329,7 @@ export default function ShiftShowcase() {
     return (
       <section id="features" style={{ position: "relative" }}>
         <div style={{ padding: "56px 1.25rem 0" }}>{headerBlock}</div>
-        <div style={{ padding: "0 1.25rem" }}>{innerContent}</div>
+        <div ref={mobileStageRef} style={{ padding: "0 1.25rem" }}>{innerContent}</div>
         {ladderRecap}
       </section>
     );
