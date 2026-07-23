@@ -18,6 +18,7 @@ export interface InternalHeroStat {
 
 interface InternalHeroProps {
   eyebrow: string;
+  tone?: "blue" | "green" | "yellow";
   title: ReactNode;
   subtitle?: ReactNode;
   icon?: LucideIcon;
@@ -29,6 +30,7 @@ interface InternalHeroProps {
 
 export function InternalHero({
   eyebrow,
+  tone = "blue",
   title,
   subtitle,
   icon: Icon,
@@ -37,6 +39,13 @@ export function InternalHero({
   stats = [],
   className,
 }: InternalHeroProps) {
+  const TONES = {
+    blue: { chip: "bg-[#EEF5FF] text-[#4B8EF0]", badge: "border-[#D4E7FF] bg-[#EEF5FF] text-[#4B8EF0]" },
+    green: { chip: "bg-[#EAF8F0] text-[#1FA45C]", badge: "border-[#C8EEDA] bg-[#EAF8F0] text-[#1FA45C]" },
+    yellow: { chip: "bg-[#FCF6E3] text-[#B8860B]", badge: "border-[#F2E3B3] bg-[#FCF6E3] text-[#B8860B]" },
+  } as const;
+  const toneCls = TONES[tone];
+
   return (
     <section className={cn(INTERNAL_HERO, "relative px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-8", className)}>
       <div className="pointer-events-none absolute -right-16 -top-24 h-52 w-52 rounded-full bg-[rgba(75,142,240,0.18)] blur-3xl" />
@@ -46,14 +55,14 @@ export function InternalHero({
         <div className="max-w-3xl space-y-3">
           <div className="flex flex-wrap items-center gap-3">
             {Icon ? (
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#EEF5FF] text-[#4B8EF0] shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+              <div className={cn("flex h-11 w-11 items-center justify-center rounded-2xl shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]", toneCls.chip)}>
                 <Icon className="h-5 w-5" />
               </div>
             ) : null}
             <div>
               <p className={INTERNAL_EYEBROW}>{eyebrow}</p>
               {badge ? (
-                <div className="mt-2 inline-flex rounded-full border border-[#D4E7FF] bg-[#EEF5FF] px-3 py-1 font-dm text-xs font-semibold text-[#4B8EF0]">
+                <div className={cn("mt-2 inline-flex rounded-full border px-3 py-1 font-dm text-xs font-semibold", toneCls.badge)}>
                   {badge}
                 </div>
               ) : null}

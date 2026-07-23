@@ -172,6 +172,7 @@ export default function CandidatesPage() {
     <InternalPageShell>
       <InternalHero
         eyebrow="Your talent pool"
+        tone="green"
         title={talentSearchPageCopy.header.title}
         subtitle={talentSearchPageCopy.header.subtitle}
         icon={Sparkles}
