@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import UseCasesPage from "@/pages/use-cases-page";
+import AboutPage from "@/pages/about-page";
 import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
 import React, { lazy, Suspense, useEffect, useState, useRef } from "react";
 
@@ -95,6 +96,7 @@ function Router() {
       <Route path="/pricing" component={PricingPage} />
       <Route path="/claim/:token" component={ClaimPage} />
       <Route path="/solutions" component={UseCasesPage} />
+      <Route path="/about" component={AboutPage} />
       <Route path="/recruiter-auth" component={RecruiterAuth} />
       <Route path="/candidate-auth" component={CandidateAuth} />
       <ProtectedRoute path="/onboarding" component={OnboardingPage} requiredRole={['recruiter']} />

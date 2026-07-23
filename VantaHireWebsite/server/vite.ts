@@ -132,7 +132,7 @@ export async function setupVite(app: Express, server: Server) {
 
   // 301 redirects for killed pages (before static middleware to catch /brand)
   app.get(['/product', '/compare'], (_req, res) => res.redirect(301, '/features'));
-  app.get(['/about', '/brand', '/brand-assets'], (_req, res) => res.redirect(301, '/'));
+  app.get(['/brand', '/brand-assets'], (_req, res) => res.redirect(301, '/'));
   app.get(['/consultants', '/demo'], (_req, res) => res.redirect(301, '/recruiter-auth'));
 
   // Serve static HTML files from client/public (e.g., landing pages)
@@ -187,7 +187,7 @@ export async function setupVite(app: Express, server: Server) {
       title: 'Browse Jobs | ealana — Find Your Next Role',
       description: 'Browse open positions across technology, consulting, and more. Apply directly through ealana with AI-powered matching and fit scoring.',
       canonical: 'https://ealana.com/jobs',
-      keywords: 'jobs India, tech jobs Bangalore, IT jobs APAC, apply online, ealana jobs',
+      keywords: 'jobs India, tech jobs Noida NCR, IT jobs APAC, apply online, ealana jobs',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Jobs", "item": "https://ealana.com/jobs" }] }],
     },
     '/recruiters': {
@@ -196,6 +196,15 @@ export async function setupVite(app: Express, server: Server) {
       canonical: 'https://ealana.com/recruiters',
       keywords: 'specialist recruiters India, IT recruiters, telecom recruiters, healthcare recruiters APAC',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://ealana.com/recruiters" }] }],
+    },
+    '/about': {
+      title: 'About | ealana \u2014 Built by a recruiter, made in India',
+      description: 'ealana is a decision intelligence platform for recruiting, built in Noida, India by founder Puneet Kumar \u2014 13+ years running recruitment before building the system recruiters actually need.',
+      canonical: 'https://ealana.com/about',
+      jsonLd: [
+        { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "About", "item": "https://ealana.com/about" }] },
+        { "@context": "https://schema.org", "@type": "Person", "@id": "https://ealana.com/about#founder", "name": "Puneet Kumar", "jobTitle": "Founder & CEO", "sameAs": ["https://www.linkedin.com/in/puneet-gleuck/"], "worksFor": { "@id": "https://ealana.com/#organization" } },
+      ],
     },
     '/privacy-policy': {
       title: 'Privacy Policy | ealana',
@@ -413,7 +422,7 @@ export async function serveStatic(app: Express) {
 
   // 301 redirects for killed pages
   app.get(['/product', '/compare'], (_req, res) => res.redirect(301, '/features'));
-  app.get(['/about', '/brand', '/brand-assets'], (_req, res) => res.redirect(301, '/'));
+  app.get(['/brand', '/brand-assets'], (_req, res) => res.redirect(301, '/'));
   app.get(['/consultants', '/demo'], (_req, res) => res.redirect(301, '/recruiter-auth'));
 
   // SSR meta injection for marketing pages (registered before static middleware
@@ -461,7 +470,7 @@ export async function serveStatic(app: Express) {
       title: 'Browse Jobs | ealana — Find Your Next Role',
       description: 'Browse open positions across technology, consulting, and more. Apply directly through ealana with AI-powered matching and fit scoring.',
       canonical: 'https://ealana.com/jobs',
-      keywords: 'jobs India, tech jobs Bangalore, IT jobs APAC, apply online, ealana jobs',
+      keywords: 'jobs India, tech jobs Noida NCR, IT jobs APAC, apply online, ealana jobs',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Jobs", "item": "https://ealana.com/jobs" }] }],
     },
     '/recruiters': {
@@ -470,6 +479,15 @@ export async function serveStatic(app: Express) {
       canonical: 'https://ealana.com/recruiters',
       keywords: 'specialist recruiters India, IT recruiters, telecom recruiters, healthcare recruiters APAC',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://ealana.com/recruiters" }] }],
+    },
+    '/about': {
+      title: 'About | ealana \u2014 Built by a recruiter, made in India',
+      description: 'ealana is a decision intelligence platform for recruiting, built in Noida, India by founder Puneet Kumar \u2014 13+ years running recruitment before building the system recruiters actually need.',
+      canonical: 'https://ealana.com/about',
+      jsonLd: [
+        { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "About", "item": "https://ealana.com/about" }] },
+        { "@context": "https://schema.org", "@type": "Person", "@id": "https://ealana.com/about#founder", "name": "Puneet Kumar", "jobTitle": "Founder & CEO", "sameAs": ["https://www.linkedin.com/in/puneet-gleuck/"], "worksFor": { "@id": "https://ealana.com/#organization" } },
+      ],
     },
     '/privacy-policy': {
       title: 'Privacy Policy | ealana',
