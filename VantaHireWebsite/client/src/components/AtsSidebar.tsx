@@ -271,7 +271,7 @@ export default function AtsSidebar({
             </div>
             <div className="min-w-0 space-y-1 group-data-[collapsible=icon]:hidden">
               <div className="flex items-center gap-2">
-                <div className="rounded-full border border-sidebar-border bg-[rgba(75,142,240,0.12)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sidebar-primary">{atsShellCopy.brand.badge}</div>
+                <div className="rounded-full border border-sidebar-border bg-[rgba(245,200,66,0.14)] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#B8860B]">{atsShellCopy.brand.badge}</div>
               </div>
               {organizationName && (
                 <div className="truncate text-[12px] font-medium text-sidebar-foreground/70">
@@ -329,11 +329,6 @@ export default function AtsSidebar({
                       <Icon className="h-4 w-4 shrink-0 group-data-[collapsible=icon]:m-0" />
                       <span className="min-w-0 truncate">
                         <span>{item.label}</span>
-                        {item.path === "/candidates" && (
-                          <span className="ml-0.5 text-[7px] font-semibold uppercase tracking-normal text-sidebar-primary/65">
-                            by Memory
-                          </span>
-                        )}
                       </span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>

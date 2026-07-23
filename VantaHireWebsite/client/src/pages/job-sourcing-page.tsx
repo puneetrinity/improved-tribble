@@ -490,7 +490,10 @@ export default function JobSourcingPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">{jobSourcingPageCopy.header.title}</h1>
+              <h1 className="text-xl font-semibold">
+                <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[#4B8EF0] align-middle" aria-hidden="true" />
+                {jobSourcingPageCopy.header.title}
+              </h1>
             </div>
             {isPolling && (
               <div className="flex items-center gap-2 mt-1">
