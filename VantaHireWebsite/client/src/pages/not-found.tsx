@@ -10,6 +10,7 @@ export default function NotFound() {
     <>
       <Helmet>
         <title>Page Not Found | ealana</title>
+        <meta name="description" content="This page doesn't exist or has moved. Head back to ealana — the Neural OS for Talent." />
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme min-h-screen">
