@@ -47,10 +47,10 @@ export default function AboutPage() {
   return (
     <>
       <Helmet>
-        <title>About | ealana — Built by a recruiter, made in India</title>
+        <title>About | ealana — Built by a recruiter who lived the problem</title>
         <meta
           name="description"
-          content="ealana is a decision intelligence platform for recruiting, built in Noida, India by founder Puneet Kumar — 13+ years running recruitment before building the system recruiters actually need."
+          content="ealana is a decision intelligence platform for recruiting, built by founder Puneet Kumar — 13+ years running recruitment before building the system recruiters actually need."
         />
         <link rel="canonical" href="https://ealana.com/about" />
         <script type="application/ld+json">{jsonLd}</script>
@@ -96,8 +96,8 @@ export default function AboutPage() {
             className="mx-auto mt-6 max-w-2xl font-body leading-relaxed text-e-text2"
             style={{ fontSize: isMobile ? "0.98rem" : "1.08rem", fontWeight: 300 }}
           >
-            ealana is a decision intelligence platform for recruiting — built in Noida, India, by
-            someone who spent over a decade inside the problem it solves.
+            ealana is a decision intelligence platform for recruiting — built by someone who spent
+            over a decade inside the problem it solves.
           </motion.p>
         </section>
 
@@ -172,8 +172,8 @@ export default function AboutPage() {
         <section className="relative mx-auto max-w-3xl px-5 pb-20 sm:px-6 sm:pb-28">
           <motion.div {...fadeUp} className="grid gap-4 sm:grid-cols-3">
             {[
-              { label: "Based in", value: "Noida, India" },
-              { label: "Founded by", value: "A recruiter, not a tourist" },
+              { label: "Founded by", value: "A recruiter who lived the problem" },
+              { label: "Built for", value: "Recruiting teams everywhere" },
               { label: "Reach us", value: "info@ealana.com" },
             ].map((f) => (
               <div

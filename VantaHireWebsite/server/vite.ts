@@ -198,8 +198,8 @@ export async function setupVite(app: Express, server: Server) {
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://ealana.com/recruiters" }] }],
     },
     '/about': {
-      title: 'About | ealana \u2014 Built by a recruiter, made in India',
-      description: 'ealana is a decision intelligence platform for recruiting, built in Noida, India by founder Puneet Kumar \u2014 13+ years running recruitment before building the system recruiters actually need.',
+      title: 'About | ealana \u2014 Built by a recruiter who lived the problem',
+      description: 'ealana is a decision intelligence platform for recruiting, built by founder Puneet Kumar \u2014 13+ years running recruitment before building the system recruiters actually need.',
       canonical: 'https://ealana.com/about',
       jsonLd: [
         { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "About", "item": "https://ealana.com/about" }] },
@@ -491,8 +491,8 @@ export async function serveStatic(app: Express) {
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Recruiters", "item": "https://ealana.com/recruiters" }] }],
     },
     '/about': {
-      title: 'About | ealana \u2014 Built by a recruiter, made in India',
-      description: 'ealana is a decision intelligence platform for recruiting, built in Noida, India by founder Puneet Kumar \u2014 13+ years running recruitment before building the system recruiters actually need.',
+      title: 'About | ealana \u2014 Built by a recruiter who lived the problem',
+      description: 'ealana is a decision intelligence platform for recruiting, built by founder Puneet Kumar \u2014 13+ years running recruitment before building the system recruiters actually need.',
       canonical: 'https://ealana.com/about',
       jsonLd: [
         { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "About", "item": "https://ealana.com/about" }] },

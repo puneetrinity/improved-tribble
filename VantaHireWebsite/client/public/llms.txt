@@ -20,6 +20,6 @@ pool compounds and repeat searches serve from memory, not credits), and Flow
 - https://ealana.com/pricing — pricing
 - https://ealana.com/features — features
 Contact: info@ealana.com
-- [About](https://ealana.com/about): Company and founder — built in Noida, India by Puneet Kumar, 13+ years in recruitment.
+- [About](https://ealana.com/about): Company and founder — built by Puneet Kumar, 13+ years in recruitment.
 - [What is Decision Intelligence in Recruiting?](https://ealana.com/what-is-decision-intelligence): Canonical definition — a system that ranks, remembers, and recommends, so hiring runs on evidence.
 - [Talent Intelligence vs ATS](https://ealana.com/talent-intelligence-vs-ats): How the categories differ and why the next step past both is decision intelligence.
