@@ -379,10 +379,10 @@ const Contact = () => {
                         <Phone className="h-5 w-5 text-white" />
                       </div>
                       <a
-                        href="tel:+919742944825"
+                        href="tel:+917982215841"
                         className="font-medium text-white/90 hover:text-[#FF5BA8] transition-all duration-300 group-hover:tracking-wide"
                       >
-                        +91-9742944825
+                        +91 7982215841
                       </a>
                     </div>
                     <div className="flex items-center group transition-all duration-300 hover:translate-x-2">
