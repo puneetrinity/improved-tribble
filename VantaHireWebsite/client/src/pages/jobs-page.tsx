@@ -312,7 +312,7 @@ export default function JobsPage() {
                     style={{ background: "radial-gradient(ellipse, rgba(75,142,240,0.12) 0%, rgba(52,209,122,0.05) 40%, transparent 72%)", filter: "blur(80px)" }}
                   />
                   <div className="relative font-mono text-[0.68rem] font-medium text-e-blue tracking-[0.12em] uppercase mb-[18px]">Open Positions</div>
-                  <h1 className="relative font-display text-[clamp(2.8rem,5vw,4.4rem)] font-medium leading-[1.08] tracking-[-0.03em] mb-4 text-e-text max-w-[700px] mx-auto">Find Your Next<br />Opportunity</h1>
+                  <h1 className="relative font-display text-[clamp(2.8rem,5vw,4.4rem)] font-medium leading-[1.08] tracking-[-0.03em] mb-4 text-e-text max-w-[700px] mx-auto">Find Your Next<br /><span style={{ fontStyle: "italic", background: "linear-gradient(135deg, #4B8EF0 0%, #34D17A 100%)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>Opportunity</span></h1>
                   <p className="relative text-base leading-[1.8] text-e-text2 max-w-[520px] mx-auto text-center">
                     Discover roles with leading companies across India, powered by intelligent matching.
                   </p>
