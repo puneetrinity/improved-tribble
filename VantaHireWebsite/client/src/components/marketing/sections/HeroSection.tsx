@@ -168,14 +168,6 @@ export function HeroSection() {
           </motion.strong>{" "}
           — the Neural OS for Talent.
         </span>
-        <motion.span
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.45, delay: 2.4 }}
-          className="mt-2 block italic"
-        >
-          The right 100, not 4,847 maybes.
-        </motion.span>
       </motion.p>
 
       <motion.div
