@@ -26,13 +26,19 @@ function WindowBar() {
   );
 }
 
+const ATS_STATUS: Record<string, { bg: string; fg: string }> = {
+  "In review": { bg: "rgba(75,142,240,0.12)", fg: "#2F6FD0" },
+  "On hold": { bg: "rgba(245,200,66,0.16)", fg: "#8A6510" },
+  Archived: { bg: "#EEF0F4", fg: "#6B7280" },
+};
+
 function AtsPanel() {
-  const rows = [
-    ["A. Krishnamurthy", "Mar 12", "In review"],
-    ["P. Sharma", "Mar 09", "In review"],
-    ["R. Mehta", "Feb 28", "On hold"],
-    ["S. Iyer", "Feb 21", "On hold"],
-    ["V. Nair", "Feb 14", "Archived"],
+  const rows: Array<[string, string, string, string, string]> = [
+    ["AK", "A. Krishnamurthy", "Mar 12", "In review", "#4B8EF0"],
+    ["PS", "P. Sharma", "Mar 09", "In review", "#34D17A"],
+    ["RM", "R. Mehta", "Feb 28", "On hold", "#F5C842"],
+    ["SI", "S. Iyer", "Feb 21", "On hold", "#4B8EF0"],
+    ["VN", "V. Nair", "Feb 14", "Archived", "#34D17A"],
   ];
   return (
     <div style={MOCK_WINDOW}>
@@ -46,12 +52,17 @@ function AtsPanel() {
           </tr>
         </thead>
         <tbody>
-          {rows.map(([name, date, status]) => (
+          {rows.map(([initials, name, date, status, tint]) => (
             <tr key={name}>
-              <td style={{ padding: "10px", borderBottom: "1px solid #F1F3F7" }}>{name}</td>
-              <td style={{ padding: "10px", borderBottom: "1px solid #F1F3F7" }}>{date}</td>
-              <td style={{ padding: "10px", borderBottom: "1px solid #F1F3F7" }}>
-                <span style={{ fontSize: "0.66rem", padding: "2px 9px", borderRadius: 100, background: "#EEF0F4" }}>{status}</span>
+              <td style={{ padding: "9px 10px", borderBottom: "1px solid #F1F3F7" }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+                  <span style={{ width: 26, height: 26, borderRadius: "50%", background: `${tint}1f`, color: tint === "#F5C842" ? "#8A6510" : tint, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.6rem", fontWeight: 600, flexShrink: 0 }}>{initials}</span>
+                  <span style={{ color: "#374151", fontWeight: 500 }}>{name}</span>
+                </span>
+              </td>
+              <td style={{ padding: "9px 10px", borderBottom: "1px solid #F1F3F7" }}>{date}</td>
+              <td style={{ padding: "9px 10px", borderBottom: "1px solid #F1F3F7" }}>
+                <span style={{ fontSize: "0.66rem", padding: "2px 9px", borderRadius: 100, background: ATS_STATUS[status]!.bg, color: ATS_STATUS[status]!.fg }}>{status}</span>
               </td>
             </tr>
           ))}
@@ -77,18 +88,24 @@ function TiPanel({ animate }: { animate: boolean }) {
       <WindowBar />
       <div style={{ position: "relative", maxHeight: 250, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: 8 }}>
-          {FLOOD.map(([role, meta], i) => (
-            <motion.div
-              key={role + meta}
-              initial={animate ? { opacity: 0, y: 8 } : false}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.25, delay: animate ? Math.min(i * 0.045, 0.7) : 0 }}
-              style={{ border: "1px solid #E5E7EB", borderRadius: 9, padding: "8px 10px", background: "#FFFFFF", color: "#6B7280", fontSize: "0.66rem" }}
-            >
-              <span style={{ display: "block", color: "#374151", fontWeight: 600, fontSize: "0.7rem" }}>{role}</span>
-              {meta}
-            </motion.div>
-          ))}
+          {FLOOD.map(([role, meta], i) => {
+            const tint = ["#4B8EF0", "#34D17A", "#F5C842"][i % 3]!;
+            return (
+              <motion.div
+                key={role + meta}
+                initial={animate ? { opacity: 0, y: 8 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: animate ? Math.min(i * 0.045, 0.7) : 0 }}
+                style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #E5E7EB", borderRadius: 9, padding: "8px 10px", background: "#FFFFFF", color: "#6B7280", fontSize: "0.66rem" }}
+              >
+                <span style={{ width: 22, height: 22, borderRadius: 7, background: `${tint}1a`, color: tint === "#F5C842" ? "#8A6510" : tint, display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: "0.58rem", fontWeight: 700, flexShrink: 0 }}>{role[0]}</span>
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: "block", color: "#374151", fontWeight: 600, fontSize: "0.7rem", whiteSpace: "nowrap" }}>{role}</span>
+                  {meta}
+                </span>
+              </motion.div>
+            );
+          })}
         </div>
         <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, paddingTop: 30, paddingBottom: 4, textAlign: "center", fontSize: "0.7rem", color: "#6B7280", background: "linear-gradient(transparent, #F8F9FC 70%)" }}>
           …4,831 more · unranked
@@ -106,7 +123,7 @@ const RANKED = [
 
 function DiPanel({ animate }: { animate: boolean }) {
   return (
-    <div style={MOCK_WINDOW}>
+    <div style={{ ...MOCK_WINDOW, padding: 18 }}>
       <WindowBar />
       <div>
         {RANKED.map((c, i) => (
@@ -115,7 +132,7 @@ function DiPanel({ animate }: { animate: boolean }) {
             initial={animate ? { opacity: 0, y: 14 } : false}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: animate ? 0.12 * i : 0 }}
-            style={{ display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 12, alignItems: "center", padding: "11px 10px", borderBottom: i < RANKED.length - 1 ? "1px solid #ECEFF5" : "none" }}
+            style={{ display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 12, alignItems: "center", padding: "9px 10px", borderBottom: i < RANKED.length - 1 ? "1px solid #ECEFF5" : "none" }}
           >
             <span style={{ width: 34, height: 34, borderRadius: "50%", background: `${c.tint}26`, color: c.tint === "#F5C842" ? "#B8860B" : c.tint, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.66rem", fontWeight: 600 }}>{c.initials}</span>
             <span>
@@ -262,15 +279,15 @@ export default function ShiftShowcase() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.35, ease: "easeInOut" }}
-          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1.2fr", gap: isMobile ? "1.5rem" : "5rem", alignItems: "center" }}
+          style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) minmax(0,1.2fr)", gap: isMobile ? "1.5rem" : "5rem", alignItems: "center" }}
         >
-          <div>
+          <div style={{ position: "relative", zIndex: 2 }}>
             <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#3D4460", letterSpacing: "0.12em" }}>{active.rung}</div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: isMobile ? "2rem" : "2.6rem", color: active.key === "di" ? "#4B8EF0" : "#F4F5FA", lineHeight: 1.05, marginBottom: "0.4rem", marginTop: "0.25rem" }}>{active.title}</div>
             <div style={{ fontFamily: "var(--font-body)", fontSize: "0.9rem", fontStyle: "italic", color: active.key === "di" ? "#4B8EF0" : "#8891AA", opacity: 0.75, marginBottom: "1rem" }}>{active.hook}</div>
             <p style={{ fontFamily: "var(--font-body)", fontSize: "0.98rem", color: active.key === "di" ? "#C7CDDE" : "#8891AA", lineHeight: 1.7, margin: 0 }}>{active.caption}</p>
           </div>
-          <div style={{ height: isMobile ? "auto" : "min(calc(100vh - 300px), 520px)", display: "flex", alignItems: "center" }}>
+          <div style={{ height: isMobile ? "auto" : "min(calc(100vh - 280px), 560px)", display: "flex", alignItems: "center", minWidth: 0, position: "relative", zIndex: 1 }}>
             {active.panel(!reducedMotion)}
           </div>
         </motion.div>
@@ -280,13 +297,15 @@ export default function ShiftShowcase() {
 
   // GEO block: the ladder as permanent, server-rendered, always-visible text.
   const ladderRecap = (
-    <div style={{ maxWidth: 780, margin: "0 auto", padding: isMobile ? "2.5rem 1.25rem 3.5rem" : "3rem 4rem 5rem", textAlign: "center" }}>
+    <div style={{ maxWidth: 780, margin: "0 auto", padding: isMobile ? "2rem 1.25rem 3rem" : "2rem 4rem 4rem", textAlign: "center" }}>
       <p style={{ fontFamily: "var(--font-body)", fontSize: "0.95rem", color: "#8891AA", lineHeight: 1.8, margin: 0 }}>
         An ATS keeps records — it tracks who applied. Talent intelligence adds insight — it tells you
         who exists. Decision intelligence ranks, remembers, and recommends — it tells you what to do
-        next. <span style={{ color: "#F4F5FA" }}>ealana is built for the third rung.</span>{" "}
-        <a href="/what-is-decision-intelligence" style={{ color: "#4B8EF0", textDecoration: "none" }}>
-          Read the full definition →
+        next.
+      </p>
+      <p style={{ margin: "0.9rem 0 0" }}>
+        <a href="/what-is-decision-intelligence" style={{ fontFamily: "var(--font-body)", fontSize: "0.82rem", color: "#6C7590", textDecoration: "none" }}>
+          More on decision intelligence →
         </a>
       </p>
     </div>

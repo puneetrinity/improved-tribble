@@ -13,7 +13,7 @@ export default function LoopHandoff() {
   const reducedMotion = useReducedMotion();
 
   return (
-    <section style={{ padding: isMobile ? "64px 1.25rem" : "110px 4rem", position: "relative" }}>
+    <section style={{ padding: isMobile ? "56px 1.25rem" : "88px 4rem 96px", position: "relative" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ textAlign: "center", marginBottom: isMobile ? "2.5rem" : "3.5rem" }}>
           <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#34D17A", textTransform: "uppercase", marginBottom: "1rem" }}>
