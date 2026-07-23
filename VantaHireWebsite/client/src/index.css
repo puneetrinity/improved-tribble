@@ -67,6 +67,8 @@
     --font-satoshi: "Satoshi", sans-serif;
     --font-dm: "DM Sans", sans-serif;
     --font-outfit: "Outfit", sans-serif;
+    --font-display: "Outfit", sans-serif;
+    --font-body: "DM Sans", sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     --background: 255 0% 100%;
     --foreground: 240 10% 3.9%;
