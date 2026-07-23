@@ -1,4 +1,4 @@
-﻿import { useEffect, useState, type MouseEvent } from "react";
+﻿import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
@@ -119,13 +119,6 @@ export default function HomepageNav() {
     };
   }, [isMenuOpen]);
 
-  const handleFeaturesClick = (e: MouseEvent<HTMLAnchorElement>) => {
-    if (window.location.pathname === "/") {
-      e.preventDefault();
-      document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
-    }
-  };
-
   return (
     <>
       <div className="fixed top-0 left-0 right-0 z-[1000] md:hidden">
@@ -167,17 +160,14 @@ export default function HomepageNav() {
               Explore
             </div>
             <div className="flex flex-col gap-2">
-              <a
-                href="/#features"
+              <Link
+                href="/features"
                 className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]"
                 style={{ fontFamily: '"DM Sans", sans-serif' }}
-                onClick={(e) => {
-                  setIsMenuOpen(false);
-                  handleFeaturesClick(e);
-                }}
+                onClick={() => setIsMenuOpen(false)}
               >
                 Features
-              </a>
+              </Link>
               <Link href="/solutions" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
                 Solutions
               </Link>
@@ -249,15 +239,14 @@ export default function HomepageNav() {
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-          <a
-            href="/#features"
+          <Link
+            href="/features"
             style={linkStyle}
-            onClick={handleFeaturesClick}
             onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
             onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
           >
             Features
-          </a>
+          </Link>
           <Link
             href="/solutions"
             style={linkStyle}
@@ -342,15 +331,14 @@ export default function HomepageNav() {
           </Link>
 
           <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-            <a
-              href="/#features"
+            <Link
+              href="/features"
               style={pillLinkStyle}
-              onClick={handleFeaturesClick}
               onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
               onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
             >
               Features
-            </a>
+            </Link>
             <Link
               href="/solutions"
               style={pillLinkStyle}

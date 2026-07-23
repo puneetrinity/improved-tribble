@@ -3,10 +3,9 @@ import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import CTA from "@/components/marketing/sections/CTA";
-import HowItWorks from "@/components/marketing/sections/HowItWorks";
+import ShiftShowcase from "@/components/marketing/sections/ShiftShowcase";
+import LoopHandoff from "@/components/marketing/sections/LoopHandoff";
 import HeroSection from "@/components/marketing/sections/HeroSection";
-import Platform from "@/components/marketing/sections/Platform";
-import ProblemSection from "@/components/marketing/sections/ProblemSection";
 import Stats from "@/components/marketing/sections/Stats";
 import { Helmet } from "react-helmet-async";
 
@@ -32,9 +31,8 @@ const Home = () => {
         <div className="relative z-10">
           <HomepageNav />
           <HeroSection />
-          <ProblemSection />
-          <HowItWorks />
-          <Platform />
+          <ShiftShowcase />
+          <LoopHandoff />
           <Stats />
           <CTA />
           <HomepageFooter />
