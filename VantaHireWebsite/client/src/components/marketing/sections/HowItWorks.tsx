@@ -1,6 +1,6 @@
 // @charset "utf-8"
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-motion";
 import { DiscoverPanel } from "./DiscoverFeature";
 import { MemoryPanel } from "./MemoryFeature";
 import { FlowPanel } from "./FlowFeature";
@@ -70,31 +70,33 @@ export default function HowItWorks() {
   const active = (TABS[activeTab] ?? TABS[0])!;
 
 
-  // Scroll-jacking: when this section centers in the viewport we lock the page
-  // scroll. Each deliberate wheel/key/touch gesture advances one layer
-  // (Discover → Memory → Flow). Scrolling past the last layer (or above the
-  // first) releases the lock and resumes normal page scroll. Both directions.
-  // Desktop only — mobile keeps tap-to-switch tabs (scroll-jacking touch is an
-  // anti-pattern and unreliable with mobile browser chrome).
-
-  // Clicking a tab smoothly centers the section, locks, and jumps to that layer.
-  // Normal scrolling everywhere. The old scroll-jack (wheel capture + viewport
-  // lock + stepped tabs) felt like stutter and fought the user's scroll; tabs
-  // are click-driven with a gentle auto-advance that pauses on interaction.
-  const interactedRef = useRef(false);
-  const goToStep = (index: number) => {
-    interactedRef.current = true;
-    setActiveTab(index);
-  };
-
-  useEffect(() => {
+  // Pinned scroll-story (desktop): the section is stepCount viewports tall and
+  // the content pins via position:sticky while NATIVE scroll progress selects
+  // the active layer (Discover → Memory → Flow). This holds the screen for the
+  // three layers — they're the product — without wheel-hijacking: momentum,
+  // trackpads, keyboard, and scrollbars all keep working, so no stutter.
+  const { scrollYProgress } = useScroll({
+    target: sectionRef as React.RefObject<HTMLElement>,
+    offset: ["start start", "end end"],
+  });
+  useMotionValueEvent(scrollYProgress, "change", (v) => {
     if (isMobile) return;
-    const id = setInterval(() => {
-      if (interactedRef.current) return; // user took over — stop rotating
-      setActiveTab((t) => (t + 1) % stepCount);
-    }, 6500);
-    return () => clearInterval(id);
-  }, [isMobile, stepCount]);
+    const idx = Math.min(stepCount - 1, Math.max(0, Math.floor(v * stepCount)));
+    setActiveTab((t) => (t === idx ? t : idx));
+  });
+
+  // Clicking a tab scrolls to that layer's slice of the pinned track.
+  const goToStep = (index: number) => {
+    if (isMobile || !sectionRef.current) {
+      setActiveTab(index);
+      return;
+    }
+    const el = sectionRef.current;
+    const top = window.scrollY + el.getBoundingClientRect().top;
+    const track = el.offsetHeight - window.innerHeight;
+    const target = top + ((index + 0.5) / stepCount) * track;
+    window.scrollTo({ top: target, behavior: "smooth" });
+  };
 
   const innerContent = (
     <div style={{ maxWidth: 1100, margin: "0 auto", width: "100%" }}>
@@ -185,7 +187,7 @@ export default function HowItWorks() {
             >
               <span style={{ fontSize: "0.7rem" }}>👇</span> Try it out here
             </motion.div>
-            <div style={{ height: isMobile ? "auto" : "min(68vh, 640px)", overflow: "hidden", position: "relative", borderRadius: 16 }}>
+            <div style={{ height: isMobile ? "auto" : "min(calc(100vh - 380px), 640px)", overflow: "hidden", position: "relative", borderRadius: 16 }}>
               {active.panel}
               <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 32, background: "linear-gradient(to bottom, transparent, rgba(5,6,14,0.85))", pointerEvents: "none" }} />
             </div>
@@ -207,11 +209,22 @@ export default function HowItWorks() {
     <section
       id="features"
       ref={sectionRef}
-      style={{
-        padding: "110px 4rem 90px",
-      }}
+      style={{ height: `${stepCount * 100}vh`, position: "relative" }}
     >
-      {innerContent}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          overflow: "hidden",
+          padding: "96px 4rem 36px",
+        }}
+      >
+        {innerContent}
+      </div>
     </section>
   );
 }
