@@ -1280,8 +1280,6 @@ export const orgBillingPageCopy = {
 export const jobSourcingPageCopy = {
   header: {
     title: "Discover",
-    betaBadge: "Beta",
-    betaHint: "Beta feature, still being refined.",
     searching: "Searching for candidates...",
     enriching: "Enrichment in progress...",
     action: "Find Candidates",
