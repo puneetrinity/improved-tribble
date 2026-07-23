@@ -18,7 +18,10 @@ const STATS = [
 ] as const;
 
 function CountUp({ target, suffix = "", duration = 1500, inView }: CountUpProps) {
-  const [display, setDisplay] = useState(0);
+  // Initial state = the real value: crawlers (and no-scroll renders) must never
+  // index "0+ sources / 0% lower cost". The count-up is a scroll-triggered
+  // enhancement only.
+  const [display, setDisplay] = useState(target);
 
   useEffect(() => {
     if (!inView) return;
