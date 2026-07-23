@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useInView, useMotionValueEvent, useReducedMotion, useScroll } from "framer-motion";
+import { AnimatePresence, motion, useMotionValueEvent, useReducedMotion, useScroll } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const MOCK_WINDOW: React.CSSProperties = {
@@ -221,7 +221,17 @@ export default function ShiftShowcase() {
   // Mobile: auto-advance the story while the section is in view, so scrollers
   // see TI and DI without the desktop pin. Stops at the DI beat; any manual
   // tab tap hands control to the user permanently. Reduced motion: static.
-  const mobileInView = useInView(mobileStageRef, { amount: 0.35 });
+  // Hand-rolled observer: isMobile resolves AFTER first render, so a mount-time
+  // useInView would bind while the mobile branch (and its ref) doesn't exist yet
+  // and never re-attach. Keyed on isMobile instead.
+  const [mobileInView, setMobileInView] = useState(false);
+  useEffect(() => {
+    const el = mobileStageRef.current;
+    if (!isMobile || !el) return;
+    const obs = new IntersectionObserver(([entry]) => setMobileInView(entry?.isIntersecting ?? false), { threshold: 0.2 });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [isMobile]);
   useEffect(() => {
     if (!isMobile || userTookControl || reducedMotion || !mobileInView) return;
     if (activeTab >= stepCount - 1) return;
