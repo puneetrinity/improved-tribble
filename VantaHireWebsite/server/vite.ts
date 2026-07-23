@@ -206,6 +206,16 @@ export async function setupVite(app: Express, server: Server) {
         { "@context": "https://schema.org", "@type": "Person", "@id": "https://ealana.com/about#founder", "name": "Puneet Kumar", "jobTitle": "Founder & CEO", "sameAs": ["https://www.linkedin.com/in/puneet-gleuck/"], "worksFor": { "@id": "https://ealana.com/#organization" } },
       ],
     },
+    '/what-is-decision-intelligence': {
+      title: 'What is Decision Intelligence in Recruiting? | ealana',
+      description: 'Decision intelligence in recruiting ranks, remembers, and recommends \u2014 so hiring decisions run on evidence, not instinct. A plain-language definition and guide.',
+      canonical: 'https://ealana.com/what-is-decision-intelligence',
+    },
+    '/talent-intelligence-vs-ats': {
+      title: 'Talent Intelligence vs ATS: What\u2019s the Difference? | ealana',
+      description: 'An ATS tracks candidates who arrive; talent intelligence finds and understands the whole market. Here\u2019s the difference \u2014 and the next step past both.',
+      canonical: 'https://ealana.com/talent-intelligence-vs-ats',
+    },
     '/privacy-policy': {
       title: 'Privacy Policy | ealana',
       description: 'How ealana collects, uses, and protects your data. Read our privacy policy covering candidate data, recruiter data, and platform usage.',
@@ -488,6 +498,16 @@ export async function serveStatic(app: Express) {
         { "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "About", "item": "https://ealana.com/about" }] },
         { "@context": "https://schema.org", "@type": "Person", "@id": "https://ealana.com/about#founder", "name": "Puneet Kumar", "jobTitle": "Founder & CEO", "sameAs": ["https://www.linkedin.com/in/puneet-gleuck/"], "worksFor": { "@id": "https://ealana.com/#organization" } },
       ],
+    },
+    '/what-is-decision-intelligence': {
+      title: 'What is Decision Intelligence in Recruiting? | ealana',
+      description: 'Decision intelligence in recruiting ranks, remembers, and recommends \u2014 so hiring decisions run on evidence, not instinct. A plain-language definition and guide.',
+      canonical: 'https://ealana.com/what-is-decision-intelligence',
+    },
+    '/talent-intelligence-vs-ats': {
+      title: 'Talent Intelligence vs ATS: What\u2019s the Difference? | ealana',
+      description: 'An ATS tracks candidates who arrive; talent intelligence finds and understands the whole market. Here\u2019s the difference \u2014 and the next step past both.',
+      canonical: 'https://ealana.com/talent-intelligence-vs-ats',
     },
     '/privacy-policy': {
       title: 'Privacy Policy | ealana',

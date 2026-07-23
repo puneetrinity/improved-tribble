@@ -11,6 +11,8 @@ import Home from "@/pages/Home";
 import UseCasesPage from "@/pages/use-cases-page";
 import AboutPage from "@/pages/about-page";
 import FeaturesPage from "@/pages/features-page";
+import WhatIsDecisionIntelligencePage from "@/pages/what-is-decision-intelligence";
+import TalentIntelligenceVsAtsPage from "@/pages/talent-intelligence-vs-ats";
 import { CookieConsent, AnalyticsOnConsent } from "@/components/CookieConsent";
 import React, { lazy, Suspense, useEffect, useState, useRef } from "react";
 
@@ -95,6 +97,8 @@ function Router() {
       <Route path="/claim/:token" component={ClaimPage} />
       <Route path="/solutions" component={UseCasesPage} />
       <Route path="/about" component={AboutPage} />
+      <Route path="/what-is-decision-intelligence" component={WhatIsDecisionIntelligencePage} />
+      <Route path="/talent-intelligence-vs-ats" component={TalentIntelligenceVsAtsPage} />
       <Route path="/recruiter-auth" component={RecruiterAuth} />
       <Route path="/candidate-auth" component={CandidateAuth} />
       <ProtectedRoute path="/onboarding" component={OnboardingPage} requiredRole={['recruiter']} />
