@@ -86,7 +86,7 @@ function TiPanel({ animate }: { animate: boolean }) {
   return (
     <div style={MOCK_WINDOW}>
       <WindowBar />
-      <div style={{ position: "relative", maxHeight: 250, overflow: "hidden" }}>
+      <div style={{ position: "relative", maxHeight: 232, overflow: "hidden" }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(118px, 1fr))", gap: 8 }}>
           {FLOOD.map(([role, meta], i) => {
             const tint = ["#4B8EF0", "#34D17A", "#F5C842"][i % 3]!;
@@ -243,7 +243,7 @@ export default function ShiftShowcase() {
 
   const innerContent = (
     <div style={{ maxWidth: 1180, margin: "0 auto", width: "100%" }}>
-      <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: "1.25rem", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: isMobile ? "1.25rem" : "2.5rem", flexWrap: isMobile ? "wrap" : "nowrap" }}>
         {BEATS.map((beat, index) => {
           const isActive = index === activeTab;
           const accent = beat.key === "di" ? "#4B8EF0" : "#8891AA";

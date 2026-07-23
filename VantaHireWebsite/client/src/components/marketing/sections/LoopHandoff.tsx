@@ -32,6 +32,14 @@ export default function LoopHandoff() {
                 : { animate: { rotate: 360 }, transition: { duration: 46, repeat: Infinity, ease: "linear" } })}
               style={{ position: "absolute", inset: 26, border: "1.5px dashed rgba(255,255,255,0.16)", borderRadius: "50%" }}
             />
+            <motion.div
+              {...(reducedMotion
+                ? {}
+                : { animate: { rotate: 360 }, transition: { duration: 14, repeat: Infinity, ease: "linear" } })}
+              style={{ position: "absolute", inset: 26, borderRadius: "50%", pointerEvents: "none" }}
+            >
+              <span style={{ position: "absolute", top: -4, left: "50%", marginLeft: -4, width: 8, height: 8, borderRadius: "50%", background: "linear-gradient(135deg, #4B8EF0, #34D17A)", boxShadow: "0 0 12px rgba(75,142,240,0.8)" }} />
+            </motion.div>
             {LAYERS.map((l) => (
               <span
                 key={l.label}
