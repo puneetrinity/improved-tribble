@@ -80,7 +80,7 @@ function FlowCard({ active }: { active: boolean }) {
     <div style={cardStyle(active, accent)}>
       <div style={{ ...mono, fontSize: "0.58rem", letterSpacing: "0.12em", color: accent, marginBottom: 14 }}>FLOW</div>
       {[
-        { icon: "💬", label: "WhatsApp → Arjun K.", badge: "Delivered", badgeColor: "#34D17A" },
+        { icon: "💬", label: "WhatsApp update → Arjun K.", badge: "Delivered", badgeColor: "#34D17A" },
         { icon: "📧", label: "Email → Priya V.", badge: "Opened", badgeColor: "#4B8EF0" },
         { icon: "📅", label: "Interview · Rohit S.", badge: "Tomorrow 3pm", badgeColor: "#F5C842" },
       ].map((row, index) => (
