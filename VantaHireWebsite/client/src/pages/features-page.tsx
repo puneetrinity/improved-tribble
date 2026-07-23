@@ -109,6 +109,13 @@ export default function FeaturesPage() {
                 cycle starts smarter than the last. ealana delivers it as three connected layers:
                 Discover, Memory, and Flow.
               </p>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, lineHeight: 1.75, textAlign: "center", maxWidth: 720, margin: "1.15rem auto 0" }}>
+                The practical test is simple: when a search ends, ask what the system learned. If
+                the answer is nothing — if the next role starts from a blank query box — you have a
+                database, not decision intelligence. ealana passes that test by design: every
+                search enriches Memory, every ranked candidate carries their evidence, and every
+                cycle starts from what came before.
+              </p>
 
               <h2 style={{ fontFamily: "var(--font-display)", fontSize: isMobile ? "1.7rem" : "2.3rem", fontWeight: 600, letterSpacing: "-0.02em", color: "#F4F5FA", textAlign: "center", margin: "4rem 0 1.75rem" }}>
                 ealana vs a traditional ATS
@@ -138,6 +145,19 @@ export default function FeaturesPage() {
                   </tbody>
                 </table>
               </div>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, lineHeight: 1.75, maxWidth: 780, margin: "1.75rem auto 0" }}>
+                These aren't just feature differences — they compound differently. A traditional
+                ATS is worth roughly the same on day 400 as on day 4: it holds more records, but it
+                hasn't learned anything. A decision intelligence platform gets more valuable every
+                cycle, because each search adds to what the system knows about the market and each
+                decision teaches it what your team actually values.
+              </p>
+              <p style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, lineHeight: 1.75, maxWidth: 780, margin: "1.15rem auto 0" }}>
+                And because Discover, Memory, and Flow share one data model, there is nothing to
+                sync, export, or reconcile. The search you ran, the shortlist you built, and the
+                outreach you sent are one record, not three tools' worth of exports — which is why
+                the workflow holds together at the moments a stitched-together stack falls apart.
+              </p>
             </div>
           </section>
           <CTA />
