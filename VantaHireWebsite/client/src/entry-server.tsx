@@ -14,6 +14,9 @@ import Home from './pages/Home';
 import FeaturesPage from './pages/features-page';
 import PricingPage from './pages/pricing-page';
 import UseCasesPage from './pages/use-cases-page';
+import AboutPage from './pages/about-page';
+import WhatIsDecisionIntelligencePage from './pages/what-is-decision-intelligence';
+import TalentIntelligenceVsAtsPage from './pages/talent-intelligence-vs-ats';
 import JobsPage from './pages/jobs-page';
 import JobDetailsPage from './pages/job-details-page';
 import RecruitersDirectoryPage from './pages/recruiters-directory-page';
@@ -81,6 +84,9 @@ export function render(
                       <Route path="/features" component={FeaturesPage} />
                       <Route path="/pricing" component={PricingPage} />
                       <Route path="/solutions" component={UseCasesPage} />
+                      <Route path="/about" component={AboutPage} />
+                      <Route path="/what-is-decision-intelligence" component={WhatIsDecisionIntelligencePage} />
+                      <Route path="/talent-intelligence-vs-ats" component={TalentIntelligenceVsAtsPage} />
                       <Route path="/jobs" component={JobsPage} />
                       <Route path="/jobs/:id" component={JobDetailsPage} />
                       <Route path="/recruiters" component={RecruitersDirectoryPage} />
