@@ -298,8 +298,8 @@ export const myJobsPageCopy = {
 
 export const talentSearchPageCopy = {
   header: {
-    title: "Discover",
-    subtitle: "Find the signal others miss using natural language. Describe the skills, experience, or qualifications you're looking for.",
+    title: "Memory",
+    subtitle: "Everyone your team has already discovered, searchable in plain language — your next hire starts smarter than your last.",
   },
   search: {
     placeholder: "Describe the candidate you're looking for, e.g. 'React developer with 3+ years experience'...",
@@ -1279,7 +1279,7 @@ export const orgBillingPageCopy = {
 
 export const jobSourcingPageCopy = {
   header: {
-    title: "Sourcing",
+    title: "Discover",
     betaBadge: "Beta",
     betaHint: "Beta feature, still being refined.",
     searching: "Searching for candidates...",
