@@ -48,18 +48,18 @@ const AFTER = [
 
 const METRICS = [
   [
-    { num: "3×", label: "faster candidate delivery" },
-    { num: "60%", label: "less time on manual sourcing" },
+    { num: "Top 100", label: "AI-ranked candidates per role" },
+    { num: "Seconds", label: "to a client-ready shortlist" },
     { num: "100%", label: "client pipeline visibility" },
   ],
   [
-    { num: "5×", label: "more roles filled per recruiter" },
+    { num: "25+", label: "sources in one search" },
     { num: "Zero", label: "duplicate placements" },
-    { num: "40%", label: "lower cost per placement" },
+    { num: "Zero", label: "re-sourcing candidates you already found" },
   ],
   [
     { num: "25+", label: "sources in one search" },
-    { num: "60%", label: "lower per-hire cost by year 2" },
+    { num: "Every", label: "search compounds into the next" },
     { num: "Zero", label: "knowledge lost when team changes" },
   ],
 ];
