@@ -228,7 +228,7 @@ export default function ShiftShowcase() {
   };
 
   const headerBlock = (
-    <div style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center", padding: isMobile ? "0 0 2rem" : "110px 4rem 56px" }}>
+    <div style={{ maxWidth: 1100, margin: "0 auto", textAlign: "center", padding: isMobile ? "0 0 1.5rem" : "48px 4rem 16px" }}>
       <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase", marginBottom: "1rem" }}>
         The Shift
       </div>
@@ -325,7 +325,7 @@ export default function ShiftShowcase() {
     <section id="features" style={{ position: "relative" }}>
       {headerBlock}
       <div ref={trackRef} style={{ height: `${stepCount * 100}vh`, position: "relative" }}>
-        <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "88px 4rem 28px", overflow: "visible" }}>
+        <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "56px 4rem 24px", overflow: "visible" }}>
           {innerContent}
         </div>
       </div>

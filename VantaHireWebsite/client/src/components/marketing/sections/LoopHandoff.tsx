@@ -20,7 +20,10 @@ export default function LoopHandoff() {
             Delivered as three layers
           </div>
           <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2rem,4vw,3rem)", lineHeight: 1.1, color: "#F4F5FA", fontWeight: 400, margin: 0 }}>
-            The loop that compounds.
+            The loop that{" "}
+            <span style={{ fontStyle: "italic", background: "linear-gradient(135deg, #4B8EF0, #34D17A)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+              compounds.
+            </span>
           </h2>
         </div>
 
