@@ -152,8 +152,8 @@ export async function setupVite(app: Express, server: Server) {
       keywords: 'Neural OS for Talent, AI candidate sourcing, applicant tracking system India, recruiting automation, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
-      title: 'Features | ealana — Discover, Memory, Flow',
-      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate searchable and ever-fresher, and Flow runs email outreach with delivery tracking, WhatsApp status updates, client feedback, and interview scheduling.',
+      title: 'Features | ealana — Decision Intelligence for Recruiting',
+      description: 'ealana turns recruiting into decision intelligence: Discover ranks candidates by real fit, Memory compounds what your team learns, and Flow runs the outreach.',
       canonical: 'https://ealana.com/features',
       keywords: 'AI candidate discovery, hiring memory, recruiter outreach, email outreach with delivery tracking, AI-ranked shortlist, candidate fit scoring, client feedback portal',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
@@ -435,8 +435,8 @@ export async function serveStatic(app: Express) {
       keywords: 'Neural OS for Talent, AI candidate sourcing, applicant tracking system India, recruiting automation, ATS for startups, recruiting agencies APAC',
     },
     '/features': {
-      title: 'Features | ealana — Discover, Memory, Flow',
-      description: 'Three layers, one signal. Discover surfaces AI-ranked candidates by real fit, Memory keeps every candidate searchable and ever-fresher, and Flow runs email outreach with delivery tracking, WhatsApp status updates, client feedback, and interview scheduling.',
+      title: 'Features | ealana — Decision Intelligence for Recruiting',
+      description: 'ealana turns recruiting into decision intelligence: Discover ranks candidates by real fit, Memory compounds what your team learns, and Flow runs the outreach.',
       canonical: 'https://ealana.com/features',
       keywords: 'AI candidate discovery, hiring memory, recruiter outreach, email outreach with delivery tracking, AI-ranked shortlist, candidate fit scoring, client feedback portal',
       jsonLd: [{ "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [{ "@type": "ListItem", "position": 1, "name": "Home", "item": "https://ealana.com/" }, { "@type": "ListItem", "position": 2, "name": "Features", "item": "https://ealana.com/features" }] }],
