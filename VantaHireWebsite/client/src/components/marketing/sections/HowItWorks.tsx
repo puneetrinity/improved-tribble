@@ -185,9 +185,9 @@ export default function HowItWorks() {
             >
               <span style={{ fontSize: "0.7rem" }}>👇</span> Try it out here
             </motion.div>
-            <div style={{ height: isMobile ? "auto" : "min(56vh, 540px)", overflow: "hidden", position: "relative", borderRadius: 16 }}>
+            <div style={{ height: isMobile ? "auto" : "min(68vh, 640px)", overflow: "hidden", position: "relative", borderRadius: 16 }}>
               {active.panel}
-              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 56, background: "linear-gradient(to bottom, transparent, #05060E)", pointerEvents: "none" }} />
+              <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: 32, background: "linear-gradient(to bottom, transparent, rgba(5,6,14,0.85))", pointerEvents: "none" }} />
             </div>
           </div>
         </motion.div>
