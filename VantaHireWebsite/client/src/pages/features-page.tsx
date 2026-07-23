@@ -1,7 +1,5 @@
 ﻿import CTA from "@/components/marketing/sections/CTA";
-import DiscoverFeature from "@/components/marketing/sections/DiscoverFeature";
-import FlowFeature from "@/components/marketing/sections/FlowFeature";
-import MemoryFeature from "@/components/marketing/sections/MemoryFeature";
+import HowItWorks from "@/components/marketing/sections/HowItWorks";
 import GridOverlay from "@/components/GridOverlay";
 import HomepageFooter from "@/components/HomepageFooter";
 import HomepageNav from "@/components/HomepageNav";
@@ -92,11 +90,35 @@ export default function FeaturesPage() {
               </motion.div>
             </div>
           </section>
-          <DiscoverFeature />
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", maxWidth: 1100, margin: "0 auto" }} />
-          <MemoryFeature />
-          <div style={{ height: 1, background: "rgba(255,255,255,0.04)", maxWidth: 1100, margin: "0 auto" }} />
-          <FlowFeature />
+          <HowItWorks />
+          <section style={{ padding: isMobile ? "56px 1.25rem" : "96px 4rem", position: "relative" }}>
+            <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+              <div style={{ textAlign: "center", marginBottom: isMobile ? "2rem" : "3rem" }}>
+                <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase", marginBottom: "1rem" }}>What you get</div>
+                <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(1.9rem,3.6vw,2.7rem)", lineHeight: 1.1, color: "#F4F5FA", fontWeight: 400, margin: 0 }}>Every capability, by layer.</h2>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 20 }}>
+                {[
+                  { name: "Discover", role: "The ranking layer", color: "#4B8EF0", items: ["25+ sources in one search", "Plain-language role briefs", "Fit scoring with evidence attached", "Top 100 ranked candidates per role"] },
+                  { name: "Memory", role: "The compounding layer", color: "#34D17A", items: ["Every candidate and search retained", "Semantic search over your talent pool", "Candidates resurface for new roles", "Your uploads and decisions stay org-private"] },
+                  { name: "Flow", role: "The execution layer", color: "#F5C842", items: ["Pipeline stages and client portal", "Email outreach with delivery tracking", "WhatsApp status updates to staged candidates", "Interview scheduling and structured feedback"] },
+                ].map((cap) => (
+                  <div key={cap.name} style={{ border: "1px solid rgba(255,255,255,0.08)", borderTop: `2px solid ${cap.color}`, borderRadius: 18, padding: 24, background: "rgba(255,255,255,0.02)" }}>
+                    <div style={{ fontFamily: "var(--font-display)", fontSize: "1.15rem", color: cap.color, marginBottom: 2 }}>{cap.name}</div>
+                    <div style={{ fontFamily: "var(--font-body)", fontSize: "0.72rem", color: "#6C7590", marginBottom: 14 }}>{cap.role}</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+                      {cap.items.map((item) => (
+                        <div key={item} style={{ display: "flex", gap: 10 }}>
+                          <div style={{ width: 5, height: 5, borderRadius: "50%", background: cap.color, flexShrink: 0, marginTop: 8 }} />
+                          <span style={{ fontFamily: "var(--font-body)", fontSize: "0.87rem", color: "#A6ADC3", fontWeight: 300, lineHeight: 1.6 }}>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
           <section style={{ padding: isMobile ? "56px 1.25rem" : "96px 4rem", position: "relative" }}>
             <div style={{ maxWidth: 900, margin: "0 auto" }}>
               <h2 style={{ fontFamily: "var(--font-display)", fontSize: isMobile ? "1.7rem" : "2.3rem", fontWeight: 600, letterSpacing: "-0.02em", color: "#F4F5FA", textAlign: "center", marginBottom: "1.25rem" }}>
