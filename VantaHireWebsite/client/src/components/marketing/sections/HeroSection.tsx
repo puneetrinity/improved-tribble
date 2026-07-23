@@ -145,7 +145,37 @@ export function HeroSection() {
         className="relative z-10 mb-8 max-w-xl font-body leading-relaxed text-e-text2"
         style={{ fontSize: isMobile ? "0.98rem" : "1.05rem", fontWeight: 300 }}
       >
-        ealana finds candidates others miss, remembers every hiring decision, and executes outreach - all in one place.
+        <span className="block">
+          From{" "}
+          <span className="relative inline-block">
+            talent intelligence
+            <motion.span
+              initial={{ scaleX: 0 }}
+              animate={{ scaleX: 1 }}
+              transition={{ duration: 0.5, delay: 1.6, ease: "easeOut" }}
+              className="absolute left-0 top-1/2 h-[2px] w-full origin-left bg-current opacity-80"
+              aria-hidden="true"
+            />
+          </span>{" "}
+          to{" "}
+          <motion.strong
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.45, delay: 2.05 }}
+            className="font-semibold text-e-text"
+          >
+            decision intelligence
+          </motion.strong>{" "}
+          — the Neural OS for Talent.
+        </span>
+        <motion.span
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.45, delay: 2.4 }}
+          className="mt-2 block italic"
+        >
+          The right 100, not 4,847 maybes.
+        </motion.span>
       </motion.p>
 
       <motion.div

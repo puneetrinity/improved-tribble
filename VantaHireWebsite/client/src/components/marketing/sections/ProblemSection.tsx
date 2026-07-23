@@ -89,7 +89,7 @@ function SolvedDashboard() {
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", background: "#F1F2F6", borderBottom: "1px solid rgba(0,0,0,0.07)", flexWrap: "wrap" }}>
         <span style={{ ...mono, fontSize: "0.56rem", color: "#9CA3AF", textDecoration: "line-through" }}>4,847 results · 0 ranked</span>
         <span style={{ color: "#34D17A", fontSize: "0.7rem" }}>→</span>
-        <span style={{ ...mono, fontSize: "0.58rem", color: "#34D17A" }}>12 ranked · 4 shortlisted · 1 search</span>
+        <span style={{ ...mono, fontSize: "0.58rem", color: "#34D17A" }}>100 ranked · 4 shortlisted · 1 search</span>
       </div>
 
       {/* Ranked candidate list */}
