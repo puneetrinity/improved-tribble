@@ -59,7 +59,7 @@ export function CookieConsent() {
   const reduced = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   return (
-    <div className="fixed bottom-4 left-1/2 z-[1000] w-[calc(100%-1rem)] max-w-[28rem] -translate-x-1/2 md:bottom-6 md:max-w-[38rem]">
+    <div className="fixed bottom-4 left-1/2 z-[1000] w-[calc(100%-1rem)] max-w-[28rem] -translate-x-1/2 md:bottom-6 md:left-auto md:right-6 md:max-w-[26rem] md:translate-x-0">
       <div
         className="relative overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(17,19,38,0.96)_0%,rgba(10,12,24,0.98)_100%)] p-4 shadow-[0_24px_90px_rgba(0,0,0,0.38)] backdrop-blur-2xl md:p-5"
         style={{

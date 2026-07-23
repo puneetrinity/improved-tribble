@@ -278,14 +278,14 @@ export default function HowItWorks() {
 
   const innerContent = (
     <div style={{ maxWidth: 1100, margin: "0 auto", width: "100%" }}>
-      <div style={{ marginBottom: isMobile ? "2rem" : "2.5rem", textAlign: "center" }}>
+      <div style={{ marginBottom: isMobile ? "1.5rem" : "1.75rem", textAlign: "center" }}>
         <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase", marginBottom: "1rem" }}>
           How Ealana Works
         </div>
-        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.4rem,5vw,3.8rem)", lineHeight: 1.1, color: "#F4F5FA", fontWeight: 400, margin: 0 }}>
+        <h2 style={{ fontFamily: "var(--font-display)", fontSize: "clamp(2.2rem,4.2vw,3.2rem)", lineHeight: 1.1, color: "#F4F5FA", fontWeight: 400, margin: 0 }}>
           Three layers. One right hire.
         </h2>
-        <p style={{ fontFamily: "var(--font-body)", fontSize: "0.95rem", color: "#8891AA", lineHeight: 1.8, maxWidth: 720, margin: "1rem auto 0" }}>
+        <p style={{ fontFamily: "var(--font-body)", fontSize: "0.88rem", color: "#8891AA", lineHeight: 1.6, maxWidth: 760, margin: "0.85rem auto 0" }}>
           <strong>What is talent intelligence?</strong> A living, verified memory of every
           candidate a company has ever encountered — sourced, applied, or enriched — that
           makes each future search smarter than the last.{" "}
@@ -295,7 +295,7 @@ export default function HowItWorks() {
         </p>
       </div>
 
-      <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: "2rem", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
+      <div style={{ display: "flex", justifyContent: isMobile ? "flex-start" : "center", gap: 8, marginBottom: "1.25rem", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? 4 : 0 }}>
         {TABS.map((tab, index) => {
           const isActive = index === activeTab;
           return (
@@ -333,9 +333,9 @@ export default function HowItWorks() {
         >
           <div>
             <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#3D4460", letterSpacing: "0.12em" }}>{active.layerNum}</div>
-            <div style={{ fontFamily: "var(--font-display)", fontSize: "3.5rem", color: active.accent, lineHeight: 1, marginBottom: "0.5rem", marginTop: "0.35rem" }}>{active.title}</div>
-            <div style={{ fontFamily: "var(--font-body)", fontSize: "0.9rem", fontStyle: "italic", color: active.accent, opacity: 0.7, marginBottom: "1.5rem" }}>{active.hook}</div>
-            <p style={{ fontFamily: "var(--font-body)", fontSize: "0.97rem", color: "#8891AA", lineHeight: 1.8, marginBottom: "2rem" }}>{active.description}</p>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: "2.7rem", color: active.accent, lineHeight: 1, marginBottom: "0.4rem", marginTop: "0.25rem" }}>{active.title}</div>
+            <div style={{ fontFamily: "var(--font-body)", fontSize: "0.9rem", fontStyle: "italic", color: active.accent, opacity: 0.7, marginBottom: "1rem" }}>{active.hook}</div>
+            <p style={{ fontFamily: "var(--font-body)", fontSize: "0.95rem", color: "#8891AA", lineHeight: 1.7, marginBottom: "1.25rem" }}>{active.description}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {active.bullets.map((bullet) => (
                 <div key={bullet} style={{ display: "flex", gap: 10 }}>
