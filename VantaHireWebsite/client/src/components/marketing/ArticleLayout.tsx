@@ -67,8 +67,8 @@ export default function ArticleLayout({ title, description, path, headline, date
         </div>
       </div>
       <style>{`
-        .e-article h1 { font-family: 'Outfit', sans-serif; font-size: ${isMobile ? "2.1rem" : "2.9rem"}; line-height: 1.12; letter-spacing: -0.025em; color: #F4F5FA; font-weight: 600; margin: 0 0 1.5rem; }
-        .e-article h2 { font-family: 'Outfit', sans-serif; font-size: ${isMobile ? "1.45rem" : "1.75rem"}; letter-spacing: -0.02em; color: #F4F5FA; font-weight: 600; margin: 2.75rem 0 1rem; }
+        .e-article h1 { font-family: 'Outfit', sans-serif; font-size: clamp(2.1rem, 6vw, 2.9rem); line-height: 1.12; letter-spacing: -0.025em; color: #F4F5FA; font-weight: 600; margin: 0 0 1.5rem; }
+        .e-article h2 { font-family: 'Outfit', sans-serif; font-size: clamp(1.45rem, 4vw, 1.75rem); letter-spacing: -0.02em; color: #F4F5FA; font-weight: 600; margin: 2.75rem 0 1rem; }
         .e-article p, .e-article li { font-family: var(--font-body); font-size: 1.02rem; font-weight: 300; line-height: 1.8; color: #A6ADC3; }
         .e-article p { margin: 0 0 1.15rem; }
         .e-article ul { margin: 0 0 1.15rem; padding-left: 1.4rem; }
