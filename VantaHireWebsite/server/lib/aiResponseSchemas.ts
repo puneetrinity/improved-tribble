@@ -33,6 +33,14 @@ export const JDDigestResponseSchema = z.object({
   constraints: z.array(z.string()).max(10).default([]),
   keyResponsibilities: z.array(z.string()).max(5).default([]),
   titleSearchTerms: z.array(z.string()).max(6).default([]),
+  // v3: each bucket is one later sourcing rung of closely related literal titles.
+  adjacentBuckets: z.array(z.array(z.string()).max(4)).max(3).default([]).catch([]),
+  // Country accompanies the metro so Signal can reject cross-country relaxation
+  // before it spends a Crustdata search on it.
+  adjacentLocations: z.array(z.object({
+    metro: z.string(),
+    country: z.string(),
+  })).max(3).default([]).catch([]),
 });
 export type JDDigestResponse = z.infer<typeof JDDigestResponseSchema>;
 
