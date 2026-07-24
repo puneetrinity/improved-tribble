@@ -19,6 +19,7 @@
     "check:server": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.server.json --noEmit --incremental false",
     "check:client": "node --max-old-space-size=8192 ./node_modules/typescript/bin/tsc -p tsconfig.client.json --noEmit --incremental false",
     "test": "vitest run",
+    "test:resume-extractor": "vitest run --config vitest.server.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:bulk-import:integration": "vitest run server/tests/bulkResumeImport.finalize.integration.test.ts",
