@@ -219,9 +219,9 @@ async function triggerRun(jobId: number): Promise<string> {
   // Ensure JD digest exists before sourcing (same as signal.routes.ts)
   let jdDigest = job.jdDigest as Record<string, unknown> | null;
   if (!jdDigest || !job.jdDigestVersion || job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-    let generated = await generateJDDigest(job.title, job.description ?? '');
+    let generated = await generateJDDigest(job.title, job.description ?? '', { location: job.location });
     if (generated.topSkills.length === 0) {
-      generated = await generateJDDigest(job.title, job.description ?? '');
+      generated = await generateJDDigest(job.title, job.description ?? '', { location: job.location });
     }
     await db.update(jobs).set({
       jdDigest: generated,

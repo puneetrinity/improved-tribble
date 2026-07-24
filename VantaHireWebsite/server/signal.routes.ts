@@ -372,9 +372,9 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       if (!jdDigest) {
         // No digest at all — must generate synchronously so we have topSkills for sourcing.
-        let generated = await generateJDDigest(job.title, digestSourceDescription);
+        let generated = await generateJDDigest(job.title, digestSourceDescription, { location: job.location });
         if (generated.topSkills.length === 0) {
-          generated = await generateJDDigest(job.title, digestSourceDescription);
+          generated = await generateJDDigest(job.title, digestSourceDescription, { location: job.location });
         }
         await db.update(jobs).set({
           jdDigest: generated,
@@ -387,9 +387,9 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         // Stale digest — use existing version now, upgrade in background (non-blocking).
         setImmediate(async () => {
           try {
-            let generated = await generateJDDigest(job.title, digestSourceDescription);
+            let generated = await generateJDDigest(job.title, digestSourceDescription, { location: job.location });
             if (generated.topSkills.length === 0) {
-              generated = await generateJDDigest(job.title, digestSourceDescription);
+              generated = await generateJDDigest(job.title, digestSourceDescription, { location: job.location });
             }
             await db.update(jobs).set({
               jdDigest: generated,

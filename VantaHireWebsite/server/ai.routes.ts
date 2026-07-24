@@ -628,7 +628,7 @@ export function registerAIRoutes(app: Express): void {
         let jdDigest: JDDigest = application.job.jdDigest as JDDigest;
 
         if (!jdDigest || !application.job.jdDigestVersion || application.job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-          jdDigest = await generateJDDigest(application.job.title, application.job.originalJD || application.job.description);
+          jdDigest = await generateJDDigest(application.job.title, application.job.originalJD || application.job.description, { location: application.job.location });
 
           // Cache digest
           await db
@@ -847,7 +847,7 @@ export function registerAIRoutes(app: Express): void {
             let jdDigest: JDDigest = app.job.jdDigest as JDDigest;
 
             if (!jdDigest || !app.job.jdDigestVersion || app.job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-              jdDigest = await generateJDDigest(app.job.title, app.job.originalJD || app.job.description);
+              jdDigest = await generateJDDigest(app.job.title, app.job.originalJD || app.job.description, { location: app.job.location });
 
               await db
                 .update(jobs)
