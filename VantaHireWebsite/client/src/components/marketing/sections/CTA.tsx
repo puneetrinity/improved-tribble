@@ -48,8 +48,8 @@ export default function CTA() {
           />
         </motion.div>
         <motion.h2
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 24 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7 }}
           style={{
@@ -64,8 +64,8 @@ export default function CTA() {
           That&apos;s ealana.
         </motion.h2>
         <motion.p
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 24 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, delay: 0.15 }}
           style={{
@@ -81,8 +81,8 @@ export default function CTA() {
           If this sounds like the way recruiting should work, we&apos;d love to show you around.
         </motion.p>
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 24 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, delay: 0.3 }}
         >

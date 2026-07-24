@@ -15,8 +15,8 @@ export default function SolutionsCTA() {
 
       <div style={{ position: "relative" }}>
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 24 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
           style={{ marginBottom: "1.25rem" }}
@@ -30,8 +30,8 @@ export default function SolutionsCTA() {
         </motion.div>
 
         <motion.p
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 16 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
           style={{ fontFamily: "var(--font-body)", fontSize: "1.05rem", color: "#8891AA", fontWeight: 300, maxWidth: 460, margin: "0 auto 2.5rem", lineHeight: 1.75 }}
@@ -49,7 +49,7 @@ export default function SolutionsCTA() {
           {pills.map(({ label }) => (
             <motion.div
               key={label}
-              variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }}
+              variants={{ hidden: { y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5 } } }}
               style={{ display: "flex", alignItems: "center", padding: "8px 18px", borderRadius: 100, border: "1px solid rgba(75,142,240,0.2)", background: "rgba(75,142,240,0.06)" }}
             >
               <span style={{ fontFamily: "var(--font-body)", fontSize: "0.85rem", color: "#4B8EF0" }}>{label}</span>
@@ -58,8 +58,8 @@ export default function SolutionsCTA() {
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 12 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.3, ease: [0.25, 0.1, 0.25, 1] }}
           style={{ display: "flex", justifyContent: "center", gap: 12, flexWrap: "wrap" }}

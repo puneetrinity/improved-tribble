@@ -50,7 +50,7 @@ export default function Stats() {
       <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "repeat(2, minmax(0, 1fr))" : "repeat(4, 1fr)" }}>
         {STATS.map((stat, index) => (
           <div key={index} style={{ display: "flex" }}>
-            <motion.div initial={{ opacity: 0, y: 16 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.55, delay: index * 0.1, ease: [0.25, 0.1, 0.25, 1] }} style={{ flex: 1, padding: isMobile ? "1.75rem 1rem" : "2.5rem 2rem", textAlign: "center" }}>
+            <motion.div initial={{ y: 16 }} animate={inView ? { y: 0 } : {}} transition={{ duration: 0.55, delay: index * 0.1, ease: [0.25, 0.1, 0.25, 1] }} style={{ flex: 1, padding: isMobile ? "1.75rem 1rem" : "2.5rem 2rem", textAlign: "center" }}>
               <div style={{ width: 28, height: 2, borderRadius: 2, background: stat.accent, margin: "0 auto 1rem" }} />
               <div style={{ fontFamily: "'Outfit', sans-serif", fontSize: "3rem", color: "#F4F5FA", lineHeight: 1 }}>
                 {stat.countUp ? <CountUp target={stat.value as number} suffix={stat.suffix} inView={inView} /> : stat.value}

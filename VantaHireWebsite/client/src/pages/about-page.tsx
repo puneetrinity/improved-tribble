@@ -36,8 +36,8 @@ const jsonLd = JSON.stringify([
 ]);
 
 const fadeUp = {
-  initial: { opacity: 0, y: 24 },
-  whileInView: { opacity: 1, y: 0 },
+  initial: { y: 24 },
+  whileInView: { y: 0 },
   viewport: { once: true, margin: "-80px" },
   transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] as const },
 };
@@ -64,8 +64,8 @@ export default function AboutPage() {
           style={{ paddingTop: isMobile ? 140 : 180, paddingBottom: isMobile ? 40 : 64 }}
         >
           <motion.h1
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ y: 24 }}
+            animate={{ y: 0 }}
             transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
             className="mx-auto max-w-4xl font-normal"
             style={{
@@ -90,8 +90,8 @@ export default function AboutPage() {
             </span>
           </motion.h1>
           <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ y: 16 }}
+            animate={{ y: 0 }}
             transition={{ duration: 0.6, delay: 0.25 }}
             className="mx-auto mt-6 max-w-2xl font-body leading-relaxed text-e-text2"
             style={{ fontSize: isMobile ? "0.98rem" : "1.08rem", fontWeight: 300 }}

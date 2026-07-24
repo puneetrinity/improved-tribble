@@ -192,8 +192,8 @@ export function FlowPanel() {
   return (
     <motion.div
       ref={rootRef}
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ y: 30 }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
       style={{ background: "#F8F9FC", border: "1px solid rgba(245,200,66,0.2)", borderRadius: 18, boxShadow: "0 32px 80px rgba(0,0,0,0.5), 0 0 60px rgba(245,200,66,0.04)", overflow: "hidden" }}
@@ -237,7 +237,7 @@ export function FlowPanel() {
         })}
       </div>
 
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="wait" initial={false}>
         <motion.div key={activeTab} {...tabAnim}>
           <Content />
         </motion.div>
@@ -252,8 +252,8 @@ export default function FlowFeature() {
     <section style={{ padding: isMobile ? "72px 1.25rem" : "120px 4rem" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "5rem", alignItems: "center" }}>
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 30 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
         >
