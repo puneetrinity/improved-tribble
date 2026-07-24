@@ -147,8 +147,8 @@ export function DiscoverPanel() {
   return (
     <motion.div
       ref={rootRef}
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ y: 30 }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
       style={{
@@ -240,8 +240,8 @@ export function DiscoverPanel() {
             candidates.map((candidate, index) => (
               <motion.div
                 key={candidate.name}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
+                initial={{ x: -10 }}
+                animate={{ x: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.35, delay: index * 0.12 }}
                 style={{
@@ -297,8 +297,8 @@ export default function DiscoverFeature() {
     <section style={{ padding: isMobile ? "72px 1.25rem" : "120px 4rem" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "1.5rem" : "5rem", alignItems: "center" }}>
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 30 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
         >

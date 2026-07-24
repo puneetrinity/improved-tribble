@@ -130,15 +130,15 @@ export default function Platform() {
           <span style={{ ...mono, fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase" }}>One Platform</span>
         </div>
 
-        <motion.h2 initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }} style={{ fontFamily: "'Outfit', sans-serif", fontSize: "clamp(2.5rem,5vw,4rem)", color: "#F4F5FA", textAlign: "center", lineHeight: 1.15, fontWeight: 400, marginBottom: 16 }}>
+        <motion.h2 initial={{ y: 24 }} whileInView={{ y: 0 }} viewport={{ once: true }} transition={{ duration: 0.7 }} style={{ fontFamily: "'Outfit', sans-serif", fontSize: "clamp(2.5rem,5vw,4rem)", color: "#F4F5FA", textAlign: "center", lineHeight: 1.15, fontWeight: 400, marginBottom: 16 }}>
           Three layers. <em>One right hire.</em>
         </motion.h2>
 
-        <motion.p initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.15 }} style={{ ...body, fontSize: isMobile ? "0.98rem" : "1rem", color: "#8891AA", fontWeight: 300, maxWidth: 560, margin: `0 auto ${isMobile ? "2rem" : "5rem"}`, lineHeight: 1.75, textAlign: "center" }}>
+        <motion.p initial={{ y: 16 }} whileInView={{ y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, delay: 0.15 }} style={{ ...body, fontSize: isMobile ? "0.98rem" : "1rem", color: "#8891AA", fontWeight: 300, maxWidth: 560, margin: `0 auto ${isMobile ? "2rem" : "5rem"}`, lineHeight: 1.75, textAlign: "center" }}>
           Discover, Memory, and Flow work together — so every search, every decision, and every outreach happens in one place.
         </motion.p>
 
-        <motion.div initial={{ opacity: 0, y: 32 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.8 }} style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "stretch", gap: isMobile ? 12 : 0 }}>
+        <motion.div initial={{ y: 32 }} whileInView={{ y: 0 }} viewport={{ once: true, margin: "-60px" }} transition={{ duration: 0.8 }} style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "stretch", gap: isMobile ? 12 : 0 }}>
           <ActiveCard progress={scrollYProgress} threshold={0.1}>{(active) => <DiscoverCard active={active} />}</ActiveCard>
           {!isMobile ? <AnimatedBeam progress={beam1Progress} color="#4B8EF0" /> : null}
           <ActiveCard progress={scrollYProgress} threshold={0.45}>{(active) => <MemoryCard active={active} />}</ActiveCard>
@@ -146,7 +146,7 @@ export default function Platform() {
           <ActiveCard progress={scrollYProgress} threshold={0.8}>{(active) => <FlowCard active={active} />}</ActiveCard>
         </motion.div>
 
-        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.2 }} style={{ fontFamily: "'Outfit', sans-serif", fontStyle: "italic", fontSize: "1.3rem", color: "#8891AA", textAlign: "center", marginTop: "3rem" }}>
+        <motion.p initial={false} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ duration: 0.7, delay: 0.2 }} style={{ fontFamily: "'Outfit', sans-serif", fontStyle: "italic", fontSize: "1.3rem", color: "#8891AA", textAlign: "center", marginTop: "3rem" }}>
           Your system gets smarter with every hire.
         </motion.p>
       </div>

@@ -56,8 +56,8 @@ function FixCell({ text, accent }: { text: string; accent: string }) {
 function SolvedDashboard() {
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.96, y: 30 }}
-      whileInView={{ opacity: 1, scale: 1, y: 0 }}
+      initial={{ scale: 0.96, y: 30 }}
+      whileInView={{ scale: 1, y: 0 }}
       viewport={{ once: true, margin: "-40px" }}
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
       style={{
@@ -150,8 +150,8 @@ export function ProblemSection() {
             {PAIRS.map((pair, index) => (
               <motion.div
                 key={pair.pain}
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={{ y: 24 }}
+                whileInView={{ y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.55, delay: index * 0.06 }}
               >
@@ -174,7 +174,7 @@ export function ProblemSection() {
       <div style={{ maxWidth: 1140, margin: "0 auto", paddingLeft: "4rem", paddingRight: "4rem" }}>
         <div style={{ display: "grid", gridTemplateColumns: "0.92fr 1.08fr", gap: "4.5rem", alignItems: "center" }}>
           {/* Left — concise framing */}
-          <motion.div initial={{ opacity: 0, y: 28 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7 }}>
+          <motion.div initial={{ y: 28 }} whileInView={{ y: 0 }} viewport={{ once: true, margin: "-80px" }} transition={{ duration: 0.7 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 22 }}>
               <span className="font-mono" style={{ fontSize: "0.62rem", letterSpacing: "0.14em", color: "#4B8EF0", textTransform: "uppercase" }}>The Problem → The Fix</span>
               <div style={{ height: 1, background: "#4B8EF0", opacity: 0.2, width: 48 }} />

@@ -19,7 +19,7 @@ const breadcrumbJsonLd = JSON.stringify({
 const words1 = ["Decision", "intelligence"];
 const wordVariants = { hidden: {}, visible: { transition: { staggerChildren: 0.09 } } };
 const wordItem = {
-  hidden: { y: 28, opacity: 0 },
+  hidden: { y: 28 },
   visible: { y: 0, opacity: 1, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1] } },
 };
 const pills = [
@@ -77,12 +77,12 @@ export default function FeaturesPage() {
                   </motion.span>
                 </span>
               </motion.h1>
-              <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.9, ease: [0.25, 0.1, 0.25, 1] }} style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, maxWidth: 520, margin: "0 auto", lineHeight: 1.75 }}>
+              <motion.p initial={{ y: 16 }} animate={{ y: 0 }} transition={{ duration: 0.7, delay: 0.9, ease: [0.25, 0.1, 0.25, 1] }} style={{ fontFamily: "var(--font-body)", fontSize: isMobile ? "0.98rem" : "1.05rem", color: "#8891AA", fontWeight: 300, maxWidth: 520, margin: "0 auto", lineHeight: 1.75 }}>
                 Discover finds the right people. Memory keeps everything your team learns. Flow gets the outreach done.
               </motion.p>
               <motion.div initial="hidden" animate="visible" variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1, delayChildren: 1.1 } } }} style={{ display: "flex", justifyContent: "center", gap: 12, marginTop: isMobile ? "1.75rem" : "2.5rem", flexWrap: "wrap" }}>
                 {pills.map(({ label, color }) => (
-                  <motion.div key={label} variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] } } }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", borderRadius: 100, border: `1px solid ${color}33`, background: `${color}0f` }}>
+                  <motion.div key={label} variants={{ hidden: { y: 10 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 0.1, 0.25, 1] } } }} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 18px", borderRadius: 100, border: `1px solid ${color}33`, background: `${color}0f` }}>
                     <div style={{ width: 6, height: 6, borderRadius: "50%", background: color, flexShrink: 0 }} />
                     <span style={{ fontFamily: "var(--font-body)", fontSize: "0.85rem", color }}>{label}</span>
                   </motion.div>

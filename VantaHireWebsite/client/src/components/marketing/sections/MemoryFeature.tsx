@@ -83,8 +83,8 @@ export function MemoryPanel() {
   return (
     <motion.div
       ref={rootRef}
-      initial={{ opacity: 0, y: 30 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ y: 30 }}
+      whileInView={{ y: 0 }}
       viewport={{ once: true }}
       transition={{ duration: 0.7, ease: [0.25, 0.1, 0.25, 1] }}
       style={{
@@ -151,11 +151,11 @@ export function MemoryPanel() {
         </div>
 
         <div style={{ width: "45%", padding: "1rem 0.75rem" }}>
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" initial={false}>
             {selectedIndex === null ? (
               <motion.div
                 key="empty"
-                initial={{ opacity: 0 }}
+                initial={false}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.25 }}
@@ -169,8 +169,8 @@ export function MemoryPanel() {
             ) : selectedTimeline && selectedResurfaced ? (
               <motion.div
                 key={selectedIndex}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ y: 8 }}
+                animate={{ y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.4 }}
               >
@@ -211,8 +211,8 @@ export default function MemoryFeature() {
         <MemoryPanel />
 
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
+          initial={{ y: 30 }}
+          whileInView={{ y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
         >

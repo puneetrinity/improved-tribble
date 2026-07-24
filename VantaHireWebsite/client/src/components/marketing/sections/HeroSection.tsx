@@ -59,8 +59,8 @@ export function HeroSection() {
       </div>
 
       <motion.div
-        initial={{ opacity: 0, scale: 0.8, y: 16 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
+        initial={{ scale: 0.8, y: 16 }}
+        animate={{ scale: 1, y: 0 }}
         transition={{ duration: 0.8, ease: [0.25, 0.1, 0.25, 1] }}
         className="relative z-10 mb-8"
       >
@@ -103,7 +103,7 @@ export function HeroSection() {
           <motion.span
             key={word}
             variants={{
-              hidden: { y: 30, opacity: 0 },
+              hidden: { y: 30 },
               visible: {
                 y: 0,
                 opacity: 1,
@@ -116,7 +116,7 @@ export function HeroSection() {
         ))}
         <motion.span
           variants={{
-            hidden: { y: 30, opacity: 0 },
+            hidden: { y: 30 },
             visible: {
               y: 0,
               opacity: 1,
@@ -139,8 +139,8 @@ export function HeroSection() {
       </motion.h1>
 
       <motion.p
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ y: 16 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.6, delay: 1.0 }}
         className="relative z-10 mb-8 max-w-3xl font-body leading-relaxed text-e-text2"
         style={{ fontSize: isMobile ? "0.98rem" : "1.05rem", fontWeight: 300 }}
@@ -159,7 +159,7 @@ export function HeroSection() {
           </span>{" "}
           to{" "}
           <motion.strong
-            initial={{ opacity: 0 }}
+            initial={false}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.45, delay: 2.05 }}
             className="font-semibold text-e-text"
@@ -171,8 +171,8 @@ export function HeroSection() {
       </motion.p>
 
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ y: 16 }}
+        animate={{ y: 0 }}
         transition={{ duration: 0.6, delay: 1.15 }}
         className="relative z-10 mb-6 flex w-full max-w-sm flex-col items-stretch gap-3 sm:max-w-none sm:flex-row sm:items-center sm:justify-center"
       >
@@ -202,7 +202,7 @@ export function HeroSection() {
       </motion.div>
 
       <motion.p
-        initial={{ opacity: 0 }}
+        initial={false}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.4 }}
         className="relative z-10 font-body text-e-text3"
