@@ -22,8 +22,8 @@ export function HeroSection() {
 
   return (
     <section
-      className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-5 text-center sm:px-6"
-      style={{ paddingTop: isMobile ? 92 : 64, paddingBottom: isMobile ? 48 : 24 }}
+      className="relative flex flex-col items-center justify-center overflow-hidden px-5 text-center sm:px-6"
+      style={{ minHeight: "min(100vh, 920px)", paddingTop: isMobile ? 92 : 64, paddingBottom: isMobile ? 48 : 24 }}
     >
       <div className="absolute inset-0 pointer-events-none">
         <div
