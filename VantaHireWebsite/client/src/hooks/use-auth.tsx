@@ -34,6 +34,9 @@ function isPublicSsrPath(pathname: string): boolean {
   return (
     pathname === "/" ||
     pathname === "/features" ||
+    pathname === "/about" ||
+    pathname === "/what-is-decision-intelligence" ||
+    pathname === "/talent-intelligence-vs-ats" ||
     pathname === "/pricing" ||
     pathname === "/solutions" ||
     pathname === "/jobs" ||

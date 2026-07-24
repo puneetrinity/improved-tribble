@@ -349,7 +349,7 @@ export default function ShiftShowcase() {
     <section id="features" style={{ position: "relative" }}>
       {headerBlock}
       <div ref={trackRef} style={{ height: `${stepCount * 100}vh`, position: "relative" }}>
-        <div style={{ position: "sticky", top: 0, height: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", padding: "56px 4rem 24px", overflow: "visible" }}>
+        <div style={{ position: "sticky", top: 0, height: "min(100vh, 920px)", display: "flex", flexDirection: "column", justifyContent: "center", padding: "56px 4rem 24px", overflow: "visible" }}>
           {innerContent}
         </div>
       </div>
