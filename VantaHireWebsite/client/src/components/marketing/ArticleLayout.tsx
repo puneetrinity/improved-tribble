@@ -66,7 +66,7 @@ export default function ArticleLayout({ title, description, path, headline, date
           <HomepageFooter />
         </div>
       </div>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .e-article h1 { font-family: 'Outfit', sans-serif; font-size: clamp(2.1rem, 6vw, 2.9rem); line-height: 1.12; letter-spacing: -0.025em; color: #F4F5FA; font-weight: 600; margin: 0 0 1.5rem; }
         .e-article h2 { font-family: 'Outfit', sans-serif; font-size: clamp(1.45rem, 4vw, 1.75rem); letter-spacing: -0.02em; color: #F4F5FA; font-weight: 600; margin: 2.75rem 0 1rem; }
         .e-article p, .e-article li { font-family: var(--font-body); font-size: 1.02rem; font-weight: 300; line-height: 1.8; color: #A6ADC3; }
@@ -85,7 +85,7 @@ export default function ArticleLayout({ title, description, path, headline, date
         .e-article .table-scroll { overflow-x: auto; }
         .e-article .table-scroll table { min-width: 540px; }
         .e-article .meta-line { font-family: var(--font-body); font-size: 0.8rem; color: #6C7590; margin-bottom: 2.25rem; }
-      `}</style>
+      ` }} />
     </>
   );
 }
