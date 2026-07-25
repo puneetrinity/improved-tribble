@@ -1055,6 +1055,11 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   foundEmails: jsonb("found_emails"),
   emailResolvedAt: timestamp("email_resolved_at"),
   emailResolveStatus: text("email_resolve_status"),
+  emailResolveAttempts: integer("email_resolve_attempts").notNull().default(0),
+  emailResolveNextAttemptAt: timestamp("email_resolve_next_attempt_at"),
+  emailResolveLeaseToken: text("email_resolve_lease_token"),
+  emailResolveLeaseExpiresAt: timestamp("email_resolve_lease_expires_at"),
+  emailResolveLastErrorCode: text("email_resolve_last_error_code"),
   outreachCount: integer("outreach_count").notNull().default(0),
   lastOutreachRound: integer("last_outreach_round"),
   lastOutreachCampaignId: text("last_outreach_campaign_id"),
@@ -1075,6 +1080,10 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   stateIdx: index("job_sourced_candidates_state_idx").on(table.state),
   fitScoreIdx: index("job_sourced_candidates_fit_score_idx").on(table.fitScore),
   sourceTypeIdx: index("job_sourced_candidates_source_type_idx").on(table.sourceType),
+  emailResolutionDueIdx: index("job_sourced_candidates_email_resolution_due_idx").on(
+    table.emailResolveNextAttemptAt,
+    table.id,
+  ).where(sql`${table.emailResolveStatus} = 'pending'`),
 }));
 
 export const sourcedCandidateOutreachCampaigns = pgTable("sourced_candidate_outreach_campaigns", {
@@ -2696,7 +2705,12 @@ export const insertJobSourcedCandidateSchema = z.object({
   foundEmail: z.string().email().optional(),
   foundEmails: z.array(z.string().email()).optional(),
   emailResolvedAt: z.date().optional(),
-  emailResolveStatus: z.enum(['pending', 'resolved', 'not_found', 'failed']).optional(),
+  emailResolveStatus: z.enum(['pending', 'resolved', 'suppressed', 'not_found', 'failed']).optional(),
+  emailResolveAttempts: z.number().int().min(0).optional(),
+  emailResolveNextAttemptAt: z.date().optional(),
+  emailResolveLeaseToken: z.string().uuid().optional(),
+  emailResolveLeaseExpiresAt: z.date().optional(),
+  emailResolveLastErrorCode: z.string().max(100).optional(),
   outreachCount: z.number().int().min(0).max(3).optional(),
   lastOutreachRound: z.number().int().min(1).max(3).optional(),
   lastOutreachCampaignId: z.string().min(1).max(255).optional(),

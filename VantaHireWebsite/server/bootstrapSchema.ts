@@ -1516,6 +1516,11 @@ export async function ensureAtsSchema(): Promise<void> {
       found_emails JSONB,
       email_resolved_at TIMESTAMP,
       email_resolve_status TEXT,
+      email_resolve_attempts INTEGER NOT NULL DEFAULT 0,
+      email_resolve_next_attempt_at TIMESTAMP,
+      email_resolve_lease_token TEXT,
+      email_resolve_lease_expires_at TIMESTAMP,
+      email_resolve_last_error_code TEXT,
       outreach_count INTEGER NOT NULL DEFAULT 0,
       last_outreach_round INTEGER,
       last_outreach_campaign_id TEXT,
@@ -1534,6 +1539,33 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS found_emails JSONB;`);
   await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolved_at TIMESTAMP;`);
   await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_status TEXT;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_attempts INTEGER NOT NULL DEFAULT 0;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_next_attempt_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_lease_token TEXT;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_lease_expires_at TIMESTAMP;`);
+  await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS email_resolve_last_error_code TEXT;`);
+  await execSafe(sql`
+    UPDATE job_sourced_candidates
+    SET email_resolve_status = 'failed',
+        email_resolved_at = COALESCE(email_resolved_at, NOW()),
+        email_resolve_next_attempt_at = NULL,
+        email_resolve_lease_token = NULL,
+        email_resolve_lease_expires_at = NULL,
+        email_resolve_last_error_code = 'missing_signal_candidate_id'
+    WHERE email_resolve_status = 'pending'
+      AND btrim(COALESCE(signal_candidate_id, '')) = '';
+  `);
+  await execSafe(sql`
+    UPDATE job_sourced_candidates
+    SET email_resolve_next_attempt_at = COALESCE(
+          email_resolve_next_attempt_at,
+          updated_at,
+          NOW()
+    )
+    WHERE email_resolve_status = 'pending'
+      AND btrim(COALESCE(signal_candidate_id, '')) <> ''
+      AND email_resolve_next_attempt_at IS NULL;
+  `);
   await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS outreach_count INTEGER NOT NULL DEFAULT 0;`);
   await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_round INTEGER;`);
   await execSafe(sql`ALTER TABLE job_sourced_candidates ADD COLUMN IF NOT EXISTS last_outreach_campaign_id TEXT;`);
@@ -1548,6 +1580,40 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_state_idx ON job_sourced_candidates(state);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_fit_score_idx ON job_sourced_candidates(fit_score);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_source_type_idx ON job_sourced_candidates(source_type);`);
+  await execSafe(sql`
+    CREATE INDEX IF NOT EXISTS job_sourced_candidates_email_resolution_due_idx
+    ON job_sourced_candidates(email_resolve_next_attempt_at, id)
+    WHERE email_resolve_status = 'pending';
+  `);
+  await execSafe(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'job_sourced_candidates_email_resolve_attempts_nonnegative'
+          AND conrelid = 'job_sourced_candidates'::regclass
+      ) THEN
+        ALTER TABLE job_sourced_candidates
+          ADD CONSTRAINT job_sourced_candidates_email_resolve_attempts_nonnegative
+          CHECK (email_resolve_attempts >= 0);
+      END IF;
+
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'job_sourced_candidates_email_resolve_lease_pair'
+          AND conrelid = 'job_sourced_candidates'::regclass
+      ) THEN
+        ALTER TABLE job_sourced_candidates
+          ADD CONSTRAINT job_sourced_candidates_email_resolve_lease_pair
+          CHECK (
+            (email_resolve_lease_token IS NULL AND email_resolve_lease_expires_at IS NULL)
+            OR
+            (email_resolve_lease_token IS NOT NULL AND email_resolve_lease_expires_at IS NOT NULL)
+          );
+      END IF;
+    END
+    $$;
+  `);
 
   console.log('  Creating sourced_candidate_outreach_campaigns table...');
   await execSafe(sql`
@@ -1758,6 +1824,12 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`CREATE INDEX IF NOT EXISTS rfb_unsynced_idx ON recruiter_feedback_events(synced_to_signal_at);`);
   await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS platform_discovery_consent BOOLEAN DEFAULT FALSE;`);
   await execSafe(sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS consent_captured_at TIMESTAMP;`);
+
+  if (bootstrapFailures > 0) {
+    throw new Error(
+      `ATS schema migration failed for ${bootstrapFailures} statement(s); transaction rolled back`,
+    );
+  }
 
   });
 

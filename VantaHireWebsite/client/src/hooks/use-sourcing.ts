@@ -23,7 +23,7 @@ export interface SourcedCandidateForUI {
   foundEmail: string | null;
   foundEmails: string[] | null;
   emailResolvedAt: string | null;
-  emailResolveStatus: "pending" | "resolved" | "not_found" | "failed" | null;
+  emailResolveStatus: "pending" | "resolved" | "suppressed" | "not_found" | "failed" | null;
   outreachCount: number;
   lastOutreachRound: number | null;
   lastOutreachCampaignId: string | null;
@@ -612,13 +612,25 @@ export function useUpdateCandidateState(jobId: number | undefined) {
                 ? {
                     ...c,
                     state,
+                    ...(state !== "shortlisted" ? {
+                      foundEmail: null,
+                      foundEmails: [],
+                      emailResolvedAt: null,
+                      emailResolveStatus: null,
+                      cardSignals: c.cardSignals
+                        ? {
+                            ...c.cardSignals,
+                            email: null,
+                            emailAvailable: false,
+                          }
+                        : c.cardSignals,
+                    } : {}),
                     emailResolveStatus:
-                      state === "shortlisted"
-                      && !c.foundEmail
-                      && c.emailResolveStatus !== "resolved"
-                      && c.emailResolveStatus !== "pending"
-                        ? "pending"
-                        : c.emailResolveStatus,
+                      state !== "shortlisted"
+                        ? null
+                        : !c.foundEmail && c.emailResolveStatus == null
+                          ? "pending"
+                          : c.emailResolveStatus,
                   }
                 : c,
             ),
@@ -689,7 +701,36 @@ export function useFindContact() {
         queryKey: ["/api/jobs", variables.jobId, "sourced-candidates"],
       });
 
-      if (data.emails && data.emails.length > 0) {
+      if (data.state === "pending") {
+        toast({
+          title: "Contact Search Queued",
+          description: "The email will appear here when the lookup finishes.",
+        });
+      } else if (data.state === "suppressed") {
+        queryClient.setQueryData<SourcedCandidatesResponse>(
+          ["/api/jobs", variables.jobId, "sourced-candidates"],
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              candidates: old.candidates.map((c) =>
+                c.id === variables.candidateId
+                  ? {
+                      ...c,
+                      foundEmail: null,
+                      foundEmails: [],
+                      emailResolveStatus: "suppressed",
+                    }
+                  : c,
+              ),
+            };
+          },
+        );
+        toast({
+          title: "Email Suppressed",
+          description: "This address cannot be used for outreach.",
+        });
+      } else if (data.emails && data.emails.length > 0) {
         queryClient.setQueryData<SourcedCandidatesResponse>(
           ["/api/jobs", variables.jobId, "sourced-candidates"],
           (old) => {
@@ -698,17 +739,11 @@ export function useFindContact() {
               ...old,
               candidates: old.candidates.map((c) => {
                 if (c.id === variables.candidateId) {
-                  const crustdata = c.crustdata || {};
                   return {
                     ...c,
-                    crustdata: {
-                      ...crustdata,
-                      emails: data.emails,
-                      contact: {
-                        ...(crustdata.contact || {}),
-                        has_personal_email: true,
-                      }
-                    }
+                    foundEmail: data.emails[0] ?? null,
+                    foundEmails: data.emails,
+                    emailResolveStatus: "resolved",
                   };
                 }
                 return c;

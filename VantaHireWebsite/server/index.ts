@@ -12,6 +12,10 @@ import { seedDefaultWhatsAppTemplates } from "./seedWhatsAppTemplates";
 import { startApplicationGraphSyncProcessor, stopApplicationGraphSyncProcessor } from "./lib/applicationGraphSyncProcessor";
 import { startResumeImportProcessor, stopResumeImportProcessor } from "./lib/resumeImportProcessor";
 import { startOutreachScheduler } from "./lib/outreachScheduler";
+import {
+  startContactResolutionProcessor,
+  stopContactResolutionProcessor,
+} from "./lib/contactResolutionProcessor";
 import { captureServerException, initServerMonitoring, isExpectedDisconnectError, monitoringRequestContext } from "./monitoring";
 
 initServerMonitoring();
@@ -152,11 +156,12 @@ import { initWebSocketServer } from "./websocket";
 
     // Initialize database: Create schema, sync admin, seed data
     try {
-      // 1. Ensure ATS tables exist (creates them if missing) when explicitly enabled
-      if (process.env.ENABLE_BOOTSTRAP === "true") {
+      // Production entrypoints complete the fail-closed migrator before this
+      // process starts. Keep the legacy convenience bootstrap development-only.
+      if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_BOOTSTRAP === "true") {
         console.log("🔧 Running DB bootstrap...");
         await ensureAtsSchema();
-      } else {
+      } else if (process.env.NODE_ENV !== 'production') {
         console.log("⚡ Skipping DB bootstrap (fast startup)");
       }
 
@@ -191,6 +196,9 @@ import { initWebSocketServer } from "./websocket";
     // Start outreach campaign auto-scheduler (rounds 2 & 3 fire automatically)
     startOutreachScheduler();
 
+    // Recover shortlist-triggered contact lookups after deploys and disconnects.
+    startContactResolutionProcessor();
+
     // Start ActiveKG graph sync processor (if enabled)
     if (process.env.ACTIVEKG_SYNC_ENABLED === 'true') {
       startApplicationGraphSyncProcessor();
@@ -208,6 +216,7 @@ import { initWebSocketServer } from "./websocket";
     console.log(`Received ${signal}, shutting down gracefully...`);
     stopApplicationGraphSyncProcessor();
     stopResumeImportProcessor();
+    stopContactResolutionProcessor();
     server.close(() => {
       process.exit(0);
     });
