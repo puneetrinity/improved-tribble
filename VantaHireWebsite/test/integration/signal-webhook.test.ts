@@ -403,8 +403,12 @@ maybeDescribe('Signal webhook callback integration', () => {
         enrichedCount: 5,
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({
+      success: false,
+      retryable: true,
+      error: 'Callback processing failed',
+    });
 
     // Run should be 'failed', not 'completed'
     const run = await db.query.jobSourcingRuns.findFirst({
@@ -424,6 +428,43 @@ maybeDescribe('Signal webhook callback integration', () => {
     expect(candidates.length).toBe(0);
 
     // Webhook event should be 'failed'
+    const event = await db.query.webhookEvents.findFirst({
+      where: and(
+        eq(webhookEvents.provider, 'signal'),
+        eq(webhookEvents.eventId, claims.jti),
+      ),
+    });
+    expect(event?.status).toBe('failed');
+  });
+
+  it('acknowledges a Signal-declared failure without requesting redelivery', async () => {
+    const requestId = await createRun();
+    const claims = mockJwtClaims(requestId);
+
+    const res = await request(app)
+      .post('/api/webhooks/signal/callback')
+      .set('Authorization', 'Bearer fake-token')
+      .send({
+        version: 1,
+        requestId,
+        externalJobId: `vanta:jobs:${jobId}`,
+        status: 'failed',
+        candidateCount: 0,
+        enrichedCount: 0,
+        error: 'Sourcing failed upstream',
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true });
+    expect(signalClientMock.getResults).not.toHaveBeenCalled();
+
+    const run = await db.query.jobSourcingRuns.findFirst({
+      where: eq(jobSourcingRuns.requestId, requestId),
+    });
+    expect(run?.status).toBe('failed');
+    expect(run?.candidateCount).toBe(0);
+    expect(run?.errorMessage).toBe('Sourcing failed upstream');
+
     const event = await db.query.webhookEvents.findFirst({
       where: and(
         eq(webhookEvents.provider, 'signal'),

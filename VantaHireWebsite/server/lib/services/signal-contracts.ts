@@ -59,6 +59,8 @@ export interface SignalSourceResponse {
   status: string;                           // 'queued' for new, or existing status for idempotent
   idempotent: boolean;
   retried?: boolean;
+  acquisitionGeneration?: number;
+  executionAttemptId?: string | null;
   error?: string;
 }
 
@@ -229,6 +231,8 @@ export interface SignalCallbackPayload {
   version: 1;
   requestId: string;                        // camelCase in body (NOT snake_case)
   externalJobId: string;
+  acquisitionGeneration?: number;
+  executionAttemptId?: string;
   status: 'complete' | 'partial' | 'failed';
   candidateCount: number;
   enrichedCount: number;

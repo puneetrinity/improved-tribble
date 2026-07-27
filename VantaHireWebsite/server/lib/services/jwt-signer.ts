@@ -108,6 +108,8 @@ export interface VerifiedCallbackClaims {
   jti: string;
   tenantId: string;
   requestId: string;
+  acquisitionGeneration?: number;
+  executionAttemptId?: string;
   scopes: string;
 }
 
@@ -159,10 +161,23 @@ export async function verifySignalCallbackJwt(
     throw new Error('JWT missing request_id claim');
   }
 
+  const acquisitionGeneration =
+    typeof payload.acquisition_generation === 'number'
+      ? payload.acquisition_generation
+      : undefined;
+  const executionAttemptId =
+    typeof payload.execution_attempt_id === 'string'
+      ? payload.execution_attempt_id
+      : undefined;
+
   return {
     jti: payload.jti,
     tenantId,
     requestId,
+    ...(acquisitionGeneration != null
+      ? { acquisitionGeneration }
+      : {}),
+    ...(executionAttemptId ? { executionAttemptId } : {}),
     scopes: rawScopes,
   };
 }
