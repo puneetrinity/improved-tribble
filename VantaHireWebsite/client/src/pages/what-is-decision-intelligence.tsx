@@ -8,6 +8,23 @@ export default function WhatIsDecisionIntelligencePage() {
       path="/what-is-decision-intelligence"
       headline="What is Decision Intelligence in Recruiting?"
       datePublished="2026-07-23"
+      faq={[
+        {
+          question: "Is decision intelligence just AI matching?",
+          answer:
+            "No. Matching is one input. Decision intelligence adds memory (what the team already learned) and recommendation (ranked output with evidence), and it improves cycle over cycle. A matching score with no memory resets to zero every search.",
+        },
+        {
+          question: "Does it replace recruiters?",
+          answer:
+            "No — it replaces the re-work around recruiters. Humans make the calls; the system makes sure every call starts from the best available evidence.",
+        },
+        {
+          question: "How is this different from an ATS?",
+          answer:
+            "An ATS tracks candidates who arrive. Decision intelligence finds, ranks, remembers, and recommends — the ATS workflow is one layer of it, not the whole.",
+        },
+      ]}
     >
       <h1>What is decision intelligence in recruiting?</h1>
       <p className="meta-line">By Puneet Kumar, Founder &amp; CEO of ealana · 13+ years in recruitment</p>
