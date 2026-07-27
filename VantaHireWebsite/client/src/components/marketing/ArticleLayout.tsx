@@ -12,13 +12,16 @@ type Props = {
   path: string; // e.g. "/what-is-decision-intelligence"
   headline: string;
   datePublished: string;
+  // Q&A that MUST mirror the page's visible "Common questions" copy verbatim —
+  // FAQPage rich results require the marked-up answers to match on-page text.
+  faq?: { question: string; answer: string }[];
   children: ReactNode;
 };
 
-export default function ArticleLayout({ title, description, path, headline, datePublished, children }: Props) {
+export default function ArticleLayout({ title, description, path, headline, datePublished, faq, children }: Props) {
   const isMobile = useIsMobile();
   const url = `https://ealana.com${path}`;
-  const jsonLd = JSON.stringify([
+  const schema: Record<string, unknown>[] = [
     {
       "@context": "https://schema.org",
       "@type": "Article",
@@ -38,7 +41,20 @@ export default function ArticleLayout({ title, description, path, headline, date
         { "@type": "ListItem", position: 2, name: headline, item: url },
       ],
     },
-  ]);
+  ];
+  if (faq && faq.length > 0) {
+    schema.push({
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "@id": `${url}#faq`,
+      mainEntity: faq.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: { "@type": "Answer", text: item.answer },
+      })),
+    });
+  }
+  const jsonLd = JSON.stringify(schema);
 
   return (
     <>

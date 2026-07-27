@@ -8,6 +8,23 @@ export default function TalentIntelligenceVsAtsPage() {
       path="/talent-intelligence-vs-ats"
       headline="Talent Intelligence vs ATS: What's the Difference?"
       datePublished="2026-07-23"
+      faq={[
+        {
+          question: "Do I need an ATS if I have talent intelligence?",
+          answer:
+            "You need what an ATS does — stages, auditability, scheduling. Whether it's a separate product is the real question; in ealana, that layer (Flow) is built in.",
+        },
+        {
+          question: "Is talent intelligence just sourcing?",
+          answer:
+            "Sourcing is the act; talent intelligence is the layer that makes it informed — enrichment, fit signals, market context. But without memory and ranking, even great talent intelligence resets every search.",
+        },
+        {
+          question: "What should a small team buy first?",
+          answer:
+            "Neither, separately. Stitching two systems is where small teams bleed time. A connected platform that finds, decides, and executes in one place — priced to start free — is the practical answer.",
+        },
+      ]}
     >
       <h1>Talent intelligence vs ATS: what's the difference?</h1>
       <p className="meta-line">By Puneet Kumar, Founder &amp; CEO of ealana · 13+ years in recruitment</p>
