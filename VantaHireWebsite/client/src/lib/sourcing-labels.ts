@@ -82,11 +82,58 @@ export const FIT_INTERNAL_KEYS = new Set([
   "matchedSkills"
 ]);
 
-export function fitDescription(scorePct: number): string {
-  if (scorePct >= 75) return "Strong match";
+export type MatchStrength = "strong" | "good" | "possible";
+
+export interface FitBadgePresentation {
+  label: string;
+  className: string;
+}
+
+export function fitDescription(
+  scorePct: number,
+  matchStrength?: MatchStrength | null,
+): string {
+  if (matchStrength === "strong") return "Strong match";
+  if (matchStrength === "good") return "Good match";
+  if (matchStrength === "possible") return "Possible match";
+
+  // Historical rows lack Signal's verified-skill evidence. Preserve their
+  // score detail without inferring a "strong" claim Flow cannot substantiate.
   if (scorePct >= 60) return "Good match";
   if (scorePct >= 45) return "Moderate match";
   return "Weak match";
+}
+
+export function fitBadgePresentation(
+  scorePct: number,
+  matchStrength?: MatchStrength | null,
+): FitBadgePresentation {
+  const label = fitDescription(scorePct, matchStrength);
+  const tone = matchStrength
+    ?? (scorePct >= 60 ? "good" : scorePct >= 45 ? "possible" : "weak");
+
+  switch (tone) {
+    case "strong":
+      return {
+        label,
+        className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      };
+    case "good":
+      return {
+        label,
+        className: "bg-amber-50 text-amber-700 border-amber-200",
+      };
+    case "possible":
+      return {
+        label,
+        className: "bg-slate-50 text-slate-600 border-slate-200",
+      };
+    default:
+      return {
+        label,
+        className: "bg-rose-50 text-rose-600 border-rose-200",
+      };
+  }
 }
 
 /** Normalize fit value to 0-100 percentage for display. */

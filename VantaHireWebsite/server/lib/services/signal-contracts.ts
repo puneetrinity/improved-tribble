@@ -71,6 +71,7 @@ export interface SignalResultsResponse {
   requestId: string;
   externalJobId: string;
   resultCount: number | null;
+  matchStrengthBands?: SignalMatchStrengthBands | null;
   data: SignalResultCandidateV3[];
   error?: string;
   
@@ -288,7 +289,17 @@ export function mapCallbackStatusToRunStatus(callbackStatus: SignalCallbackPaylo
 // =====================================================
 
 export type CandidateMatchTier = 'best_matches' | 'broader_pool';
+export type CandidateMatchStrength = 'strong' | 'good' | 'possible';
 export type CandidateLocationMatchType = 'city_exact' | 'city_alias' | 'country_only' | 'unknown_location' | 'none';
+
+export interface SignalMatchStrengthBands {
+  sampleSize: number;
+  p50: number | null;
+  p80: number | null;
+  goodFloor: number;
+  effectiveGoodThreshold: number | null;
+  effectiveStrongThreshold: number | null;
+}
 
 /** Flattened candidate shape for UI consumption. */
 export interface SourcedCandidateForUI {
@@ -340,6 +351,7 @@ export interface SourcedCandidateForUI {
   } | null;
 
   // Tiering/quality metadata (additive, null-safe)
+  matchStrength: CandidateMatchStrength | null;
   matchTier: CandidateMatchTier | null;
   locationMatchType: CandidateLocationMatchType | null;
   dataConfidence: 'high' | 'medium' | 'low' | null;
@@ -476,6 +488,14 @@ function extractLocationMatchType(cs: Record<string, unknown>): CandidateLocatio
     : null;
 }
 
+function extractMatchStrength(cs: Record<string, unknown>): CandidateMatchStrength | null {
+  const sourcingContext = safeRecord(cs.sourcingContext);
+  const value = sourcingContext?.matchStrength;
+  return value === 'strong' || value === 'good' || value === 'possible'
+    ? value
+    : null;
+}
+
 function extractSearchSignals(cs: Record<string, unknown>): SourcedCandidateForUI['searchSignals'] {
   const explicitSignals = safeRecord(cs.searchSignals);
   const explicitSerpDate = safeString(explicitSignals?.serpDate);
@@ -573,6 +593,7 @@ export function flattenCandidateForUI(row: {
     searchSnippet: safeString(cs.searchSnippet),
     searchProvider: safeString(cs.searchProvider),
     searchSignals,
+    matchStrength: extractMatchStrength(cs),
     matchTier: extractMatchTier(cs),
     locationMatchType: extractLocationMatchType(cs),
     dataConfidence: cs.dataConfidence === 'high' || cs.dataConfidence === 'medium' || cs.dataConfidence === 'low' ? cs.dataConfidence : null,

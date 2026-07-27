@@ -8,7 +8,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
 import {
-  fitDescription,
+  fitBadgePresentation,
   freshnessLabel,
   locationConfidence,
 } from "@/lib/sourcing-labels";
@@ -47,25 +47,29 @@ function maskEmail(email: string | null): string {
 
 // ─── Fit score badge ──────────────────────────────────────────────────────────
 
-function FitBadge({ score }: { score: number | null }) {
+function FitBadge({
+  score,
+  matchStrength,
+}: {
+  score: number | null;
+  matchStrength: SourcedCandidateForUI["matchStrength"];
+}) {
   if (score == null)
     return (
       <Badge variant="outline" className="text-xs text-muted-foreground">
         No score
       </Badge>
     );
-  const { bg, text, border } =
-    score >= 75
-      ? { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" }
-      : score >= 50
-        ? { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" }
-        : { bg: "bg-rose-50", text: "text-rose-600", border: "border-rose-200" };
+  const presentation = fitBadgePresentation(score, matchStrength);
   return (
     <Badge
       variant="outline"
-      className={cn("text-xs font-semibold tabular-nums", bg, text, border)}
+      className={cn(
+        "text-xs font-semibold tabular-nums",
+        presentation.className,
+      )}
     >
-      {score}% &middot; {fitDescription(score)}
+      {score}% &middot; {presentation.label}
     </Badge>
   );
 }
@@ -232,6 +236,10 @@ export function CandidateCard({
             <span className="font-semibold text-lg leading-tight truncate shrink min-w-[100px] max-w-full">
               {name}
             </span>
+            <FitBadge
+              score={candidate.fitScore}
+              matchStrength={candidate.matchStrength}
+            />
             {candidate.engagementReady && (
               <Badge
                 variant="outline"

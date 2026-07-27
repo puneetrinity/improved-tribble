@@ -127,6 +127,9 @@ function buildSignalRunMetaPatch(
     ...(fetchedResults.trackDecision ? { trackDecision: fetchedResults.trackDecision } : {}),
     ...(fetchedResults.groupCounts ? { groupCounts: fetchedResults.groupCounts } : {}),
     ...(fetchedResults.snapshotStats ? { snapshotStats: fetchedResults.snapshotStats } : {}),
+    ...(fetchedResults.matchStrengthBands !== undefined
+      ? { matchStrengthBands: fetchedResults.matchStrengthBands }
+      : {}),
     ...(fetchedResults.diagnostics ? { diagnostics: fetchedResults.diagnostics } : {}),
     ...(requestedLocation !== undefined ? { requestedLocation } : {}),
     ...(expansionReason !== undefined ? { expansionReason } : {}),

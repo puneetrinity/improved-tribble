@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
 import { useFindContact } from "@/hooks/use-sourcing";
 import {
-  fitDescription,
+  fitBadgePresentation,
   tierLabel,
   tierColor,
   identityLabel,
@@ -60,19 +60,26 @@ interface CandidateDrawerProps {
   isUpdating: boolean;
 }
 
-function FitBadge({ score }: { score: number | null }) {
+function FitBadge({
+  score,
+  matchStrength,
+}: {
+  score: number | null;
+  matchStrength: SourcedCandidateForUI["matchStrength"];
+}) {
   if (score == null) {
     return <Badge variant="outline" className="text-xs">No score</Badge>;
   }
-  const color =
-    score >= 75
-      ? "bg-green-100 text-green-800 border-green-200"
-      : score >= 50
-        ? "bg-amber-100 text-amber-800 border-amber-200"
-        : "bg-red-100 text-red-800 border-red-200";
+  const presentation = fitBadgePresentation(score, matchStrength);
   return (
-    <Badge variant="outline" className={cn("text-xs font-semibold", color)}>
-      {fitDescription(score)} &middot; {score}
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs font-semibold tabular-nums",
+        presentation.className,
+      )}
+    >
+      {presentation.label} &middot; {score}
     </Badge>
   );
 }
@@ -269,6 +276,10 @@ export function CandidateDrawer({
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <FitBadge
+              score={c.fitScore}
+              matchStrength={c.matchStrength}
+            />
             {c.engagementReady && (
               <Badge variant="outline" className="text-xs font-semibold bg-green-50 text-green-700 border-green-200">
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
