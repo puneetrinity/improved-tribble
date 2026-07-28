@@ -15,7 +15,7 @@
 import type { Express, Request, Response } from 'express';
 import { db } from '../db';
 import { broadcastSourcingUpdate, broadcastPipelineEvent } from '../websocket';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, ne, sql } from 'drizzle-orm';
 import {
   webhookEvents,
   jobSourcingRuns,
@@ -29,9 +29,68 @@ import {
   mapCallbackStatusToRunStatus,
   type SignalCallbackPayload,
 } from '../lib/services/signal-contracts';
+import {
+  decideSignalCallbackExecution,
+  decideSignalTerminalCommitFallback,
+  getSignalCallbackAcknowledgement,
+  type SignalCallbackExecutionDecision,
+  type SignalExecutionIdentity,
+} from '../lib/services/signal-callback-ack';
 import { syncSignalResultsIntoVanta } from '../lib/services/sourcing-sync';
+import {
+  buildSignalExecutionPredicates,
+  commitIfSignalExecutionCurrent,
+} from '../lib/services/signal-execution-fence';
 
 const WEBHOOK_PROVIDER = 'signal';
+
+function readSignalExecution(meta: unknown): SignalExecutionIdentity {
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return {};
+  const execution = (meta as Record<string, unknown>).signalExecution;
+  if (
+    !execution ||
+    typeof execution !== 'object' ||
+    Array.isArray(execution)
+  ) {
+    return {};
+  }
+  const value = execution as Record<string, unknown>;
+  return {
+    acquisitionGeneration:
+      typeof value.acquisitionGeneration === 'number'
+        ? value.acquisitionGeneration
+        : null,
+    executionAttemptId:
+      typeof value.executionAttemptId === 'string'
+        ? value.executionAttemptId
+        : null,
+  };
+}
+
+async function finishNonCurrentCallback(
+  eventId: string,
+  decision: Exclude<
+    SignalCallbackExecutionDecision,
+    { action: 'accept' }
+  >,
+  res: Response,
+): Promise<void> {
+  if (decision.action === 'stale') {
+    await finalizeWebhookEvent(eventId, 'processed');
+    res.status(200).json({
+      success: true,
+      stale: true,
+      message: decision.reason,
+    });
+    return;
+  }
+  await finalizeWebhookEvent(eventId, 'failed', decision.reason);
+  res.status(503).json({
+    success: false,
+    retryable: true,
+    error: decision.reason,
+  });
+}
 
 /**
  * Atomically claim a webhook event for processing.
@@ -97,6 +156,17 @@ export function registerSignalWebhook(app: Express) {
       res.status(400).json({ error: 'Invalid payload' });
       return;
     }
+    if (
+      claims.requestId !== payload.requestId ||
+      (claims.acquisitionGeneration ?? null) !==
+        (payload.acquisitionGeneration ?? null) ||
+      (claims.executionAttemptId ?? null) !==
+        (payload.executionAttemptId ?? null)
+    ) {
+      console.error('Signal callback JWT/body execution mismatch');
+      res.status(403).json({ error: 'Callback execution mismatch' });
+      return;
+    }
 
     let claimedJti: string | null = null;
     try {
@@ -138,6 +208,24 @@ export function registerSignalWebhook(app: Express) {
         return;
       }
 
+      const callbackExecution = {
+        acquisitionGeneration:
+          payload.acquisitionGeneration ?? null,
+        executionAttemptId: payload.executionAttemptId ?? null,
+      };
+      const initialExecutionDecision = decideSignalCallbackExecution(
+        callbackExecution,
+        readSignalExecution(run.meta),
+      );
+      if (initialExecutionDecision.action !== 'accept') {
+        await finishNonCurrentCallback(
+          claims.jti,
+          initialExecutionDecision,
+          res,
+        );
+        return;
+      }
+
       // 7. Handle partial real-time updates (Pipeline Streaming)
       if (payload.status === 'partial') {
         const event = payload.event;
@@ -164,31 +252,72 @@ export function registerSignalWebhook(app: Express) {
           try {
             console.log(`👤 [WEBHOOK] LIVE ENRICHMENT FOR CANDIDATE: ${payload.candidateData.id}`);
 
-            const existing = await db.query.jobSourcedCandidates.findFirst({
-              where: and(
-                eq(jobSourcedCandidates.jobId, run.jobId),
-                eq(jobSourcedCandidates.signalCandidateId, payload.candidateData.id)
-              )
-            });
+            const committed = await commitIfSignalExecutionCurrent(
+              payload.requestId,
+              callbackExecution,
+              async (transaction) => {
+                const existing =
+                  await transaction.query.jobSourcedCandidates.findFirst({
+                    where: and(
+                      eq(jobSourcedCandidates.jobId, run.jobId),
+                      eq(
+                        jobSourcedCandidates.signalCandidateId,
+                        payload.candidateData!.id,
+                      ),
+                    ),
+                  });
 
-            if (existing) {
-              const summary = (existing.candidateSummary as any) || {};
-              const updatedSummary = {
-                ...summary,
-                candidate: {
-                  ...(summary.candidate || {}),
-                  ...payload.candidateData
-                },
-                enrichmentStatus: payload.candidateData.enrichmentStatus,
-                lastEnrichedAt: payload.candidateData.lastEnrichedAt,
-              };
+                if (existing) {
+                  const summary = (existing.candidateSummary as any) || {};
+                  const updatedSummary = {
+                    ...summary,
+                    candidate: {
+                      ...(summary.candidate || {}),
+                      ...payload.candidateData,
+                    },
+                    enrichmentStatus:
+                      payload.candidateData!.enrichmentStatus,
+                    lastEnrichedAt:
+                      payload.candidateData!.lastEnrichedAt,
+                  };
 
-              await db.update(jobSourcedCandidates)
-                .set({
-                  candidateSummary: updatedSummary,
-                  updatedAt: new Date(),
-                })
-                .where(eq(jobSourcedCandidates.id, existing.id));
+                  await transaction
+                    .update(jobSourcedCandidates)
+                    .set({
+                      candidateSummary: updatedSummary,
+                      updatedAt: new Date(),
+                    })
+                    .where(eq(jobSourcedCandidates.id, existing.id));
+                }
+              },
+            );
+            if (!committed.committed) {
+              const latestRun = await db.query.jobSourcingRuns.findFirst({
+                where: eq(jobSourcingRuns.id, run.id),
+                columns: { meta: true },
+              });
+              const decision = latestRun
+                ? decideSignalCallbackExecution(
+                    callbackExecution,
+                    readSignalExecution(latestRun.meta),
+                  )
+                : {
+                    action: 'retry' as const,
+                    reason:
+                      'Flow sourcing run disappeared before partial callback commit',
+                  };
+              await finishNonCurrentCallback(
+                claims.jti,
+                decision.action === 'accept'
+                  ? {
+                      action: 'retry',
+                      reason:
+                        'Flow sourcing execution changed before partial callback commit',
+                    }
+                  : decision,
+                res,
+              );
+              return;
             }
 
             broadcastSourcingUpdate(run.jobId, {
@@ -230,6 +359,7 @@ export function registerSignalWebhook(app: Express) {
               requestId: payload.requestId,
               externalJobId: run.externalJobId,
               signalTenantId: org.signalTenantId,
+              execution: callbackExecution,
             },
             (candidate, rank) => {
               streamedCount++;
@@ -304,30 +434,74 @@ export function registerSignalWebhook(app: Express) {
         }
         : priorRefreshMeta;
 
-      await db.update(jobSourcingRuns)
+      const callbackMetaPatch = {
+        callbackStatus: payload.status,
+        enrichedCount: payload.enrichedCount,
+        ...(metaPatch ?? {}),
+        ...forcedNotInProgressMetaPatch,
+        ...(finalStatus === 'completed'
+          ? { enrichmentRefresh: enrichmentRefreshMeta }
+          : {}),
+        ...(processError ? { errorCode: 'RESULTS_FETCH_FAILED' } : {}),
+      };
+      const updatedRuns = await db.update(jobSourcingRuns)
         .set({
           status: finalStatus,
           candidateCount: finalCandidateCount,
           completedAt: new Date(),
           errorMessage: payload.error || processError || null,
-          meta: {
-            ...runMeta,
-            callbackStatus: payload.status,
-            enrichedCount: payload.enrichedCount,
-            ...(metaPatch ?? {}),
-            ...forcedNotInProgressMetaPatch,
-            ...(finalStatus === 'completed' ? { enrichmentRefresh: enrichmentRefreshMeta } : {}),
-            ...(processError ? { errorCode: 'RESULTS_FETCH_FAILED' } : {}),
-          },
+          // Merge into the latest JSON instead of replacing it with the copy
+          // read before result sync. This preserves concurrent metadata owned
+          // by the same sourcing execution.
+          meta: sql`COALESCE(${jobSourcingRuns.meta}, '{}'::jsonb) || ${JSON.stringify(callbackMetaPatch)}::jsonb`,
           updatedAt: new Date(),
         })
-        .where(eq(jobSourcingRuns.id, run.id));
+        .where(and(
+          eq(jobSourcingRuns.id, run.id),
+          ...buildSignalExecutionPredicates(callbackExecution),
+          finalStatus === 'failed'
+            ? ne(jobSourcingRuns.status, 'completed')
+            : undefined,
+        ))
+        .returning({ id: jobSourcingRuns.id });
+
+      if (updatedRuns.length !== 1) {
+        const latestRun = await db.query.jobSourcingRuns.findFirst({
+          where: eq(jobSourcingRuns.id, run.id),
+          columns: { meta: true, status: true },
+        });
+        const fallback = latestRun
+          ? decideSignalTerminalCommitFallback(
+              callbackExecution,
+              readSignalExecution(latestRun.meta),
+              latestRun.status,
+            )
+          : {
+              action: 'retry' as const,
+              reason: 'Flow sourcing run disappeared before callback commit',
+            };
+        if (fallback.action === 'acknowledge_completed') {
+          await finalizeWebhookEvent(claims.jti, 'processed');
+          res.status(200).json({
+            success: true,
+            alreadyCompleted: true,
+          });
+          return;
+        }
+        await finishNonCurrentCallback(
+          claims.jti,
+          fallback,
+          res,
+        );
+        return;
+      }
 
       // 11. Finalize webhook event
       await finalizeWebhookEvent(claims.jti, finalStatus === 'failed' ? 'failed' : 'processed', processError);
 
       broadcastSourcingUpdate(run.jobId, { status: finalStatus, candidateCount: finalCandidateCount });
-      res.json({ success: true });
+      const acknowledgement = getSignalCallbackAcknowledgement(processError);
+      res.status(acknowledgement.status).json(acknowledgement.body);
     } catch (error: any) {
       console.error('Signal webhook error:', error);
       // Unstick claimed event so retries aren't blocked

@@ -409,11 +409,29 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       });
 
       if (existingByRequestId) {
-        if (req.body.forceSourcing) {
+        if (
+          req.body.forceSourcing ||
+          req.body.refresh ||
+          signalResponse.retried
+        ) {
+          const existingMeta =
+            existingByRequestId.meta &&
+            typeof existingByRequestId.meta === 'object'
+              ? (existingByRequestId.meta as Record<string, unknown>)
+              : {};
           await db.update(jobSourcingRuns)
             .set({
               status: 'submitted',
               candidateCount: 0,
+              meta: {
+                ...existingMeta,
+                signalExecution: {
+                  acquisitionGeneration:
+                    signalResponse.acquisitionGeneration ?? null,
+                  executionAttemptId:
+                    signalResponse.executionAttemptId ?? null,
+                },
+              },
               updatedAt: new Date()
             })
             .where(eq(jobSourcingRuns.id, existingByRequestId.id));
@@ -451,7 +469,15 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           callbackUrl,
           expiresAt,
           submittedAt: new Date(),
-          meta: { requestedLocation: job.location },
+          meta: {
+            requestedLocation: job.location,
+            signalExecution: {
+              acquisitionGeneration:
+                signalResponse.acquisitionGeneration ?? null,
+              executionAttemptId:
+                signalResponse.executionAttemptId ?? null,
+            },
+          },
         });
       } catch (insertError: any) {
         // 23505 = unique_violation — concurrent request already inserted this requestId

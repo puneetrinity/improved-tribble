@@ -5,6 +5,8 @@ import type {
   SignalResultCandidateV3,
   SignalResultsResponse,
 } from './signal-contracts';
+import type { SignalExecutionIdentity } from './signal-callback-ack';
+import { commitIfSignalExecutionCurrent } from './signal-execution-fence';
 
 const ENRICHED_STATUSES = new Set(['completed', 'enriched']);
 const PENDING_STATUSES = new Set(['pending', 'queued']);
@@ -49,6 +51,7 @@ export interface SyncSignalResultsParams {
   requestId: string;
   externalJobId: string;
   signalTenantId: string;
+  execution?: SignalExecutionIdentity;
 }
 
 export interface SyncSignalResultsResult {
@@ -150,6 +153,7 @@ export async function upsertSignalCandidates(
   requestId: string,
   candidates: SignalResultCandidateV3[],
   onCandidateUpserted?: (candidate: SignalResultCandidateV3, rank: number) => void,
+  execution?: SignalExecutionIdentity,
 ): Promise<number> {
   if (candidates.length === 0) return 0;
 
@@ -235,7 +239,18 @@ export async function upsertSignalCandidates(
       updated_at = NOW()
   `;
 
-  await db.execute(bulkSql);
+  if (execution) {
+    const committed = await commitIfSignalExecutionCurrent(
+      requestId,
+      execution,
+      (transaction) => transaction.execute(bulkSql),
+    );
+    if (!committed.committed) {
+      throw new Error('Sourcing execution was superseded before candidate sync');
+    }
+  } else {
+    await db.execute(bulkSql);
+  }
 
 
   // Fire per-candidate callbacks after the batch
@@ -277,6 +292,7 @@ export async function syncSignalResultsIntoVanta(
       params.requestId,
       candidates,
       onCandidateUpserted,
+      params.execution,
     );
     candidateCount = candidates.length;
   }
