@@ -7,6 +7,7 @@ import type { PipelineProgressState, EnrichmentCandidateEvent } from "@/componen
 import { INITIAL_PROGRESS } from "@/components/sourcing/SourcingProgressModal";
 
 export type MatchTier = "best_matches" | "broader_pool";
+export type MatchStrength = "strong" | "good" | "possible";
 export type LocationMatchType = "city_exact" | "city_alias" | "country_only" | "unknown_location" | "none";
 
 export interface SourcedCandidateForUI {
@@ -43,6 +44,7 @@ export interface SourcedCandidateForUI {
     linkedinLocale: string | null;
   };
 
+  matchStrength: MatchStrength | null;
   matchTier?: MatchTier | null;
   locationMatchType?: LocationMatchType | null;
   dataConfidence?: "high" | "medium" | "low" | null;
