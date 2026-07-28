@@ -25,6 +25,8 @@ import {
 import { getEmailService } from '../simpleEmailService';
 import { generateColdOutreachDraft, isAIEnabled } from '../aiJobAnalyzer';
 import { flattenCandidateForUI } from './services/signal-contracts';
+import { revalidateCandidateContact } from './contactResolutionProcessor';
+import { deliverWithRevalidatedContact } from './contactSendGuard';
 
 const DAYS_BETWEEN_ROUNDS = 3;
 const MAX_CAMPAIGN_ROUNDS = 3;
@@ -144,9 +146,9 @@ async function fireScheduledCampaign(scheduled: typeof scheduledOutreachCampaign
   // Fetch organization
   const org = await db.query.organizations.findFirst({
     where: eq(organizations.id, organizationId),
-    columns: { id: true, name: true },
+    columns: { id: true, name: true, signalTenantId: true },
   });
-  if (!org) { await markStatus('cancelled'); return; }
+  if (!org || !org.signalTenantId) { await markStatus('cancelled'); return; }
 
   // Fetch recruiter (the one who originally started campaign 1)
   const recruiter = await db.query.users.findFirst({
@@ -209,6 +211,7 @@ async function fireScheduledCampaign(scheduled: typeof scheduledOutreachCampaign
   let failed = 0;
 
   for (const candidate of candidates) {
+    let recipientEmail: string | null = null;
     try {
       // Generate AI draft
       const draft = await generateColdOutreachDraft({
@@ -233,14 +236,34 @@ async function fireScheduledCampaign(scheduled: typeof scheduledOutreachCampaign
       const finalHtml = buildOutreachHtml(normalizedBody, publicJobUrl, recruiterName, recruiterEmail, org.name);
       const finalText = buildOutreachText(normalizedBody, publicJobUrl, recruiterName, recruiterEmail, org.name);
 
-      const sendResult = await emailService.sendEmail({
-        to: candidate.foundEmail!,
-        subject: draft.subject,
-        text: finalText,
-        html: finalHtml,
+      const delivery = await deliverWithRevalidatedContact({
+        candidateId: candidate.id,
+        organizationId,
+        jobId,
+        signalTenantId: org.signalTenantId,
+        signalCandidateId: candidate.signalCandidateId ?? '',
+        externalJobId: `vanta:jobs:${jobId}`,
+        attempts: candidate.emailResolveAttempts ?? 0,
+      }, {
+        revalidate: revalidateCandidateContact,
+        deliver: async (email) => {
+          recipientEmail = email;
+          const sendResult = await emailService.sendEmail({
+            to: email,
+            subject: draft.subject,
+            text: finalText,
+            html: finalHtml,
+          });
+          if (!sendResult) {
+            throw new Error('Email delivery failed');
+          }
+          return sendResult;
+        },
       });
-
-      if (!sendResult) throw new Error('Email delivery failed');
+      if (delivery.status === 'skipped') {
+        failed++;
+        continue;
+      }
 
       // Log success
       await db.insert(sourcedCandidateOutreachLog).values({
@@ -249,7 +272,7 @@ async function fireScheduledCampaign(scheduled: typeof scheduledOutreachCampaign
         sourcedCandidateId: candidate.id,
         campaignId,
         campaignRound,
-        recipientEmail: candidate.foundEmail!,
+        recipientEmail,
         recipientName: getCandidateName(candidate),
         subject: draft.subject,
         body: finalText,
@@ -279,24 +302,26 @@ async function fireScheduledCampaign(scheduled: typeof scheduledOutreachCampaign
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       console.error(`[OutreachScheduler] Failed to send to candidate ${candidate.id}:`, errorMessage);
 
-      await db.insert(sourcedCandidateOutreachLog).values({
-        organizationId,
-        jobId,
-        sourcedCandidateId: candidate.id,
-        campaignId,
-        campaignRound,
-        recipientEmail: candidate.foundEmail!,
-        recipientName: getCandidateName(candidate),
-        subject: `Auto campaign round ${campaignRound}`,
-        body: '',
-        bodyHtml: null,
-        aiDraftBody: null,
-        aiDraftSubject: null,
-        wasEdited: false,
-        status: 'failed',
-        errorMessage,
-        sentBy: triggeredBy,
-      });
+      if (recipientEmail) {
+        await db.insert(sourcedCandidateOutreachLog).values({
+          organizationId,
+          jobId,
+          sourcedCandidateId: candidate.id,
+          campaignId,
+          campaignRound,
+          recipientEmail,
+          recipientName: getCandidateName(candidate),
+          subject: `Auto campaign round ${campaignRound}`,
+          body: '',
+          bodyHtml: null,
+          aiDraftBody: null,
+          aiDraftSubject: null,
+          wasEdited: false,
+          status: 'failed',
+          errorMessage,
+          sentBy: triggeredBy,
+        });
+      }
 
       await db.update(jobSourcedCandidates)
         .set({ lastOutreachAt: new Date(), lastOutreachStatus: 'failed', updatedAt: new Date() })
@@ -339,12 +364,16 @@ async function runSchedulerTick(): Promise<void> {
 
     for (const scheduled of due) {
       // Mark in-progress immediately to avoid duplicate processing on overlap
-      await db.update(scheduledOutreachCampaigns)
+      const claimed = await db.update(scheduledOutreachCampaigns)
         .set({ status: 'sending' } as any)
         .where(and(
           eq(scheduledOutreachCampaigns.id, scheduled.id),
           eq(scheduledOutreachCampaigns.status, 'pending'),
-        ));
+        ))
+        .returning({ id: scheduledOutreachCampaigns.id });
+      if (claimed.length === 0) {
+        continue;
+      }
 
       await fireScheduledCampaign(scheduled).catch((err) => {
         console.error(`[OutreachScheduler] Uncaught error for scheduled id ${scheduled.id}:`, err);

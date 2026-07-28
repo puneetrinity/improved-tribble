@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
 import { useFindContact } from "@/hooks/use-sourcing";
+import { selectDisplayCandidateEmails } from "@shared/contactResolution";
 import {
   fitBadgePresentation,
   tierLabel,
@@ -115,6 +116,12 @@ export function CandidateDrawer({
   const c = candidate;
   const isShortlisted = c.state === "shortlisted";
   const isHidden = c.state === "hidden";
+  const displayedEmails = selectDisplayCandidateEmails({
+    candidateState: c.state,
+    status: c.emailResolveStatus,
+    foundEmails: c.foundEmails,
+    foundEmail: c.foundEmail,
+  });
   const signals = candidate.cardSignals;
   const aiSummary = candidate.aiSummary;
 
@@ -343,26 +350,48 @@ export function CandidateDrawer({
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[10px] text-muted-foreground uppercase font-bold">Email Address</p>
-                  {(c.crustdata as any)?.emails?.length > 0 ? (
+                  {!isShortlisted ? (
+                    <div className="mt-1">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Shortlist required
+                      </span>
+                    </div>
+                  ) : displayedEmails.length > 0 ? (
                     <div className="mt-1 flex flex-col gap-1">
-                      {(c.crustdata as any).emails.map((email: string, i: number) => (
+                      {displayedEmails.map((email: string, i: number) => (
                         <div key={i} className="flex items-center gap-1.5 text-xs font-medium text-foreground bg-muted/50 px-2 py-1 rounded w-fit">
                           {email}
-                          <Badge variant="outline" className="h-4 px-1 text-[9px] bg-green-50 text-green-700 border-green-200 ml-1">Verified</Badge>
+                          <Badge variant="outline" className="h-4 px-1 text-[9px] bg-green-50 text-green-700 border-green-200 ml-1">Found</Badge>
                         </div>
                       ))}
                     </div>
                   ) : (
                     <div className="mt-1">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 text-xs font-semibold px-3"
-                        disabled={contactPending}
-                        onClick={() => findContact({ candidateId: c.id, jobId: c.jobId })}
-                      >
-                        {contactPending ? "Finding..." : "Find Personal Email"}
-                      </Button>
+                      {c.emailResolveStatus === "suppressed" ? (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Email suppressed
+                        </span>
+                      ) : c.emailResolveStatus === "not_found" ? (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          No email found
+                        </span>
+                      ) : c.emailResolveStatus === "failed" ? (
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Contact lookup unavailable
+                        </span>
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-xs font-semibold px-3"
+                          disabled={contactPending || c.emailResolveStatus === "pending"}
+                          onClick={() => findContact({ candidateId: c.id, jobId: c.jobId })}
+                        >
+                          {contactPending || c.emailResolveStatus === "pending"
+                            ? "Finding..."
+                            : "Find Personal Email"}
+                        </Button>
+                      )}
                     </div>
                   )}
                 </div>

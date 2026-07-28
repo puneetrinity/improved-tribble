@@ -3,7 +3,7 @@ import { computeTotalExperienceYears } from "@/lib/sourcing-experience";
 import { Button } from "@/components/ui/button";
 import {
   Star, MapPin, Building, Briefcase, CheckCircle2,
-  Mail, Phone, Github, Twitter, Linkedin, Sparkles, Loader2, RotateCw,
+  Mail, Phone, Github, Twitter, Linkedin, Sparkles, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
@@ -28,8 +28,6 @@ interface CandidateCardProps {
   shortlistMode?: boolean;
   emailRevealed?: boolean;
   onToggleRevealEmail?: () => void;
-  onRetryEmailLookup?: () => void;
-  isRetryingEmail?: boolean;
 }
 
 function maskEmail(email: string | null): string {
@@ -104,8 +102,6 @@ export function CandidateCard({
   shortlistMode = false,
   emailRevealed = false,
   onToggleRevealEmail,
-  onRetryEmailLookup,
-  isRetryingEmail = false,
 }: CandidateCardProps) {
   const isShortlisted = candidate.state === "shortlisted";
   const isHidden = candidate.state === "hidden";
@@ -326,26 +322,15 @@ export function CandidateCard({
                     </Button>
                   </>
                 )}
+                {candidate.emailResolveStatus === "suppressed" && (
+                  <span className="font-medium text-amber-900">Email suppressed</span>
+                )}
                 {(candidate.emailResolveStatus === "not_found" || candidate.emailResolveStatus === "failed") && (
-                  <>
-                    <span className="font-medium text-amber-900">
-                      {candidate.emailResolveStatus === "failed" ? "Lookup failed" : "No email found"}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={isRetryingEmail}
-                      className="h-6 px-2 text-[11px] text-amber-800 hover:bg-amber-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onRetryEmailLookup?.();
-                      }}
-                    >
-                      {isRetryingEmail ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCw className="h-3.5 w-3.5 mr-1" />}
-                      Retry
-                    </Button>
-                  </>
+                  <span className="font-medium text-amber-900">
+                    {candidate.emailResolveStatus === "failed"
+                      ? "Contact lookup unavailable"
+                      : "No email found"}
+                  </span>
                 )}
                 {!candidate.emailResolveStatus && (
                   <span className="font-medium text-amber-800">Email status unavailable</span>

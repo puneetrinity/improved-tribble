@@ -12,7 +12,6 @@ import {
   useSourcingStatus,
   useSourcedCandidates,
   useFindCandidates,
-  useFindContact,
   useDraftOutreach,
   useSendOutreach,
   useOutreachHistory,
@@ -174,7 +173,6 @@ export default function JobSourcingPage() {
   const { data: candidatesData, isLoading: candidatesLoading } = useSourcedCandidates(jobId);
   const { trigger: findCandidatesBase, isPending: findPending } = useFindCandidates(jobId);
   const { update: updateState, isPending: updatePending } = useUpdateCandidateState(jobId);
-  const { findContact, isPending: contactLookupPending } = useFindContact();
   const { draftOutreach, isPending: draftingOutreach } = useDraftOutreach(jobId);
   const { sendOutreach, isPending: sendingOutreach } = useSendOutreach(jobId);
   const { data: outreachHistory } = useOutreachHistory(jobId);
@@ -423,9 +421,17 @@ export default function JobSourcingPage() {
   };
 
   const handleShortlistToggle = (c: SourcedCandidateForUI) => {
+    const nextState = c.state === "shortlisted" ? "new" : "shortlisted";
+    if (nextState !== "shortlisted") {
+      setRevealedEmails((current) => {
+        const next = { ...current };
+        delete next[c.id];
+        return next;
+      });
+    }
     updateState({
       candidateId: c.id,
-      state: c.state === "shortlisted" ? "new" : "shortlisted",
+      state: nextState,
       candidateSnapshot: c,
     });
   };
@@ -469,11 +475,6 @@ export default function JobSourcingPage() {
               onToggleRevealEmail={() =>
                 setRevealedEmails((current) => ({ ...current, [c.id]: !current[c.id] }))
               }
-              onRetryEmailLookup={() => {
-                if (!jobId) return;
-                findContact({ candidateId: c.id, jobId });
-              }}
-              isRetryingEmail={contactLookupPending}
               {...(pos != null ? { displayPosition: pos } : {})}
             />
           );
@@ -865,7 +866,16 @@ export default function JobSourcingPage() {
         candidate={liveSelected}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        onUpdateState={(candidateId, state) => updateState({ candidateId, state })}
+        onUpdateState={(candidateId, state) => {
+          if (state !== "shortlisted") {
+            setRevealedEmails((current) => {
+              const next = { ...current };
+              delete next[candidateId];
+              return next;
+            });
+          }
+          updateState({ candidateId, state });
+        }}
         isUpdating={updatePending}
       />
 

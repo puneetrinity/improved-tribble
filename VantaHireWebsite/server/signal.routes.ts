@@ -14,7 +14,16 @@ import { requireRole } from './auth';
 import { requireSeat } from './auth';
 import { getUserOrganization, requireSignalTenantId } from './lib/organizationService';
 import { queueMauticSourcingRunSync } from './lib/mauticService';
-import { sourceJob, enrichBatch, findContact } from './lib/services/signal-client';
+import { sourceJob, enrichBatch } from './lib/services/signal-client';
+import {
+  enqueueCandidateContactResolution,
+  revalidateCandidateContact,
+  wakeContactResolutionProcessor,
+} from './lib/contactResolutionProcessor';
+import {
+  planManualContactResolution,
+  planShortlistContactTransition,
+} from './lib/contactResolutionCore';
 import {
   CONTEXT_HASH_VERSION,
   toDisplayBucket,
@@ -30,75 +39,6 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { resolveActiveKGTenantId } from './lib/activekgTenant';
-
-type ContactResolutionStatus = 'pending' | 'resolved' | 'not_found' | 'failed';
-
-function normalizeResolvedEmails(emails: unknown): string[] {
-  if (!Array.isArray(emails)) {
-    return [];
-  }
-
-  const normalized = emails
-    .filter((email): email is string => typeof email === 'string')
-    .map((email) => email.trim())
-    .filter(Boolean);
-
-  return Array.from(new Set(normalized));
-}
-
-async function persistResolvedCandidateContact(
-  candidateId: number,
-  emails: string[],
-  status: 'resolved' | 'not_found',
-): Promise<void> {
-  await db
-    .update(jobSourcedCandidates)
-    .set({
-      foundEmail: emails[0] ?? null,
-      foundEmails: emails,
-      emailResolvedAt: new Date(),
-      emailResolveStatus: status,
-      updatedAt: new Date(),
-    })
-    .where(eq(jobSourcedCandidates.id, candidateId));
-}
-
-async function markCandidateContactResolutionFailed(candidateId: number): Promise<void> {
-  await db
-    .update(jobSourcedCandidates)
-    .set({
-      emailResolveStatus: 'failed',
-      emailResolvedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(eq(jobSourcedCandidates.id, candidateId));
-}
-
-async function resolveCandidateContactAsync(params: {
-  candidateId: number;
-  signalCandidateId: string;
-  signalTenantId: string;
-}): Promise<void> {
-  const { candidateId, signalCandidateId, signalTenantId } = params;
-
-  try {
-    const response = await findContact(signalTenantId, signalCandidateId);
-    const emails = normalizeResolvedEmails(response.emails);
-    await persistResolvedCandidateContact(
-      candidateId,
-      emails,
-      emails.length > 0 ? 'resolved' : 'not_found',
-    );
-  } catch (error) {
-    console.error('[SOURCING] Failed to resolve candidate contact (non-blocking):', {
-      candidateId,
-      signalCandidateId,
-      error: error instanceof Error ? error.message : error,
-    });
-
-    await markCandidateContactResolutionFailed(candidateId);
-  }
-}
 
 function normalizeSkillList(skills: unknown): string[] {
   if (!Array.isArray(skills)) {
@@ -1049,20 +989,86 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
 
-      const shouldStartEmailResolution =
-        newState === 'shortlisted'
-        && !candidate.foundEmail
-        && candidate.emailResolveStatus !== 'resolved'
-        && candidate.emailResolveStatus !== 'pending';
+      const shouldStartEmailResolution = await db.transaction(async (tx: typeof db) => {
+        // Re-read under a row lock. A concurrent manual lookup or worker may
+        // have leased, resolved, or suppressed the contact after the route's
+        // initial authorization read; that current state must win.
+        const lockedResult = await tx.execute(sql`
+          SELECT email_resolve_status, signal_candidate_id
+          FROM job_sourced_candidates
+          WHERE id = ${candidateId}
+            AND job_id = ${jobId}
+            AND organization_id = ${organizationId}
+          FOR UPDATE
+        `);
+        const locked = lockedResult.rows?.[0] as {
+          email_resolve_status?: unknown;
+          signal_candidate_id?: unknown;
+        } | undefined;
+        if (!locked) {
+          throw new Error('Candidate disappeared during state transition');
+        }
 
-      await db
-        .update(jobSourcedCandidates)
-        .set({
-          state: newState,
-          ...(shouldStartEmailResolution ? { emailResolveStatus: 'pending' as ContactResolutionStatus } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(jobSourcedCandidates.id, candidateId));
+        const currentEmailStatus = typeof locked.email_resolve_status === 'string'
+          ? locked.email_resolve_status
+          : null;
+        const currentSignalCandidateId = typeof locked.signal_candidate_id === 'string'
+          ? locked.signal_candidate_id
+          : '';
+        const contactTransition = planShortlistContactTransition({
+          targetState: newState,
+          emailResolveStatus: currentEmailStatus,
+          signalTenantId,
+          signalCandidateId: currentSignalCandidateId,
+        });
+        const shouldStart = contactTransition.action === 'enqueue';
+        const shouldCancelPending = contactTransition.action === 'cancel_pending';
+        const emailResolutionBlocker = contactTransition.action === 'fail'
+          ? contactTransition.errorCode
+          : null;
+
+        await tx
+          .update(jobSourcedCandidates)
+          .set({
+            state: newState,
+            ...(shouldStart ? {
+              foundEmail: null,
+              foundEmails: [],
+              emailResolveStatus: 'pending',
+              emailResolveAttempts: 0,
+              emailResolveNextAttemptAt: new Date(),
+              emailResolveLeaseToken: null,
+              emailResolveLeaseExpiresAt: null,
+              emailResolveLastErrorCode: null,
+              emailResolvedAt: null,
+            } : {}),
+            ...(shouldCancelPending ? {
+              foundEmail: null,
+              foundEmails: [],
+              emailResolveStatus: null,
+              emailResolveAttempts: 0,
+              emailResolveNextAttemptAt: null,
+              emailResolveLeaseToken: null,
+              emailResolveLeaseExpiresAt: null,
+              emailResolveLastErrorCode: null,
+              emailResolvedAt: null,
+            } : {}),
+            ...(emailResolutionBlocker ? {
+              foundEmail: null,
+              foundEmails: [],
+              emailResolveStatus: 'failed',
+              emailResolveNextAttemptAt: null,
+              emailResolveLeaseToken: null,
+              emailResolveLeaseExpiresAt: null,
+              emailResolveLastErrorCode: emailResolutionBlocker,
+              emailResolvedAt: new Date(),
+            } : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(jobSourcedCandidates.id, candidateId));
+
+        return shouldStart;
+      });
 
       // Feedback capture (non-blocking, best-effort)
       if (process.env.FEEDBACK_CAPTURE_ENABLED === 'true'
@@ -1140,12 +1146,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       res.json({ success: true, id: candidate.id, state: newState });
 
-      if (shouldStartEmailResolution && signalTenantId && candidate.signalCandidateId) {
-        void resolveCandidateContactAsync({
-          candidateId: candidate.id,
-          signalCandidateId: candidate.signalCandidateId,
-          signalTenantId,
-        });
+      if (shouldStartEmailResolution) {
+        wakeContactResolutionProcessor();
       }
     } catch (error) {
       next(error);
@@ -1197,7 +1199,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
     }
   });
 
-  app.post('/api/candidates/:candidateId/find-contact', requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  app.post('/api/candidates/:candidateId/find-contact', csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const candidateId = parseInt(req.params.candidateId || '', 10);
       if (isNaN(candidateId)) {
@@ -1221,6 +1223,34 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
 
+      const contactPlan = planManualContactResolution({
+        candidateState: candidate.state,
+        emailResolveStatus: candidate.emailResolveStatus,
+        foundEmail: candidate.foundEmail,
+        foundEmails: candidate.foundEmails,
+        lastErrorCode: candidate.emailResolveLastErrorCode,
+      });
+      if (contactPlan.action === 'reject_not_shortlisted') {
+        res.status(409).json({
+          success: false,
+          state: 'failed',
+          error: 'Candidate must be shortlisted before contact lookup',
+        });
+        return;
+      }
+      if (contactPlan.action === 'return') {
+        if (contactPlan.state === 'pending') {
+          wakeContactResolutionProcessor();
+        }
+        res.status(contactPlan.status).json({
+          success: contactPlan.status < 400,
+          state: contactPlan.state,
+          emails: contactPlan.emails,
+          ...('code' in contactPlan ? { code: contactPlan.code } : {}),
+        });
+        return;
+      }
+
       const { signalTenantId } = contextResult.context;
       if (!signalTenantId) {
         res.status(500).json({ error: 'Tenant ID is missing' });
@@ -1231,49 +1261,51 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         res.status(400).json({ error: 'Candidate has no signal ID' });
         return;
       }
-      await db
-        .update(jobSourcedCandidates)
-        .set({
-          emailResolveStatus: 'pending',
-          updatedAt: new Date(),
-        })
-        .where(eq(jobSourcedCandidates.id, candidateId));
-
-      const response = await findContact(signalTenantId, signalCandidateId);
-      const emails = normalizeResolvedEmails(response.emails);
-      await persistResolvedCandidateContact(
-        candidateId,
-        emails,
-        emails.length > 0 ? 'resolved' : 'not_found',
-      );
-
-      // Also persist the found emails onto the candidate profile so the
-      // CandidateDrawer (which reads crustdata.emails) shows them after refresh.
-      if (emails.length > 0) {
-        const cs = (candidate.candidateSummary as any) || {};
-        if (!cs.candidate) cs.candidate = {};
-        if (!cs.candidate.searchMeta) cs.candidate.searchMeta = {};
-        if (!cs.candidate.searchMeta.crustdata) cs.candidate.searchMeta.crustdata = {};
-        if (!cs.candidate.searchMeta.crustdata.contact) cs.candidate.searchMeta.crustdata.contact = {};
-
-        cs.candidate.searchMeta.crustdata.contact.has_personal_email = true;
-        cs.candidate.searchMeta.crustdata.emails = emails;
-
-        await db.update(jobSourcedCandidates)
-          .set({ candidateSummary: cs })
-          .where(eq(jobSourcedCandidates.id, candidateId));
-      }
-
-      res.json(response);
-    } catch (error) {
-      const candidateId = parseInt(req.params.candidateId || '', 10);
-      if (!isNaN(candidateId)) {
-        try {
-          await markCandidateContactResolutionFailed(candidateId);
-        } catch (persistError) {
-          console.error('[SOURCING] Failed to persist contact lookup failure:', persistError);
+      if (contactPlan.action === 'revalidate') {
+        const result = await revalidateCandidateContact({
+          candidateId,
+          organizationId: contextResult.context.organizationId,
+          jobId: candidate.jobId,
+          signalTenantId,
+          signalCandidateId,
+          externalJobId: `vanta:jobs:${candidate.jobId}`,
+          attempts: candidate.emailResolveAttempts ?? 0,
+        });
+        if (!result.persisted) {
+          res.status(409).json({
+            success: false,
+            state: 'failed',
+            emails: [],
+            code: 'candidate_no_longer_shortlisted',
+          });
+          return;
         }
+        res.status(result.state === 'pending' ? 202 : result.state === 'failed' ? 409 : 200).json({
+          success: result.state !== 'failed',
+          state: result.state,
+          emails: result.state === 'found' ? result.emails : [],
+          ...(result.errorCode ? { code: result.errorCode } : {}),
+        });
+        return;
       }
+      const queued = await enqueueCandidateContactResolution(candidateId);
+      if (!queued) {
+        res.status(409).json({
+          success: false,
+          state: 'failed',
+          emails: [],
+          code: 'candidate_no_longer_shortlisted',
+        });
+        return;
+      }
+
+      wakeContactResolutionProcessor();
+      res.status(202).json({
+        success: true,
+        state: 'pending',
+        emails: [],
+      });
+    } catch (error) {
       next(error);
     }
   });

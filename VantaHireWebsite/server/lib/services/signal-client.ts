@@ -12,6 +12,7 @@ import {
   type SignalSourceResponse,
   type SignalResultsResponse,
 } from './signal-contracts';
+import type { ContactResolutionResponse } from '../contactResolutionCore';
 
 function getBaseUrl(): string {
   const url = process.env.SIGNAL_BASE_URL;
@@ -40,6 +41,7 @@ async function signalFetch(
     scopes: string;
     requestId?: string;
     body?: unknown;
+    timeoutMs?: number;
   },
 ): Promise<Response> {
   const token = await signServiceJwt('signal', {
@@ -55,6 +57,7 @@ async function signalFetch(
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
     },
+    ...(opts.timeoutMs ? { signal: AbortSignal.timeout(opts.timeoutMs) } : {}),
     ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
   });
 
@@ -198,16 +201,56 @@ export async function enrichBatch(
 /**
  * POST /api/v3/candidates/{externalCandidateId}/find-contact
  */
+export function normalizeContactResolutionResponse(
+  body: any,
+  httpStatus: number,
+): ContactResolutionResponse {
+  const emails = Array.isArray(body.emails)
+    ? body.emails.filter((email: unknown): email is string => typeof email === 'string')
+    : [];
+  const responseState = body.state;
+  const state = httpStatus === 202
+    ? 'pending'
+    : responseState === 'found'
+      || responseState === 'suppressed'
+      || responseState === 'not_found'
+      || responseState === 'pending'
+      ? responseState
+      : emails.length > 0
+        ? 'found'
+        : 'not_found';
+
+  return {
+    success: typeof body.success === 'boolean' ? body.success : state !== 'pending',
+    state,
+    emails,
+  };
+}
+
+function getContactResolutionTimeoutMs(): number {
+  const parsed = Number.parseInt(
+    process.env.CONTACT_RESOLUTION_SIGNAL_TIMEOUT_MS || '',
+    10,
+  );
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 90_000;
+}
+
 export async function findContact(
   tenantId: string,
   externalCandidateId: string,
-): Promise<{ emails: string[], success: boolean }> {
+  externalJobId: string,
+): Promise<ContactResolutionResponse> {
   const res = await signalFetch(
     `/api/v3/candidates/${encodeURIComponent(externalCandidateId)}/find-contact`,
     {
       method: 'POST',
       tenantId,
-      scopes: SIGNAL_SCOPES.SOURCE,
+      scopes: SIGNAL_SCOPES.CONTACT,
+      timeoutMs: getContactResolutionTimeoutMs(),
+      body: {
+        trigger: 'shortlist',
+        jobId: externalJobId,
+      },
     },
   );
 
@@ -221,5 +264,5 @@ export async function findContact(
     );
   }
 
-  return body;
+  return normalizeContactResolutionResponse(body, res.status);
 }

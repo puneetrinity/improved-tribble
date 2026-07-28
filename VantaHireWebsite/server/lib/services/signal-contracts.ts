@@ -316,7 +316,7 @@ export interface SourcedCandidateForUI {
   foundEmail: string | null;
   foundEmails: string[] | null;
   emailResolvedAt: string | null;
-  emailResolveStatus: 'pending' | 'resolved' | 'not_found' | 'failed' | null;
+  emailResolveStatus: 'pending' | 'resolved' | 'suppressed' | 'not_found' | 'failed' | null;
   outreachCount: number;
   lastOutreachRound: number | null;
   lastOutreachCampaignId: string | null;
@@ -516,6 +516,42 @@ function extractSearchSignals(cs: Record<string, unknown>): SourcedCandidateForU
   };
 }
 
+const EMAIL_TEXT_PATTERN = /[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi;
+const PHONE_TEXT_PATTERN =
+  /(?:\+\d[\d().\s-]{5,}\d|\(\d{2,4}\)[\s.-]\d{3,4}[\s.-]\d{3,4}|\b\d{2,4}[\s.-]\d{3,4}[\s.-]\d{3,4}\b|\b\d{5}[\s.-]\d{5}\b|\b\d{9,15}\b)/g;
+
+function redactContactEvidence(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value
+      .map(redactContactEvidence)
+      .filter((item) => item !== undefined);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([key]) => {
+          const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return !(
+            normalized.includes('email')
+            || normalized.includes('phone')
+            || normalized.includes('mobile')
+            || normalized.includes('contact')
+          );
+        })
+        .map(([key, item]) => [key, redactContactEvidence(item)]),
+    );
+  }
+
+  if (typeof value === 'string') {
+    return value
+      .replace(EMAIL_TEXT_PATTERN, '[suppressed]')
+      .replace(PHONE_TEXT_PATTERN, '[suppressed]');
+  }
+
+  return value;
+}
+
 /** Map a DB row to the flat UI shape. Null-safe throughout. */
 export function flattenCandidateForUI(row: {
   id: number;
@@ -538,10 +574,27 @@ export function flattenCandidateForUI(row: {
   lastSyncedAt: Date | string | null;
   createdAt: Date | string | null;
 }): SourcedCandidateForUI {
-  const cs: Record<string, unknown> =
+  const rawCandidateSummary: Record<string, unknown> =
     row.candidateSummary && typeof row.candidateSummary === 'object'
       ? (row.candidateSummary as Record<string, unknown>)
       : {};
+  const candidateState = (['new', 'shortlisted', 'hidden', 'converted'].includes(row.state)
+    ? row.state
+    : 'new') as SourcedCandidateForUI['state'];
+  const contactVisible = candidateState === 'shortlisted';
+  const contactResolved = contactVisible && row.emailResolveStatus === 'resolved';
+  const contactStatus = contactVisible && (
+    row.emailResolveStatus === 'pending'
+    || row.emailResolveStatus === 'resolved'
+    || row.emailResolveStatus === 'suppressed'
+    || row.emailResolveStatus === 'not_found'
+    || row.emailResolveStatus === 'failed'
+  )
+    ? row.emailResolveStatus
+    : null;
+  // Legacy Signal code copied provider emails into candidateSummary/searchMeta.
+  // That blob is not qualified contact evidence and must never be an API lane.
+  const cs = redactContactEvidence(rawCandidateSummary) as Record<string, unknown>;
 
   const identitySummary = extractIdentitySummary(cs);
   const snapshot = extractSnapshot(cs);
@@ -563,20 +616,15 @@ export function flattenCandidateForUI(row: {
       : null),
     sourceType: (row.sourceType as SignalSourceType) || 'discovered',
     displayBucket: toDisplayBucket((row.sourceType as SignalSourceType) || 'discovered'),
-    state: (['new', 'shortlisted', 'hidden', 'converted'].includes(row.state)
-      ? row.state
-      : 'new') as SourcedCandidateForUI['state'],
-    foundEmail: safeString(row.foundEmail),
-    foundEmails: Array.isArray(row.foundEmails)
-      ? row.foundEmails.filter((email): email is string => typeof email === 'string')
-      : null,
-    emailResolvedAt: safeString(row.emailResolvedAt),
-    emailResolveStatus: (row.emailResolveStatus === 'pending'
-      || row.emailResolveStatus === 'resolved'
-      || row.emailResolveStatus === 'not_found'
-      || row.emailResolveStatus === 'failed'
-      ? row.emailResolveStatus
-      : null) as SourcedCandidateForUI['emailResolveStatus'],
+    state: candidateState,
+    foundEmail: contactResolved ? safeString(row.foundEmail) : null,
+    foundEmails: contactResolved
+      ? Array.isArray(row.foundEmails)
+        ? row.foundEmails.filter((email): email is string => typeof email === 'string')
+        : null
+      : [],
+    emailResolvedAt: contactVisible ? safeString(row.emailResolvedAt) : null,
+    emailResolveStatus: contactStatus as SourcedCandidateForUI['emailResolveStatus'],
     outreachCount: typeof row.outreachCount === 'number' ? row.outreachCount : 0,
     lastOutreachRound: typeof row.lastOutreachRound === 'number' ? row.lastOutreachRound : null,
     lastOutreachCampaignId: safeString(row.lastOutreachCampaignId),
@@ -601,15 +649,15 @@ export function flattenCandidateForUI(row: {
     experienceScore: safeNumber(cs.experienceScore) ?? safeNumber((row.fitBreakdown as any)?.experienceScore),
 
     cardSignals: (cs.cardSignals && typeof cs.cardSignals === 'object') ? {
-      email: safeString((cs.cardSignals as any).email),
-      phone: safeString((cs.cardSignals as any).phone),
+      email: contactResolved ? safeString(row.foundEmail) : null,
+      phone: null,
       github: safeString((cs.cardSignals as any).github),
       twitter: safeString((cs.cardSignals as any).twitter),
       skillsTopN: Array.isArray((cs.cardSignals as any).skillsTopN) ? (cs.cardSignals as any).skillsTopN : [],
       activeSeeker: Boolean((cs.cardSignals as any).activeSeeker),
       summaryShort: safeString((cs.cardSignals as any).summaryShort),
-      emailAvailable: Boolean((cs.cardSignals as any).emailAvailable),
-      phoneAvailable: Boolean((cs.cardSignals as any).phoneAvailable),
+      emailAvailable: contactResolved && Boolean(row.foundEmail),
+      phoneAvailable: false,
     } : null,
 
     identitySummary,
@@ -633,7 +681,7 @@ export function flattenCandidateForUI(row: {
     locationLabel: safeString(cs.locationLabel),
     locationConfidenceNumeric: safeNumber(cs.locationConfidence),
 
-    candidateSummary: row.candidateSummary,
+    candidateSummary: cs,
 
     lastSyncedAt: row.lastSyncedAt instanceof Date ? row.lastSyncedAt.toISOString() : (row.lastSyncedAt ?? null),
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : (row.createdAt ?? null),
@@ -650,4 +698,5 @@ export const SIGNAL_SCOPES = {
   RESULTS: 'jobs:results',
   ENRICH_BATCH: 'enrich:batch',
   PDL_CONTACT: 'pdl:contact',
+  CONTACT: 'contact:write',
 } as const;
