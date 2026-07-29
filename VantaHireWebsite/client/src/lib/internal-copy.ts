@@ -1358,12 +1358,12 @@ export const candidateDashboardCopy = {
   header: {
     titlePrimary: "Candidate",
     titleSecondary: "Dashboard",
-    subtitle: "Manage your profile and track your job applications with AI-powered insights",
+    subtitle: "Manage your profile, resumes, saved jobs, and application status",
   },
   alerts: {
     fitUnavailable: "AI-powered job fit scoring is currently unavailable. You can still view and manage your applications.",
     resumeUnavailable: "AI resume advisor is currently unavailable. Standard resume uploads are still available.",
-    fitComputations: "Free AI Fit Computations",
+    fitComputations: "AI Match Credits",
   },
 } as const;
 

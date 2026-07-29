@@ -49,6 +49,7 @@ vi.mock('../auth', () => ({
   requireAuth: (_req: any, _res: any, next: any) => next(),
   requireRole: () => (_req: any, _res: any, next: any) => next(),
   requireSeat: () => (_req: any, _res: any, next: any) => next(),
+  requireVerifiedCandidate: (_req: any, _res: any, next: any) => next(),
 }));
 
 vi.mock('../storage', () => ({

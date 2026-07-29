@@ -1,6 +1,7 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { fetchWithCsrf } from "./csrf";
 import { captureFrontendException, shouldCaptureClientError } from "@/lib/monitoring";
+import { isUserScopedQueryPath } from "@/lib/candidate-query-keys";
 
 // Rate limit info returned from 429 responses
 export interface RateLimitInfo {
@@ -202,3 +203,9 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+export function clearUserScopedQueryCache(): void {
+  queryClient.removeQueries({
+    predicate: (query) => isUserScopedQueryPath(query.queryKey[0]),
+  });
+}

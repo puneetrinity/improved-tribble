@@ -17,7 +17,7 @@ import { sql, eq, and, inArray, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
 import { storage } from './storage';
-import { requireAuth, requireRole, requireSeat } from './auth';
+import { requireAuth, requireRole, requireSeat, requireVerifiedCandidate } from './auth';
 import { getUserOrganization } from './lib/organizationService';
 import { calculateAiCost } from './lib/aiMatchingEngine';
 import { syncProfileCompletionStatus } from './lib/profileCompletion';
@@ -35,6 +35,8 @@ import {
   candidateResumes,
   userAiUsage,
   applicationFeedback,
+  type Application,
+  type Job,
 } from '@shared/schema';
 import { uploadToGCS, getSignedDownloadUrl, downloadFromGCS } from './gcs-storage';
 import {
@@ -60,6 +62,34 @@ import { pickInitialPipelineStage } from './lib/pipelineStageSelection';
 
 // Base URL for email links
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+
+function toCandidateApplicationView(application: Application & { job: Job }) {
+  return {
+    id: application.id,
+    jobId: application.jobId,
+    status: application.status,
+    coverLetter: application.coverLetter,
+    appliedAt: application.appliedAt,
+    updatedAt: application.updatedAt,
+    aiFitScore: application.aiFitScore,
+    aiFitLabel: application.aiFitLabel,
+    aiFitReasons: application.aiFitReasons,
+    aiComputedAt: application.aiComputedAt,
+    aiStaleReason: application.aiStaleReason,
+    job: {
+      id: application.job.id,
+      title: application.job.title,
+      location: application.job.location,
+      type: application.job.type,
+      description: application.job.description,
+      skills: application.job.skills,
+      deadline: application.job.deadline,
+      createdAt: application.job.createdAt,
+      isActive: application.job.isActive,
+      expiresAt: application.job.expiresAt,
+    },
+  };
+}
 
 // Validation schemas
 const updateStageSchema = z.object({
@@ -183,13 +213,101 @@ export function registerApplicationsRoutes(
         return;
       }
 
-      if (!req.file) {
-        res.status(400).json({ error: 'Resume file is required' });
+      if (job.expiresAt && new Date(job.expiresAt) < new Date()) {
+        res.status(400).json({ error: 'This job is no longer accepting applications' });
         return;
       }
 
-      // Validate application data
-      const applicationData = insertApplicationSchema.parse(req.body);
+      const rawResumeId = req.body?.resumeId;
+      const hasStoredResume =
+        rawResumeId !== undefined &&
+        rawResumeId !== null &&
+        String(rawResumeId).trim() !== '';
+      const hasUploadedResume = Boolean(req.file);
+
+      if (hasUploadedResume === hasStoredResume) {
+        res.status(400).json({
+          error: 'Choose exactly one resume',
+          message: 'Upload a resume or select one from your saved resumes, but not both.',
+        });
+        return;
+      }
+
+      let requestedResumeId: number | null = null;
+      if (hasStoredResume) {
+        const normalizedResumeId = String(rawResumeId).trim();
+        if (!/^\d+$/.test(normalizedResumeId)) {
+          res.status(400).json({ error: 'Invalid resume ID' });
+          return;
+        }
+        requestedResumeId = Number(normalizedResumeId);
+        if (!Number.isSafeInteger(requestedResumeId) || requestedResumeId <= 0) {
+          res.status(400).json({ error: 'Invalid resume ID' });
+          return;
+        }
+      }
+
+      const verifiedCandidate =
+        req.user?.role === 'candidate' && req.user.emailVerified === true
+          ? req.user
+          : null;
+
+      if (requestedResumeId !== null && !verifiedCandidate) {
+        const unverifiedCandidate = req.user?.role === 'candidate' && !req.user.emailVerified;
+        res.status(403).json({
+          error: unverifiedCandidate
+            ? 'Please verify your email before using a saved resume'
+            : 'Sign in as a verified candidate to use a saved resume',
+          code: unverifiedCandidate ? 'EMAIL_NOT_VERIFIED' : 'CANDIDATE_AUTH_REQUIRED',
+        });
+        return;
+      }
+
+      let submittedName = req.body?.name;
+      let submittedEmail = req.body?.email;
+      if (verifiedCandidate) {
+        submittedEmail = verifiedCandidate.username.trim().toLowerCase();
+        const accountName = [verifiedCandidate.firstName, verifiedCandidate.lastName]
+          .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+          .map(part => part.trim())
+          .join(' ') || verifiedCandidate.username.split('@')[0] || 'Candidate';
+        submittedName = accountName.slice(0, 50);
+      }
+
+      // This is an applicant-owned allowlist. Recruiter-only workflow fields never
+      // cross the public route boundary.
+      const applicationData = insertApplicationSchema.parse({
+        name: submittedName,
+        email: submittedEmail,
+        phone: req.body?.phone,
+        coverLetter: req.body?.coverLetter,
+        whatsappConsent: req.body?.whatsappConsent,
+      });
+
+      let resumeUrl = '';
+      let resumeRecordId: number | null = null;
+      let resumeCountForCompletion: number | null = null;
+      let extractedResumeText: string | null = null;
+      let resumeFilename: string | null = null;
+
+      if (requestedResumeId !== null && verifiedCandidate) {
+        const storedResume = await db.query.candidateResumes.findFirst({
+          where: and(
+            eq(candidateResumes.id, requestedResumeId),
+            eq(candidateResumes.userId, verifiedCandidate.id)
+          ),
+        });
+
+        if (!storedResume) {
+          res.status(404).json({ error: 'Saved resume not found' });
+          return;
+        }
+
+        resumeUrl = storedResume.gcsPath;
+        resumeRecordId = storedResume.id;
+        extractedResumeText = storedResume.extractedText;
+        resumeFilename = storedResume.label;
+      }
 
       // Duplicate detection (case-insensitive email check)
       const existingApp = await db.query.applications.findFirst({
@@ -211,12 +329,9 @@ export function registerApplicationsRoutes(
       // Increment apply click count for analytics (after duplicate check)
       await storage.incrementApplyClicks(jobId);
 
-      // Upload resume to Google Cloud Storage
-      let resumeUrl = '';
-      let resumeRecordId: number | null = null;
-      let resumeCountForCompletion: number | null = null;
-      let extractedResumeText: string | null = null;
+      // Upload a new resume only when the application did not select a saved one.
       if (req.file) {
+        resumeFilename = req.file.originalname ?? null;
         try {
           resumeUrl = await uploadToGCS(req.file.buffer, req.file.originalname);
         } catch (error) {
@@ -244,11 +359,11 @@ export function registerApplicationsRoutes(
       }
 
       // If candidate is authenticated, persist resume + extracted text for AI
-      if (req.user?.id && req.file?.buffer) {
+      if (verifiedCandidate && req.file?.buffer) {
         try {
           // Enforce soft limit of 3 resumes like resume upload endpoint
           const existingResumes = await db.query.candidateResumes.findMany({
-            where: eq(candidateResumes.userId, req.user.id),
+            where: eq(candidateResumes.userId, verifiedCandidate.id),
             columns: { id: true, isDefault: true },
           });
           resumeCountForCompletion = existingResumes.length;
@@ -259,7 +374,7 @@ export function registerApplicationsRoutes(
             const [resume] = await db
               .insert(candidateResumes)
               .values({
-                userId: req.user.id,
+                userId: verifiedCandidate.id,
                 label: req.file.originalname || 'Uploaded Resume',
                 gcsPath: resumeUrl,
                 extractedText: extractedResumeText,
@@ -291,12 +406,13 @@ export function registerApplicationsRoutes(
       // Create application record (with optional initial stage assignment)
       const application = await storage.createApplication({
         ...applicationData,
+        status: 'submitted',
         jobId,
         resumeUrl,
-        resumeFilename: req.file?.originalname ?? null,
+        resumeFilename,
         ...(resumeRecordId !== null && { resumeId: resumeRecordId }),
         ...(extractedResumeText && { extractedResumeText }),
-        ...(req.user?.id !== undefined && { userId: req.user.id }),
+        ...(verifiedCandidate && { userId: verifiedCandidate.id }),
         ...(initialStageId !== null && {
           currentStage: initialStageId,
           stageChangedAt: now,
@@ -312,8 +428,8 @@ export function registerApplicationsRoutes(
         appliedAt: application.appliedAt ?? now,
       });
 
-      if (req.user?.id && resumeCountForCompletion !== null) {
-        await syncProfileCompletionStatus(req.user, { resumeCount: resumeCountForCompletion });
+      if (verifiedCandidate && resumeCountForCompletion !== null) {
+        await syncProfileCompletionStatus(verifiedCandidate, { resumeCount: resumeCountForCompletion });
       }
 
       // Log initial stage assignment to history table (if a default stage was applied)
@@ -2541,35 +2657,39 @@ export function registerApplicationsRoutes(
   // Note: Profile routes (GET/POST/PATCH /api/profile) are in profile.routes.ts
 
   // Get user's applications (bound to userId, with email fallback for unclaimed applications)
-  app.get("/api/my-applications", requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      // Pass user's email to also find unclaimed applications that match by email
-      const applicationsList = await storage.getApplicationsByUserId(req.user!.id, req.user!.username);
+  app.get(
+    "/api/my-applications",
+    requireVerifiedCandidate,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        // Pass user's email to also find unclaimed applications that match by email
+        const applicationsList = await storage.getApplicationsByUserId(req.user!.id, req.user!.username);
 
-      // Claim-on-read: if any applications were found by email but not yet claimed, claim them now
-      // This ensures subsequent actions (withdraw, etc.) work properly
-      const unclaimedIds = applicationsList
-        .filter(app => app.userId === null || app.userId === undefined)
-        .map(app => app.id);
+        // Claim-on-read: if any applications were found by email but not yet claimed, claim them now
+        // This ensures subsequent actions (withdraw, etc.) work properly
+        const unclaimedIds = applicationsList
+          .filter(app => app.userId === null || app.userId === undefined)
+          .map(app => app.id);
 
-      if (unclaimedIds.length > 0) {
-        await db
-          .update(applications)
-          .set({ userId: req.user!.id })
-          .where(
-            and(
-              inArray(applications.id, unclaimedIds),
-              sql`${applications.userId} IS NULL`
-            )
-          );
+        if (unclaimedIds.length > 0) {
+          await db
+            .update(applications)
+            .set({ userId: req.user!.id })
+            .where(
+              and(
+                inArray(applications.id, unclaimedIds),
+                sql`${applications.userId} IS NULL`
+              )
+            );
+        }
+
+        res.json(applicationsList.map(toCandidateApplicationView));
+        return;
+      } catch (error) {
+        next(error);
       }
-
-      res.json(applicationsList);
-      return;
-    } catch (error) {
-      next(error);
     }
-  });
+  );
 
   // Get applications received for recruiter's jobs
   app.get("/api/my-applications-received", requireRole(['recruiter', 'super_admin']), requireSeat({ allowNoOrg: true }), async (req: Request, res: Response, next: NextFunction): Promise<void> => {

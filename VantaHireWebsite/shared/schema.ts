@@ -106,6 +106,19 @@ export const jobs = pgTable("jobs", {
   deactivatedAtIdx: index("jobs_deactivated_at_idx").on(table.deactivatedAt),
 }));
 
+export const savedJobs = pgTable("saved_jobs", {
+  id: serial("id").primaryKey(),
+  candidateId: integer("candidate_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  candidateJobUniqueIdx: uniqueIndex("saved_jobs_candidate_job_unique_idx")
+    .on(table.candidateId, table.jobId),
+  candidateCreatedAtIdx: index("saved_jobs_candidate_created_at_idx")
+    .on(table.candidateId, table.createdAt),
+  jobIdIdx: index("saved_jobs_job_id_idx").on(table.jobId),
+}));
+
 export const userProfiles = pgTable("user_profiles", {
   id: serial("id").primaryKey(),
   userId: integer("user_id").notNull().references(() => users.id),
@@ -1241,6 +1254,7 @@ export const resumeImportItems = pgTable("resume_import_items", {
 export const usersRelations = relations(users, ({ many, one }) => ({
   jobs: many(jobs),
   reviewedJobs: many(jobs, { relationName: "reviewedJobs" }),
+  savedJobs: many(savedJobs),
   mauticContactLinks: many(mauticContactLinks),
   sourcedCandidateOutreachCampaigns: many(sourcedCandidateOutreachCampaigns),
   sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
@@ -1277,6 +1291,7 @@ export const jobsRelations = relations(jobs, ({ one, many }) => ({
     references: [clients.id],
   }),
   applications: many(applications),
+  savedByCandidates: many(savedJobs),
   analytics: one(jobAnalytics, {
     fields: [jobs.id],
     references: [jobAnalytics.jobId],
@@ -1286,6 +1301,17 @@ export const jobsRelations = relations(jobs, ({ one, many }) => ({
   sourcedCandidates: many(jobSourcedCandidates),
   sourcedCandidateOutreachCampaigns: many(sourcedCandidateOutreachCampaigns),
   sourcedCandidateOutreachLogs: many(sourcedCandidateOutreachLog),
+}));
+
+export const savedJobsRelations = relations(savedJobs, ({ one }) => ({
+  candidate: one(users, {
+    fields: [savedJobs.candidateId],
+    references: [users.id],
+  }),
+  job: one(jobs, {
+    fields: [savedJobs.jobId],
+    references: [jobs.id],
+  }),
 }));
 
 export const applicationsRelations = relations(applications, ({ one, many }) => ({
@@ -2030,15 +2056,11 @@ export const insertApplicationSchema = createInsertSchema(applications).pick({
   email: true,
   phone: true,
   coverLetter: true,
-  status: true,
-  notes: true,
 }).extend({
   name: z.string().min(1).max(50),
   email: z.string().email(),
   phone: z.string().regex(/^\d{10}$/, "Please enter exactly 10 digits for your phone number"),
   coverLetter: z.string().max(2000).optional(),
-  status: z.enum(["submitted", "reviewed", "shortlisted", "rejected"]).optional(),
-  notes: z.string().max(1000).optional(),
   whatsappConsent: z.preprocess(
     (val) => val === 'true' || val === true,
     z.boolean()
@@ -2117,6 +2139,9 @@ export type ContactSubmission = typeof contactSubmissions.$inferSelect;
 
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
+
+export type SavedJob = typeof savedJobs.$inferSelect;
+export type InsertSavedJob = typeof savedJobs.$inferInsert;
 
 export type InsertApplication = z.infer<typeof insertApplicationSchema>;
 export type RecruiterAddApplication = z.infer<typeof recruiterAddApplicationSchema>;

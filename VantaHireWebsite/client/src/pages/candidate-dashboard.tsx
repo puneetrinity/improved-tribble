@@ -3,13 +3,11 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { useAIFeatures } from "@/hooks/use-ai-features";
 import { useAsyncFitScoring } from "@/hooks/use-async-fit-scoring";
-import { Redirect, Link } from "wouter";
+import { Redirect, Link, useLocation, useSearch } from "wouter";
 import { 
   User, 
   MapPin, 
   Calendar, 
-  Eye, 
-  Download, 
   Trash2, 
   Edit3, 
   Save, 
@@ -19,17 +17,17 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  UserCheck,
   Linkedin,
   Mail,
-  Phone,
   Star,
   Target,
   AlertCircle,
   Sparkles,
   Brain,
   Upload,
-  Loader2
+  Loader2,
+  Bookmark,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,26 +38,45 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { UserProfile, Application, Job } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { type User as AuthUser, UserProfile } from "@shared/schema";
+import { apiRequest, isApiError, queryClient } from "@/lib/queryClient";
 import { fetchWithCsrf } from "@/lib/csrf";
-import Layout from "@/components/Layout";
 import { KpiCard } from "@/components/dashboards/KpiCard";
 import { CandidateTimeline } from "@/components/dashboards/CandidateTimeline";
 import { ProfileCompletionBanner } from "@/components/ProfileCompletionBanner";
 import { candidateDashboardCopy } from "@/lib/internal-copy";
-
-type ApplicationWithJob = Application & {
-  job: Job;
-  stageName?: string | null;
-  stageOrder?: number | null;
-};
+import HomepageNav from "@/components/HomepageNav";
+import HomepageFooter from "@/components/HomepageFooter";
+import GridOverlay from "@/components/GridOverlay";
+import { CandidateJobStatusBadge } from "@/components/candidate/CandidateJobStatusBadge";
+import { candidatePrivateQueryKey } from "@/lib/candidate-query-keys";
+import {
+  candidateApplicationsQueryKey,
+  candidateResumesQueryKey,
+  useCandidateJobState,
+  type CandidateApplicationSummary,
+} from "@/hooks/use-candidate-job-state";
 
 export default function CandidateDashboard() {
   const { user } = useAuth();
+
+  if (!user || user.role !== "candidate" || !user.emailVerified) {
+    return <Redirect to="/candidate-auth" />;
+  }
+
+  return <CandidateDashboardContent key={user.id} user={user} />;
+}
+
+function CandidateDashboardContent({ user }: { user: AuthUser }) {
   const { toast } = useToast();
+  const [, navigate] = useLocation();
+  const search = useSearch();
   const { fitScoring, resumeAdvisor, queueEnabled } = useAIFeatures();
-  const asyncFit = useAsyncFitScoring({ queueEnabled });
+  const asyncFit = useAsyncFitScoring({
+    queueEnabled,
+    candidateId: user.id,
+  });
+  const candidateJobState = useCandidateJobState();
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileData, setProfileData] = useState({
     bio: "",
@@ -74,14 +91,9 @@ export default function CandidateDashboard() {
   const [uploadingResume, setUploadingResume] = useState(false);
   const MAX_RESUME_SIZE = 5 * 1024 * 1024; // 5MB client-side guard
 
-  // Redirect if not authenticated - candidates go to candidate auth page
-  if (!user) {
-    return <Redirect to="/candidate-auth" />;
-  }
-
   // API returns { user, profile } structure - extract the profile part
   const { data: profileResponse, isLoading: profileLoading } = useQuery<{ user: any; profile: UserProfile } | null>({
-    queryKey: ["/api/profile"],
+    queryKey: candidatePrivateQueryKey("/api/profile", user.id),
     queryFn: async () => {
       const response = await fetch("/api/profile");
       if (!response.ok) throw new Error("Failed to fetch profile");
@@ -90,29 +102,22 @@ export default function CandidateDashboard() {
   });
   const profile = profileResponse?.profile ?? null;
 
-  const { data: applications, isLoading: applicationsLoading } = useQuery<ApplicationWithJob[]>({
-    queryKey: ["/api/my-applications"],
-    queryFn: async () => {
-      const response = await fetch("/api/my-applications");
-      if (!response.ok) throw new Error("Failed to fetch applications");
-      return response.json();
-    },
-  });
-
-  const { data: resumes, isLoading: resumesLoading } = useQuery<any[]>({
-    queryKey: ["/api/ai/resume"],
-    queryFn: async () => {
-      const response = await fetch("/api/ai/resume");
-      if (!response.ok) throw new Error("Failed to fetch resumes");
-      const data = await response.json();
-      // Server returns { resumes: [...] }
-      return data?.resumes ?? [];
-    },
-    enabled: resumeAdvisor,
-  });
+  const {
+    applications,
+    savedJobs,
+    resumes,
+    unsaveJob,
+    savingJobId,
+    applicationsQuery,
+    savedJobsQuery,
+    resumesQuery,
+  } = candidateJobState;
+  const applicationsLoading = applicationsQuery.isLoading;
+  const savedJobsLoading = savedJobsQuery.isLoading;
+  const resumesLoading = resumesQuery.isLoading;
 
   const { data: aiLimits } = useQuery<any>({
-    queryKey: ["/api/ai/limits"],
+    queryKey: candidatePrivateQueryKey("/api/ai/limits", user.id),
     queryFn: async () => {
       const response = await fetch("/api/ai/limits");
       if (!response.ok) throw new Error("Failed to fetch AI limits");
@@ -152,7 +157,7 @@ export default function CandidateDashboard() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-applications"] });
+      queryClient.invalidateQueries({ queryKey: candidateApplicationsQueryKey });
       toast({
         title: "Application withdrawn",
         description: "Your application has been withdrawn successfully.",
@@ -173,7 +178,7 @@ export default function CandidateDashboard() {
       return await res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-applications"] });
+      queryClient.invalidateQueries({ queryKey: candidateApplicationsQueryKey });
       queryClient.invalidateQueries({ queryKey: ["/api/ai/limits"] });
 
       const isCached = data?.fit?.cached === true;
@@ -185,11 +190,13 @@ export default function CandidateDashboard() {
       });
     },
     onError: (error: Error) => {
-      // Check if it's a 429 rate limit error
+      const isQuotaExceeded = isApiError(error) && error.code === "QUOTA_EXCEEDED";
       const is429 = error.message.includes("429");
       toast({
-        title: is429 ? "Rate limit exceeded" : "Computation failed",
-        description: is429
+        title: isQuotaExceeded ? "No match credits remaining" : is429 ? "Rate limit exceeded" : "Computation failed",
+        description: isQuotaExceeded
+          ? "Your 10 monthly match credits have been used. Existing match results remain available."
+          : is429
           ? "Please try again in a minute."
           : error.message,
         variant: "destructive",
@@ -203,7 +210,7 @@ export default function CandidateDashboard() {
       return await res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-applications"] });
+      queryClient.invalidateQueries({ queryKey: candidateApplicationsQueryKey });
       queryClient.invalidateQueries({ queryKey: ["/api/ai/limits"] });
 
       const cached = data.summary?.cached || 0;
@@ -214,10 +221,13 @@ export default function CandidateDashboard() {
       });
     },
     onError: (error: Error) => {
+      const isQuotaExceeded = isApiError(error) && error.code === "QUOTA_EXCEEDED";
       const is429 = error.message.includes("429");
       toast({
-        title: is429 ? "Rate limit exceeded" : "Batch computation failed",
-        description: is429
+        title: isQuotaExceeded ? "No match credits remaining" : is429 ? "Rate limit exceeded" : "Batch computation failed",
+        description: isQuotaExceeded
+          ? "Your 10 monthly match credits have been used. Existing match results remain available."
+          : is429
           ? "Please try again in a minute."
           : error.message,
         variant: "destructive",
@@ -231,7 +241,7 @@ export default function CandidateDashboard() {
       return await res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/resume"] });
+      queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
       toast({
         title: "Resume deleted",
         description: "Resume has been removed from your library.",
@@ -245,6 +255,22 @@ export default function CandidateDashboard() {
       });
     },
   });
+
+  const handleUnsaveJob = async (jobId: number) => {
+    try {
+      await unsaveJob(jobId);
+      toast({
+        title: "Job removed",
+        description: "The job was removed from your saved list.",
+      });
+    } catch (error) {
+      toast({
+        title: "Could not remove job",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const handleEditProfile = () => {
     setProfileData({
@@ -283,26 +309,6 @@ export default function CandidateDashboard() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      submitted: { color: "bg-info/20 text-info", icon: Clock, label: "Submitted" },
-      reviewed: { color: "bg-warning/20 text-warning", icon: Eye, label: "Under Review" },
-      shortlisted: { color: "bg-success/20 text-success", icon: UserCheck, label: "Shortlisted" },
-      rejected: { color: "bg-destructive/20 text-destructive", icon: XCircle, label: "Rejected" },
-      downloaded: { color: "bg-primary/20 text-primary", icon: Download, label: "Resume Downloaded" },
-    };
-    
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.submitted;
-    const Icon = config.icon;
-    
-    return (
-      <Badge variant="secondary" className={config.color}>
-        <Icon className="w-3 h-3 mr-1" />
-        {config.label}
-      </Badge>
-    );
-  };
-
   const formatDate = (dateString: string | Date) => {
     const date = typeof dateString === 'string' ? new Date(dateString) : dateString;
     return date.toLocaleDateString('en-US', {
@@ -324,6 +330,13 @@ export default function CandidateDashboard() {
   };
 
   const stats = getApplicationStats();
+  const hasMatchCredits = !fitScoring || !aiLimits || aiLimits.fitRemainingThisMonth > 0;
+  const requestedTab = new URLSearchParams(search).get("tab");
+  const activeTab = ["profile", "applications", "saved", "resumes"].includes(
+    requestedTab ?? "",
+  )
+    ? requestedTab!
+    : "profile";
 
   // Prepare timeline data
   const timelineApplications = useMemo(() => {
@@ -334,7 +347,6 @@ export default function CandidateDashboard() {
       jobLocation: app.job.location,
       appliedAt: app.appliedAt,
       status: app.status,
-      stageName: app.stageName ?? null,
     }));
   }, [applications]);
 
@@ -454,7 +466,7 @@ export default function CandidateDashboard() {
         throw new Error(friendly || `${response.status} ${response.statusText}`);
       }
 
-      queryClient.invalidateQueries({ queryKey: ["/api/ai/resume"] });
+      queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
       toast({
         title: "Resume uploaded",
         description: "Your resume has been added to the library.",
@@ -479,7 +491,7 @@ export default function CandidateDashboard() {
     deleteResumeMutation.mutate(resumeId);
   };
 
-  const ApplicationCard = ({ application }: { application: ApplicationWithJob }) => (
+  const ApplicationCard = ({ application }: { application: CandidateApplicationSummary }) => (
     <Card className="mb-4 border-border">
       <CardHeader>
         <div className="flex items-start justify-between">
@@ -503,7 +515,7 @@ export default function CandidateDashboard() {
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {getStatusBadge(application.status)}
+            <CandidateJobStatusBadge application={application} />
             {getFitBadge(application.aiFitScore, application.aiFitLabel)}
           </div>
         </div>
@@ -552,28 +564,12 @@ export default function CandidateDashboard() {
           </div>
         )}
 
-        {application.notes && (
-          <div className="mb-3 p-3 bg-info/10 rounded-lg border-l-4 border-info">
-            <Label className="text-info font-medium text-sm">Recruiter Feedback</Label>
-            <p className="text-muted-foreground text-sm mt-1">{application.notes}</p>
-          </div>
-        )}
-
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            {application.lastViewedAt && (
-              <span>Viewed: {formatDate(application.lastViewedAt)}</span>
-            )}
-            {application.downloadedAt && (
-              <span>Resume Downloaded: {formatDate(application.downloadedAt)}</span>
-            )}
-          </div>
-
+        <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
             {fitScoring && (!application.aiFitScore || application.aiStaleReason) && (
               <Button
                 onClick={() => handleComputeFit(application.id)}
-                disabled={computeFitMutation.isPending || asyncFit.isEnqueueingInteractive || asyncFit.isProcessing}
+                disabled={!hasMatchCredits || computeFitMutation.isPending || asyncFit.isEnqueueingInteractive || asyncFit.isProcessing}
                 variant="outline"
                 size="sm"
                 className="border-primary/30 text-primary hover:bg-primary/10"
@@ -583,7 +579,7 @@ export default function CandidateDashboard() {
                 ) : (
                   <Sparkles className="w-4 h-4 mr-2" />
                 )}
-                {application.aiStaleReason ? 'Recompute' : 'Compute'} Fit
+                {!hasMatchCredits ? 'No match credits' : `${application.aiStaleReason ? 'Recompute' : 'Compute'} Fit`}
               </Button>
             )}
             {application.status === 'submitted' && (
@@ -605,32 +601,47 @@ export default function CandidateDashboard() {
 
   if (profileLoading || applicationsLoading) {
     return (
-      <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-            <p className="text-foreground mt-4">Loading dashboard...</p>
-          </div>
+      <div className="public-theme min-h-screen bg-e-bg text-e-text">
+        <GridOverlay />
+        <div className="relative z-10 min-h-screen">
+          <HomepageNav audience="candidate" />
+          <main className="container mx-auto px-4 pb-16 pt-28">
+            <div className="text-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-e-blue mx-auto"></div>
+              <p className="text-e-text2 mt-4">Loading dashboard...</p>
+            </div>
+          </main>
+          <HomepageFooter audience="candidate" />
         </div>
-      </Layout>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div>
-        <div className="container mx-auto px-4 py-8">
+    <div className="public-theme min-h-screen bg-e-bg text-e-text">
+      <GridOverlay />
+      <div className="relative z-10 min-h-screen">
+        <HomepageNav audience="candidate" />
+        <main className="container mx-auto px-4 pb-20 pt-28">
           <div className="max-w-6xl mx-auto">
-            <div className="mb-8">
-              <div className="flex items-center gap-3 mb-2">
-                <Target className="h-7 w-7 text-primary" />
-                <h1 className="text-3xl font-bold text-foreground">
-                  {candidateDashboardCopy.header.titlePrimary} {candidateDashboardCopy.header.titleSecondary}
-                </h1>
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <Target className="h-7 w-7 text-e-blue" />
+                  <h1 className="text-3xl font-bold text-e-text">
+                    {candidateDashboardCopy.header.titlePrimary} {candidateDashboardCopy.header.titleSecondary}
+                  </h1>
+                </div>
+                <p className="text-e-text2 max-w-2xl">
+                  {candidateDashboardCopy.header.subtitle}
+                </p>
               </div>
-              <p className="text-muted-foreground max-w-2xl">
-                {candidateDashboardCopy.header.subtitle}
-              </p>
+              <Link href="/jobs">
+                <Button className="bg-e-blue text-white hover:brightness-110">
+                  <Briefcase className="mr-2 h-4 w-4" />
+                  Browse Jobs
+                </Button>
+              </Link>
             </div>
 
             {/* Profile Completion Banner */}
@@ -729,10 +740,15 @@ export default function CandidateDashboard() {
           </div>
 
           {/* Main Content */}
-          <Tabs defaultValue="profile" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+          <Tabs
+            value={activeTab}
+            onValueChange={(tab) => navigate(`/my-dashboard?tab=${tab}`)}
+            className="w-full"
+          >
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-4">
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="applications">My Applications ({stats.total})</TabsTrigger>
+              <TabsTrigger value="saved">Saved ({savedJobs.length})</TabsTrigger>
               <TabsTrigger value="resumes">Resume Library</TabsTrigger>
             </TabsList>
 
@@ -958,7 +974,7 @@ export default function CandidateDashboard() {
                       </div>
                       <Button
                         onClick={handleBatchComputeFit}
-                        disabled={batchComputeFitMutation.isPending || asyncFit.isEnqueueingBatch}
+                        disabled={!hasMatchCredits || batchComputeFitMutation.isPending || asyncFit.isEnqueueingBatch}
                         className="bg-primary hover:bg-primary/80"
                       >
                         {(batchComputeFitMutation.isPending || asyncFit.isEnqueueingBatch) ? (
@@ -966,7 +982,7 @@ export default function CandidateDashboard() {
                         ) : (
                           <Sparkles className="w-4 h-4 mr-2" />
                         )}
-                        Compute All Fits
+                        {hasMatchCredits ? "Compute All Fits" : "No match credits"}
                       </Button>
                     </div>
                   )}
@@ -989,6 +1005,95 @@ export default function CandidateDashboard() {
                         Browse Jobs
                       </Button>
                     </Link>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="saved" className="mt-6">
+              {savedJobsLoading ? (
+                <Card className="border-border">
+                  <CardContent className="p-10 text-center">
+                    <Loader2 className="mx-auto h-8 w-8 animate-spin text-e-blue" />
+                    <p className="mt-3 text-muted-foreground">Loading saved jobs...</p>
+                  </CardContent>
+                </Card>
+              ) : savedJobs.length > 0 ? (
+                <div className="space-y-3">
+                  {savedJobs.map((savedJob) => {
+                    const application = applications?.find((item) => item.jobId === savedJob.job.id);
+                    const jobUrl = `/jobs/${savedJob.job.slug || savedJob.job.id}`;
+
+                    return (
+                      <Card key={savedJob.id} className="border-border">
+                        <CardContent className="p-5">
+                          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <Link href={jobUrl} className="text-lg font-semibold text-foreground no-underline hover:text-e-blue">
+                                  {savedJob.job.title}
+                                </Link>
+                                {application ? <CandidateJobStatusBadge application={application} /> : null}
+                                {!savedJob.canApply && !application ? (
+                                  <Badge variant="secondary">Closed</Badge>
+                                ) : null}
+                              </div>
+                              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1.5">
+                                  <MapPin className="h-4 w-4" />
+                                  {savedJob.job.location}
+                                </span>
+                                <span className="flex items-center gap-1.5 capitalize">
+                                  <Briefcase className="h-4 w-4" />
+                                  {savedJob.job.type.replace("-", " ")}
+                                </span>
+                                <span className="flex items-center gap-1.5">
+                                  <Bookmark className="h-4 w-4" />
+                                  Saved {formatDate(savedJob.createdAt)}
+                                </span>
+                              </div>
+                              <p className="mt-3 line-clamp-2 text-sm text-muted-foreground">
+                                {savedJob.job.description}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-wrap gap-2">
+                              <Button asChild variant="outline" size="sm">
+                                <Link href={jobUrl}>
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  View
+                                </Link>
+                              </Button>
+                              {!application && savedJob.canApply ? (
+                                <Button asChild size="sm" className="bg-e-blue text-white hover:brightness-110">
+                                  <Link href={`${jobUrl}?apply=1`}>Apply</Link>
+                                </Button>
+                              ) : null}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleUnsaveJob(savedJob.job.id)}
+                                disabled={savingJobId === savedJob.job.id}
+                                aria-label={`Remove ${savedJob.job.title} from saved jobs`}
+                              >
+                                <Bookmark className="h-4 w-4 fill-current" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Card className="border-border">
+                  <CardContent className="p-10 text-center">
+                    <Bookmark className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+                    <h3 className="mb-2 text-xl font-semibold text-foreground">No Saved Jobs</h3>
+                    <p className="mb-4 text-muted-foreground">Save roles while browsing to keep them here.</p>
+                    <Button asChild className="bg-e-blue text-white hover:brightness-110">
+                      <Link href="/jobs">Browse Jobs</Link>
+                    </Button>
                   </CardContent>
                 </Card>
               )}
@@ -1128,8 +1233,9 @@ export default function CandidateDashboard() {
             </TabsContent>
           </Tabs>
           </div>
-        </div>
+        </main>
+        <HomepageFooter audience="candidate" />
       </div>
-    </Layout>
+    </div>
   );
 }

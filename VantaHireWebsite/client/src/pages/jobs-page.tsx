@@ -8,8 +8,10 @@ import { Job } from "@shared/schema";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
-import { useAIFeatures } from "@/hooks/use-ai-features";
-
+import { useToast } from "@/hooks/use-toast";
+import { useCandidateJobState } from "@/hooks/use-candidate-job-state";
+import { CandidateJobStatusBadge } from "@/components/candidate/CandidateJobStatusBadge";
+import { CandidateSaveButton } from "@/components/candidate/CandidateSaveButton";
 
 const titleCase = (t: string) =>
   t.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
@@ -40,6 +42,8 @@ export default function JobsPage() {
   const searchParams = new URLSearchParams(useSearch());
   const [, setUrlLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const candidateJobState = useCandidateJobState();
 
   const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10));
   const [search, setSearch] = useState(searchParams.get("search") || "");
@@ -48,11 +52,11 @@ export default function JobsPage() {
   const [minSalary, setMinSalary] = useState(searchParams.get("minSalary") || "");
   const [maxSalary, setMaxSalary] = useState(searchParams.get("maxSalary") || "");
   const [salaryPeriod, setSalaryPeriod] = useState(searchParams.get("salaryPeriod") || "per_year");
-  const [sortBy, setSortBy] = useState<string>(searchParams.get("sortBy") || "recent");
+  const initialSort = searchParams.get("sortBy");
+  const [sortBy, setSortBy] = useState<string>(
+    initialSort === "deadline" ? "deadline" : "recent",
+  );
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
-
-  const { resumeAdvisor, fitScoring } = useAIFeatures();
-  const aiEnabled = resumeAdvisor || fitScoring;
 
   // Fetch jobs
   const { data, isLoading, error } = useQuery<JobsResponse>({
@@ -131,6 +135,25 @@ export default function JobsPage() {
         return response.json();
       },
     });
+  };
+
+  const handleToggleSavedJob = async (jobId: number, isSaved: boolean) => {
+    try {
+      if (isSaved) {
+        await candidateJobState.unsaveJob(jobId);
+        toast({ title: "Removed from saved jobs" });
+      } else {
+        await candidateJobState.saveJob(jobId);
+        toast({ title: "Job saved" });
+      }
+    } catch (saveError) {
+      toast({
+        title: isSaved ? "Could not remove saved job" : "Could not save job",
+        description:
+          saveError instanceof Error ? saveError.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const activeFilterCount = useMemo(() => {
@@ -299,7 +322,7 @@ export default function JobsPage() {
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
         <GridOverlay />
         <div className="relative z-10">
-          <HomepageNav />
+          <HomepageNav audience={candidateJobState.isCandidate ? "candidate" : "public"} />
 
           <div className="pt-[60px] min-h-screen overflow-x-clip">
             {/* Header */}
@@ -370,7 +393,6 @@ export default function JobsPage() {
                         >
                           <option value="recent" style={{ backgroundColor: "#111326", color: "#F4F5FA" }}>Most Recent</option>
                           <option value="deadline" style={{ backgroundColor: "#111326", color: "#F4F5FA" }}>Deadline: Soonest</option>
-                          {aiEnabled && <option value="relevant" style={{ backgroundColor: "#111326", color: "#F4F5FA" }}>AI Relevance</option>}
                         </select>
                       </div>
                     </div>
@@ -438,6 +460,10 @@ export default function JobsPage() {
                         <div className="flex flex-col gap-3">
                           {sortedJobs.map((job, i) => {
                             const salaryDisplay = formatSalary(job.salaryMin, job.salaryMax, job.salaryPeriod);
+                            const application =
+                              candidateJobState.applicationByJobId.get(job.id);
+                            const isSaved =
+                              candidateJobState.savedJobByJobId.has(job.id);
                             return (
                               <div
                                 key={job.id}
@@ -473,14 +499,35 @@ export default function JobsPage() {
                                       )}
                                     </div>
                                   </div>
-                                  <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.06em] uppercase bg-[rgba(75,142,240,0.12)] border border-[rgba(75,142,240,0.16)] text-e-blue whitespace-nowrap shrink-0">
-                                    {job.type.replace('-', ' ')}
-                                  </span>
+                                  <div className="flex shrink-0 items-center gap-2">
+                                    {candidateJobState.isVerifiedCandidate ? (
+                                      <CandidateSaveButton
+                                        isSaved={isSaved}
+                                        isPending={
+                                          candidateJobState.savedJobsQuery.isLoading ||
+                                          candidateJobState.savingJobId === job.id
+                                        }
+                                        onToggle={() =>
+                                          void handleToggleSavedJob(job.id, isSaved)
+                                        }
+                                      />
+                                    ) : null}
+                                    <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.06em] uppercase bg-[rgba(75,142,240,0.12)] border border-[rgba(75,142,240,0.16)] text-e-blue whitespace-nowrap">
+                                      {job.type.replace('-', ' ')}
+                                    </span>
+                                  </div>
                                 </div>
 
                                 <p className="text-[0.875rem] text-e-text2 leading-[1.7] mb-4 line-clamp-2">
                                   {job.description.substring(0, 200)}...
                                 </p>
+
+                                {application ? (
+                                  <CandidateJobStatusBadge
+                                    application={application}
+                                    className="mb-4"
+                                  />
+                                ) : null}
 
                                 <div className="flex justify-between items-center max-md:flex-col max-md:items-start max-md:gap-3">
                                   {job.deadline ? (
@@ -540,7 +587,7 @@ export default function JobsPage() {
             </div>
           </div>
 
-          <HomepageFooter />
+          <HomepageFooter audience={candidateJobState.isCandidate ? "candidate" : "public"} />
         </div>
 
         {/* Mobile filter drawer */}

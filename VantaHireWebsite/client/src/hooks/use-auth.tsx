@@ -5,13 +5,19 @@ import {
   UseMutationResult,
 } from "@tanstack/react-query";
 import { User as SelectUser, InsertUser, RegisterPayload } from "@shared/schema";
-import { getQueryFn, apiRequest, queryClient } from "../lib/queryClient";
+import {
+  getQueryFn,
+  apiRequest,
+  clearUserScopedQueryCache,
+  queryClient,
+} from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { captureFrontendException, setMonitoringUser, shouldCaptureClientError } from "@/lib/monitoring";
 
 type RegisterResponse = {
   message: string;
   requiresVerification?: boolean;
+  user?: SelectUser;
 } | SelectUser;
 
 type AuthContextType = {
@@ -29,6 +35,36 @@ type LoginData = Pick<InsertUser, "username" | "password"> & {
 };
 
 export const AuthContext = createContext<AuthContextType | null>(null);
+
+const authQueryKey = ["/api/user"] as const;
+const crossTabAuthSignalStorageKey = "ealana:auth-identity-change";
+const fetchAuthUser = getQueryFn<SelectUser | null>({ on401: "returnNull" });
+
+function publishCrossTabAuthIdentityChange(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      crossTabAuthSignalStorageKey,
+      `${Date.now()}:${Math.random().toString(36).slice(2)}`,
+    );
+  } catch {
+    // Storage can be unavailable in restricted browser contexts.
+  }
+}
+
+function clearCacheForAuthIdentity(nextUser: SelectUser | null): void {
+  const currentUser = queryClient.getQueryData<SelectUser | null>(authQueryKey);
+  if ((currentUser?.id ?? null) !== (nextUser?.id ?? null)) {
+    clearUserScopedQueryCache();
+  }
+}
+
+function setCachedAuthUser(nextUser: SelectUser | null): void {
+  clearCacheForAuthIdentity(nextUser);
+  queryClient.setQueryData(authQueryKey, nextUser);
+  publishCrossTabAuthIdentityChange();
+}
 
 function isPublicSsrPath(pathname: string): boolean {
   return (
@@ -70,9 +106,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
   } = useQuery<SelectUser | null, Error>({
-    queryKey: ["/api/user"],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryKey: authQueryKey,
+    queryFn: async (context) => {
+      const nextUser = await fetchAuthUser(context);
+      clearCacheForAuthIdentity(nextUser);
+      return nextUser;
+    },
     enabled: authQueryEnabled,
+    staleTime: 30_000,
+    refetchOnWindowFocus: "always",
   });
 
   useEffect(() => {
@@ -87,13 +129,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setMonitoringUser(user ? { id: user.id, role: user.role } : null);
   }, [user]);
 
+  useEffect(() => {
+    const handleCrossTabAuthIdentityChange = (event: StorageEvent) => {
+      if (event.key !== crossTabAuthSignalStorageKey) return;
+
+      clearUserScopedQueryCache();
+      queryClient.setQueryData(authQueryKey, null);
+      window.location.reload();
+    };
+
+    window.addEventListener("storage", handleCrossTabAuthIdentityChange);
+    return () => {
+      window.removeEventListener("storage", handleCrossTabAuthIdentityChange);
+    };
+  }, []);
+
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
       const res = await apiRequest("POST", "/api/login", credentials);
       return await res.json();
     },
     onSuccess: (user: SelectUser) => {
-      queryClient.setQueryData(["/api/user"], user);
+      setCachedAuthUser(user);
       toast({
         title: "Login successful",
         description: "Welcome back!",
@@ -129,8 +186,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Don't set user - they need to verify first
         return;
       }
-      // Legacy response (user object) - should not happen with new backend
-      queryClient.setQueryData(["/api/user"], response);
+
+      if ('user' in response && response.user) {
+        setCachedAuthUser(response.user);
+      } else if ('id' in response) {
+        setCachedAuthUser(response);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: authQueryKey });
+        publishCrossTabAuthIdentityChange();
+      }
       toast({
         title: "Registration successful",
         description: "Welcome to ealana!",
@@ -156,7 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("POST", "/api/logout");
     },
     onSuccess: () => {
-      queryClient.setQueryData(["/api/user"], null);
+      setCachedAuthUser(null);
       toast({
         title: "Logged out",
         description: "See you soon!",

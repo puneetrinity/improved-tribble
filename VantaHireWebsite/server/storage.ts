@@ -166,6 +166,7 @@ export interface IStorage {
   createApplication(application: InsertApplication & {
     jobId: number;
     resumeUrl: string;
+    status?: 'submitted';
     resumeFilename?: string | null;
     userId?: number | null;
     extractedResumeText?: string | undefined;
@@ -1428,6 +1429,7 @@ export class DatabaseStorage implements IStorage {
   async createApplication(application: InsertApplication & {
     jobId: number;
     resumeUrl: string;
+    status?: 'submitted';
     resumeFilename?: string | null;
     resumeId?: number | null;
     userId?: number | null;
@@ -1630,27 +1632,13 @@ export class DatabaseStorage implements IStorage {
         id: applications.id,
         jobId: applications.jobId,
         userId: applications.userId,
-        name: applications.name,
-        email: applications.email,
-        phone: applications.phone,
-        resumeUrl: applications.resumeUrl,
-        // AI fit fields for candidate dashboard
         aiFitScore: applications.aiFitScore,
         aiFitLabel: applications.aiFitLabel,
         aiFitReasons: applications.aiFitReasons,
-        aiModelVersion: applications.aiModelVersion,
         aiComputedAt: applications.aiComputedAt,
         aiStaleReason: applications.aiStaleReason,
-        aiDigestVersionUsed: applications.aiDigestVersionUsed,
-        resumeId: applications.resumeId,
         coverLetter: applications.coverLetter,
         status: applications.status,
-        currentStage: applications.currentStage,
-        stageName: pipelineStages.name,
-        stageOrder: pipelineStages.order,
-        notes: applications.notes,
-        lastViewedAt: applications.lastViewedAt,
-        downloadedAt: applications.downloadedAt,
         appliedAt: applications.appliedAt,
         updatedAt: applications.updatedAt,
         job: {
@@ -1661,19 +1649,13 @@ export class DatabaseStorage implements IStorage {
           description: jobs.description,
           skills: jobs.skills,
           deadline: jobs.deadline,
-          postedBy: jobs.postedBy,
           createdAt: jobs.createdAt,
           isActive: jobs.isActive,
-          status: jobs.status,
-          reviewComments: jobs.reviewComments,
           expiresAt: jobs.expiresAt,
-          reviewedBy: jobs.reviewedBy,
-          reviewedAt: jobs.reviewedAt
         }
       })
       .from(applications)
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .leftJoin(pipelineStages, eq(applications.currentStage, pipelineStages.id))
       .where(whereClause)
       .orderBy(desc(applications.appliedAt));
 
@@ -3585,8 +3567,8 @@ export class DatabaseStorage implements IStorage {
     id: number,
     status: 'pending' | 'active' | 'completed' | 'failed' | 'cancelled',
     updates?: {
-      error?: string;
-      errorCode?: string;
+      error?: string | null;
+      errorCode?: string | null;
       result?: any;
       startedAt?: Date;
       completedAt?: Date;

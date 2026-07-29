@@ -2,12 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { candidatePrivateQueryKey } from "@/lib/candidate-query-keys";
 
 interface AiFitJob {
   id: number;
   bullJobId: string;
   queueName: string;
-  userId: number;
   applicationId?: number | null;
   applicationIds?: number[] | null;
   status: string;
@@ -71,19 +71,30 @@ function getErrorMessage(errorCode: string | undefined, error: string, details?:
 interface UseAsyncFitScoringOptions {
   /** Whether the async queue is enabled (from /api/ai/features) */
   queueEnabled: boolean;
+  candidateId: number | null;
 }
 
 /**
  * Hook for async fit scoring with job queue
  */
-export function useAsyncFitScoring({ queueEnabled }: UseAsyncFitScoringOptions) {
+export function useAsyncFitScoring({
+  queueEnabled,
+  candidateId,
+}: UseAsyncFitScoringOptions) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeJobId, setActiveJobId] = useState<number | null>(null);
 
+  useEffect(() => {
+    setActiveJobId(null);
+  }, [candidateId]);
+
   // Fetch existing pending/active jobs on mount (only when queue is enabled)
   const { data: existingJobs, refetch: refetchJobs } = useQuery<{ jobs: AiFitJob[] }>({
-    queryKey: ["/api/ai/match/jobs"],
+    queryKey: candidatePrivateQueryKey(
+      "/api/ai/match/jobs",
+      candidateId,
+    ),
     queryFn: async () => {
       try {
         const res = await apiRequest("GET", "/api/ai/match/jobs");
@@ -93,9 +104,9 @@ export function useAsyncFitScoring({ queueEnabled }: UseAsyncFitScoringOptions) 
         return { jobs: [] };
       }
     },
-    enabled: queueEnabled,
+    enabled: queueEnabled && candidateId !== null,
     staleTime: 10_000,
-    refetchOnWindowFocus: true,
+    refetchOnWindowFocus: false,
   });
 
   // Set active job on mount if there's a pending/active job
@@ -108,11 +119,15 @@ export function useAsyncFitScoring({ queueEnabled }: UseAsyncFitScoringOptions) 
         setActiveJobId(activeJob.id);
       }
     }
-  }, [existingJobs, activeJobId]);
+  }, [existingJobs, activeJobId, candidateId]);
 
   // Poll for job status when there's an active job
   const { data: jobStatus, isLoading: isPolling } = useQuery<AiFitJob>({
-    queryKey: ["/api/ai/match/jobs", activeJobId],
+    queryKey: candidatePrivateQueryKey(
+      "/api/ai/match/jobs",
+      candidateId,
+      activeJobId,
+    ),
     queryFn: async () => {
       if (!activeJobId) throw new Error("No active job");
       const res = await apiRequest("GET", `/api/ai/match/jobs/${activeJobId}`);
@@ -122,7 +137,7 @@ export function useAsyncFitScoring({ queueEnabled }: UseAsyncFitScoringOptions) 
       }
       return await res.json();
     },
-    enabled: !!activeJobId,
+    enabled: candidateId !== null && activeJobId !== null,
     refetchInterval: (query) => {
       const data = query.state.data;
       // Stop polling when job is done

@@ -10,7 +10,7 @@
  */
 
 import type { Express, Request, Response, NextFunction } from 'express';
-import { requireAuth, requireRole, requireSeat } from './auth';
+import { requireAuth, requireRole, requireSeat, requireVerifiedCandidate } from './auth';
 import { doubleCsrfProtection } from './csrf';
 import rateLimit from 'express-rate-limit';
 import { db } from './db';
@@ -20,7 +20,14 @@ import { upload, uploadToGCS, downloadFromGCS } from './gcs-storage';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
 import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { computeFitScore, isFitStale, getStalenessReason } from './lib/aiMatchingEngine';
-import { getUserLimits, canUseFitComputation } from './lib/aiLimits';
+import {
+  finalizeFitCredit,
+  FitGenerationChangedError,
+  getUserLimits,
+  releaseFitCredit,
+  reserveFitCredit,
+  type FitCreditReservation,
+} from './lib/aiLimits';
 import { getRedisHealth } from './lib/redis';
 import { isQueueAvailable, enqueueInteractive, enqueueBatch, getQueueHealth, removeJob, QUEUES } from './lib/aiQueue';
 import { syncProfileCompletionStatus } from './lib/profileCompletion';
@@ -73,6 +80,47 @@ const RATE_LIMIT_FIT_COMPUTE = parseInt(process.env.AI_RATE_LIMIT_FIT || '10', 1
 const RATE_LIMIT_BATCH = parseInt(process.env.AI_RATE_LIMIT_BATCH || '3', 10);
 const RATE_LIMIT_GENERIC = parseInt(process.env.AI_RATE_LIMIT_GENERIC || '30', 10);
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.AI_RATE_LIMIT_WINDOW_MS || '60000', 10);
+
+function candidateQuotaExceededPayload(limits: Awaited<ReturnType<typeof getUserLimits>>) {
+  return {
+    error: 'No match credits remaining',
+    errorCode: 'QUOTA_EXCEEDED',
+    message: `You have used all ${limits.fitLimitPerMonth} match credits for this month. Existing match results remain available.`,
+    remaining: limits.fitRemainingThisMonth,
+    limits,
+  };
+}
+
+async function getPersistedCandidateFit(userId: number, applicationId: number) {
+  const application = await db.query.applications.findFirst({
+    where: and(
+      eq(applications.id, applicationId),
+      eq(applications.userId, userId)
+    ),
+    columns: {
+      aiFitScore: true,
+      aiFitLabel: true,
+      aiFitReasons: true,
+      aiComputedAt: true,
+    },
+  });
+
+  if (!application || application.aiFitScore === null || !application.aiComputedAt) {
+    return null;
+  }
+
+  return {
+    score: application.aiFitScore,
+    label: application.aiFitLabel,
+    reasons: Array.isArray(application.aiFitReasons)
+      ? application.aiFitReasons.filter(
+          (reason: unknown): reason is string => typeof reason === 'string'
+        )
+      : [],
+    computedAt: application.aiComputedAt,
+    cached: true,
+  };
+}
 
 // Rate limiters with structured logging
 const resumeUploadLimiter = rateLimit({
@@ -293,9 +341,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.post(
     '/api/ai/resume',
-    requireAuth,
-    requireRole(['candidate']),
-    requireFeatureFlag('resume'),
+    requireVerifiedCandidate,
     doubleCsrfProtection,
     resumeUploadLimiter,
     upload.single('resume'),
@@ -407,9 +453,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.get(
     '/api/ai/resume',
-    requireAuth,
-    requireRole(['candidate']),
-    requireFeatureFlag('resume'),
+    requireVerifiedCandidate,
     async (req, res): Promise<void> => {
       try {
         const userId = req.user!.id;
@@ -440,9 +484,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.delete(
     '/api/ai/resume/:id',
-    requireAuth,
-    requireRole(['candidate']),
-    requireFeatureFlag('resume'),
+    requireVerifiedCandidate,
     doubleCsrfProtection,
     async (req, res): Promise<void> => {
       try {
@@ -474,8 +516,20 @@ export function registerAIRoutes(app: Express): void {
        return;
         }
 
-        // Delete resume
-        await db.delete(candidateResumes).where(eq(candidateResumes.id, resumeId));
+        await db.transaction(async (tx: any) => {
+          // Applications keep their copied resume URL/text after the library item
+          // is removed, but must release the FK first.
+          await tx
+            .update(applications)
+            .set({ resumeId: null })
+            .where(
+              and(
+                eq(applications.resumeId, resumeId),
+                eq(applications.userId, userId)
+              )
+            );
+          await tx.delete(candidateResumes).where(eq(candidateResumes.id, resumeId));
+        });
 
         const remaining = await db
           .select({ count: count() })
@@ -503,12 +557,13 @@ export function registerAIRoutes(app: Express): void {
    */
   app.post(
     '/api/ai/match',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     requireFeatureFlag('match'),
     doubleCsrfProtection,
     fitComputeLimiter,
     async (req, res): Promise<void> => {
+      let reservation: FitCreditReservation | null = null;
+      let applicationIdForRecovery: number | null = null;
       try {
         const userId = req.user!.id;
 
@@ -520,6 +575,7 @@ export function registerAIRoutes(app: Express): void {
         }
 
         const { applicationId } = body.data;
+        applicationIdForRecovery = applicationId;
 
         // Get application with job data
         const application = await db.query.applications.findFirst({
@@ -584,18 +640,6 @@ export function registerAIRoutes(app: Express): void {
        return;
         }
 
-        // Check free tier limit (AFTER cache check, so cached results don't consume quota)
-        const canCompute = await canUseFitComputation(userId);
-        if (!canCompute) {
-          const limits = await getUserLimits(userId);
-          res.status(403).json({
-            error: 'Free tier limit reached',
-            message: `You have used all ${limits.fitUsedThisMonth} free fit computations this month.`,
-            limits,
-          });
-       return;
-        }
-
         // Get resume text
         let resumeText = resumeData?.extractedText || '';
 
@@ -640,28 +684,55 @@ export function registerAIRoutes(app: Express): void {
             .where(eq(jobs.id, application.job.id));
         }
 
-        // Compute fit score
-        const result = await computeFitScore(
-          resumeText,
-          jdDigest,
+        // Reserve only after cache/resume/digest work. The reservation is the
+        // concurrency-safe quota authority shared with the background workers.
+        const reservationResult = await reserveFitCredit(
           userId,
           applicationId,
+          application.aiComputedAt,
           application.job.organizationId ?? undefined
         );
+        if (reservationResult.status === 'quota_exceeded') {
+          const limits = await getUserLimits(userId);
+          res.status(403).json(candidateQuotaExceededPayload(limits));
+          return;
+        }
+        if (reservationResult.status === 'in_progress') {
+          res.status(409).json({
+            error: 'Match computation already in progress',
+            errorCode: 'FIT_COMPUTATION_IN_PROGRESS',
+            message: 'A match computation is already running for this application.',
+          });
+          return;
+        }
+        if (reservationResult.status === 'generation_changed') {
+          res.status(409).json({
+            error: 'Match result changed',
+            errorCode: 'FIT_GENERATION_CHANGED',
+            message: 'The match result changed. Refresh the application and try again if needed.',
+          });
+          return;
+        }
+        if (reservationResult.status === 'cached') {
+          res.json({
+            message: 'Fit score retrieved from cache',
+            fit: {
+              ...reservationResult.fit,
+              cached: true,
+            },
+          });
+          return;
+        }
+        reservation = reservationResult.reservation;
 
-        // Update application with fit score
-        await db
-          .update(applications)
-          .set({
-            aiFitScore: result.score,
-            aiFitLabel: result.label,
-            aiFitReasons: result.reasons,
-            aiModelVersion: result.modelVersion,
-            aiComputedAt: new Date(),
-            aiStaleReason: null,
-            aiDigestVersionUsed: jdDigest.version, // Store digest version for staleness detection
-          })
-          .where(eq(applications.id, applicationId));
+        const result = await computeFitScore(resumeText, jdDigest);
+        const computedAt = await finalizeFitCredit(
+          reservation,
+          result,
+          jdDigest.version,
+          application.job.organizationId ?? undefined
+        );
+        reservation = null;
 
         res.json({
           message: 'Fit score computed successfully',
@@ -669,13 +740,37 @@ export function registerAIRoutes(app: Express): void {
             score: result.score,
             label: result.label,
             reasons: result.reasons,
-            computedAt: new Date(),
+            computedAt,
             cached: false,
             cost: result.costUsd,
             durationMs: result.durationMs,
           },
         });
       } catch (error: any) {
+        if (reservation) {
+          try {
+            await releaseFitCredit(reservation);
+          } catch (releaseError) {
+            // The short lease self-heals if the database is unavailable here.
+            console.error('Failed to release fit credit reservation:', releaseError);
+          }
+        }
+        if (
+          error instanceof FitGenerationChangedError &&
+          applicationIdForRecovery !== null
+        ) {
+          const fit = await getPersistedCandidateFit(
+            req.user!.id,
+            applicationIdForRecovery
+          );
+          if (fit) {
+            res.json({
+              message: 'Fit score retrieved from cache',
+              fit,
+            });
+            return;
+          }
+        }
         console.error('Fit computation error:', error);
 
         if (error.message?.includes('Circuit breaker') || error.message?.includes('budget')) {
@@ -698,8 +793,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.post(
     '/api/ai/match/batch',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     requireFeatureFlag('match'),
     doubleCsrfProtection,
     batchComputeLimiter,
@@ -719,10 +813,6 @@ export function registerAIRoutes(app: Express): void {
         // Deduplicate input
         applicationIds = [...new Set(applicationIds)];
 
-        // Check free tier limit
-        const limits = await getUserLimits(userId);
-        const remaining = limits.fitRemainingThisMonth;
-
         // Fetch all applications (validate ownership)
         const apps = await db.query.applications.findMany({
           where: inArray(applications.id, applicationIds),
@@ -736,6 +826,10 @@ export function registerAIRoutes(app: Express): void {
           success: boolean;
           status: 'success' | 'cached' | 'requiresPaid' | 'unauthorized' | 'error';
           error?: string;
+          errorCode?:
+            | 'QUOTA_EXCEEDED'
+            | 'FIT_COMPUTATION_IN_PROGRESS'
+            | 'FIT_GENERATION_CHANGED';
           fit?: any;
         }> = [];
 
@@ -799,18 +893,8 @@ export function registerAIRoutes(app: Express): void {
             continue;
           }
 
-          // Check free tier limit
-          if (computedCount >= remaining) {
-            results.push({
-              applicationId: appId,
-              success: false,
-              status: 'requiresPaid',
-              error: `Free tier limit reached. ${remaining} free computations remaining this month.`,
-            });
-            continue;
-          }
-
           // Compute fit score
+          let reservation: FitCreditReservation | null = null;
           try {
             let resumeText = resumeData?.extractedText || '';
 
@@ -858,27 +942,64 @@ export function registerAIRoutes(app: Express): void {
                 .where(eq(jobs.id, app.job.id));
             }
 
-            const result = await computeFitScore(
-              resumeText,
-              jdDigest,
+            const reservationResult = await reserveFitCredit(
               userId,
               appId,
+              app.aiComputedAt,
               app.job.organizationId ?? undefined
             );
+            if (reservationResult.status === 'quota_exceeded') {
+              results.push({
+                applicationId: appId,
+                success: false,
+                status: 'requiresPaid',
+                error: 'No match credits remaining this month.',
+                errorCode: 'QUOTA_EXCEEDED',
+              });
+              continue;
+            }
+            if (reservationResult.status === 'in_progress') {
+              results.push({
+                applicationId: appId,
+                success: false,
+                status: 'error',
+                error: 'Match computation already in progress.',
+                errorCode: 'FIT_COMPUTATION_IN_PROGRESS',
+              });
+              continue;
+            }
+            if (reservationResult.status === 'generation_changed') {
+              results.push({
+                applicationId: appId,
+                success: false,
+                status: 'error',
+                error: 'Match result changed. Refresh and try again if needed.',
+                errorCode: 'FIT_GENERATION_CHANGED',
+              });
+              continue;
+            }
+            if (reservationResult.status === 'cached') {
+              results.push({
+                applicationId: appId,
+                success: true,
+                status: 'cached',
+                fit: {
+                  ...reservationResult.fit,
+                  cached: true,
+                },
+              });
+              continue;
+            }
+            reservation = reservationResult.reservation;
 
-            // Update application
-            await db
-              .update(applications)
-              .set({
-                aiFitScore: result.score,
-                aiFitLabel: result.label,
-                aiFitReasons: result.reasons,
-                aiModelVersion: result.modelVersion,
-                aiComputedAt: new Date(),
-                aiStaleReason: null,
-                aiDigestVersionUsed: jdDigest.version, // Store digest version for staleness detection
-              })
-              .where(eq(applications.id, appId));
+            const result = await computeFitScore(resumeText, jdDigest);
+            const computedAt = await finalizeFitCredit(
+              reservation,
+              result,
+              jdDigest.version,
+              app.job.organizationId ?? undefined
+            );
+            reservation = null;
 
             results.push({
               applicationId: appId,
@@ -888,7 +1009,7 @@ export function registerAIRoutes(app: Express): void {
                 score: result.score,
                 label: result.label,
                 reasons: result.reasons,
-                computedAt: new Date(),
+                computedAt,
                 cached: false,
               },
             });
@@ -900,6 +1021,28 @@ export function registerAIRoutes(app: Express): void {
               await new Promise((resolve) => setTimeout(resolve, 200));
             }
           } catch (error: any) {
+            if (reservation) {
+              try {
+                await releaseFitCredit(reservation);
+              } catch (releaseError) {
+                console.error(
+                  `Failed to release fit credit reservation for app ${appId}:`,
+                  releaseError
+                );
+              }
+            }
+            if (error instanceof FitGenerationChangedError) {
+              const fit = await getPersistedCandidateFit(userId, appId);
+              if (fit) {
+                results.push({
+                  applicationId: appId,
+                  success: true,
+                  status: 'cached',
+                  fit,
+                });
+                continue;
+              }
+            }
             results.push({
               applicationId: appId,
               success: false,
@@ -934,8 +1077,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.get(
     '/api/ai/limits',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     requireFeatureFlag('match'),
     async (req, res): Promise<void> => {
       try {
@@ -1025,8 +1167,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.post(
     '/api/ai/match/queue',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     requireFeatureFlag('match'),
     requireAsyncQueue,
     doubleCsrfProtection,
@@ -1122,11 +1263,7 @@ export function registerAIRoutes(app: Express): void {
         // Check quota
         const limits = await getUserLimits(userId);
         if (limits.fitRemainingThisMonth < 1) {
-          res.status(403).json({
-            error: 'You have no analyses left this month.',
-            errorCode: 'QUOTA_EXCEEDED',
-            remaining: 0,
-          });
+          res.status(403).json(candidateQuotaExceededPayload(limits));
           return;
         }
 
@@ -1171,8 +1308,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.post(
     '/api/ai/match/batch/queue',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     requireFeatureFlag('match'),
     requireAsyncQueue,
     doubleCsrfProtection,
@@ -1301,9 +1437,9 @@ export function registerAIRoutes(app: Express): void {
         const limits = await getUserLimits(userId);
         if (staleIds.length > limits.fitRemainingThisMonth) {
           res.status(403).json({
-            error: `You have only ${limits.fitRemainingThisMonth} analyses left. Select fewer applications.`,
-            errorCode: 'QUOTA_EXCEEDED',
-            remaining: limits.fitRemainingThisMonth,
+            ...candidateQuotaExceededPayload(limits),
+            error: 'Not enough match credits for this batch',
+            message: `You have ${limits.fitRemainingThisMonth} of ${limits.fitLimitPerMonth} monthly match credits remaining. Select fewer applications.`,
             staleCount: staleIds.length,
           });
           return;
@@ -1370,12 +1506,16 @@ export function registerAIRoutes(app: Express): void {
    */
   app.get(
     '/api/ai/match/jobs/:id',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     async (req, res): Promise<void> => {
       try {
         const userId = req.user!.id;
-        const jobId = parseInt(req.params.id, 10);
+        const idParam = req.params.id;
+        if (!idParam) {
+          res.status(400).json({ error: 'Invalid job ID' });
+          return;
+        }
+        const jobId = parseInt(idParam, 10);
 
         if (isNaN(jobId)) {
           res.status(400).json({ error: 'Invalid job ID' });
@@ -1414,8 +1554,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.get(
     '/api/ai/match/jobs',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     async (req, res): Promise<void> => {
       try {
         const userId = req.user!.id;
@@ -1446,8 +1585,7 @@ export function registerAIRoutes(app: Express): void {
    */
   app.delete(
     '/api/ai/match/jobs/:id',
-    requireAuth,
-    requireRole(['candidate']),
+    requireVerifiedCandidate,
     doubleCsrfProtection,
     async (req, res): Promise<void> => {
       try {

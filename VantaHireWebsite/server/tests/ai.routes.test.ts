@@ -13,6 +13,7 @@ vi.mock('../auth', () => ({
   requireAuth: (_req: any, _res: any, next: any) => next(),
   requireRole: () => (_req: any, _res: any, next: any) => next(),
   requireSeat: () => (_req: any, _res: any, next: any) => next(),
+  requireVerifiedCandidate: (_req: any, _res: any, next: any) => next(),
 }));
 
 vi.mock('../csrf', () => ({
@@ -53,7 +54,9 @@ vi.mock('../lib/aiMatchingEngine', () => ({
 
 vi.mock('../lib/aiLimits', () => ({
   getUserLimits: vi.fn(),
-  canUseFitComputation: vi.fn(),
+  reserveFitCredit: vi.fn(),
+  releaseFitCredit: vi.fn(),
+  finalizeFitCredit: vi.fn(),
 }));
 
 vi.mock('../lib/redis', () => ({
