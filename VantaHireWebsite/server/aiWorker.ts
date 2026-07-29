@@ -17,7 +17,15 @@ import { pool } from './db';
 import { storage } from './storage';
 import { QUEUES, getIoRedisConnection, FitJobData, BatchFitJobData, SummaryBatchJobData } from './lib/aiQueue';
 import { computeFitScore, isFitStale, checkCircuitBreaker, trackBudgetSpending, calculateAiCost } from './lib/aiMatchingEngine';
-import { getUserLimits, canUseFitComputation } from './lib/aiLimits';
+import {
+  finalizeFitCredit,
+  FitComputationInProgressError,
+  FitGenerationChangedError,
+  FitQuotaExceededError,
+  releaseFitCredit,
+  reserveFitCredit,
+  type FitCreditReservation,
+} from './lib/aiLimits';
 import { hasEnoughCredits, useCredits, getCreditCostForOperation } from './lib/creditService';
 import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
@@ -29,6 +37,11 @@ import { eq, and } from 'drizzle-orm';
 import type { BatchFitResult, BatchFitResultItem } from '../shared/schema';
 import { createSourcingRefreshWorker } from './lib/sourcingRefreshWorker';
 import { isSourcingRefreshQueueAvailable } from './lib/sourcingRefreshQueue';
+import {
+  reconcileTerminalBatchFitCollision,
+  reconcileTerminalInteractiveFitCollision,
+  type FreshFitSnapshot,
+} from './lib/fitCollisionReconciliation';
 
 // Summary batch result types
 interface SummaryBatchResultItem {
@@ -47,17 +60,13 @@ interface SummaryBatchResult {
   };
 }
 
+type WorkerBatchFitResultItem = BatchFitResultItem & {
+  errorCode?: 'QUOTA_EXCEEDED';
+};
+
 // Environment configuration
 const INTERACTIVE_CONCURRENCY = parseInt(process.env.AI_WORKER_INTERACTIVE_CONCURRENCY || '2', 10);
 const BATCH_CONCURRENCY = parseInt(process.env.AI_WORKER_BATCH_CONCURRENCY || '1', 10);
-
-// Custom error for quota exhaustion
-class QuotaExhaustedError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'QuotaExhaustedError';
-  }
-}
 
 /**
  * Get resume data for an application
@@ -162,12 +171,6 @@ async function processOneApplication(
     };
   }
 
-  // Check quota
-  const canCompute = await canUseFitComputation(userId);
-  if (!canCompute) {
-    throw new QuotaExhaustedError('Monthly fit computation quota exhausted');
-  }
-
   // Get or generate JD digest
   let jdDigest: JDDigest = app.job.jdDigest as JDDigest;
   if (!jdDigest || !app.job.jdDigestVersion || app.job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
@@ -178,38 +181,129 @@ async function processOneApplication(
     }).where(eq(jobs.id, app.job.id));
   }
 
-  // Compute fit score
-  const result = await computeFitScore(
-    resume.text,
-    jdDigest,
+  const reservationResult = await reserveFitCredit(
     userId,
     applicationId,
+    app.aiComputedAt,
     app.job.organizationId ?? undefined
   );
+  if (reservationResult.status === 'quota_exceeded') {
+    throw new FitQuotaExceededError();
+  }
+  if (reservationResult.status === 'in_progress') {
+    throw new FitComputationInProgressError();
+  }
+  if (reservationResult.status === 'generation_changed') {
+    throw new FitGenerationChangedError();
+  }
+  if (reservationResult.status === 'cached') {
+    return {
+      cached: true,
+      score: reservationResult.fit.score,
+      ...(reservationResult.fit.label !== null && {
+        label: reservationResult.fit.label,
+      }),
+      reasons: reservationResult.fit.reasons,
+    };
+  }
+  let reservation: FitCreditReservation | null = reservationResult.reservation;
 
-  // Update application
-  await db.update(applications).set({
-    aiFitScore: result.score,
-    aiFitLabel: result.label,
-    aiFitReasons: result.reasons,
-    aiModelVersion: result.modelVersion,
-    aiComputedAt: new Date(),
-    aiStaleReason: null,
-    aiDigestVersionUsed: jdDigest.version,
-  }).where(eq(applications.id, applicationId));
+  try {
+    const result = await computeFitScore(resume.text, jdDigest);
+    await finalizeFitCredit(
+      reservation,
+      result,
+      jdDigest.version,
+      app.job.organizationId ?? undefined
+    );
+    reservation = null;
+
+    return {
+      cached: false,
+      score: result.score,
+      label: result.label,
+      reasons: result.reasons,
+    };
+  } catch (error) {
+    if (reservation) {
+      try {
+        await releaseFitCredit(reservation);
+      } catch (releaseError) {
+        // Expired reservations stop counting automatically even if the
+        // database is unavailable during this best-effort cleanup.
+        console.error(
+          `[AI Worker] Failed to release fit credit reservation for app ${applicationId}:`,
+          releaseError
+        );
+      }
+    }
+    throw error;
+  }
+}
+
+async function getFreshFitSnapshot(
+  applicationId: number,
+  userId: number
+): Promise<FreshFitSnapshot | null> {
+  const app = await db.query.applications.findFirst({
+    where: and(
+      eq(applications.id, applicationId),
+      eq(applications.userId, userId)
+    ),
+    with: { job: true },
+  });
+  if (
+    !app ||
+    !app.aiComputedAt ||
+    app.aiFitScore === null ||
+    !app.job
+  ) {
+    return null;
+  }
+
+  let resumeData = app.resumeId
+    ? await db.query.candidateResumes.findFirst({
+        where: eq(candidateResumes.id, app.resumeId),
+      })
+    : await db.query.candidateResumes.findFirst({
+        where: and(
+          eq(candidateResumes.userId, userId),
+          eq(candidateResumes.isDefault, true as any)
+        ),
+      });
+  if (!resumeData) {
+    resumeData = await db.query.candidateResumes.findFirst({
+      where: eq(candidateResumes.userId, userId),
+      orderBy: (resume: any, { desc }: any) => [desc(resume.updatedAt)],
+    });
+  }
+
+  const stale = isFitStale(
+    app.aiComputedAt,
+    resumeData?.updatedAt ?? null,
+    app.job.updatedAt,
+    app.job.jdDigestVersion || 1,
+    app.aiDigestVersionUsed || null
+  );
+  if (stale) {
+    return null;
+  }
 
   return {
-    cached: false,
-    score: result.score,
-    label: result.label,
-    reasons: result.reasons,
+    score: app.aiFitScore,
+    ...(app.aiFitLabel !== null && { label: app.aiFitLabel }),
+    reasons: Array.isArray(app.aiFitReasons)
+      ? app.aiFitReasons.filter(
+          (reason: unknown): reason is string => typeof reason === 'string'
+        )
+      : [],
   };
 }
 
 /**
  * Build batch result summary
  */
-function buildBatchResult(results: BatchFitResultItem[]): BatchFitResult {
+function buildBatchResult(results: WorkerBatchFitResultItem[]): BatchFitResult {
   return {
     results,
     summary: {
@@ -260,12 +354,22 @@ async function processFitJob(job: Job<FitJobData>): Promise<{ success: boolean; 
   } catch (error: any) {
     console.error(`[AI Worker] Interactive job ${job.id} failed:`, error);
 
-    if (error instanceof QuotaExhaustedError) {
+    if (
+      error instanceof FitComputationInProgressError ||
+      error instanceof FitGenerationChangedError
+    ) {
+      // Keep the durable job visible to polling clients while BullMQ retries.
+      // The winning computation will make this retry return cached.
+      await storage.updateAiFitJobStatus(dbJobId, 'pending');
+      throw error;
+    }
+
+    if (error instanceof FitQuotaExceededError) {
       // Non-retryable
       await storage.updateAiFitJobStatus(dbJobId, 'failed', {
         completedAt: new Date(),
         error: error.message,
-        errorCode: 'QUOTA_EXHAUSTED',
+        errorCode: 'QUOTA_EXCEEDED',
       });
       throw new UnrecoverableError(error.message);
     }
@@ -304,7 +408,9 @@ async function processBatchFitJob(job: Job<BatchFitJobData>): Promise<BatchFitRe
   // Load previous results from DB for retry resilience (includes cached items)
   const existingJob = await storage.getAiFitJob(dbJobId);
   const existingResult = existingJob?.result as BatchFitResult | undefined;
-  const results: BatchFitResultItem[] = existingResult?.results ? [...existingResult.results] : [];
+  const results: WorkerBatchFitResultItem[] = existingResult?.results
+    ? [...existingResult.results]
+    : [];
 
   // Rebuild processedIds from existing results to handle crash-after-write scenarios
   // This ensures we don't duplicate entries even if job.data.processedIds is stale
@@ -333,7 +439,7 @@ async function processBatchFitJob(job: Job<BatchFitJobData>): Promise<BatchFitRe
       }
 
       const result = await processOneApplication(appId, userId);
-      const resultItem: BatchFitResultItem = {
+      const resultItem: WorkerBatchFitResultItem = {
         applicationId: appId,
         status: result.cached ? 'cached' : 'success',
       };
@@ -343,20 +449,38 @@ async function processBatchFitJob(job: Job<BatchFitJobData>): Promise<BatchFitRe
       results.push(resultItem);
       finalProcessedIds.push(appId);
     } catch (error: any) {
+      if (
+        error instanceof FitComputationInProgressError ||
+        error instanceof FitGenerationChangedError
+      ) {
+        await job.updateData({ ...job.data, processedIds: finalProcessedIds });
+        throw error;
+      }
+
       // Circuit breaker errors should be thrown to let BullMQ retry
       if (error.message?.includes('Circuit breaker')) {
         throw error;
       }
 
       // Capture individual failures - don't throw!
-      if (error instanceof QuotaExhaustedError) {
+      if (error instanceof FitQuotaExceededError) {
         // Mark this and remaining as requiresPaid
-        results.push({ applicationId: appId, status: 'requiresPaid', error: error.message });
+        results.push({
+          applicationId: appId,
+          status: 'requiresPaid',
+          error: error.message,
+          errorCode: 'QUOTA_EXCEEDED',
+        });
         finalProcessedIds.push(appId);
 
         // Mark remaining apps
         for (const remainingId of remaining.slice(i + 1)) {
-          results.push({ applicationId: remainingId, status: 'requiresPaid', error: 'Quota exhausted' });
+          results.push({
+            applicationId: remainingId,
+            status: 'requiresPaid',
+            error: 'No match credits remaining this month',
+            errorCode: 'QUOTA_EXCEEDED',
+          });
           finalProcessedIds.push(remainingId);
         }
         break;
@@ -702,8 +826,33 @@ async function main(): Promise<void> {
     console.log(`[AI Worker] Interactive job ${job.id} completed`);
   });
 
-  interactiveWorker.on('failed', (job: Job | undefined, error: Error) => {
+  interactiveWorker.on('failed', (job: Job<FitJobData> | undefined, error: Error) => {
     console.error(`[AI Worker] Interactive job ${job?.id} failed:`, error.message);
+    if (!job) {
+      return;
+    }
+    void reconcileTerminalInteractiveFitCollision(job, error, {
+      getDurableJob: (dbJobId) => storage.getAiFitJob(dbJobId),
+      getFreshFit: getFreshFitSnapshot,
+      updateStatus: (dbJobId, status, updates) =>
+        storage.updateAiFitJobStatus(dbJobId, status, updates),
+      updateProgress: (dbJobId, updates) =>
+        storage.updateAiFitJobProgress(dbJobId, updates),
+      now: () => new Date(),
+    })
+      .then((outcome) => {
+        if (outcome !== 'ignored') {
+          console.log(
+            `[AI Worker] Reconciled terminal interactive collision for DB job ${job.data.dbJobId}: ${outcome}`
+          );
+        }
+      })
+      .catch((reconciliationError) => {
+        console.error(
+          `[AI Worker] Failed to reconcile terminal interactive collision for DB job ${job.data.dbJobId}:`,
+          reconciliationError
+        );
+      });
   });
 
   // Batch worker - handles both fit and summary batch jobs
@@ -732,6 +881,32 @@ async function main(): Promise<void> {
   batchWorker.on('failed', (job: Job | undefined, error: Error) => {
     const jobType = job?.name === 'batch-summary' ? 'summary' : 'fit';
     console.error(`[AI Worker] Batch ${jobType} job ${job?.id} failed:`, error.message);
+    if (!job || jobType !== 'fit') {
+      return;
+    }
+    const fitJob = job as Job<BatchFitJobData>;
+    void reconcileTerminalBatchFitCollision(fitJob, error, {
+      getDurableJob: (dbJobId) => storage.getAiFitJob(dbJobId),
+      getFreshFit: getFreshFitSnapshot,
+      updateStatus: (dbJobId, status, updates) =>
+        storage.updateAiFitJobStatus(dbJobId, status, updates),
+      updateProgress: (dbJobId, updates) =>
+        storage.updateAiFitJobProgress(dbJobId, updates),
+      now: () => new Date(),
+    })
+      .then((outcome) => {
+        if (outcome !== 'ignored') {
+          console.log(
+            `[AI Worker] Reconciled terminal batch collision for DB job ${fitJob.data.dbJobId}: ${outcome}`
+          );
+        }
+      })
+      .catch((reconciliationError) => {
+        console.error(
+          `[AI Worker] Failed to reconcile terminal batch collision for DB job ${fitJob.data.dbJobId}:`,
+          reconciliationError
+        );
+      });
   });
 
   if (isSourcingRefreshQueueAvailable()) {

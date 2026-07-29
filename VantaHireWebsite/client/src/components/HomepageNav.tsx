@@ -4,6 +4,7 @@ import { Link, useLocation } from "wouter";
 import { trackEvent } from "@/lib/analytics";
 import { Menu, X } from "lucide-react";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
+import { useAuth } from "@/hooks/use-auth";
 
 const linkStyle = {
   fontFamily: '"DM Sans", sans-serif',
@@ -96,10 +97,20 @@ function BrandMark({ compact = false, showWord = true }: { compact?: boolean; sh
   );
 }
 
-export default function HomepageNav() {
+export type HomepageNavAudience = "public" | "candidate";
+
+export default function HomepageNav({
+  audience = "public",
+}: {
+  audience?: HomepageNavAudience;
+}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [floated, setFloated] = useState(false);
   const [location] = useLocation();
+  const { user, logoutMutation } = useAuth();
+  const candidateAudience = audience === "candidate";
+  const authenticatedCandidate =
+    candidateAudience && user?.role === "candidate";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -160,55 +171,79 @@ export default function HomepageNav() {
               Explore
             </div>
             <div className="flex flex-col gap-2">
-              <Link
-                href="/features"
-                className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]"
-                style={{ fontFamily: '"DM Sans", sans-serif' }}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Features
-              </Link>
-              <Link href="/solutions" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
-                Solutions
-              </Link>
-              <Link href="/pricing" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
-                Pricing
-              </Link>
+              {!candidateAudience ? (
+                <>
+                  <Link
+                    href="/features"
+                    className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]"
+                    style={{ fontFamily: '"DM Sans", sans-serif' }}
+                    onClick={() => setIsMenuOpen(false)}
+                  >
+                    Features
+                  </Link>
+                  <Link href="/solutions" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
+                    Solutions
+                  </Link>
+                  <Link href="/pricing" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
+                    Pricing
+                  </Link>
+                </>
+              ) : null}
               <Link href="/jobs" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
                 Jobs
               </Link>
+              {authenticatedCandidate ? (
+                <Link href="/my-dashboard" className="rounded-xl border border-transparent bg-white/[0.02] px-4 py-3 text-[0.875rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:border-white/12 hover:bg-white/[0.05]" style={{ fontFamily: '"DM Sans", sans-serif' }} onClick={() => setIsMenuOpen(false)}>
+                  Dashboard
+                </Link>
+              ) : null}
             </div>
           </div>
 
-          <div className="mt-auto rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(75,142,240,0.10)_0%,rgba(255,255,255,0.03)_100%)] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-            <div className="mb-3 px-2 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-[#8891AA]">
-              Start Here
+          {!candidateAudience ? (
+            <div className="mt-auto rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(75,142,240,0.10)_0%,rgba(255,255,255,0.03)_100%)] p-3 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+              <div className="mb-3 px-2 font-mono text-[0.65rem] uppercase tracking-[0.18em] text-[#8891AA]">
+                Start Here
+              </div>
+              <a
+                href="https://cal.com/ealana/quick-connect"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mb-2 block rounded-lg border border-white/12 bg-white/[0.04] px-4 py-[9px] text-center text-[0.82rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
+                style={{ fontFamily: '"DM Sans", sans-serif' }}
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  trackEvent("cta_click", { location: "site_header_mobile", action: "book_demo" });
+                }}
+              >
+                Book a demo
+              </a>
+              <a
+                href="/recruiter-auth"
+                className="block rounded-lg bg-[#4B8EF0] px-4 py-[9px] text-center text-[0.82rem] font-medium text-white no-underline shadow-[0_12px_30px_rgba(75,142,240,0.28)] transition-transform hover:translate-y-[-1px]"
+                style={{ fontFamily: '"DM Sans", sans-serif' }}
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  trackEvent("cta_click", { location: "site_header_mobile", action: "get_started" });
+                }}
+              >
+                Get Started {"->"}
+              </a>
             </div>
-            <a
-              href="https://cal.com/ealana/quick-connect"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mb-2 block rounded-lg border border-white/12 bg-white/[0.04] px-4 py-[9px] text-center text-[0.82rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
+          ) : authenticatedCandidate ? (
+            <button
+              type="button"
+              className="mt-auto rounded-lg border border-white/12 bg-white/[0.04] px-4 py-[9px] text-center text-[0.82rem] font-medium text-[#F4F5FA] transition-colors hover:bg-white/[0.07]"
               style={{ fontFamily: '"DM Sans", sans-serif' }}
               onClick={() => {
                 setIsMenuOpen(false);
-                trackEvent("cta_click", { location: "site_header_mobile", action: "book_demo" });
+                logoutMutation.mutate();
               }}
+              disabled={logoutMutation.isPending}
             >
-              Book a demo
-            </a>
-            <a
-              href="/recruiter-auth"
-              className="block rounded-lg bg-[#4B8EF0] px-4 py-[9px] text-center text-[0.82rem] font-medium text-white no-underline shadow-[0_12px_30px_rgba(75,142,240,0.28)] transition-transform hover:translate-y-[-1px]"
-              style={{ fontFamily: '"DM Sans", sans-serif' }}
-              onClick={() => {
-                setIsMenuOpen(false);
-                trackEvent("cta_click", { location: "site_header_mobile", action: "get_started" });
-              }}
-            >
-              Get Started {"->"}
-            </a>
-          </div>
+              {logoutMutation.isPending ? "Signing out..." : "Logout"}
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -239,30 +274,34 @@ export default function HomepageNav() {
         </Link>
 
         <div style={{ display: "flex", alignItems: "center", gap: "2rem" }}>
-          <Link
-            href="/features"
-            style={linkStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
-          >
-            Features
-          </Link>
-          <Link
-            href="/solutions"
-            style={linkStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
-          >
-            Solutions
-          </Link>
-          <Link
-            href="/pricing"
-            style={linkStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
-          >
-            Pricing
-          </Link>
+          {!candidateAudience ? (
+            <>
+              <Link
+                href="/features"
+                style={linkStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+              >
+                Features
+              </Link>
+              <Link
+                href="/solutions"
+                style={linkStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+              >
+                Solutions
+              </Link>
+              <Link
+                href="/pricing"
+                style={linkStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+              >
+                Pricing
+              </Link>
+            </>
+          ) : null}
           <Link
             href="/jobs"
             style={linkStyle}
@@ -271,27 +310,50 @@ export default function HomepageNav() {
           >
             Jobs
           </Link>
+          {authenticatedCandidate ? (
+            <Link
+              href="/my-dashboard"
+              style={linkStyle}
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+            >
+              Dashboard
+            </Link>
+          ) : null}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: "0.9rem" }}>
-          <a
-            href="https://cal.com/ealana/quick-connect"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={ghostButtonStyle}
-            onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
-            onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
-            onClick={() => trackEvent("cta_click", { location: "site_header", action: "book_demo" })}
-          >
-            Book a demo
-          </a>
-          <a
-            href="/recruiter-auth"
-            style={primaryButtonStyle}
-            onClick={() => trackEvent("cta_click", { location: "site_header", action: "get_started" })}
-          >
-            Get Started {"->"}
-          </a>
+          {!candidateAudience ? (
+            <>
+              <a
+                href="https://cal.com/ealana/quick-connect"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={ghostButtonStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+                onClick={() => trackEvent("cta_click", { location: "site_header", action: "book_demo" })}
+              >
+                Book a demo
+              </a>
+              <a
+                href="/recruiter-auth"
+                style={primaryButtonStyle}
+                onClick={() => trackEvent("cta_click", { location: "site_header", action: "get_started" })}
+              >
+                Get Started {"->"}
+              </a>
+            </>
+          ) : authenticatedCandidate ? (
+            <button
+              type="button"
+              style={{ ...ghostButtonStyle, cursor: "pointer" }}
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              {logoutMutation.isPending ? "Signing out..." : "Logout"}
+            </button>
+          ) : null}
         </div>
       </motion.div>
 
@@ -331,30 +393,43 @@ export default function HomepageNav() {
           </Link>
 
           <div style={{ display: "flex", alignItems: "center", gap: "1.5rem" }}>
-            <Link
-              href="/features"
-              style={pillLinkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
-            >
-              Features
-            </Link>
-            <Link
-              href="/solutions"
-              style={pillLinkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
-            >
-              Solutions
-            </Link>
-            <Link
-              href="/pricing"
-              style={pillLinkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
-              onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
-            >
-              Pricing
-            </Link>
+            {!candidateAudience ? (
+              <>
+                <Link
+                  href="/features"
+                  style={pillLinkStyle}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+                >
+                  Features
+                </Link>
+                <Link
+                  href="/solutions"
+                  style={pillLinkStyle}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+                >
+                  Solutions
+                </Link>
+                <Link
+                  href="/pricing"
+                  style={pillLinkStyle}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+                >
+                  Pricing
+                </Link>
+              </>
+            ) : authenticatedCandidate ? (
+              <Link
+                href="/my-dashboard"
+                style={pillLinkStyle}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#F4F5FA")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "#8891AA")}
+              >
+                Dashboard
+              </Link>
+            ) : null}
             {location !== "/jobs" ? (
               <Link
                 href="/jobs"
@@ -367,13 +442,24 @@ export default function HomepageNav() {
             ) : null}
           </div>
 
-          <a
-            href="/recruiter-auth"
-            style={pillButtonStyle}
-            onClick={() => trackEvent("cta_click", { location: "site_header_floating", action: "get_started" })}
-          >
-            Get Started {"->"}
-          </a>
+          {!candidateAudience ? (
+            <a
+              href="/recruiter-auth"
+              style={pillButtonStyle}
+              onClick={() => trackEvent("cta_click", { location: "site_header_floating", action: "get_started" })}
+            >
+              Get Started {"->"}
+            </a>
+          ) : authenticatedCandidate ? (
+            <button
+              type="button"
+              style={{ ...pillButtonStyle, border: 0, cursor: "pointer" }}
+              onClick={() => logoutMutation.mutate()}
+              disabled={logoutMutation.isPending}
+            >
+              {logoutMutation.isPending ? "Signing out..." : "Logout"}
+            </button>
+          ) : null}
         </div>
       </motion.div>
     </>

@@ -37,6 +37,7 @@ import { registerSignalRoutes } from "./signal.routes";
 import { registerColdOutreachRoutes } from "./coldOutreach.routes";
 import { registerCandidateSemanticRoutes } from "./candidates.semantic.routes";
 import { registerRecruiterDashboardRoutes } from "./recruiterDashboard.routes";
+import { registerCandidatePortalRoutes } from "./candidatePortal.routes";
 import { isExpectedDisconnectError } from "./monitoring";
 import { ensureAtsSchema } from "./bootstrapSchema";
 
@@ -465,6 +466,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register applications routes (applications, pipeline, candidates, profiles)
   registerApplicationsRoutes(app, doubleCsrfProtection, upload);
+
+  // Register candidate portal routes (saved jobs)
+  registerCandidatePortalRoutes(app, doubleCsrfProtection);
 
   // Register bulk resume import routes (staging/review/finalize flow)
   registerBulkResumeImportRoutes(app, doubleCsrfProtection, upload);

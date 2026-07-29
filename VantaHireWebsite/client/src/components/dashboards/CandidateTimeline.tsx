@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { Calendar, Briefcase, MapPin } from "lucide-react";
+import { getCandidateApplicationStatus } from "@/components/candidate/CandidateJobStatusBadge";
 
 interface TimelineApplication {
   id: number;
@@ -10,8 +11,6 @@ interface TimelineApplication {
   jobLocation?: string;
   appliedAt: Date | string;
   status?: string;
-  currentStage?: string;
-  stageName?: string | null;
 }
 
 interface CandidateTimelineProps {
@@ -149,12 +148,9 @@ export function CandidateTimeline({
                             <div className="flex flex-col gap-1 items-end">
                               {app.status && (
                                 <Badge variant="outline" className="text-xs border-info/50 text-info">
-                                  {app.status}
-                                </Badge>
-                              )}
-                              {(app.stageName || app.currentStage) && (
-                                <Badge variant="outline" className="text-xs border-green-400/50 text-green-300">
-                                  {app.stageName || app.currentStage}
+                                  {getCandidateApplicationStatus({
+                                    status: app.status,
+                                  }).label}
                                 </Badge>
                               )}
                             </div>

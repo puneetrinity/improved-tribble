@@ -83,10 +83,10 @@ async function sendVerificationEmail(
   try {
     await emailService.sendEmail({
       to: email,
-      subject: 'Verify your VantaHire account',
+      subject: 'Verify your Ealana account',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1a1a1a;">Welcome to VantaHire!</h2>
+          <h2 style="color: #1a1a1a;">Welcome to Ealana!</h2>
           <p>Hi ${name},</p>
           <p>Thanks for signing up. Please verify your email address to get started.</p>
           <p style="margin: 30px 0;">
@@ -150,6 +150,36 @@ export function requireAuth(req: any, res: any, next: any) {
   if (!req.user) {
     return res.status(401).json({ error: 'Authentication required' });
   }
+  next();
+}
+
+export function requireVerifiedCandidate(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  if (!req.user) {
+    res.status(401).json({ error: 'Authentication required' });
+    return;
+  }
+
+  if (req.user.role !== 'candidate') {
+    res.status(403).json({
+      error: 'Candidate access required',
+      code: 'INSUFFICIENT_PERMISSIONS',
+    });
+    return;
+  }
+
+  if (!req.user.emailVerified) {
+    res.status(403).json({
+      error: 'Please verify your email before continuing',
+      code: 'EMAIL_NOT_VERIFIED',
+      email: req.user.username,
+    });
+    return;
+  }
+
   next();
 }
 
@@ -537,8 +567,9 @@ export function setupAuth(app: Express) {
         return;
       }
 
-      // Block unverified recruiters from logging in
-      if (user.role === 'recruiter' && !user.emailVerified) {
+      // Block unverified candidates and recruiters before a session or
+      // application claim can be created.
+      if ((user.role === 'recruiter' || user.role === 'candidate') && !user.emailVerified) {
         res.status(403).json({
           error: "Please verify your email before logging in",
           code: "EMAIL_NOT_VERIFIED",
@@ -572,7 +603,8 @@ export function setupAuth(app: Express) {
               username: user.username,
               firstName: user.firstName,
               lastName: user.lastName,
-              role: user.role
+              role: user.role,
+              emailVerified: user.emailVerified,
             });
           })
           .catch((e) => {
@@ -582,7 +614,8 @@ export function setupAuth(app: Express) {
               username: user.username,
               firstName: user.firstName,
               lastName: user.lastName,
-              role: user.role
+              role: user.role,
+              emailVerified: user.emailVerified,
             });
           });
         });
@@ -819,7 +852,7 @@ export function setupAuth(app: Express) {
 
         await emailService.sendEmail({
           to: email,
-          subject: 'Reset Your VantaHire Password',
+          subject: 'Reset Your Ealana Password',
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #7B38FB;">Reset Your Password</h2>
@@ -832,10 +865,10 @@ export function setupAuth(app: Express) {
               <p style="word-break: break-all; color: #666;">${resetUrl}</p>
               <p style="color: #999; font-size: 12px; margin-top: 30px;">This link will expire in 1 hour. If you didn't request a password reset, you can safely ignore this email.</p>
               <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
-              <p style="color: #999; font-size: 12px;">© VantaHire - AI-Powered Recruitment Platform</p>
+              <p style="color: #999; font-size: 12px;">© Ealana - The Neural OS for Talent</p>
             </div>
           `,
-          text: `Hi ${name}, Reset your VantaHire password by visiting: ${resetUrl} (expires in 1 hour)`,
+          text: `Hi ${name}, Reset your Ealana password by visiting: ${resetUrl} (expires in 1 hour)`,
         });
       }
 

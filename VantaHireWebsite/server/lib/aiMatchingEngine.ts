@@ -10,9 +10,6 @@
  * - Server-side label derivation
  */
 
-import { db } from '../db';
-import { applications, userAiUsage } from '../../shared/schema';
-import { eq } from 'drizzle-orm';
 import { redisGet, redisSet, redisIncr, redisDecr } from './redis';
 import { formatDigestForPrompt, JDDigest } from './jdDigest';
 import { getGroqClient } from './groqClient';
@@ -156,43 +153,15 @@ async function decrementConcurrency(): Promise<void> {
 }
 
 /**
- * Record AI usage for user
- */
-async function recordUsage(
-  userId: number,
-  kind: 'fit' | 'content' | 'role' | 'feedback',
-  tokensIn: number,
-  tokensOut: number,
-  costUsd: number,
-  metadata: Record<string, any>,
-  organizationId?: number
-): Promise<void> {
-  await db.insert(userAiUsage).values({
-    userId,
-    kind,
-    tokensIn,
-    tokensOut,
-    costUsd: costUsd.toFixed(8),
-    metadata,
-    ...(organizationId != null && { organizationId }),
-  });
-}
-
-/**
  * Compute fit score between resume and job
  *
  * @param resumeText - Extracted resume text
  * @param jdDigest - Job description digest
- * @param userId - User ID for usage tracking
- * @param applicationId - Application ID for metadata
  * @returns Fit computation result
  */
 export async function computeFitScore(
   resumeText: string,
-  jdDigest: JDDigest,
-  userId: number,
-  applicationId: number,
-  organizationId?: number
+  jdDigest: JDDigest
 ): Promise<FitComputationResult> {
   const startTime = Date.now();
 
@@ -265,14 +234,6 @@ Be objective and concise. Provide 3-5 specific reasons.`;
 
     // Track budget
     await trackBudgetSpending(costUsd);
-
-    // Record usage
-    await recordUsage(userId, 'fit', tokensIn, tokensOut, costUsd, {
-      applicationId,
-      durationMs,
-      score,
-      label,
-    }, organizationId);
 
     return {
       score,

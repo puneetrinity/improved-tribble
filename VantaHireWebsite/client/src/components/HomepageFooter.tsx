@@ -1,7 +1,14 @@
 ﻿import { Link } from "wouter";
 import ealanaMoth from "@/assets/ealana-moth (1).svg";
+import type { HomepageNavAudience } from "@/components/HomepageNav";
 
-const HomepageFooter = () => {
+const HomepageFooter = ({
+  audience = "public",
+}: {
+  audience?: HomepageNavAudience;
+}) => {
+  const candidateAudience = audience === "candidate";
+
   const openCookiePreferences = () => {
     window.dispatchEvent(new CustomEvent("cookie-consent:open", { detail: { reset: true } }));
   };
@@ -40,7 +47,9 @@ const HomepageFooter = () => {
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Features</Link></li>
                 <li><Link href="/solutions" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Solutions</Link></li>
-                <li><Link href="/pricing" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Pricing</Link></li>
+                {!candidateAudience ? (
+                  <li><Link href="/pricing" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Pricing</Link></li>
+                ) : null}
                 <li><Link href="/jobs" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Browse Jobs</Link></li>
               </ul>
             </div>
@@ -48,7 +57,9 @@ const HomepageFooter = () => {
               <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Company</h5>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li><Link href="/about" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">About</Link></li>
-                <li><a href="https://cal.com/ealana/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
+                {!candidateAudience ? (
+                  <li><a href="https://cal.com/ealana/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
+                ) : null}
                 <li><a href="mailto:info@ealana.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
               </ul>
             </div>

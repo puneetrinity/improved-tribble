@@ -93,6 +93,27 @@ export async function ensureAtsSchema(): Promise<void> {
       );
     `);
 
+    await execSafe(sql`
+      CREATE TABLE IF NOT EXISTS saved_jobs (
+        id SERIAL PRIMARY KEY,
+        candidate_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT NOW() NOT NULL
+      );
+    `);
+    await execSafe(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS saved_jobs_candidate_job_unique_idx
+      ON saved_jobs(candidate_id, job_id);
+    `);
+    await execSafe(sql`
+      CREATE INDEX IF NOT EXISTS saved_jobs_candidate_created_at_idx
+      ON saved_jobs(candidate_id, created_at DESC);
+    `);
+    await execSafe(sql`
+      CREATE INDEX IF NOT EXISTS saved_jobs_job_id_idx
+      ON saved_jobs(job_id);
+    `);
+
   await execSafe(sql`
     CREATE TABLE IF NOT EXISTS user_profiles (
       id SERIAL PRIMARY KEY,

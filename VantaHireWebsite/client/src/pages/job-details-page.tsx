@@ -1,21 +1,27 @@
-﻿import { useState, useEffect } from "react";
+﻿import { useState, useEffect, useLayoutEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useRoute, Link, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { MapPin, Clock, Calendar, Users, FileText, Upload, Briefcase, Star, Share2, Bookmark, Sparkles, AlertTriangle, RotateCcw, History, IndianRupee, GraduationCap, ChevronRight, User, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Job, insertApplicationSchema } from "@shared/schema";
+import { Job, insertApplicationSchema, type UserProfile } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchWithCsrf } from "@/lib/csrf";
 import { z } from "zod";
 import { differenceInDays, format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { DEFAULT_SITE_URL, generateJobPostingJsonLd, generateJobMetaDescription, getJobCanonicalUrl } from "@/lib/seoHelpers";
-import { useAIFeatures } from "@/hooks/use-ai-features";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
 import { sectionLabel } from "@/lib/shared-styles";
+import {
+  candidateApplicationsQueryKey,
+  useCandidateJobState,
+} from "@/hooks/use-candidate-job-state";
+import { CandidateSaveButton } from "@/components/candidate/CandidateSaveButton";
+import { CandidateJobStatusBadge } from "@/components/candidate/CandidateJobStatusBadge";
+import { candidatePrivateQueryKey } from "@/lib/candidate-query-keys";
 
 // Types for audit log
 interface AuditLogEntry {
@@ -26,9 +32,36 @@ interface AuditLogEntry {
   createdAt: string;
 }
 
+type CandidateProfileResponse = {
+  profile: Pick<UserProfile, "displayName" | "phone">;
+};
+
+const useBrowserLayoutEffect =
+  typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+function createEmptyApplicationForm() {
+  return {
+    name: "",
+    email: "",
+    phone: "",
+    coverLetter: "",
+    whatsappConsent: true,
+  };
+}
 
 const titleCase = (t: string) =>
   t.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
+
+const normalizePhoneNumber = (value: string) => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return digits.slice(2);
+  }
+  if (digits.length === 11 && digits.startsWith("0")) {
+    return digits.slice(1);
+  }
+  return digits;
+};
 
 const emptyStateCls = "flex flex-col items-center justify-center min-h-[60vh] text-center py-[60px] px-5 gap-3 [&>svg]:w-12 [&>svg]:h-12 [&>svg]:text-e-text3 [&>svg]:mb-2";
 const btnApplyCls = "bg-e-blue text-white border-none py-3 px-8 rounded-xl font-ui text-[0.875rem] font-medium cursor-pointer transition-all duration-200 whitespace-nowrap hover:brightness-110 hover:shadow-[0_10px_36px_rgba(75,142,240,0.28)] disabled:opacity-50 disabled:cursor-not-allowed";
@@ -44,20 +77,36 @@ const statusBadgeBase = "inline-block py-1 px-3 rounded-full font-mono text-[0.6
 
 export default function JobDetailsPage() {
   const [match, params] = useRoute("/jobs/:id");
+  const search = useSearch();
   const { toast } = useToast();
   const { user } = useAuth();
+  const candidateJobState = useCandidateJobState();
   const [showApplicationForm, setShowApplicationForm] = useState(false);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    coverLetter: "",
-    whatsappConsent: true,
-  });
+  const [formData, setFormData] = useState(createEmptyApplicationForm);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [selectedResumeId, setSelectedResumeId] = useState<number | null>(null);
+
+  const {
+    data: candidateProfile,
+    isLoading: candidateProfileLoading,
+  } = useQuery<CandidateProfileResponse>({
+    queryKey: candidatePrivateQueryKey(
+      "/api/profile",
+      candidateJobState.isVerifiedCandidate ? user!.id : null,
+    ),
+    queryFn: async () => {
+      const response = await fetch("/api/profile", { credentials: "include" });
+      if (!response.ok) {
+        throw new Error("Failed to load your profile");
+      }
+      return response.json();
+    },
+    enabled: candidateJobState.isVerifiedCandidate,
+  });
 
   // Support both numeric ID and slug in URL
   const jobIdOrSlug = params?.id || null;
+  const applicationContextKey = `${user?.id ?? "anonymous"}:${jobIdOrSlug ?? "none"}`;
 
   // Extended type for job with client data for JSON-LD
   interface JobWithExtras extends Job {
@@ -91,10 +140,89 @@ export default function JobDetailsPage() {
     },
   });
 
-  const { resumeAdvisor, fitScoring } = useAIFeatures();
-  const aiEnabled = resumeAdvisor || fitScoring;
-
   const isRecruiterOrAdmin = user?.role === 'recruiter' || user?.role === 'super_admin';
+  const candidateApplication = job
+    ? candidateJobState.applicationByJobId.get(job.id)
+    : undefined;
+  const isSaved = job
+    ? candidateJobState.savedJobByJobId.has(job.id)
+    : false;
+
+  useBrowserLayoutEffect(() => {
+    setShowApplicationForm(false);
+    setFormData(createEmptyApplicationForm());
+    setResumeFile(null);
+    setSelectedResumeId(null);
+  }, [applicationContextKey]);
+
+  useEffect(() => {
+    if (!candidateJobState.isVerifiedCandidate) return;
+
+    const profileName =
+      candidateProfile?.profile.displayName?.trim() ||
+      [user?.firstName, user?.lastName].filter(Boolean).join(" ");
+
+    setFormData((current) => ({
+      ...current,
+      name: current.name || profileName,
+      email: current.email || user?.username || "",
+      phone: current.phone || candidateProfile?.profile.phone || "",
+    }));
+  }, [
+    candidateJobState.isVerifiedCandidate,
+    candidateProfile?.profile.displayName,
+    candidateProfile?.profile.phone,
+    user?.firstName,
+    user?.lastName,
+    user?.username,
+  ]);
+
+  useEffect(() => {
+    if (!candidateJobState.isVerifiedCandidate) return;
+
+    const selectedStillExists = candidateJobState.resumes.some(
+      (resume) => resume.id === selectedResumeId,
+    );
+    if (!selectedStillExists) {
+      setSelectedResumeId(candidateJobState.defaultResume?.id ?? null);
+    }
+  }, [
+    candidateJobState.defaultResume?.id,
+    candidateJobState.isVerifiedCandidate,
+    candidateJobState.resumes,
+    selectedResumeId,
+  ]);
+
+  useEffect(() => {
+    if (
+      new URLSearchParams(search).get("apply") !== "1" ||
+      !job ||
+      !candidateJobState.isVerifiedCandidate ||
+      candidateJobState.applicationsQuery.isLoading ||
+      candidateJobState.resumesQuery.isLoading ||
+      candidateJobState.resumes.length === 0 ||
+      candidateProfileLoading ||
+      candidateApplication
+    ) {
+      return;
+    }
+
+    setShowApplicationForm(true);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("hr-jd-apply-section")
+        ?.scrollIntoView({ behavior: "smooth" });
+    });
+  }, [
+    candidateApplication,
+    candidateJobState.applicationsQuery.isLoading,
+    candidateJobState.isVerifiedCandidate,
+    candidateJobState.resumes.length,
+    candidateJobState.resumesQuery.isLoading,
+    candidateProfileLoading,
+    job,
+    search,
+  ]);
 
   // Fetch audit log for job (recruiters/admins only)
   const { data: auditLog = [] } = useQuery<AuditLogEntry[]>({
@@ -141,8 +269,17 @@ export default function JobDetailsPage() {
     },
     onSuccess: () => {
       toast({ title: "Application submitted successfully", description: "We'll review your application and get back to you soon." });
+      queryClient.invalidateQueries({
+        queryKey: candidateApplicationsQueryKey,
+      });
       setShowApplicationForm(false);
-      setFormData({ name: "", email: "", phone: "", coverLetter: "", whatsappConsent: true });
+      setFormData((current) => ({
+        name: candidateJobState.isVerifiedCandidate ? current.name : "",
+        email: candidateJobState.isVerifiedCandidate ? current.email : "",
+        phone: candidateJobState.isVerifiedCandidate ? current.phone : "",
+        coverLetter: "",
+        whatsappConsent: true,
+      }));
       setResumeFile(null);
     },
     onError: (error: Error) => {
@@ -153,7 +290,24 @@ export default function JobDetailsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!resumeFile) {
+    if (candidateApplication) {
+      toast({
+        title: "Already applied",
+        description: "Your application for this role is already in progress.",
+      });
+      return;
+    }
+
+    if (candidateJobState.isVerifiedCandidate && !selectedResumeId) {
+      toast({
+        title: "Resume required",
+        description: "Choose one of your saved resumes to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!candidateJobState.isVerifiedCandidate && !resumeFile) {
       toast({ title: "Resume required", description: "Please upload your resume to continue.", variant: "destructive" });
       return;
     }
@@ -161,6 +315,7 @@ export default function JobDetailsPage() {
     try {
       const validatedData = insertApplicationSchema.parse({
         ...formData,
+        phone: normalizePhoneNumber(formData.phone),
         jobId: job?.id!,
       });
       const formDataToSend = new FormData();
@@ -169,7 +324,9 @@ export default function JobDetailsPage() {
           formDataToSend.append(key, value.toString());
         }
       });
-      if (resumeFile) {
+      if (candidateJobState.isVerifiedCandidate && selectedResumeId) {
+        formDataToSend.append("resumeId", selectedResumeId.toString());
+      } else if (resumeFile) {
         formDataToSend.append('resume', resumeFile);
       }
       applicationMutation.mutate(formDataToSend);
@@ -177,6 +334,27 @@ export default function JobDetailsPage() {
       if (error instanceof z.ZodError) {
         toast({ title: "Validation error", description: error.errors[0]?.message || "Validation failed", variant: "destructive" });
       }
+    }
+  };
+
+  const handleToggleSavedJob = async () => {
+    if (!job) return;
+
+    try {
+      if (isSaved) {
+        await candidateJobState.unsaveJob(job.id);
+        toast({ title: "Removed from saved jobs" });
+      } else {
+        await candidateJobState.saveJob(job.id);
+        toast({ title: "Job saved" });
+      }
+    } catch (saveError) {
+      toast({
+        title: isSaved ? "Could not remove saved job" : "Could not save job",
+        description:
+          saveError instanceof Error ? saveError.message : "Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -191,7 +369,7 @@ export default function JobDetailsPage() {
   if (!match || !jobIdOrSlug) {
     return (
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
-        <HomepageNav />
+        <HomepageNav audience={candidateJobState.isCandidate ? "candidate" : "public"} />
         <GridOverlay />
         <div className={emptyStateCls}>
           <Briefcase />
@@ -199,7 +377,7 @@ export default function JobDetailsPage() {
           <p className="text-sm text-e-text2 max-w-[400px]">The job you're looking for doesn't exist.</p>
           <Link href="/jobs" className="bg-e-blue text-white border-none py-2 px-[18px] rounded-xl font-ui text-[0.82rem] font-medium cursor-pointer no-underline transition-all duration-200 inline-block hover:brightness-110">Browse Jobs</Link>
         </div>
-        <HomepageFooter />
+        <HomepageFooter audience={candidateJobState.isCandidate ? "candidate" : "public"} />
       </div>
     );
   }
@@ -207,13 +385,13 @@ export default function JobDetailsPage() {
   if (isLoading) {
     return (
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
-        <HomepageNav />
+        <HomepageNav audience={candidateJobState.isCandidate ? "candidate" : "public"} />
         <GridOverlay />
         <div className={emptyStateCls}>
           <div className="w-9 h-9 border-[3px] border-white/10 border-t-e-blue rounded-full animate-hr-spin" />
           <p className="text-sm text-e-text2 max-w-[400px]">Loading job details...</p>
         </div>
-        <HomepageFooter />
+        <HomepageFooter audience={candidateJobState.isCandidate ? "candidate" : "public"} />
       </div>
     );
   }
@@ -224,7 +402,7 @@ export default function JobDetailsPage() {
 
     return (
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
-        <HomepageNav />
+        <HomepageNav audience={candidateJobState.isCandidate ? "candidate" : "public"} />
         <GridOverlay />
         <div className={emptyStateCls}>
           {isExpiredOrInactive ? (
@@ -249,7 +427,7 @@ export default function JobDetailsPage() {
             </>
           )}
         </div>
-        <HomepageFooter />
+        <HomepageFooter audience={candidateJobState.isCandidate ? "candidate" : "public"} />
       </div>
     );
   }
@@ -296,7 +474,7 @@ export default function JobDetailsPage() {
       </Helmet>
 
       <div className="font-ui leading-normal bg-e-bg text-e-text antialiased public-theme">
-        <HomepageNav />
+        <HomepageNav audience={candidateJobState.isCandidate ? "candidate" : "public"} />
         <GridOverlay />
 
         {/* Page wrapper */}
@@ -351,20 +529,30 @@ export default function JobDetailsPage() {
                         Expires {daysUntilExpiry === 0 ? 'today' : daysUntilExpiry === 1 ? 'tomorrow' : `in ${daysUntilExpiry} days`}
                       </span>
                     )}
+                    {candidateApplication ? (
+                      <CandidateJobStatusBadge application={candidateApplication} />
+                    ) : null}
                   </div>
                 </div>
 
                 {/* Quick actions */}
                 <div className="flex flex-col gap-3 shrink-0 pt-7 max-md:pt-0 max-md:flex-row max-md:flex-wrap max-md:items-center">
-                  {!isExpired && (
+                  {!isExpired && !candidateApplication && (
                     <button
                       className={btnApplyCls}
                       onClick={() => {
                         setShowApplicationForm(true);
                         document.getElementById('hr-jd-apply-section')?.scrollIntoView({ behavior: 'smooth' });
                       }}
+                      disabled={
+                        candidateJobState.isVerifiedCandidate &&
+                        candidateJobState.applicationsQuery.isLoading
+                      }
                     >
-                      Apply Now
+                      {candidateJobState.isVerifiedCandidate &&
+                      candidateJobState.applicationsQuery.isLoading
+                        ? "Checking status..."
+                        : "Apply Now"}
                     </button>
                   )}
                   {isExpired && isRecruiterOrAdmin && (
@@ -389,12 +577,25 @@ export default function JobDetailsPage() {
                     >
                       <Share2 /> Share
                     </button>
-                    <button
-                      className={btnSecondaryCls}
-                      onClick={() => toast({ title: "Job saved", description: "We'll remind you about this opportunity" })}
-                    >
-                      <Bookmark /> Save
-                    </button>
+                    {candidateJobState.isVerifiedCandidate ? (
+                      <CandidateSaveButton
+                        isSaved={isSaved}
+                        isPending={
+                          candidateJobState.savedJobsQuery.isLoading ||
+                          candidateJobState.savingJobId === job.id
+                        }
+                        onToggle={() => void handleToggleSavedJob()}
+                        showLabel
+                        className="max-md:flex-1"
+                      />
+                    ) : !user ? (
+                      <Link
+                        href="/candidate-auth"
+                        className={`${btnSecondaryCls} no-underline`}
+                      >
+                        <Bookmark /> Sign in to save
+                      </Link>
+                    ) : null}
                   </div>
                 </div>
               </header>
@@ -611,32 +812,62 @@ export default function JobDetailsPage() {
                     </div>
                   </div>
 
-                  {/* AI match badge */}
-                  {aiEnabled && (
-                    <div className="bg-[linear-gradient(135deg,rgba(75,142,240,0.1),rgba(52,209,122,0.05))] border border-[rgba(75,142,240,0.2)] rounded-[24px] py-[18px] px-5">
-                      <div className="flex items-center gap-2 text-[0.88rem] font-semibold text-e-blue mb-2 [&>svg]:w-4 [&>svg]:h-4">
-                        <Sparkles /> AI Match Score
-                      </div>
-                      <p className="text-[0.78rem] text-e-text3 leading-[1.5] mb-3">Upload your resume to see your match score</p>
-                      <span className="inline-block py-1 px-3 rounded-full font-mono text-[0.62rem] font-medium tracking-[0.04em] bg-[rgba(75,142,240,0.12)] text-e-blue border border-[rgba(75,142,240,0.2)]">AI-Powered Matching Available</span>
-                    </div>
-                  )}
-
                   {/* Apply card */}
-                  {!showApplicationForm ? (
+                  {candidateApplication ? (
+                    <div className={sidebarCardCls}>
+                      <div className="font-display text-base font-medium text-e-text mb-3">
+                        Application status
+                      </div>
+                      <CandidateJobStatusBadge
+                        application={candidateApplication}
+                        className="mb-4"
+                      />
+                      <p className="mb-4 text-[0.82rem] leading-[1.6] text-e-text2">
+                        You have already applied for this role.
+                      </p>
+                      <Link
+                        href="/my-dashboard"
+                        className={`${btnSecondaryCls} w-full justify-center no-underline`}
+                      >
+                        View application
+                      </Link>
+                    </div>
+                  ) : !showApplicationForm ? (
                     <div className={sidebarCardCls}>
                       <div className="font-display text-base font-medium text-e-text mb-4">Interested?</div>
                       <p className="text-[0.88rem] text-e-text2 leading-[1.6] mb-5">
                         Submit your application and we'll get back to you.
                       </p>
                       {!isExpired && (
-                        <button
-                          className={`${btnApplyCls} w-full`}
-                          onClick={() => setShowApplicationForm(true)}
-                          data-testid="apply-button"
-                        >
-                          Apply Now
-                        </button>
+                        candidateJobState.isVerifiedCandidate &&
+                        !candidateJobState.resumesQuery.isLoading &&
+                        candidateJobState.resumes.length === 0 ? (
+                          <Link
+                            href="/my-dashboard?tab=resumes"
+                            className={`${btnApplyCls} block w-full text-center no-underline`}
+                          >
+                            Upload a resume to apply
+                          </Link>
+                        ) : (
+                          <button
+                            className={`${btnApplyCls} w-full`}
+                            onClick={() => setShowApplicationForm(true)}
+                            data-testid="apply-button"
+                            disabled={
+                              candidateJobState.isVerifiedCandidate &&
+                              (candidateJobState.applicationsQuery.isLoading ||
+                                candidateJobState.resumesQuery.isLoading)
+                            }
+                          >
+                            {candidateJobState.isVerifiedCandidate &&
+                            candidateJobState.applicationsQuery.isLoading
+                              ? "Checking status..."
+                              : candidateJobState.isVerifiedCandidate &&
+                                  candidateJobState.resumesQuery.isLoading
+                              ? "Loading resumes..."
+                              : "Apply Now"}
+                          </button>
+                        )
                       )}
                     </div>
                   ) : (
@@ -650,7 +881,11 @@ export default function JobDetailsPage() {
                       <p className="text-[0.82rem] text-e-text3 mb-5">
                         Fill out the form below to apply for this position
                       </p>
-                      <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
+                      <form
+                        key={applicationContextKey}
+                        onSubmit={handleSubmit}
+                        className="flex flex-col gap-3.5"
+                      >
                         <div className="flex flex-col gap-1.5">
                           <label htmlFor="name" className="text-[0.78rem] font-medium text-e-text2">Full Name *</label>
                           <input
@@ -686,25 +921,62 @@ export default function JobDetailsPage() {
                             placeholder="+91 98765 43210"
                           />
                         </div>
-                        <div className="flex flex-col gap-1.5">
-                          <label htmlFor="resume" className="text-[0.78rem] font-medium text-e-text2">Resume (PDF) *</label>
-                          <div className="relative">
-                            <input
-                              id="resume"
-                              type="file"
-                              accept=".pdf,.doc,.docx"
-                              className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 px-3 font-ui text-[0.82rem] text-e-text2 w-full cursor-pointer file:bg-e-blue file:text-white file:border-none file:rounded-xl file:py-1.5 file:px-4 file:mr-3 file:font-ui file:text-[0.78rem] file:font-medium file:cursor-pointer"
-                              onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                        {candidateJobState.isVerifiedCandidate ? (
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="resumeId" className="text-[0.78rem] font-medium text-e-text2">
+                              Resume *
+                            </label>
+                            <select
+                              id="resumeId"
+                              className={`${formInputCls} cursor-pointer [color-scheme:dark]`}
+                              value={selectedResumeId ?? ""}
+                              onChange={(event) =>
+                                setSelectedResumeId(Number(event.target.value))
+                              }
                               required
-                            />
-                            <Upload className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-e-text3 pointer-events-none" />
+                            >
+                              <option value="" disabled style={{ backgroundColor: "#111326", color: "#F4F5FA" }}>
+                                Choose a resume
+                              </option>
+                              {candidateJobState.resumes.map((resume) => (
+                                <option
+                                  key={resume.id}
+                                  value={resume.id}
+                                  style={{ backgroundColor: "#111326", color: "#F4F5FA" }}
+                                >
+                                  {resume.label}
+                                  {resume.isDefault ? " (Default)" : ""}
+                                </option>
+                              ))}
+                            </select>
+                            <Link
+                              href="/my-dashboard?tab=resumes"
+                              className="text-[0.75rem] text-e-blue no-underline hover:underline"
+                            >
+                              Manage resumes
+                            </Link>
                           </div>
-                          {resumeFile && (
-                            <span className="flex items-center gap-1.5 text-[0.78rem] text-e-green mt-1 [&>svg]:w-3.5 [&>svg]:h-3.5">
-                              <Check /> {resumeFile.name}
-                            </span>
-                          )}
-                        </div>
+                        ) : (
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="resume" className="text-[0.78rem] font-medium text-e-text2">Resume (PDF) *</label>
+                            <div className="relative">
+                              <input
+                                id="resume"
+                                type="file"
+                                accept=".pdf,.doc,.docx"
+                                className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 px-3 font-ui text-[0.82rem] text-e-text2 w-full cursor-pointer file:bg-e-blue file:text-white file:border-none file:rounded-xl file:py-1.5 file:px-4 file:mr-3 file:font-ui file:text-[0.78rem] file:font-medium file:cursor-pointer"
+                                onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
+                                required
+                              />
+                              <Upload className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-e-text3 pointer-events-none" />
+                            </div>
+                            {resumeFile && (
+                              <span className="flex items-center gap-1.5 text-[0.78rem] text-e-green mt-1 [&>svg]:w-3.5 [&>svg]:h-3.5">
+                                <Check /> {resumeFile.name}
+                              </span>
+                            )}
+                          </div>
+                        )}
                         <div className="flex flex-col gap-1.5">
                           <label htmlFor="coverLetter" className="text-[0.78rem] font-medium text-e-text2">Cover Letter</label>
                           <textarea
@@ -731,7 +1003,11 @@ export default function JobDetailsPage() {
                           <button
                             type="submit"
                             className={`${btnApplyCls} flex-1`}
-                            disabled={applicationMutation.isPending}
+                            disabled={
+                              applicationMutation.isPending ||
+                              (candidateJobState.isVerifiedCandidate &&
+                                !selectedResumeId)
+                            }
                           >
                             {applicationMutation.isPending ? "Submitting..." : "Submit Application"}
                           </button>
@@ -754,7 +1030,7 @@ export default function JobDetailsPage() {
           </div>
         </div>
 
-        <HomepageFooter />
+        <HomepageFooter audience={candidateJobState.isCandidate ? "candidate" : "public"} />
       </div>
     </>
   );
