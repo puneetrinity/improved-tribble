@@ -1,4 +1,5 @@
 [phases.build]
-cmds = ["npm ci --no-audit --no-fund", "npm run build"]
+# Railway sets NODE_ENV=production, but Vite and esbuild are build-time dev dependencies.
+cmds = ["npm ci --include=dev --no-audit --no-fund", "npm run build"]
 # Empty array disables default cache mounts
 cacheDirectories = []
