@@ -22,6 +22,7 @@ export const ACTIVEKG_SCOPES = {
   ASK: 'ask:read',
   WRITE: 'kg:write',
   KG_READ: 'kg:read',
+  CONTACT_WRITE: 'contact:write',
 } as const;
 
 // =====================================================
@@ -154,6 +155,7 @@ async function activekgFetch(
     requestId?: string | undefined;
     body?: unknown | undefined;
     query?: Record<string, string> | undefined;
+    timeoutMs?: number | undefined;
   },
 ): Promise<Response> {
   const token = await signServiceJwt('activekg', {
@@ -180,6 +182,9 @@ async function activekgFetch(
     method: opts.method,
     headers,
     ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
+    // Node's fetch has no default timeout; an unbounded call here would pin the
+    // caller (and, for outreach hygiene, a pooled DB connection) indefinitely.
+    ...(opts.timeoutMs != null ? { signal: AbortSignal.timeout(opts.timeoutMs) } : {}),
   });
 
   return res;
@@ -432,4 +437,43 @@ export async function getResumeRefs(
   }
   const body: any = await res.json().catch(() => null);
   return (body && body.refs) || {};
+}
+
+export type ContactSuppressionReason = 'hard_bounce' | 'complaint';
+
+/**
+ * Hygiene suppression is called on the Brevo webhook path, which must answer the
+ * provider quickly and must never hold outreach locks on a slow Memory.
+ */
+export const CONTACT_SUPPRESSION_TIMEOUT_MS = 5000;
+
+export async function suppressContactEvidence(
+  tenantId: string,
+  input: {
+    email: string;
+    reason: ContactSuppressionReason;
+    providerEventId?: string | null;
+  },
+  requestId?: string,
+): Promise<void> {
+  const res = await activekgFetch('/contact-evidence/suppress', {
+    method: 'POST',
+    tenantId,
+    scopes: ACTIVEKG_SCOPES.CONTACT_WRITE,
+    requestId,
+    timeoutMs: CONTACT_SUPPRESSION_TIMEOUT_MS,
+    body: {
+      email: input.email,
+      reason: input.reason,
+      provider_event_id: input.providerEventId ?? null,
+    },
+  });
+  if (res.ok) return;
+
+  const body: any = await res.json().catch(() => null);
+  throw new ActiveKGClientError(
+    body?.detail || `ActiveKG /contact-evidence/suppress returned ${res.status}`,
+    res.status,
+    body,
+  );
 }

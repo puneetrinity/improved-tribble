@@ -178,7 +178,7 @@ export interface IStorage {
     stageChangedAt?: Date;
     stageChangedBy?: number;
     organizationId?: number;
-  }): Promise<Application>;
+  }, executor?: any): Promise<Application>;
   getApplicationsByJob(jobId: number): Promise<Application[]>;
   getApplicationsByUser(email: string): Promise<Application[]>;
   getApplication(id: number): Promise<Application | undefined>;
@@ -1442,8 +1442,8 @@ export class DatabaseStorage implements IStorage {
     stageChangedAt?: Date;
     stageChangedBy?: number;
     organizationId?: number;
-  }): Promise<Application> {
-    const [result] = await db
+  }, executor: any = db): Promise<Application> {
+    const [result] = await executor
       .insert(applications)
       .values({
         ...application,

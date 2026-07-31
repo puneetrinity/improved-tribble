@@ -64,7 +64,8 @@ interface HistoryCampaign {
     recipientEmail: string;
     recipientName: string | null;
     subject: string;
-    status: "sent" | "failed";
+    status: "sending" | "sent" | "failed";
+    deliveryStatus: string | null;
     errorMessage: string | null;
     sentAt: string;
   }>;
@@ -78,6 +79,17 @@ interface HistoryState {
     candidateIds: number[];
   }>;
   maxCampaigns: number;
+  funnel: Array<{ stage: string; count: number }>;
+  candidateStates: Array<{
+    candidateId: number;
+    name: string;
+    outreachCount: number;
+    lastRound: number | null;
+    lastStatus: string | null;
+    nextRound: number | null;
+    nextDueAt: string | null;
+    appliedAt: string | null;
+  }>;
   campaigns: HistoryCampaign[];
 }
 

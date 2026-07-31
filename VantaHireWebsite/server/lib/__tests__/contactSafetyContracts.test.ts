@@ -28,13 +28,16 @@ describe('contact safety deployment contracts', () => {
   it('revalidates through Signal before manual and scheduled sends', () => {
     const manualSource = read('../../coldOutreach.routes.ts');
     const schedulerSource = read('../outreachScheduler.ts');
+    const deliverySource = read('../outreachDelivery.ts');
     const signalRoutesSource = read('../../signal.routes.ts');
 
-    expect(manualSource).toContain('deliverWithRevalidatedContact({');
+    expect(manualSource).toContain('sendTrackedOutreachEmail({');
     expect(manualSource).not.toContain('waitForEnrichmentCompletion');
     expect(manualSource).not.toMatch(/to:\s*candidate\.foundEmail/);
-    expect(schedulerSource).toContain('deliverWithRevalidatedContact({');
+    expect(schedulerSource).toContain('sendTrackedOutreachEmail({');
     expect(schedulerSource).not.toMatch(/to:\s*candidate\.foundEmail/);
+    expect(deliverySource).toContain('deliverWithRevalidatedContact(input.contact');
+    expect(deliverySource).toContain('isSuppressed:');
     expect(signalRoutesSource).toMatch(
       /app\.post\('\/api\/candidates\/:candidateId\/find-contact', csrfProtection,/,
     );
@@ -44,9 +47,63 @@ describe('contact safety deployment contracts', () => {
     const schedulerSource = read('../outreachScheduler.ts');
 
     expect(schedulerSource).toContain(
-      '.returning({ id: scheduledOutreachCampaigns.id })',
+      '.returning({ id: candidateOutreachSchedules.id })',
     );
     expect(schedulerSource).toContain('if (claimed.length === 0)');
+  });
+
+  it('serializes dispatch against applications and hygiene events', () => {
+    const deliverySource = read('../outreachDelivery.ts');
+    const applicationSource = read('../../applications.routes.ts');
+    const unsubscribeSource = read('../../outreachCompliance.routes.ts');
+    const webhookSource = read('../../webhooks/brevo.webhook.ts');
+
+    expect(deliverySource).toContain('withOutreachDispatchFence(');
+    expect(deliverySource).toContain(
+      'const currentContact = await revalidateCandidateContact(input.contact)',
+    );
+    expect(deliverySource).toContain(
+      'hashOutreachEmail(currentEmail) !== hashOutreachEmail(email)',
+    );
+    expect(applicationSource).toContain('lockCandidateOutreach(tx, sourcedCandidate.id)');
+    expect(unsubscribeSource).toContain(
+      'lockCandidateOutreach(tx, claims.sourcedCandidateId)',
+    );
+    expect(unsubscribeSource).toContain(
+      'lockOutreachEmailHash(tx, claims.emailHash)',
+    );
+    expect(webhookSource).toContain(
+      'lockCandidateOutreach(tx, log.sourcedCandidateId)',
+    );
+    expect(webhookSource).toContain(
+      'lockOutreachEmailHash(tx, hashOutreachEmail(event.email))',
+    );
+    expect(applicationSource).toContain(
+      'Application persistence and drip cancellation are one commit',
+    );
+    expect(applicationSource).toContain('executor: tx');
+    expect(webhookSource).toContain('const observedSentAt = lockedLog.sentAt ?? now');
+    expect(webhookSource).toContain(
+      'COALESCE(${sourcedCandidateOutreachLog.sentAt}, ${observedSentAt})',
+    );
+    expect(webhookSource).toContain('const eventPrecedesRecordedDelivery = Boolean(');
+    expect(webhookSource).toContain("WHEN ${eventType} = 'hard_bounce'");
+  });
+
+  it('keeps unsubscribe scanner-safe and follow-ups automatic', () => {
+    const unsubscribeSource = read('../../outreachCompliance.routes.ts');
+    const manualSource = read('../../coldOutreach.routes.ts');
+
+    const getHandler = unsubscribeSource.slice(
+      unsubscribeSource.indexOf("app.get('/api/outreach/unsubscribe'"),
+      unsubscribeSource.indexOf("app.post('/api/outreach/unsubscribe'"),
+    );
+    expect(getHandler).not.toContain('suppressOrgEmail({');
+    expect(unsubscribeSource).toContain('<form method="post"');
+    expect(manualSource).toContain('if (campaignRound !== 1)');
+    expect(manualSource).toContain(
+      'Follow-up rounds are sent automatically after 3 days',
+    );
   });
 
   it('keeps a locally observed platform suppression monotonic', () => {

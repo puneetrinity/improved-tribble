@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -951,7 +951,7 @@ export const webhookEvents = pgTable("webhook_events", {
   eventType: text("event_type").notNull(),
   payload: jsonb("payload").notNull(),
   processedAt: timestamp("processed_at").defaultNow().notNull(),
-  status: text("status").notNull(), // 'processed', 'skipped', 'failed'
+  status: text("status").notNull(), // 'processing', 'processed', 'skipped', 'failed'
   errorMessage: text("error_message"),
 }, (table) => ({
   eventIdIdx: uniqueIndex("webhook_events_event_id_idx").on(table.provider, table.eventId),
@@ -1093,6 +1093,11 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   stateIdx: index("job_sourced_candidates_state_idx").on(table.state),
   fitScoreIdx: index("job_sourced_candidates_fit_score_idx").on(table.fitScore),
   sourceTypeIdx: index("job_sourced_candidates_source_type_idx").on(table.sourceType),
+  ownershipIdx: uniqueIndex("job_sourced_candidates_id_org_job_idx").on(
+    table.id,
+    table.organizationId,
+    table.jobId,
+  ),
   emailResolutionDueIdx: index("job_sourced_candidates_email_resolution_due_idx").on(
     table.emailResolveNextAttemptAt,
     table.id,
@@ -1156,6 +1161,11 @@ export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_l
   aiDraftSubject: text("ai_draft_subject"),
   wasEdited: boolean("was_edited").notNull().default(false),
   status: text("status").notNull(),
+  deliveryKey: text("delivery_key"),
+  deliveryId: text("delivery_id"),
+  providerMessageId: text("provider_message_id"),
+  deliveryStatus: text("delivery_status"),
+  deliveryEventAt: timestamp("delivery_event_at"),
   errorMessage: text("error_message"),
   sentBy: integer("sent_by").notNull().references(() => users.id),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
@@ -1164,6 +1174,75 @@ export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_l
   candidateIdx: index("scol_candidate_idx").on(table.sourcedCandidateId),
   campaignIdx: index("scol_campaign_idx").on(table.campaignId),
   orgIdx: index("scol_org_idx").on(table.organizationId),
+  deliveryKeyIdx: uniqueIndex("scol_delivery_key_idx").on(table.deliveryKey),
+  deliveryIdIdx: uniqueIndex("scol_delivery_id_idx").on(table.deliveryId),
+  providerMessageIdx: uniqueIndex("scol_provider_message_idx").on(table.providerMessageId),
+}));
+
+export const outreachOrgSuppressions = pgTable("outreach_org_suppressions", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  emailHash: text("email_hash").notNull(),
+  signalCandidateId: text("signal_candidate_id"),
+  reason: text("reason").notNull().default("unsubscribe"),
+  sourceOutreachLogId: integer("source_outreach_log_id").references(() => sourcedCandidateOutreachLog.id, { onDelete: 'set null' }),
+  providerEventId: text("provider_event_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgEmailIdx: uniqueIndex("outreach_org_suppressions_org_email_idx").on(table.organizationId, table.emailHash),
+  orgCandidateIdx: index("outreach_org_suppressions_org_candidate_lookup_idx")
+    .on(table.organizationId, table.signalCandidateId)
+    .where(sql`${table.signalCandidateId} IS NOT NULL`),
+  providerEventIdx: uniqueIndex("outreach_org_suppressions_provider_event_idx").on(table.providerEventId),
+  // Org-scoped suppression is for UNSUBSCRIBE only. Hard bounce and complaint
+  // are platform-wide and belong in Memory's hash-keyed tombstone table —
+  // recording them here would silently narrow a platform-wide obligation to one
+  // org and leave every other org free to mail a known-bad address.
+  reasonCheck: check(
+    "outreach_org_suppressions_reason_check",
+    sql`${table.reason} = 'unsubscribe'`,
+  ),
+}));
+
+export const candidateOutreachSchedules = pgTable("candidate_outreach_schedules", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+  sourcedCandidateId: integer("sourced_candidate_id").notNull().references(() => jobSourcedCandidates.id, { onDelete: 'cascade' }),
+  nextRound: integer("next_round").notNull(),
+  dueAt: timestamp("due_at").notNull(),
+  status: text("status").notNull().default("pending"),
+  triggeredBy: integer("triggered_by").notNull().references(() => users.id),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  candidateIdx: uniqueIndex("candidate_outreach_schedules_candidate_idx").on(table.sourcedCandidateId),
+  dueIdx: index("candidate_outreach_schedules_due_idx").on(table.status, table.dueAt),
+  orgJobIdx: index("candidate_outreach_schedules_org_job_idx").on(table.organizationId, table.jobId),
+  candidateOwnershipFk: foreignKey({
+    columns: [table.sourcedCandidateId, table.organizationId, table.jobId],
+    foreignColumns: [
+      jobSourcedCandidates.id,
+      jobSourcedCandidates.organizationId,
+      jobSourcedCandidates.jobId,
+    ],
+    name: "candidate_outreach_schedules_candidate_owner_fk",
+  }).onDelete("cascade"),
+  roundCheck: check(
+    "candidate_outreach_schedules_round_check",
+    sql`${table.nextRound} BETWEEN 2 AND 3`,
+  ),
+  statusCheck: check(
+    "candidate_outreach_schedules_status_check",
+    sql`${table.status} IN ('pending', 'sending', 'completed', 'cancelled')`,
+  ),
+  attemptCountCheck: check(
+    "candidate_outreach_schedules_attempt_count_check",
+    sql`${table.attemptCount} >= 0`,
+  ),
 }));
 
 // =====================================================
@@ -2753,6 +2832,8 @@ export type JobSourcedCandidate = typeof jobSourcedCandidates.$inferSelect;
 export type InsertJobSourcedCandidate = z.infer<typeof insertJobSourcedCandidateSchema>;
 export type SourcedCandidateOutreachCampaign = typeof sourcedCandidateOutreachCampaigns.$inferSelect;
 export type SourcedCandidateOutreachLog = typeof sourcedCandidateOutreachLog.$inferSelect;
+export type OutreachOrgSuppression = typeof outreachOrgSuppressions.$inferSelect;
+export type CandidateOutreachSchedule = typeof candidateOutreachSchedules.$inferSelect;
 
 // =====================================================
 // END SIGNAL SOURCING INSERT SCHEMAS & TYPES

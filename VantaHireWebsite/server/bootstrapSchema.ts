@@ -1601,6 +1601,7 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_state_idx ON job_sourced_candidates(state);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_fit_score_idx ON job_sourced_candidates(fit_score);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS job_sourced_candidates_source_type_idx ON job_sourced_candidates(source_type);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS job_sourced_candidates_id_org_job_idx ON job_sourced_candidates(id, organization_id, job_id);`);
   await execSafe(sql`
     CREATE INDEX IF NOT EXISTS job_sourced_candidates_email_resolution_due_idx
     ON job_sourced_candidates(email_resolve_next_attempt_at, id)
@@ -1694,6 +1695,11 @@ export async function ensureAtsSchema(): Promise<void> {
       ai_draft_subject TEXT,
       was_edited BOOLEAN NOT NULL DEFAULT FALSE,
       status TEXT NOT NULL,
+      delivery_key TEXT,
+      delivery_id TEXT,
+      provider_message_id TEXT,
+      delivery_status TEXT,
+      delivery_event_at TIMESTAMP,
       error_message TEXT,
       sent_by INTEGER NOT NULL REFERENCES users(id),
       sent_at TIMESTAMP DEFAULT NOW() NOT NULL
@@ -1701,10 +1707,88 @@ export async function ensureAtsSchema(): Promise<void> {
   `);
   await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS campaign_round INTEGER;`);
   await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS body_html TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS delivery_key TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS delivery_id TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS provider_message_id TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS delivery_status TEXT;`);
+  await execSafe(sql`ALTER TABLE sourced_candidate_outreach_log ADD COLUMN IF NOT EXISTS delivery_event_at TIMESTAMP;`);
+  await execSafe(sql`
+    UPDATE sourced_candidate_outreach_log
+    SET delivery_status = CASE WHEN status = 'sent' THEN 'accepted' ELSE status END
+    WHERE delivery_status IS NULL;
+  `);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_job_idx ON sourced_candidate_outreach_log(job_id);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_candidate_idx ON sourced_candidate_outreach_log(sourced_candidate_id);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_campaign_idx ON sourced_candidate_outreach_log(campaign_id);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS scol_org_idx ON sourced_candidate_outreach_log(organization_id);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS scol_delivery_key_idx ON sourced_candidate_outreach_log(delivery_key);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS scol_delivery_id_idx ON sourced_candidate_outreach_log(delivery_id);`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS scol_provider_message_idx ON sourced_candidate_outreach_log(provider_message_id);`);
+
+  console.log('  Creating outreach_org_suppressions table...');
+  await execSafe(sql`
+    CREATE TABLE IF NOT EXISTS outreach_org_suppressions (
+      id SERIAL PRIMARY KEY,
+      organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      email_hash TEXT NOT NULL,
+      signal_candidate_id TEXT,
+      reason TEXT NOT NULL DEFAULT 'unsubscribe',
+      source_outreach_log_id INTEGER REFERENCES sourced_candidate_outreach_log(id) ON DELETE SET NULL,
+      provider_event_id TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      CONSTRAINT outreach_org_suppressions_reason_check CHECK (reason = 'unsubscribe')
+    );
+  `);
+  await execSafe(sql`ALTER TABLE outreach_org_suppressions ADD COLUMN IF NOT EXISTS signal_candidate_id TEXT;`);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS outreach_org_suppressions_org_email_idx ON outreach_org_suppressions(organization_id, email_hash);`);
+  await execSafe(sql`DROP INDEX IF EXISTS outreach_org_suppressions_org_candidate_idx;`);
+  await execSafe(sql`
+    CREATE INDEX IF NOT EXISTS outreach_org_suppressions_org_candidate_lookup_idx
+    ON outreach_org_suppressions(organization_id, signal_candidate_id)
+    WHERE signal_candidate_id IS NOT NULL;
+  `);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS outreach_org_suppressions_provider_event_idx ON outreach_org_suppressions(provider_event_id);`);
+
+  console.log('  Creating candidate_outreach_schedules table...');
+  await execSafe(sql`
+    CREATE TABLE IF NOT EXISTS candidate_outreach_schedules (
+      id SERIAL PRIMARY KEY,
+      organization_id INTEGER NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+      job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+      sourced_candidate_id INTEGER NOT NULL REFERENCES job_sourced_candidates(id) ON DELETE CASCADE,
+      next_round INTEGER NOT NULL CHECK (next_round BETWEEN 2 AND 3),
+      due_at TIMESTAMP NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'sending', 'completed', 'cancelled')),
+      triggered_by INTEGER NOT NULL REFERENCES users(id),
+      attempt_count INTEGER NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+      last_error TEXT,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS candidate_outreach_schedules_candidate_idx ON candidate_outreach_schedules(sourced_candidate_id);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS candidate_outreach_schedules_due_idx ON candidate_outreach_schedules(status, due_at);`);
+  await execSafe(sql`CREATE INDEX IF NOT EXISTS candidate_outreach_schedules_org_job_idx ON candidate_outreach_schedules(organization_id, job_id);`);
+  await execSafe(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'candidate_outreach_schedules_candidate_owner_fk'
+          AND conrelid = 'candidate_outreach_schedules'::regclass
+      ) THEN
+        ALTER TABLE candidate_outreach_schedules
+          ADD CONSTRAINT candidate_outreach_schedules_candidate_owner_fk
+          FOREIGN KEY (sourced_candidate_id, organization_id, job_id)
+          REFERENCES job_sourced_candidates(id, organization_id, job_id)
+          ON DELETE CASCADE;
+      END IF;
+    END
+    $$;
+  `);
 
   // Scheduled outreach campaigns (auto-send rounds 2 & 3 after 3-day intervals)
   console.log('  Creating scheduled_outreach_campaigns table...');
@@ -1728,6 +1812,24 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`CREATE INDEX IF NOT EXISTS soc_status_scheduled_idx ON scheduled_outreach_campaigns(status, scheduled_at);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS soc_job_idx ON scheduled_outreach_campaigns(job_id);`);
   await execSafe(sql`CREATE INDEX IF NOT EXISTS soc_org_idx ON scheduled_outreach_campaigns(organization_id);`);
+  await execSafe(sql`
+    INSERT INTO candidate_outreach_schedules (
+      organization_id, job_id, sourced_candidate_id, next_round, due_at, status, triggered_by
+    )
+    SELECT
+      soc.organization_id, soc.job_id, jsc.id, soc.round, soc.scheduled_at, 'pending', soc.triggered_by
+    FROM scheduled_outreach_campaigns soc
+    JOIN job_sourced_candidates jsc
+      ON jsc.organization_id = soc.organization_id
+     AND jsc.job_id = soc.job_id
+    WHERE soc.status = 'pending'
+      AND soc.round BETWEEN 2 AND 3
+      AND jsc.state = 'shortlisted'
+      AND jsc.applied_at IS NULL
+      AND jsc.outreach_count = soc.round - 1
+    ON CONFLICT (sourced_candidate_id) DO NOTHING;
+  `);
+  await execSafe(sql`UPDATE scheduled_outreach_campaigns SET status = 'cancelled' WHERE status = 'pending';`);
 
   // ActiveKG Graph Sync: Application resume sync jobs
   console.log('  Creating application_graph_sync_jobs table...');

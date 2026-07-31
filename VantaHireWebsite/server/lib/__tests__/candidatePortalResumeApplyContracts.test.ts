@@ -97,7 +97,7 @@ describe('candidate resume-backed application contracts', () => {
     expect(applicantInput).not.toContain('...req.body');
     expect(applicantInput).not.toMatch(/\b(status|notes|currentStage|organizationId|userId)\s*:/);
 
-    const creationStart = source.indexOf('const application = await storage.createApplication({');
+    const creationStart = source.indexOf('await storage.createApplication({', routeStart);
     const creationEnd = source.indexOf('});', creationStart);
     const publicApplicationInsert = source.slice(creationStart, creationEnd);
     const sanitizedSpread = publicApplicationInsert.indexOf('...applicationData');

@@ -42,6 +42,7 @@ import { splitByTier, type TierModel } from "@/lib/sourcing-tiering";
 import { jobSourcingPageCopy } from "@/lib/internal-copy";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ColdOutreachSidebar } from "@/components/outreach/ColdOutreachSidebar";
+import { FunnelChart } from "@/components/dashboards/FunnelChart";
 
 type SortKey = "rank" | "fitScore" | "source" | "freshness";
 type ShortlistOutreachFilter = "all" | "fresh" | "first_sent" | "second_sent" | "completed";
@@ -217,13 +218,10 @@ export default function JobSourcingPage() {
   const selectedCampaignRound: 1 | 2 | 3 | null =
     shortlistOutreachFilter === "fresh"
       ? 1
-      : shortlistOutreachFilter === "first_sent"
-        ? 2
-        : shortlistOutreachFilter === "second_sent"
-          ? 3
-          : shortlistOutreachFilter === "all"
-            ? (outreachHistory?.nextAvailableRound ?? null)
-            : null;
+      : shortlistOutreachFilter === "all"
+        && (outreachHistory?.eligibleByRound?.[1]?.count ?? 0) > 0
+        ? 1
+        : null;
   const outreachEligibleCandidateIds = selectedCampaignRound
     ? (
       outreachHistory?.eligibleByRound?.[selectedCampaignRound]?.candidateIds
@@ -239,11 +237,12 @@ export default function JobSourcingPage() {
   const outreachButtonLabel =
     selectedCampaignRound === 1
       ? "Start First Campaign"
-      : selectedCampaignRound === 2
-        ? "Start Second Campaign"
-        : selectedCampaignRound === 3
-          ? "Start Final Campaign"
-          : "No Campaign Available";
+      : shortlistOutreachFilter === "completed"
+        ? "Outreach Complete"
+        : shortlistOutreachFilter === "first_sent"
+          || shortlistOutreachFilter === "second_sent"
+          ? "Follow-up Scheduled"
+          : "No First Campaign Available";
 
   useEffect(() => {
     if (listMode !== "shortlisted") return;
@@ -612,6 +611,19 @@ export default function JobSourcingPage() {
             </Button>
           )}
         </div>
+
+        {listMode === "shortlisted" && outreachHistory && (
+          <div className="mb-4">
+            <FunnelChart
+              title="Outreach funnel"
+              description="Delivery and application outcomes for this job"
+              data={outreachHistory.funnel.map((stage) => ({
+                name: stage.stage,
+                count: stage.count,
+              }))}
+            />
+          </div>
+        )}
 
         {/* {!isFailed && !isExpired && enrichmentInProgress && (
           <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3 mb-4">
