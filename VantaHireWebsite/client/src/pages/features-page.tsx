@@ -147,7 +147,7 @@ export default function FeaturesPage() {
                   <thead>
                     <tr>
                       {["", "Traditional ATS", "ealana"].map((h) => (
-                        <th key={h} style={{ textAlign: "left", padding: "12px 16px", color: h === "ealana" ? "#4B8EF0" : "#8891AA", fontWeight: 600, borderBottom: "1px solid rgba(255,255,255,0.1)", fontSize: "0.8rem", letterSpacing: "0.06em", textTransform: "uppercase" }}>{h}</th>
+                        <th key={h} style={{ textAlign: "left", padding: "12px 16px", color: h === "ealana" ? "#F4F5FA" : "#8891AA", fontWeight: 600, borderBottom: "1px solid rgba(255,255,255,0.1)", fontSize: "0.8rem", letterSpacing: "0.06em", textTransform: h === "ealana" ? "none" : "uppercase" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>

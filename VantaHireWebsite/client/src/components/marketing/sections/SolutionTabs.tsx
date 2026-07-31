@@ -157,7 +157,7 @@ export default function SolutionTabs() {
               <div style={{ background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.28)", borderRadius: 16, padding: isMobile ? "1.25rem" : "2rem", boxShadow: "0 0 40px rgba(239,68,68,0.10)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1.5rem" }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#EF4444", boxShadow: "0 0 8px rgba(239,68,68,0.5)", flexShrink: 0 }} />
-                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#EF4444", letterSpacing: "0.12em" }}>BEFORE EALANA</span>
+                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#EF4444", letterSpacing: "0.12em" }}>before ealana</span>
                 </div>
                 {beforeItems.map((text) => (
                   <div key={text} style={{ display: "flex", gap: 10, marginBottom: 14 }}>
@@ -170,7 +170,7 @@ export default function SolutionTabs() {
               <div style={{ background: "rgba(52,209,122,0.07)", border: "1px solid rgba(52,209,122,0.32)", borderRadius: 16, padding: isMobile ? "1.25rem" : "2rem", boxShadow: "0 0 40px rgba(52,209,122,0.12)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: "1.5rem" }}>
                   <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#34D17A", boxShadow: "0 0 8px rgba(52,209,122,0.5)", flexShrink: 0 }} />
-                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#34D17A", letterSpacing: "0.12em" }}>WITH EALANA</span>
+                  <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#34D17A", letterSpacing: "0.12em" }}>with ealana</span>
                 </div>
                 {afterItems.map((text) => (
                   <div key={text} style={{ display: "flex", gap: 10, marginBottom: 14 }}>
