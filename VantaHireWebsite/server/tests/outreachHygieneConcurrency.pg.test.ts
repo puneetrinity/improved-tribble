@@ -18,6 +18,8 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
   let purgeExpiredDeliveryCorrelations: typeof import('../lib/outreachHygieneProcessor').purgeExpiredDeliveryCorrelations;
   let requeueDeadLetteredIntents: typeof import('../lib/outreachHygieneProcessor').requeueDeadLetteredIntents;
   let currentReleaseId: typeof import('../lib/outreachHygieneProcessor').currentReleaseId;
+  let startOutreachHygieneProcessor: typeof import('../lib/outreachHygieneProcessor').startOutreachHygieneProcessor;
+  let stopOutreachHygieneProcessor: typeof import('../lib/outreachHygieneProcessor').stopOutreachHygieneProcessor;
   let processHygieneEvent: typeof import('../webhooks/brevo.webhook').processHygieneEvent;
   let candidateLockNamespace: number;
   let emailLockNamespace: number;
@@ -107,6 +109,9 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
     const separator = databaseUrl!.includes('?') ? '&' : '?';
     process.env.DATABASE_URL = `${databaseUrl}${separator}options=-csearch_path%3D${schemaName}`;
     process.env.DATABASE_SSL = 'false';
+    // Read at module scope by the processor, so they must be set before import.
+    process.env.OUTREACH_HYGIENE_POLL_INTERVAL_MS = '100';
+    process.env.OUTREACH_HYGIENE_REPLAY_SWEEP_MS = '1';
     const concurrency = await import('../lib/outreachConcurrency');
     const dbModule = await import('../db');
     const processor = await import('../lib/outreachHygieneProcessor');
@@ -119,6 +124,8 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
     purgeExpiredDeliveryCorrelations = processor.purgeExpiredDeliveryCorrelations;
     requeueDeadLetteredIntents = processor.requeueDeadLetteredIntents;
     currentReleaseId = processor.currentReleaseId;
+    startOutreachHygieneProcessor = processor.startOutreachHygieneProcessor;
+    stopOutreachHygieneProcessor = processor.stopOutreachHygieneProcessor;
     processHygieneEvent = webhookModule.processHygieneEvent;
     runtimePool = dbModule.pool as Pool;
     webhook = await admin.connect();
@@ -662,11 +669,11 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
 
     // No release id (production's actual state) and freshly dead-lettered:
     // a restart alone must NOT replay, or a crash-loop would hammer Memory.
-    expect(await requeueDeadLetteredIntents(3, new Date(), null, backoff)).toBe(0);
+    expect(await requeueDeadLetteredIntents(new Date(), null, backoff)).toBe(0);
 
     // Once the backoff has elapsed it recovers, with no release id involved.
     const later = new Date(Date.now() + backoff + 60_000);
-    expect(await requeueDeadLetteredIntents(3, later, null, backoff)).toBe(1);
+    expect(await requeueDeadLetteredIntents(later, null, backoff)).toBe(1);
     const revived = await admin.query(
       `SELECT status, attempt_count, dead_lettered_at, last_error
        FROM ${schemaName}.outreach_hygiene_intents`,
@@ -683,7 +690,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
       `UPDATE ${schemaName}.outreach_hygiene_intents
        SET status = 'dead_letter', dead_lettered_at = NOW(), replay_release = 'release-a'`,
     );
-    expect(await requeueDeadLetteredIntents(3, new Date(), 'release-b', backoff)).toBe(1);
+    expect(await requeueDeadLetteredIntents(new Date(), 'release-b', backoff)).toBe(1);
     const afterDeploy = await admin.query(
       `SELECT status, replay_count, replay_release
        FROM ${schemaName}.outreach_hygiene_intents`,
@@ -710,6 +717,42 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
       expect(currentReleaseId()).toBe('abc123');
     } finally {
       process.env = original;
+    }
+  });
+
+  it('recovers a dead letter from the RUNNING loop, with no restart', async () => {
+    // The guarantee is "always recovers eventually". Time-based eligibility
+    // cannot deliver that unless something evaluates it BETWEEN restarts.
+    //
+    // The processor is started FIRST and its startup sweep is allowed to finish
+    // before the row goes bad — otherwise this would pass on the startup call
+    // and prove nothing about the loop. Nothing restarts it afterwards.
+    await admin.query(`TRUNCATE ${schemaName}.outreach_hygiene_intents`);
+    startOutreachHygieneProcessor();
+    try {
+      await delay(400);
+
+      await admin.query(
+        `INSERT INTO ${schemaName}.outreach_hygiene_intents
+           (provider_event_id, email_hash, reason, status, dead_lettered_at,
+            signal_candidate_id, attempt_count)
+         VALUES ($1, $2, 'complaint', 'dead_letter',
+                 NOW() - INTERVAL '2 days', 'sc-loop', 7)`,
+        ['f6'.repeat(32), '6f'.repeat(32)],
+      );
+
+      let status = 'dead_letter';
+      for (let attempt = 0; attempt < 50 && status === 'dead_letter'; attempt += 1) {
+        await delay(100);
+        const row = await admin.query(
+          `SELECT status FROM ${schemaName}.outreach_hygiene_intents`,
+        );
+        status = row.rows[0]?.status ?? 'gone';
+      }
+      // It left dead_letter while the process kept running: the loop swept it.
+      expect(status).not.toBe('dead_letter');
+    } finally {
+      stopOutreachHygieneProcessor();
     }
   });
 });

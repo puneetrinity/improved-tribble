@@ -45,16 +45,19 @@ const CORRELATION_RETENTION_DAYS = readPositiveInteger(
   process.env.OUTREACH_CORRELATION_RETENTION_DAYS,
   90,
 );
-const MAX_DEAD_LETTER_REPLAYS = readPositiveInteger(
-  process.env.OUTREACH_HYGIENE_MAX_REPLAYS,
-  3,
-);
 // Recovery must not depend on the platform exposing a per-deploy identifier.
 // Time-based eligibility guarantees a dead letter is always retried eventually,
 // and bounds churn by elapsed time rather than by how often the process restarts.
 const DEAD_LETTER_REPLAY_BACKOFF_MS = readPositiveInteger(
   process.env.OUTREACH_HYGIENE_REPLAY_BACKOFF_MS,
   6 * 60 * 60 * 1000,
+);
+// How often the RUNNING loop re-checks for eligible dead letters. Time-based
+// eligibility is worthless if nothing evaluates it between restarts, which is
+// the only reason this exists.
+const DEAD_LETTER_SWEEP_INTERVAL_MS = readPositiveInteger(
+  process.env.OUTREACH_HYGIENE_REPLAY_SWEEP_MS,
+  15 * 60 * 1000,
 );
 const LEASE_MS = Math.max(
   readPositiveInteger(process.env.OUTREACH_HYGIENE_LEASE_MS, 60_000),
@@ -524,7 +527,6 @@ export function currentReleaseId(): string | null {
  * locally. What is missing is only the mirror of that suppression in Memory.
  */
 export async function requeueDeadLetteredIntents(
-  maxReplays = MAX_DEAD_LETTER_REPLAYS,
   now: Date = new Date(),
   releaseId: string | null = currentReleaseId(),
   backoffMs: number = DEAD_LETTER_REPLAY_BACKOFF_MS,
@@ -562,9 +564,8 @@ export async function requeueDeadLetteredIntents(
   `);
   const requeued = result.rows?.length ?? 0;
   if (requeued > 0) {
-    console.log('[OutreachHygiene] Requeued dead-lettered suppressions after restart', {
+    console.log('[OutreachHygiene] Requeued dead-lettered suppressions', {
       requeued,
-      maxReplays,
       releaseId,
     });
   }
@@ -572,6 +573,7 @@ export async function requeueDeadLetteredIntents(
 }
 
 let running = false;
+let lastDeadLetterSweepAt = 0;
 let cycleInFlight = false;
 let wakeRequested = false;
 let pollTimer: ReturnType<typeof setTimeout> | null = null;
@@ -609,6 +611,14 @@ async function pollCycle(): Promise<void> {
     }
     await purgeSyncedHygieneIntents();
     await purgeExpiredDeliveryCorrelations();
+    // The RUNNING loop must evaluate dead-letter eligibility. Doing this only at
+    // startup would mean a stuck record waits for a restart that may never come,
+    // which would leave the "always recovers eventually" guarantee unmet.
+    const nowMs = Date.now();
+    if (nowMs - lastDeadLetterSweepAt >= DEAD_LETTER_SWEEP_INTERVAL_MS) {
+      lastDeadLetterSweepAt = nowMs;
+      await requeueDeadLetteredIntents();
+    }
     if (result.leaseLost > 0) {
       console.warn('[OUTREACH_HYGIENE] Lease ownership changed before acknowledgement', {
         count: result.leaseLost,
@@ -655,6 +665,7 @@ export function startOutreachHygieneProcessor(): void {
   });
   // A restart is the signal that a fix may have shipped. Replay dead letters
   // before the first cycle so recovery needs no operator action.
+  lastDeadLetterSweepAt = Date.now();
   void requeueDeadLetteredIntents()
     .catch((error: unknown) => {
       console.error('[OUTREACH_HYGIENE] Dead-letter requeue failed', {
@@ -666,6 +677,7 @@ export function startOutreachHygieneProcessor(): void {
 
 export function stopOutreachHygieneProcessor(): void {
   running = false;
+  lastDeadLetterSweepAt = 0;
   wakeRequested = false;
   if (pollTimer) {
     clearTimeout(pollTimer);
