@@ -29,13 +29,21 @@ const RETENTION_DAYS = readPositiveInteger(
   process.env.OUTREACH_HYGIENE_RETENTION_DAYS,
   90,
 );
-// Correlations must outlive intents: they are what lets a LATE provider event
-// be attributed to a person at all. Providers can report complaints via feedback
-// loops long after delivery, so this window is deliberately the longer of the
-// two. Past it, an unattributable event fails closed rather than mis-suppressing.
+// APPROVED POLICY (owner, 2026-08-01): 90 days, matching the intent window.
+//
+// Correlations are what let a LATE provider event be attributed to a person at
+// all, which is why they outlive the job, candidate, organization, and delivery
+// log. Bounces arrive in minutes to days, so 90 covers them many times over.
+// The window governs ATTRIBUTION ONLY: once a complaint is attributed the
+// suppression is permanent and is never purged.
+//
+// Accepted residual: a spam report on an email older than 90 days cannot be
+// traced to a person, so it is ignored rather than guessed at — no wrong person
+// is suppressed. Self-limiting, because a 3-round sequence runs over ~6 days, so
+// anyone in an active campaign always has a fresh correlation.
 const CORRELATION_RETENTION_DAYS = readPositiveInteger(
   process.env.OUTREACH_CORRELATION_RETENTION_DAYS,
-  180,
+  90,
 );
 const MAX_DEAD_LETTER_REPLAYS = readPositiveInteger(
   process.env.OUTREACH_HYGIENE_MAX_REPLAYS,
