@@ -15,7 +15,7 @@ vi.mock('../../db', () => ({
 }));
 
 import {
-  hasPendingGlobalOutreachComplaint,
+  hasBlockingOutreachHygieneIntent,
   withOutreachDispatchFence,
 } from '../outreachConcurrency';
 
@@ -141,12 +141,15 @@ describe('outreach dispatch fence', () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 
-  it('surfaces a pending complaint before the scheduler spends on a draft', async () => {
+  it('scopes the scheduler pre-check to one person, never the whole platform', async () => {
     mocks.poolQuery.mockResolvedValueOnce({ rows: [{ pending: true }] });
 
-    await expect(hasPendingGlobalOutreachComplaint()).resolves.toBe(true);
-    expect(mocks.poolQuery).toHaveBeenCalledWith(expect.stringContaining(
-      "reason = 'complaint' AND status <> 'synced'",
-    ));
+    await expect(hasBlockingOutreachHygieneIntent('signal-candidate-1')).resolves.toBe(true);
+    const [sqlText, params] = mocks.poolQuery.mock.calls[0];
+    expect(sqlText).toContain("reason = 'complaint'");
+    expect(sqlText).toContain("status <> 'synced'");
+    // The person filter is what stops one stuck record halting every campaign.
+    expect(sqlText).toContain('signal_candidate_id = $1::text');
+    expect(params).toEqual(['signal-candidate-1']);
   });
 });

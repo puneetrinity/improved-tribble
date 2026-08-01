@@ -29,6 +29,14 @@ const RETENTION_DAYS = readPositiveInteger(
   process.env.OUTREACH_HYGIENE_RETENTION_DAYS,
   90,
 );
+// Correlations must outlive intents: they are what lets a LATE provider event
+// be attributed to a person at all. Providers can report complaints via feedback
+// loops long after delivery, so this window is deliberately the longer of the
+// two. Past it, an unattributable event fails closed rather than mis-suppressing.
+const CORRELATION_RETENTION_DAYS = readPositiveInteger(
+  process.env.OUTREACH_CORRELATION_RETENTION_DAYS,
+  180,
+);
 const LEASE_MS = Math.max(
   readPositiveInteger(process.env.OUTREACH_HYGIENE_LEASE_MS, 60_000),
   Math.ceil(BATCH_SIZE / CONCURRENCY) * CONTACT_SUPPRESSION_TIMEOUT_MS + 30_000,
@@ -427,6 +435,45 @@ export async function purgeSyncedHygieneIntents(
   return purged;
 }
 
+/**
+ * Bound retention of delivery correlations.
+ *
+ * These rows are pseudonymous but still personal data — an email hash plus a
+ * person identifier — and they are deliberately kept after the job, candidate,
+ * organization, and delivery log are deleted so a late bounce or complaint can
+ * still be honored. "Deliberately kept" is not "kept forever", so the window is
+ * bounded here.
+ *
+ * A correlation is never removed while an unresolved hygiene intent still exists
+ * for the same address: that intent represents a suppression not yet recorded in
+ * Memory, and discarding its correlation would lose the audit trail for it.
+ */
+export async function purgeExpiredDeliveryCorrelations(
+  retentionDays = CORRELATION_RETENTION_DAYS,
+  now: Date = new Date(),
+): Promise<number> {
+  const cutoff = new Date(now.getTime() - retentionDays * 24 * 60 * 60 * 1000);
+  const result = await db.execute(sql`
+    DELETE FROM outreach_delivery_correlations c
+    WHERE c.created_at < ${cutoff}
+      AND NOT EXISTS (
+        SELECT 1
+        FROM outreach_hygiene_intents i
+        WHERE i.email_hash = c.email_hash
+          AND i.status <> 'synced'
+      )
+    RETURNING c.id
+  `);
+  const purged = result.rows?.length ?? 0;
+  if (purged > 0) {
+    console.log('[OutreachHygiene] Purged delivery correlations past retention', {
+      purged,
+      retentionDays,
+    });
+  }
+  return purged;
+}
+
 let running = false;
 let cycleInFlight = false;
 let wakeRequested = false;
@@ -464,6 +511,7 @@ async function pollCycle(): Promise<void> {
       });
     }
     await purgeSyncedHygieneIntents();
+    await purgeExpiredDeliveryCorrelations();
     if (result.leaseLost > 0) {
       console.warn('[OUTREACH_HYGIENE] Lease ownership changed before acknowledgement', {
         count: result.leaseLost,

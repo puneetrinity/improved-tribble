@@ -112,12 +112,19 @@ describe('contact safety deployment contracts', () => {
     expect(webhookSource).toContain('.insert(outreachHygieneIntents)');
     expect(webhookSource).not.toContain('await suppressContactEvidence(');
     expect(concurrencySource).toContain('FROM outreach_hygiene_intents');
-    expect(concurrencySource).toContain("reason = 'complaint' AND status <> 'synced'");
+    expect(concurrencySource).toContain("reason = 'complaint'");
+    expect(concurrencySource).toContain("status <> 'synced'");
+    // Both hygiene gates must be person-scoped: a platform-wide condition would
+    // let one unsynced complaint stop every send.
+    expect(concurrencySource).toContain('signal_candidate_id = $1::text');
+    expect(concurrencySource).toContain('signal_candidate_id = $2::text');
     expect(hygieneProcessorSource).toContain('await dependencies.suppress(');
     expect(hygieneProcessorSource).toContain('FOR UPDATE SKIP LOCKED');
     expect(deliverySource).toContain("reason: 'hygiene_sync_pending'");
     expect(schedulerSource).toContain('getSkippedOutreachDisposition(delivery.reason)');
-    expect(schedulerSource).toContain('await hasPendingGlobalOutreachComplaint()');
+    expect(schedulerSource).toContain(
+      'await hasBlockingOutreachHygieneIntent(candidate.signalCandidateId ?? null)',
+    );
     expect(applicationSource).toContain(
       'Application persistence and drip cancellation are one commit',
     );

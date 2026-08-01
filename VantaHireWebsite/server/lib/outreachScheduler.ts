@@ -28,7 +28,7 @@ import {
   isOutreachDeliveryUncertainError,
   sendTrackedOutreachEmail,
 } from './outreachDelivery';
-import { hasPendingGlobalOutreachComplaint } from './outreachConcurrency';
+import { hasBlockingOutreachHygieneIntent } from './outreachConcurrency';
 import {
   getSkippedOutreachDisposition,
   getNextCandidateOutreachSchedule,
@@ -225,7 +225,9 @@ async function fireScheduledCandidate(
   }
 
   try {
-    if (await hasPendingGlobalOutreachComplaint()) {
+    // Scoped to THIS person. A platform-wide question here would let one
+    // stuck complaint retry every scheduled campaign indefinitely.
+    if (await hasBlockingOutreachHygieneIntent(candidate.signalCandidateId ?? null)) {
       await retry('hygiene_sync_pending', false);
       return;
     }

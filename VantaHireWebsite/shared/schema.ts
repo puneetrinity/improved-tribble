@@ -1297,6 +1297,16 @@ export const outreachHygieneIntents = pgTable("outreach_hygiene_intents", {
     "outreach_hygiene_intents_email_hash_check",
     sql`${table.emailHash} ~ '^[0-9a-f]{64}$'`,
   ),
+  // NOT NULL still admits ''. Without this the fence's "person unidentifiable"
+  // fallback — which stops ALL outreach — is reachable by an empty string.
+  candidateNonblankCheck: check(
+    "outreach_hygiene_intents_candidate_nonblank",
+    sql`btrim(${table.signalCandidateId}) <> ''`,
+  ),
+  tenantNonblankCheck: check(
+    "outreach_hygiene_intents_tenant_nonblank",
+    sql`btrim(${table.signalTenantId}) <> ''`,
+  ),
   attemptsCheck: check(
     "outreach_hygiene_intents_attempts_check",
     sql`${table.attemptCount} >= 0`,

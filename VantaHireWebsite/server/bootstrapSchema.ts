@@ -1883,7 +1883,11 @@ export async function ensureAtsSchema(): Promise<void> {
       CONSTRAINT outreach_hygiene_intents_attempts_check
         CHECK (attempt_count >= 0),
       CONSTRAINT outreach_hygiene_intents_dead_letter_pair_check
-        CHECK ((status = 'dead_letter') = (dead_lettered_at IS NOT NULL))
+        CHECK ((status = 'dead_letter') = (dead_lettered_at IS NOT NULL)),
+      CONSTRAINT outreach_hygiene_intents_candidate_nonblank
+        CHECK (btrim(signal_candidate_id) <> ''),
+      CONSTRAINT outreach_hygiene_intents_tenant_nonblank
+        CHECK (btrim(signal_tenant_id) <> '')
     );
   `);
   await execSafe(sql`
@@ -1911,6 +1915,28 @@ export async function ensureAtsSchema(): Promise<void> {
     ALTER TABLE outreach_hygiene_intents
     ADD CONSTRAINT outreach_hygiene_intents_dead_letter_pair_check
     CHECK ((status = 'dead_letter') = (dead_lettered_at IS NOT NULL));
+  `);
+  // NOT NULL admits ''. An intent that names no person would trip the fence's
+  // unidentifiable fallback and stop ALL outreach, so reject blanks outright.
+  // Fail-closed: if pre-existing rows are blank the constraint will not validate
+  // and the deploy stops rather than silently keeping an unenforced guard.
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_candidate_nonblank;
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    ADD CONSTRAINT outreach_hygiene_intents_candidate_nonblank
+    CHECK (btrim(signal_candidate_id) <> '');
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_tenant_nonblank;
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    ADD CONSTRAINT outreach_hygiene_intents_tenant_nonblank
+    CHECK (btrim(signal_tenant_id) <> '');
   `);
   await execSafe(sql`
     CREATE UNIQUE INDEX IF NOT EXISTS outreach_hygiene_intents_provider_event_idx

@@ -15,6 +15,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
   let withOutreachDispatchFence: typeof import('../lib/outreachConcurrency').withOutreachDispatchFence;
   let outreachHygieneStore: typeof import('../lib/outreachHygieneProcessor').outreachHygieneStore;
   let purgeSyncedHygieneIntents: typeof import('../lib/outreachHygieneProcessor').purgeSyncedHygieneIntents;
+  let purgeExpiredDeliveryCorrelations: typeof import('../lib/outreachHygieneProcessor').purgeExpiredDeliveryCorrelations;
   let processHygieneEvent: typeof import('../webhooks/brevo.webhook').processHygieneEvent;
   let candidateLockNamespace: number;
   let emailLockNamespace: number;
@@ -86,7 +87,9 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
         dead_lettered_at TIMESTAMP,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        UNIQUE(provider, provider_event_id)
+        UNIQUE(provider, provider_event_id),
+        CONSTRAINT outreach_hygiene_intents_candidate_nonblank
+          CHECK (btrim(signal_candidate_id) <> '')
       );
       CREATE TABLE ${schemaName}.candidate_outreach_schedules (
         id SERIAL PRIMARY KEY,
@@ -109,6 +112,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
     emailLockNamespace = concurrency.OUTREACH_EMAIL_LOCK_NAMESPACE;
     outreachHygieneStore = processor.outreachHygieneStore;
     purgeSyncedHygieneIntents = processor.purgeSyncedHygieneIntents;
+    purgeExpiredDeliveryCorrelations = processor.purgeExpiredDeliveryCorrelations;
     processHygieneEvent = webhookModule.processHygieneEvent;
     runtimePool = dbModule.pool as Pool;
     webhook = await admin.connect();
@@ -518,23 +522,120 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
       .toEqual(['dead_letter', 'pending']);
   });
 
-  it('falls back to a global hold only when the person cannot be identified', async () => {
-    // Defence in depth: signal_candidate_id is NOT NULL, so this should be
-    // unreachable. If it ever is reachable we cannot tell who must not be
-    // mailed, and stopping everything is the only safe answer.
+  it('rejects an intent that names no person, and still fails closed if one exists', async () => {
+    // Two layers. The constraint makes a blank identity impossible, because an
+    // intent naming nobody would trip the fence's fallback and stop ALL
+    // outreach. The fence keeps that fallback anyway, so corrupted data fails
+    // closed rather than silently sending.
     await admin.query(`TRUNCATE ${schemaName}.outreach_hygiene_intents`);
+
+    await expect(admin.query(
+      `INSERT INTO ${schemaName}.outreach_hygiene_intents
+         (provider_event_id, email_hash, reason, status, signal_candidate_id)
+       VALUES ($1, $2, 'complaint', 'pending', '')`,
+      ['6'.repeat(64), '7'.repeat(64)],
+    )).rejects.toThrow(/outreach_hygiene_intents_candidate_nonblank/);
+
+    // Simulate a row that predates the constraint to prove the fence still
+    // fails closed if such data ever reached the table.
+    await admin.query(
+      `ALTER TABLE ${schemaName}.outreach_hygiene_intents
+       DROP CONSTRAINT outreach_hygiene_intents_candidate_nonblank`,
+    );
+    try {
+      await admin.query(
+        `INSERT INTO ${schemaName}.outreach_hygiene_intents
+           (provider_event_id, email_hash, reason, status, signal_candidate_id)
+         VALUES ($1, $2, 'complaint', 'pending', '')`,
+        ['6'.repeat(64), '7'.repeat(64)],
+      );
+      const dispatch = vi.fn(async () => 'unexpected');
+      await expect(withOutreachDispatchFence(
+        701, 716, '8'.repeat(64), 'signal-candidate-anyone', dispatch,
+      )).resolves.toEqual({ status: 'blocked', reason: 'hygiene_sync_pending' });
+      expect(dispatch).not.toHaveBeenCalled();
+    } finally {
+      await admin.query(`TRUNCATE ${schemaName}.outreach_hygiene_intents`);
+      await admin.query(
+        `ALTER TABLE ${schemaName}.outreach_hygiene_intents
+         ADD CONSTRAINT outreach_hygiene_intents_candidate_nonblank
+         CHECK (btrim(signal_candidate_id) <> '')`,
+      );
+    }
+  });
+
+  it('purges only suppressions Memory has durably recorded', async () => {
+    // Retention must never destroy a suppression that was never honored:
+    // deleting an unsynced or dead-lettered row would silently un-block someone
+    // who complained, which is the failure this whole mechanism prevents.
+    await admin.query(`TRUNCATE ${schemaName}.outreach_hygiene_intents`);
+    const old = new Date('2020-01-01T00:00:00Z');
+    await admin.query(
+      `INSERT INTO ${schemaName}.outreach_hygiene_intents
+         (provider_event_id, email_hash, reason, status, synced_at,
+          dead_lettered_at, signal_candidate_id)
+       VALUES
+         ($1, $2, 'complaint',   'synced',      $5,   NULL, 'sc-synced'),
+         ($3, $4, 'complaint',   'dead_letter', NULL, $5,   'sc-dead'),
+         ($6, $7, 'hard_bounce', 'pending',     NULL, NULL, 'sc-pending')`,
+      [
+        'a1'.repeat(32), '1a'.repeat(32),
+        'b2'.repeat(32), '2b'.repeat(32),
+        old,
+        'c3'.repeat(32), '3c'.repeat(32),
+      ],
+    );
+
+    const purged = await purgeSyncedHygieneIntents(30, new Date('2026-08-01T00:00:00Z'));
+    expect(purged).toBe(1);
+
+    const survivors = await admin.query(
+      `SELECT status FROM ${schemaName}.outreach_hygiene_intents ORDER BY status`,
+    );
+    expect(survivors.rows.map((row: { status: string }) => row.status))
+      .toEqual(['dead_letter', 'pending']);
+  });
+
+
+  it('bounds correlation retention but keeps any with an unresolved suppression', async () => {
+    // Correlations outlive the parent rows on purpose so a late complaint can
+    // still be attributed. That is not a licence to keep them forever — but a
+    // correlation whose suppression has not reached Memory must survive, or the
+    // audit trail for an unhonored complaint disappears with it.
+    await admin.query(`TRUNCATE ${schemaName}.outreach_hygiene_intents`);
+    await admin.query(`TRUNCATE ${schemaName}.outreach_delivery_correlations`);
+    const settledHash = '1c'.repeat(32);
+    const unresolvedHash = '2c'.repeat(32);
+    const old = new Date('2020-01-01T00:00:00Z');
+
+    for (const [deliveryId, hash] of [
+      ['11111111-1111-4111-8111-aaaaaaaaaaaa', settledHash],
+      ['22222222-2222-4222-8222-bbbbbbbbbbbb', unresolvedHash],
+    ] as const) {
+      await admin.query(
+        `INSERT INTO ${schemaName}.outreach_delivery_correlations
+           (provider, delivery_id, organization_id, sourced_candidate_id,
+            signal_tenant_id, signal_candidate_id, email_hash, created_at)
+         VALUES ('brevo', $1, 1, 1, 'org_1', 'sc-1', $2, $3)`,
+        [deliveryId, hash, old],
+      );
+    }
+    // Only the second address still has a suppression awaiting Memory.
     await admin.query(
       `INSERT INTO ${schemaName}.outreach_hygiene_intents
          (provider_event_id, email_hash, reason, status, dead_lettered_at,
           signal_candidate_id)
-       VALUES ($1, $2, 'complaint', 'dead_letter', NOW(), '')`,
-      ['6'.repeat(64), '7'.repeat(64)],
+       VALUES ($1, $2, 'complaint', 'dead_letter', NOW(), 'sc-1')`,
+      ['d4'.repeat(32), unresolvedHash],
     );
 
-    const dispatch = vi.fn(async () => 'unexpected');
-    await expect(withOutreachDispatchFence(
-      701, 716, '8'.repeat(64), 'signal-candidate-anyone', dispatch,
-    )).resolves.toEqual({ status: 'blocked', reason: 'hygiene_sync_pending' });
-    expect(dispatch).not.toHaveBeenCalled();
+    const purged = await purgeExpiredDeliveryCorrelations(30, new Date('2026-08-01T00:00:00Z'));
+    expect(purged).toBe(1);
+
+    const remaining = await admin.query(
+      `SELECT email_hash FROM ${schemaName}.outreach_delivery_correlations`,
+    );
+    expect(remaining.rows.map((row: { email_hash: string }) => row.email_hash))
+      .toEqual([unresolvedHash]);
   });
 });

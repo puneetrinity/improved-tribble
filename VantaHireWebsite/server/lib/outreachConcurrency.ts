@@ -11,14 +11,31 @@ export type OutreachDispatchFenceResult<T> =
 
 // Cost guard only. The locked check in withOutreachDispatchFence remains the
 // authority because a complaint can arrive after this early read.
-export async function hasPendingGlobalOutreachComplaint(): Promise<boolean> {
-  const result = await pool.query(`
-    SELECT EXISTS (
-      SELECT 1
-      FROM outreach_hygiene_intents
-      WHERE reason = 'complaint' AND status <> 'synced'
-    ) AS pending
-  `);
+/**
+ * Cheap pre-check used before spending on an AI draft. It must use the SAME
+ * scope as the locked fence that runs before SMTP: a complaint concerns one
+ * person, so asking "is ANY complaint unsynced?" would make a single stuck
+ * record retry every scheduled campaign on the platform, forever.
+ *
+ * The address is not known this early, so this is deliberately narrower than the
+ * fence. The locked fence still runs before dispatch and catches the rest.
+ */
+export async function hasBlockingOutreachHygieneIntent(
+  signalCandidateId: string | null,
+): Promise<boolean> {
+  const result = await pool.query(
+    `SELECT EXISTS (
+       SELECT 1
+       FROM outreach_hygiene_intents
+       WHERE reason = 'complaint'
+         AND status <> 'synced'
+         AND (
+               ($1::text IS NOT NULL AND signal_candidate_id = $1::text)
+               OR btrim(coalesce(signal_candidate_id, '')) = ''
+             )
+     ) AS pending`,
+    [signalCandidateId],
+  );
   return result.rows?.[0]?.pending === true;
 }
 
