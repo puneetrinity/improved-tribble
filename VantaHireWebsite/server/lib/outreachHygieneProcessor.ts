@@ -487,35 +487,60 @@ export async function purgeExpiredDeliveryCorrelations(
 }
 
 /**
+ * Identifies the running build. A new release means new code, which is the only
+ * thing that can actually repair a record-specific failure.
+ */
+export function currentReleaseId(): string {
+  return (
+    process.env.RAILWAY_GIT_COMMIT_SHA
+    || process.env.RELEASE_ID
+    || process.env.npm_package_version
+    || 'unknown'
+  );
+}
+
+/**
  * Recover dead letters automatically, without an operator.
  *
  * A record-specific failure means the payload we sent will never be accepted —
- * so the remedy is a code fix, and the deploy that carries it restarts this
- * process. Requeuing on start therefore replays exactly the records a fix was
- * meant to repair, with no admin endpoint and nobody editing the database.
+ * so the remedy is a code fix, and the deploy carrying it restarts this process.
+ * Requeuing on start replays exactly the records a fix was meant to repair, with
+ * no admin endpoint and nobody editing the database.
  *
- * Bounded by replay_count so an unfixed bug cannot churn forever: after
- * MAX_DEAD_LETTER_REPLAYS restarts a row stays put and stays visible. Nothing is
- * unsafe about that state — the affected person remains fenced locally either
- * way; what is lost is only the mirror of that suppression in Memory.
+ * There is deliberately NO permanent terminal state. replay_count only damps
+ * churn WITHIN one release, so a crash-loop cannot hammer Memory; a NEW release
+ * always earns a fresh attempt, because new code is precisely the event that
+ * might fix it. A row can therefore never become permanently stuck while
+ * deployments continue.
+ *
+ * While a row waits, nothing is unsafe: the affected person stays fenced
+ * locally. What is missing is only the mirror of that suppression in Memory.
  */
 export async function requeueDeadLetteredIntents(
   maxReplays = MAX_DEAD_LETTER_REPLAYS,
   now: Date = new Date(),
+  releaseId: string = currentReleaseId(),
 ): Promise<number> {
   const result = await db.execute(sql`
     UPDATE outreach_hygiene_intents
     SET status = 'pending',
         dead_lettered_at = NULL,
         attempt_count = 0,
-        replay_count = replay_count + 1,
+        replay_count = CASE
+          WHEN replay_release IS DISTINCT FROM ${releaseId} THEN 1
+          ELSE replay_count + 1
+        END,
+        replay_release = ${releaseId},
         next_attempt_at = ${now},
         lease_token = NULL,
         lease_expires_at = NULL,
         last_error = 'requeued_after_restart',
         updated_at = ${now}
     WHERE status = 'dead_letter'
-      AND replay_count < ${maxReplays}
+      AND (
+            replay_release IS DISTINCT FROM ${releaseId}
+            OR replay_count < ${maxReplays}
+          )
     RETURNING id
   `);
   const requeued = result.rows?.length ?? 0;
@@ -523,6 +548,7 @@ export async function requeueDeadLetteredIntents(
     console.log('[OutreachHygiene] Requeued dead-lettered suppressions after restart', {
       requeued,
       maxReplays,
+      releaseId,
     });
   }
   return requeued;

@@ -1871,6 +1871,7 @@ export async function ensureAtsSchema(): Promise<void> {
       synced_at TIMESTAMP,
       dead_lettered_at TIMESTAMP,
       replay_count INTEGER NOT NULL DEFAULT 0,
+      replay_release TEXT,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
       CONSTRAINT outreach_hygiene_intents_reason_check
@@ -1898,6 +1899,10 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`
     ALTER TABLE outreach_hygiene_intents
     ADD COLUMN IF NOT EXISTS replay_count INTEGER NOT NULL DEFAULT 0;
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    ADD COLUMN IF NOT EXISTS replay_release TEXT;
   `);
   await execSafe(sql`
     ALTER TABLE outreach_hygiene_intents

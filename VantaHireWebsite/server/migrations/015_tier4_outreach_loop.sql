@@ -190,6 +190,7 @@ CREATE TABLE IF NOT EXISTS outreach_hygiene_intents (
   synced_at TIMESTAMP,
   dead_lettered_at TIMESTAMP,
   replay_count INTEGER NOT NULL DEFAULT 0,
+  replay_release TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   CONSTRAINT outreach_hygiene_intents_reason_check
@@ -215,6 +216,9 @@ CREATE TABLE IF NOT EXISTS outreach_hygiene_intents (
 -- Idempotent upgrade for tables created before these constraints existed.
 ALTER TABLE outreach_hygiene_intents
   ADD COLUMN IF NOT EXISTS replay_count INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE outreach_hygiene_intents
+  ADD COLUMN IF NOT EXISTS replay_release TEXT;
 
 ALTER TABLE outreach_hygiene_intents
   DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_candidate_nonblank;

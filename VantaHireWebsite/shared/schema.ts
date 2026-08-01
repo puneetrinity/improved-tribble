@@ -1274,6 +1274,10 @@ export const outreachHygieneIntents = pgTable("outreach_hygiene_intents", {
   // the remedy is a deploy. Dead letters are requeued once per restart until
   // this cap, which removes the need for anyone to touch the database.
   replayCount: integer("replay_count").notNull().default(0),
+  // The release that last replayed this row. A new release is a new fix, so it
+  // always earns a fresh attempt; the count only damps restart churn WITHIN a
+  // release. Together these mean no row is ever permanently stuck.
+  replayRelease: text("replay_release"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

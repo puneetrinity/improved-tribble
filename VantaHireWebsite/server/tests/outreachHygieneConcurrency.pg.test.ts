@@ -87,6 +87,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
         synced_at TIMESTAMP,
         dead_lettered_at TIMESTAMP,
         replay_count INTEGER NOT NULL DEFAULT 0,
+        replay_release TEXT,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
         UNIQUE(provider, provider_event_id),
@@ -656,7 +657,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
       ['e5'.repeat(32), '5e'.repeat(32)],
     );
 
-    expect(await requeueDeadLetteredIntents(2)).toBe(1);
+    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-a')).toBe(1);
     const revived = await admin.query(
       `SELECT status, attempt_count, replay_count, dead_lettered_at, last_error
        FROM ${schemaName}.outreach_hygiene_intents`,
@@ -674,17 +675,31 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
       `UPDATE ${schemaName}.outreach_hygiene_intents
        SET status = 'dead_letter', dead_lettered_at = NOW()`,
     );
-    expect(await requeueDeadLetteredIntents(2)).toBe(1);
+    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-a')).toBe(1);
 
     // Third: cap reached, so it stays put and stays visible.
     await admin.query(
       `UPDATE ${schemaName}.outreach_hygiene_intents
        SET status = 'dead_letter', dead_lettered_at = NOW()`,
     );
-    expect(await requeueDeadLetteredIntents(2)).toBe(0);
+    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-a')).toBe(0);
     const parked = await admin.query(
       `SELECT status, replay_count FROM ${schemaName}.outreach_hygiene_intents`,
     );
     expect(parked.rows[0]).toMatchObject({ status: 'dead_letter', replay_count: 2 });
+
+    // A NEW release is new code — the only thing that can actually repair a bad
+    // payload — so it always earns a fresh attempt. This is what stops the cap
+    // from becoming a permanent stuck state needing an operator.
+    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-b')).toBe(1);
+    const afterDeploy = await admin.query(
+      `SELECT status, replay_count, replay_release
+       FROM ${schemaName}.outreach_hygiene_intents`,
+    );
+    expect(afterDeploy.rows[0]).toMatchObject({
+      status: 'pending',
+      replay_count: 1,
+      replay_release: 'release-b',
+    });
   });
 });
