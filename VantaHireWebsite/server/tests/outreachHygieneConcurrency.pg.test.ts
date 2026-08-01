@@ -17,6 +17,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
   let purgeSyncedHygieneIntents: typeof import('../lib/outreachHygieneProcessor').purgeSyncedHygieneIntents;
   let purgeExpiredDeliveryCorrelations: typeof import('../lib/outreachHygieneProcessor').purgeExpiredDeliveryCorrelations;
   let requeueDeadLetteredIntents: typeof import('../lib/outreachHygieneProcessor').requeueDeadLetteredIntents;
+  let currentReleaseId: typeof import('../lib/outreachHygieneProcessor').currentReleaseId;
   let processHygieneEvent: typeof import('../webhooks/brevo.webhook').processHygieneEvent;
   let candidateLockNamespace: number;
   let emailLockNamespace: number;
@@ -117,6 +118,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
     purgeSyncedHygieneIntents = processor.purgeSyncedHygieneIntents;
     purgeExpiredDeliveryCorrelations = processor.purgeExpiredDeliveryCorrelations;
     requeueDeadLetteredIntents = processor.requeueDeadLetteredIntents;
+    currentReleaseId = processor.currentReleaseId;
     processHygieneEvent = webhookModule.processHygieneEvent;
     runtimePool = dbModule.pool as Pool;
     webhook = await admin.connect();
@@ -643,11 +645,11 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
       .toEqual([unresolvedHash]);
   });
 
-  it('replays dead letters on restart, but only up to the cap', async () => {
-    // A record-specific failure is a payload bug, so the fix is a deploy — and
-    // the deploy restarts this process. Replaying here is what makes recovery
-    // automatic instead of someone editing the database. The cap stops an
-    // unfixed bug from churning on every restart forever.
+  it('always recovers a dead letter eventually, with or without a release id', async () => {
+    // Production exposes no commit SHA, so release-triggered replay cannot be
+    // the only route or rows would stick forever there. Time alone must
+    // guarantee recovery, and it must be bounded by elapsed time rather than by
+    // restart count so a crash-loop cannot amplify it.
     await admin.query(`TRUNCATE ${schemaName}.outreach_hygiene_intents`);
     await admin.query(
       `INSERT INTO ${schemaName}.outreach_hygiene_intents
@@ -656,42 +658,32 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
        VALUES ($1, $2, 'complaint', 'dead_letter', NOW(), 'sc-replay', 7, 0)`,
       ['e5'.repeat(32), '5e'.repeat(32)],
     );
+    const backoff = 6 * 60 * 60 * 1000;
 
-    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-a')).toBe(1);
+    // No release id (production's actual state) and freshly dead-lettered:
+    // a restart alone must NOT replay, or a crash-loop would hammer Memory.
+    expect(await requeueDeadLetteredIntents(3, new Date(), null, backoff)).toBe(0);
+
+    // Once the backoff has elapsed it recovers, with no release id involved.
+    const later = new Date(Date.now() + backoff + 60_000);
+    expect(await requeueDeadLetteredIntents(3, later, null, backoff)).toBe(1);
     const revived = await admin.query(
-      `SELECT status, attempt_count, replay_count, dead_lettered_at, last_error
+      `SELECT status, attempt_count, dead_lettered_at, last_error
        FROM ${schemaName}.outreach_hygiene_intents`,
     );
     expect(revived.rows[0]).toMatchObject({
       status: 'pending',
       attempt_count: 0,
-      replay_count: 1,
       dead_lettered_at: null,
       last_error: 'requeued_after_restart',
     });
 
-    // Second restart: still under the cap, so it replays again.
+    // A new release short-circuits the wait: new code is the likely fix.
     await admin.query(
       `UPDATE ${schemaName}.outreach_hygiene_intents
-       SET status = 'dead_letter', dead_lettered_at = NOW()`,
+       SET status = 'dead_letter', dead_lettered_at = NOW(), replay_release = 'release-a'`,
     );
-    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-a')).toBe(1);
-
-    // Third: cap reached, so it stays put and stays visible.
-    await admin.query(
-      `UPDATE ${schemaName}.outreach_hygiene_intents
-       SET status = 'dead_letter', dead_lettered_at = NOW()`,
-    );
-    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-a')).toBe(0);
-    const parked = await admin.query(
-      `SELECT status, replay_count FROM ${schemaName}.outreach_hygiene_intents`,
-    );
-    expect(parked.rows[0]).toMatchObject({ status: 'dead_letter', replay_count: 2 });
-
-    // A NEW release is new code — the only thing that can actually repair a bad
-    // payload — so it always earns a fresh attempt. This is what stops the cap
-    // from becoming a permanent stuck state needing an operator.
-    expect(await requeueDeadLetteredIntents(2, new Date(), 'release-b')).toBe(1);
+    expect(await requeueDeadLetteredIntents(3, new Date(), 'release-b', backoff)).toBe(1);
     const afterDeploy = await admin.query(
       `SELECT status, replay_count, replay_release
        FROM ${schemaName}.outreach_hygiene_intents`,
@@ -701,5 +693,23 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
       replay_count: 1,
       replay_release: 'release-b',
     });
+  });
+
+  it('never derives a release id from a value that is constant across deploys', () => {
+    // A package version or a literal would make every deploy look identical and
+    // silently disable release-triggered replay.
+    const original = { ...process.env };
+    try {
+      delete process.env.RAILWAY_GIT_COMMIT_SHA;
+      delete process.env.RELEASE_ID;
+      process.env.npm_package_version = '1.8.0';
+      expect(currentReleaseId()).toBeNull();
+      process.env.RELEASE_ID = '  ';
+      expect(currentReleaseId()).toBeNull();
+      process.env.RELEASE_ID = 'abc123';
+      expect(currentReleaseId()).toBe('abc123');
+    } finally {
+      process.env = original;
+    }
   });
 });

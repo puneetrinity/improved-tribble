@@ -49,6 +49,13 @@ const MAX_DEAD_LETTER_REPLAYS = readPositiveInteger(
   process.env.OUTREACH_HYGIENE_MAX_REPLAYS,
   3,
 );
+// Recovery must not depend on the platform exposing a per-deploy identifier.
+// Time-based eligibility guarantees a dead letter is always retried eventually,
+// and bounds churn by elapsed time rather than by how often the process restarts.
+const DEAD_LETTER_REPLAY_BACKOFF_MS = readPositiveInteger(
+  process.env.OUTREACH_HYGIENE_REPLAY_BACKOFF_MS,
+  6 * 60 * 60 * 1000,
+);
 const LEASE_MS = Math.max(
   readPositiveInteger(process.env.OUTREACH_HYGIENE_LEASE_MS, 60_000),
   Math.ceil(BATCH_SIZE / CONCURRENCY) * CONTACT_SUPPRESSION_TIMEOUT_MS + 30_000,
@@ -487,16 +494,16 @@ export async function purgeExpiredDeliveryCorrelations(
 }
 
 /**
- * Identifies the running build. A new release means new code, which is the only
- * thing that can actually repair a record-specific failure.
+ * Identifies the running build, or null when the platform does not supply one.
+ *
+ * Deliberately NO fallback to a package version or a literal: those are constant
+ * across deploys, so they would make every release look identical and silently
+ * disable release-triggered replay. Production currently exposes no commit SHA,
+ * so this returns null there and the time-based path below does the work.
  */
-export function currentReleaseId(): string {
-  return (
-    process.env.RAILWAY_GIT_COMMIT_SHA
-    || process.env.RELEASE_ID
-    || process.env.npm_package_version
-    || 'unknown'
-  );
+export function currentReleaseId(): string | null {
+  const raw = (process.env.RAILWAY_GIT_COMMIT_SHA || process.env.RELEASE_ID || '').trim();
+  return raw || null;
 }
 
 /**
@@ -519,18 +526,22 @@ export function currentReleaseId(): string {
 export async function requeueDeadLetteredIntents(
   maxReplays = MAX_DEAD_LETTER_REPLAYS,
   now: Date = new Date(),
-  releaseId: string = currentReleaseId(),
+  releaseId: string | null = currentReleaseId(),
+  backoffMs: number = DEAD_LETTER_REPLAY_BACKOFF_MS,
 ): Promise<number> {
+  const cutoff = new Date(now.getTime() - backoffMs);
   const result = await db.execute(sql`
     UPDATE outreach_hygiene_intents
     SET status = 'pending',
         dead_lettered_at = NULL,
         attempt_count = 0,
         replay_count = CASE
-          WHEN replay_release IS DISTINCT FROM ${releaseId} THEN 1
+          WHEN ${releaseId}::text IS NOT NULL
+           AND replay_release IS DISTINCT FROM ${releaseId}::text
+          THEN 1
           ELSE replay_count + 1
         END,
-        replay_release = ${releaseId},
+        replay_release = COALESCE(${releaseId}::text, replay_release),
         next_attempt_at = ${now},
         lease_token = NULL,
         lease_expires_at = NULL,
@@ -538,8 +549,14 @@ export async function requeueDeadLetteredIntents(
         updated_at = ${now}
     WHERE status = 'dead_letter'
       AND (
-            replay_release IS DISTINCT FROM ${releaseId}
-            OR replay_count < ${maxReplays}
+            -- New code shipped: retry immediately, that is the likely fix.
+            (${releaseId}::text IS NOT NULL
+              AND replay_release IS DISTINCT FROM ${releaseId}::text)
+            -- Otherwise time alone guarantees eventual recovery, whatever the
+            -- platform exposes. Bounded by elapsed time rather than restart
+            -- count, so a crash-loop cannot amplify it.
+            OR dead_lettered_at IS NULL
+            OR dead_lettered_at < ${cutoff}
           )
     RETURNING id
   `);
