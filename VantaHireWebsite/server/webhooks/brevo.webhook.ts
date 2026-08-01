@@ -6,6 +6,8 @@ import {
   candidateOutreachSchedules,
   jobSourcedCandidates,
   organizations,
+  outreachDeliveryCorrelations,
+  outreachHygieneIntents,
   sourcedCandidateOutreachLog,
   webhookEvents,
 } from '@shared/schema';
@@ -16,7 +18,6 @@ import {
 } from '../lib/outreachSuppression';
 import {
   hashOutreachEmail,
-  normalizeOutreachEmail,
 } from '../lib/outreachComplianceCore';
 import {
   BREVO_WEBHOOK_PROCESSING_LEASE_MS,
@@ -27,13 +28,21 @@ import {
   verifyBrevoBearerToken,
   type BrevoHygieneEvent,
 } from '../lib/brevoWebhookCore';
-import { suppressContactEvidence } from '../lib/services/activekg-client';
 import {
   lockCandidateOutreach,
   lockOutreachEmailHash,
 } from '../lib/outreachConcurrency';
+import { wakeOutreachHygieneProcessor } from '../lib/outreachHygieneProcessor';
 
 const WEBHOOK_PROVIDER = 'brevo';
+const LEGACY_CORRELATION_COLUMNS = {
+  id: true,
+  deliveryId: true,
+  providerMessageId: true,
+  organizationId: true,
+  sourcedCandidateId: true,
+  recipientEmail: true,
+} as const;
 
 const webhookEventSchema = z.object({
   event: z.string().min(1),
@@ -129,11 +138,12 @@ async function finalizeEvent(
     ));
 }
 
-async function findOutreachLog(event: BrevoWebhookEvent) {
+async function findLegacyOutreachLog(event: BrevoWebhookEvent) {
   const deliveryId = parseBrevoCorrelationHeader(event['X-Mailin-custom']);
   if (deliveryId) {
     const byDelivery = await db.query.sourcedCandidateOutreachLog.findFirst({
       where: eq(sourcedCandidateOutreachLog.deliveryId, deliveryId),
+      columns: LEGACY_CORRELATION_COLUMNS,
     });
     if (byDelivery) return byDelivery;
   }
@@ -142,97 +152,172 @@ async function findOutreachLog(event: BrevoWebhookEvent) {
   if (!messageId) return null;
   return db.query.sourcedCandidateOutreachLog.findFirst({
     where: eq(sourcedCandidateOutreachLog.providerMessageId, messageId),
+    columns: LEGACY_CORRELATION_COLUMNS,
   });
 }
 
-async function processHygieneEvent(
+async function findDeliveryCorrelation(event: BrevoWebhookEvent) {
+  const deliveryId = parseBrevoCorrelationHeader(event['X-Mailin-custom']);
+  if (deliveryId) {
+    const byDelivery = await db.query.outreachDeliveryCorrelations.findFirst({
+      where: and(
+        eq(outreachDeliveryCorrelations.provider, WEBHOOK_PROVIDER),
+        eq(outreachDeliveryCorrelations.deliveryId, deliveryId),
+      ),
+    });
+    if (byDelivery) return byDelivery;
+  }
+
+  const messageId = normalizeBrevoMessageId(event['message-id']);
+  if (messageId) {
+    const byMessage = await db.query.outreachDeliveryCorrelations.findFirst({
+      where: and(
+        eq(outreachDeliveryCorrelations.provider, WEBHOOK_PROVIDER),
+        eq(outreachDeliveryCorrelations.providerMessageId, messageId),
+      ),
+    });
+    if (byMessage) return byMessage;
+  }
+
+  // Transition guard for a delivery created by the old process after migration
+  // backfill but before the new process became active. Materialize its durable
+  // hash-only correlation while all lifecycle parents still exist.
+  const log = await findLegacyOutreachLog(event);
+  if (!log) return null;
+  const durableDeliveryId = log.deliveryId?.trim() || `legacy-log:${log.id}`;
+  const [candidate, organization] = await Promise.all([
+    db.query.jobSourcedCandidates.findFirst({
+      where: eq(jobSourcedCandidates.id, log.sourcedCandidateId),
+      columns: { signalCandidateId: true },
+    }),
+    db.query.organizations.findFirst({
+      where: eq(organizations.id, log.organizationId),
+      columns: { signalTenantId: true },
+    }),
+  ]);
+  if (!candidate?.signalCandidateId?.trim() || !organization?.signalTenantId?.trim()) {
+    throw new Error('Outreach delivery is missing durable Memory identity');
+  }
+  await db.insert(outreachDeliveryCorrelations).values({
+    provider: WEBHOOK_PROVIDER,
+    deliveryId: durableDeliveryId,
+    providerMessageId: normalizeBrevoMessageId(log.providerMessageId ?? undefined),
+    organizationId: log.organizationId,
+    sourcedCandidateId: log.sourcedCandidateId,
+    signalTenantId: organization.signalTenantId,
+    signalCandidateId: candidate.signalCandidateId,
+    emailHash: hashOutreachEmail(log.recipientEmail),
+    sourceOutreachLogId: log.id,
+  }).onConflictDoNothing({
+    target: [
+      outreachDeliveryCorrelations.provider,
+      outreachDeliveryCorrelations.deliveryId,
+    ],
+  });
+  return db.query.outreachDeliveryCorrelations.findFirst({
+    where: and(
+      eq(outreachDeliveryCorrelations.provider, WEBHOOK_PROVIDER),
+      eq(outreachDeliveryCorrelations.deliveryId, durableDeliveryId),
+    ),
+  });
+}
+
+export async function processHygieneEvent(
   event: BrevoWebhookEvent,
   eventType: BrevoHygieneEvent,
   eventId: string,
 ): Promise<'processed' | 'skipped'> {
-  const log = await findOutreachLog(event);
-  if (!log) return 'skipped';
-  if (hashOutreachEmail(log.recipientEmail) !== hashOutreachEmail(event.email)) {
+  const correlation = await findDeliveryCorrelation(event);
+  if (!correlation) {
+    // A valid Ealana delivery header proves this event belongs to outreach. A
+    // missing retained row is a recoverable data-integrity incident, not an
+    // ignorable provider event: return 503 so Brevo retries while it is repaired.
+    if (parseBrevoCorrelationHeader(event['X-Mailin-custom'])) {
+      throw new Error('Outreach delivery correlation is missing');
+    }
+    return 'skipped';
+  }
+  if (correlation.emailHash !== hashOutreachEmail(event.email)) {
     throw new Error('Brevo event recipient does not match the correlated delivery');
   }
-  const sourcedCandidate = await db.query.jobSourcedCandidates.findFirst({
-    where: eq(jobSourcedCandidates.id, log.sourcedCandidateId),
-    columns: { signalCandidateId: true },
-  });
-  if (!sourcedCandidate) {
-    throw new Error('Brevo event candidate no longer exists');
-  }
-
   const now = new Date(
     typeof event.ts_event === 'number' || /^\d+$/.test(String(event.ts_event ?? ''))
       ? Number(event.ts_event) * 1000
       : Date.now(),
   );
 
-  const organization = eventType === 'hard_bounce' || eventType === 'complaint'
-    ? await db.query.organizations.findFirst({
-      where: eq(organizations.id, log.organizationId),
-      columns: { signalTenantId: true },
-    })
-    : null;
-  if (
-    (eventType === 'hard_bounce' || eventType === 'complaint')
-    && !organization?.signalTenantId
-  ) {
-    throw new Error('Outreach organization has no Memory tenant');
-  }
-
-  // Platform-wide suppression is an EXTERNAL HTTP call. It runs BEFORE the
-  // transaction opens: inside it, a slow or down Memory would pin both advisory
-  // locks and a pooled connection for the life of the request. Suppressing first
-  // is also the fail-safe order — if the local transaction then fails, Brevo
-  // redelivers and the (provider-event-idempotent) suppress simply repeats.
-  //
-  // Any failure here FAILS THE EVENT so Brevo retries. A hard bounce or
-  // complaint is platform-wide, so it is never downgraded to a local record:
-  // Memory records the hash-keyed tombstone even when it holds no evidence for
-  // the address, which is what makes the stop signal apply to every org.
-  if (
-    (eventType === 'hard_bounce' || eventType === 'complaint')
-    && organization?.signalTenantId
-  ) {
-    await suppressContactEvidence(
-      organization.signalTenantId,
-      {
-        email: normalizeOutreachEmail(event.email),
-        reason: eventType,
-        // Required by Memory whenever the calling tenant owns no evidence for
-        // the address; always present here, and idempotent across redeliveries.
-        providerEventId: eventId,
-      },
-      `brevo:${eventId}`,
-    );
-  }
-
   await db.transaction(async (tx: any) => {
-    await lockCandidateOutreach(tx, log.sourcedCandidateId);
-    await lockOutreachEmailHash(tx, hashOutreachEmail(event.email));
-    const lockedLog = await tx.query.sourcedCandidateOutreachLog.findFirst({
-      where: eq(sourcedCandidateOutreachLog.id, log.id),
+    await lockCandidateOutreach(tx, correlation.sourcedCandidateId);
+    await lockOutreachEmailHash(tx, correlation.emailHash);
+    const lockedLog = correlation.sourceOutreachLogId == null
+      ? null
+      : await tx.query.sourcedCandidateOutreachLog.findFirst({
+        where: and(
+          eq(sourcedCandidateOutreachLog.id, correlation.sourceOutreachLogId),
+          eq(sourcedCandidateOutreachLog.deliveryId, correlation.deliveryId),
+        ),
+        columns: {
+          id: true,
+          campaignId: true,
+          campaignRound: true,
+          deliveryId: true,
+          deliveryEventAt: true,
+          sentAt: true,
+        },
+      });
+    const sourcedCandidate = await tx.query.jobSourcedCandidates.findFirst({
+      where: eq(jobSourcedCandidates.id, correlation.sourcedCandidateId),
+      columns: { signalCandidateId: true },
     });
-    if (!lockedLog) {
-      throw new Error('Brevo event delivery disappeared while processing');
+    const organization = await tx.query.organizations.findFirst({
+      where: eq(organizations.id, correlation.organizationId),
+      columns: { id: true },
+    });
+
+    // The durable hash-only intent is committed under the same locks checked
+    // by every send. Memory synchronization deliberately happens after commit:
+    // a slow/down Memory can never hold the send locks, and the local fence
+    // remains fail-closed until the processor receives a valid acknowledgement.
+    if (
+      (eventType === 'hard_bounce' || eventType === 'complaint')
+    ) {
+      await tx
+        .insert(outreachHygieneIntents)
+        .values({
+          provider: WEBHOOK_PROVIDER,
+          providerEventId: eventId,
+          organizationId: correlation.organizationId,
+          sourcedCandidateId: correlation.sourcedCandidateId,
+          signalTenantId: correlation.signalTenantId,
+          signalCandidateId: correlation.signalCandidateId,
+          sourceOutreachLogId: lockedLog?.id ?? correlation.sourceOutreachLogId,
+          emailHash: correlation.emailHash,
+          reason: eventType,
+          status: 'pending',
+          nextAttemptAt: new Date(),
+        })
+        .onConflictDoNothing({
+          target: [
+            outreachHygieneIntents.provider,
+            outreachHygieneIntents.providerEventId,
+          ],
+        });
     }
-    const observedSentAt = lockedLog.sentAt ?? now;
+    const observedSentAt = lockedLog?.sentAt ?? now;
     const eventPrecedesRecordedDelivery = Boolean(
-      lockedLog.deliveryEventAt
+      lockedLog?.deliveryEventAt
       && lockedLog.deliveryEventAt.getTime() > now.getTime(),
     );
-    if (eventType === 'unsubscribed') {
+    if (eventType === 'unsubscribed' && organization) {
       await suppressOrgEmail({
-        organizationId: log.organizationId,
-        emailHash: hashOutreachEmail(event.email),
-        signalCandidateId: sourcedCandidate.signalCandidateId,
-        sourceOutreachLogId: log.id,
+        organizationId: correlation.organizationId,
+        emailHash: correlation.emailHash,
+        signalCandidateId: correlation.signalCandidateId,
+        sourceOutreachLogId: lockedLog?.id ?? null,
         providerEventId: eventId,
       }, tx);
     }
-    await tx
+    if (lockedLog) await tx
       .update(sourcedCandidateOutreachLog)
       .set({
         status: sql<string>`
@@ -271,35 +356,35 @@ async function processHygieneEvent(
           END
         `,
       })
-      .where(eq(sourcedCandidateOutreachLog.id, log.id));
-    await tx
+      .where(eq(sourcedCandidateOutreachLog.id, lockedLog.id));
+    if (sourcedCandidate && lockedLog) await tx
       .update(jobSourcedCandidates)
       .set({
         outreachCount: sql<number>`
           GREATEST(
             ${jobSourcedCandidates.outreachCount},
-            ${log.campaignRound ?? 0}
+            ${lockedLog.campaignRound ?? 0}
           )
         `,
         lastOutreachRound: sql<number | null>`
           CASE
-            WHEN ${log.campaignRound ?? 0}
+            WHEN ${lockedLog.campaignRound ?? 0}
               >= COALESCE(${jobSourcedCandidates.lastOutreachRound}, 0)
-            THEN ${log.campaignRound}
+            THEN ${lockedLog.campaignRound}
             ELSE ${jobSourcedCandidates.lastOutreachRound}
           END
         `,
         lastOutreachCampaignId: sql<string | null>`
           CASE
-            WHEN ${log.campaignRound ?? 0}
+            WHEN ${lockedLog.campaignRound ?? 0}
               >= COALESCE(${jobSourcedCandidates.lastOutreachRound}, 0)
-            THEN ${log.campaignId}
+            THEN ${lockedLog.campaignId}
             ELSE ${jobSourcedCandidates.lastOutreachCampaignId}
           END
         `,
         lastOutreachAt: sql<Date | null>`
           CASE
-            WHEN ${log.campaignRound ?? 0}
+            WHEN ${lockedLog.campaignRound ?? 0}
               >= COALESCE(${jobSourcedCandidates.lastOutreachRound}, 0)
             THEN ${observedSentAt}
             ELSE ${jobSourcedCandidates.lastOutreachAt}
@@ -312,7 +397,7 @@ async function processHygieneEvent(
             WHEN ${jobSourcedCandidates.lastOutreachStatus}
               IN ('complaint', 'unsubscribed')
             THEN ${jobSourcedCandidates.lastOutreachStatus}
-            WHEN ${log.campaignRound ?? 0}
+            WHEN ${lockedLog.campaignRound ?? 0}
               < COALESCE(${jobSourcedCandidates.lastOutreachRound}, 0)
             THEN ${jobSourcedCandidates.lastOutreachStatus}
             WHEN ${eventType} = 'hard_bounce'
@@ -327,7 +412,7 @@ async function processHygieneEvent(
         `,
         updatedAt: new Date(),
       })
-      .where(eq(jobSourcedCandidates.id, log.sourcedCandidateId));
+      .where(eq(jobSourcedCandidates.id, correlation.sourcedCandidateId));
     // Deliberately NOT cancelled on hard_bounce. Schedules are keyed per
     // candidate and carry no address, so cancelling here would end outreach to a
     // person who may still have another validated address — which the locked
@@ -342,9 +427,12 @@ async function processHygieneEvent(
           lastError: eventType,
           updatedAt: new Date(),
         })
-        .where(eq(candidateOutreachSchedules.sourcedCandidateId, log.sourcedCandidateId));
+          .where(eq(candidateOutreachSchedules.sourcedCandidateId, correlation.sourcedCandidateId));
     }
   });
+  if (eventType === 'hard_bounce' || eventType === 'complaint') {
+    wakeOutreachHygieneProcessor();
+  }
   return 'processed';
 }
 

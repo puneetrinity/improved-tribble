@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getSkippedOutreachDisposition,
   getNextCandidateOutreachSchedule,
   isJobOpenForOutreach,
 } from '../outreachSchedulerCore';
@@ -52,5 +53,22 @@ describe('candidate-owned outreach schedules', () => {
       ...open,
       expiresAt: new Date('2026-07-30T12:00:00Z'),
     }, now)).toBe(false);
+  });
+
+  it('retries a pending compliance sync without exhausting the campaign', () => {
+    expect(getSkippedOutreachDisposition('hygiene_sync_pending')).toEqual({
+      action: 'retry',
+      errorCode: 'hygiene_sync_pending',
+      consumeAttempt: false,
+    });
+    expect(getSkippedOutreachDisposition('contact_unavailable')).toEqual({
+      action: 'retry',
+      errorCode: 'contact_unavailable',
+      consumeAttempt: true,
+    });
+    expect(getSkippedOutreachDisposition('platform_suppressed')).toEqual({
+      action: 'cancel',
+      errorCode: 'platform_suppressed',
+    });
   });
 });

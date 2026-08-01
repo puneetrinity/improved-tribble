@@ -1179,6 +1179,47 @@ export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_l
   providerMessageIdx: uniqueIndex("scol_provider_message_idx").on(table.providerMessageId),
 }));
 
+// Immutable-enough, hash-only correlation data for provider hygiene callbacks.
+// These rows deliberately have no foreign keys: a complaint or bounce can arrive
+// after the owning org, job, candidate, or verbose delivery log was deleted.
+export const outreachDeliveryCorrelations = pgTable("outreach_delivery_correlations", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().default("brevo"),
+  deliveryId: text("delivery_id").notNull(),
+  providerMessageId: text("provider_message_id"),
+  organizationId: integer("organization_id").notNull(),
+  sourcedCandidateId: integer("sourced_candidate_id").notNull(),
+  signalTenantId: text("signal_tenant_id").notNull(),
+  signalCandidateId: text("signal_candidate_id").notNull(),
+  emailHash: text("email_hash").notNull(),
+  sourceOutreachLogId: integer("source_outreach_log_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  deliveryIdx: uniqueIndex("outreach_delivery_correlations_delivery_idx")
+    .on(table.provider, table.deliveryId),
+  messageIdx: uniqueIndex("outreach_delivery_correlations_message_idx")
+    .on(table.provider, table.providerMessageId)
+    .where(sql`${table.providerMessageId} IS NOT NULL`),
+  emailIdx: index("outreach_delivery_correlations_email_idx").on(table.emailHash),
+  deliveryNonblankCheck: check(
+    "outreach_delivery_correlations_delivery_nonblank",
+    sql`btrim(${table.deliveryId}) <> ''`,
+  ),
+  tenantNonblankCheck: check(
+    "outreach_delivery_correlations_tenant_nonblank",
+    sql`btrim(${table.signalTenantId}) <> ''`,
+  ),
+  candidateNonblankCheck: check(
+    "outreach_delivery_correlations_candidate_nonblank",
+    sql`btrim(${table.signalCandidateId}) <> ''`,
+  ),
+  emailHashCheck: check(
+    "outreach_delivery_correlations_email_hash_check",
+    sql`${table.emailHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+}));
+
 export const outreachOrgSuppressions = pgTable("outreach_org_suppressions", {
   id: serial("id").primaryKey(),
   organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
@@ -1202,6 +1243,67 @@ export const outreachOrgSuppressions = pgTable("outreach_org_suppressions", {
   reasonCheck: check(
     "outreach_org_suppressions_reason_check",
     sql`${table.reason} = 'unsubscribe'`,
+  ),
+}));
+
+// Durable, hash-only bridge from provider hygiene events to Memory. Pending
+// complaints intentionally create a global send hold until Memory confirms the
+// person-scoped suppression; hard bounces fence only the observed address.
+export const outreachHygieneIntents = pgTable("outreach_hygiene_intents", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().default("brevo"),
+  providerEventId: text("provider_event_id").notNull(),
+  organizationId: integer("organization_id").notNull(),
+  sourcedCandidateId: integer("sourced_candidate_id").notNull(),
+  signalTenantId: text("signal_tenant_id").notNull(),
+  signalCandidateId: text("signal_candidate_id").notNull(),
+  // Snapshot only. No FK: the compliance fence must survive log/parent deletion.
+  sourceOutreachLogId: integer("source_outreach_log_id"),
+  emailHash: text("email_hash").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at").defaultNow().notNull(),
+  leaseToken: text("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at"),
+  lastError: text("last_error"),
+  memoryGlobalCandidateId: text("memory_global_candidate_id"),
+  syncedAt: timestamp("synced_at"),
+  deadLetteredAt: timestamp("dead_lettered_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  providerEventIdx: uniqueIndex("outreach_hygiene_intents_provider_event_idx")
+    .on(table.provider, table.providerEventId),
+  dueIdx: index("outreach_hygiene_intents_due_idx")
+    .on(table.status, table.nextAttemptAt),
+  emailIdx: index("outreach_hygiene_intents_email_idx").on(table.emailHash),
+  pendingComplaintIdx: index("outreach_hygiene_intents_pending_complaint_idx")
+    .on(table.status)
+    .where(sql`${table.reason} = 'complaint' AND ${table.status} <> 'synced'`),
+  reasonCheck: check(
+    "outreach_hygiene_intents_reason_check",
+    sql`${table.reason} IN ('hard_bounce', 'complaint')`,
+  ),
+  statusCheck: check(
+    "outreach_hygiene_intents_status_check",
+    sql`${table.status} IN ('pending', 'processing', 'synced', 'dead_letter')`,
+  ),
+  eventIdCheck: check(
+    "outreach_hygiene_intents_event_id_check",
+    sql`${table.providerEventId} ~ '^[0-9a-f]{64}$'`,
+  ),
+  emailHashCheck: check(
+    "outreach_hygiene_intents_email_hash_check",
+    sql`${table.emailHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+  attemptsCheck: check(
+    "outreach_hygiene_intents_attempts_check",
+    sql`${table.attemptCount} >= 0`,
+  ),
+  deadLetterPairCheck: check(
+    "outreach_hygiene_intents_dead_letter_pair_check",
+    sql`(${table.status} = 'dead_letter') = (${table.deadLetteredAt} IS NOT NULL)`,
   ),
 }));
 
@@ -2833,6 +2935,8 @@ export type InsertJobSourcedCandidate = z.infer<typeof insertJobSourcedCandidate
 export type SourcedCandidateOutreachCampaign = typeof sourcedCandidateOutreachCampaigns.$inferSelect;
 export type SourcedCandidateOutreachLog = typeof sourcedCandidateOutreachLog.$inferSelect;
 export type OutreachOrgSuppression = typeof outreachOrgSuppressions.$inferSelect;
+export type OutreachHygieneIntent = typeof outreachHygieneIntents.$inferSelect;
+export type OutreachDeliveryCorrelation = typeof outreachDeliveryCorrelations.$inferSelect;
 export type CandidateOutreachSchedule = typeof candidateOutreachSchedules.$inferSelect;
 
 // =====================================================

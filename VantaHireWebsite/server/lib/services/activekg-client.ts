@@ -23,6 +23,7 @@ export const ACTIVEKG_SCOPES = {
   WRITE: 'kg:write',
   KG_READ: 'kg:read',
   CONTACT_WRITE: 'contact:write',
+  CONTACT_SUPPRESS: 'contact:suppress',
 } as const;
 
 // =====================================================
@@ -441,36 +442,67 @@ export async function getResumeRefs(
 
 export type ContactSuppressionReason = 'hard_bounce' | 'complaint';
 
+export interface ContactSuppressionResponse {
+  suppressed: true;
+  reason: ContactSuppressionReason;
+  evidence: 'present' | 'absent';
+  scope: 'address' | 'person';
+  global_candidate_id: string | null;
+  idempotent: boolean;
+}
+
 /**
- * Hygiene suppression is called on the Brevo webhook path, which must answer the
- * provider quickly and must never hold outreach locks on a slow Memory.
+ * Hygiene suppression is called by the durable Brevo outbox processor, outside
+ * the transaction that records the local send fence.
  */
 export const CONTACT_SUPPRESSION_TIMEOUT_MS = 5000;
 
 export async function suppressContactEvidence(
   tenantId: string,
   input: {
-    email: string;
+    emailHash: string;
     reason: ContactSuppressionReason;
-    providerEventId?: string | null;
+    providerEventId: string;
+    signalCandidateId: string;
   },
   requestId?: string,
-): Promise<void> {
+): Promise<ContactSuppressionResponse> {
   const res = await activekgFetch('/contact-evidence/suppress', {
     method: 'POST',
     tenantId,
-    scopes: ACTIVEKG_SCOPES.CONTACT_WRITE,
+    scopes: ACTIVEKG_SCOPES.CONTACT_SUPPRESS,
     requestId,
     timeoutMs: CONTACT_SUPPRESSION_TIMEOUT_MS,
     body: {
-      email: input.email,
+      email_hash: input.emailHash,
       reason: input.reason,
-      provider_event_id: input.providerEventId ?? null,
+      provider_event_id: input.providerEventId,
+      signal_candidate_id: input.signalCandidateId,
     },
   });
-  if (res.ok) return;
-
   const body: any = await res.json().catch(() => null);
+  if (res.ok) {
+    if (
+      !body
+      || body.suppressed !== true
+      || body.reason !== input.reason
+      || (body.evidence !== 'present' && body.evidence !== 'absent')
+      || (body.scope !== 'address' && body.scope !== 'person')
+      || (
+        body.global_candidate_id !== null
+        && typeof body.global_candidate_id !== 'string'
+      )
+      || typeof body.idempotent !== 'boolean'
+    ) {
+      throw new ActiveKGClientError(
+        'ActiveKG returned an invalid contact suppression acknowledgement',
+        502,
+        body,
+      );
+    }
+    return body as ContactSuppressionResponse;
+  }
+
   throw new ActiveKGClientError(
     body?.detail || `ActiveKG /contact-evidence/suppress returned ${res.status}`,
     res.status,

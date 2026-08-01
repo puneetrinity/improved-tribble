@@ -28,7 +28,9 @@ import {
   isOutreachDeliveryUncertainError,
   sendTrackedOutreachEmail,
 } from './outreachDelivery';
+import { hasPendingGlobalOutreachComplaint } from './outreachConcurrency';
 import {
+  getSkippedOutreachDisposition,
   getNextCandidateOutreachSchedule,
   isJobOpenForOutreach,
   OUTREACH_MAX_ROUNDS,
@@ -163,12 +165,14 @@ async function fireScheduledCandidate(
         eq(candidateOutreachSchedules.nextRound, campaignRound),
       ));
   };
-  const retry = async (reason: string) => {
-    const attempts = scheduled.attemptCount + 1;
+  const retry = async (reason: string, consumeAttempt = true) => {
+    const attempts = scheduled.attemptCount + (consumeAttempt ? 1 : 0);
     await db
       .update(candidateOutreachSchedules)
       .set({
-        status: attempts >= MAX_SCHEDULE_ATTEMPTS ? 'cancelled' : 'pending',
+        status: consumeAttempt && attempts >= MAX_SCHEDULE_ATTEMPTS
+          ? 'cancelled'
+          : 'pending',
         dueAt: new Date(Date.now() + RETRY_DELAY_MS),
         attemptCount: attempts,
         lastError: reason,
@@ -217,6 +221,18 @@ async function fireScheduledCandidate(
   const emailService = await getEmailService();
   if (!emailService || typeof emailService.sendEmailWithReceipt !== 'function') {
     await retry('email_service_unavailable');
+    return;
+  }
+
+  try {
+    if (await hasPendingGlobalOutreachComplaint()) {
+      await retry('hygiene_sync_pending', false);
+      return;
+    }
+  } catch {
+    // The final locked fence still runs before SMTP, but a failed early fence
+    // read is not a reason to spend on a draft or consume the send retry budget.
+    await retry('hygiene_fence_check_failed', false);
     return;
   }
 
@@ -299,20 +315,11 @@ async function fireScheduledCandidate(
           completedAt: new Date(),
         })
         .where(eq(sourcedCandidateOutreachCampaigns.campaignId, campaignId));
-      if (
-        delivery.reason === 'org_suppressed'
-        || delivery.reason === 'platform_suppressed'
-        || delivery.reason === 'candidate_ineligible'
-      ) {
-        await cancel(
-          delivery.reason === 'org_suppressed'
-            ? 'org_unsubscribed'
-            : delivery.reason === 'platform_suppressed'
-              ? 'platform_suppressed'
-              : 'candidate_ineligible',
-        );
+      const disposition = getSkippedOutreachDisposition(delivery.reason);
+      if (disposition.action === 'cancel') {
+        await cancel(disposition.errorCode);
       } else {
-        await retry('contact_unavailable');
+        await retry(disposition.errorCode, disposition.consumeAttempt);
       }
       return;
     }

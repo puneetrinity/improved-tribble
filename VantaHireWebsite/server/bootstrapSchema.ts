@@ -1725,6 +1725,104 @@ export async function ensureAtsSchema(): Promise<void> {
   await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS scol_delivery_id_idx ON sourced_candidate_outreach_log(delivery_id);`);
   await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS scol_provider_message_idx ON sourced_candidate_outreach_log(provider_message_id);`);
 
+  console.log('  Creating outreach_delivery_correlations table...');
+  await execSafe(sql`
+    CREATE TABLE IF NOT EXISTS outreach_delivery_correlations (
+      id SERIAL PRIMARY KEY,
+      provider TEXT NOT NULL DEFAULT 'brevo',
+      delivery_id TEXT NOT NULL,
+      provider_message_id TEXT,
+      organization_id INTEGER NOT NULL,
+      sourced_candidate_id INTEGER NOT NULL,
+      signal_tenant_id TEXT NOT NULL,
+      signal_candidate_id TEXT NOT NULL,
+      email_hash TEXT NOT NULL,
+      source_outreach_log_id INTEGER,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      CONSTRAINT outreach_delivery_correlations_delivery_nonblank
+        CHECK (btrim(delivery_id) <> ''),
+      CONSTRAINT outreach_delivery_correlations_tenant_nonblank
+        CHECK (btrim(signal_tenant_id) <> ''),
+      CONSTRAINT outreach_delivery_correlations_candidate_nonblank
+        CHECK (btrim(signal_candidate_id) <> ''),
+      CONSTRAINT outreach_delivery_correlations_email_hash_check
+        CHECK (email_hash ~ '^[0-9a-f]{64}$')
+    );
+  `);
+  await execSafe(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS outreach_delivery_correlations_delivery_idx
+    ON outreach_delivery_correlations(provider, delivery_id);
+  `);
+  await execSafe(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS outreach_delivery_correlations_message_idx
+    ON outreach_delivery_correlations(provider, provider_message_id)
+    WHERE provider_message_id IS NOT NULL;
+  `);
+  await execSafe(sql`
+    CREATE INDEX IF NOT EXISTS outreach_delivery_correlations_email_idx
+    ON outreach_delivery_correlations(email_hash);
+  `);
+  await execSafe(sql`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1
+        FROM sourced_candidate_outreach_log AS log
+        LEFT JOIN organizations AS org ON org.id = log.organization_id
+        LEFT JOIN job_sourced_candidates AS candidate
+          ON candidate.id = log.sourced_candidate_id
+        WHERE (
+          NULLIF(btrim(log.delivery_id), '') IS NOT NULL
+          OR NULLIF(btrim(log.provider_message_id), '') IS NOT NULL
+        )
+          AND (
+            NULLIF(btrim(org.signal_tenant_id), '') IS NULL
+            OR NULLIF(btrim(candidate.signal_candidate_id), '') IS NULL
+          )
+      ) THEN
+        RAISE EXCEPTION
+          'cannot preserve outreach callback correlation: historical delivery lacks Memory identity';
+      END IF;
+    END $$;
+  `);
+  await execSafe(sql`
+    INSERT INTO outreach_delivery_correlations (
+      provider, delivery_id, provider_message_id, organization_id,
+      sourced_candidate_id, signal_tenant_id, signal_candidate_id, email_hash,
+      source_outreach_log_id, created_at, updated_at
+    )
+    SELECT
+      'brevo',
+      COALESCE(NULLIF(btrim(log.delivery_id), ''), 'legacy-log:' || log.id::text),
+      NULLIF(lower(btrim(log.provider_message_id, '<> ')), ''),
+      log.organization_id,
+      log.sourced_candidate_id, org.signal_tenant_id, candidate.signal_candidate_id,
+      encode(sha256(convert_to(lower(btrim(log.recipient_email)), 'UTF8')), 'hex'),
+      log.id, COALESCE(log.sent_at, NOW()), NOW()
+    FROM sourced_candidate_outreach_log AS log
+    JOIN organizations AS org ON org.id = log.organization_id
+    JOIN job_sourced_candidates AS candidate ON candidate.id = log.sourced_candidate_id
+    WHERE (
+        NULLIF(btrim(log.delivery_id), '') IS NOT NULL
+        OR NULLIF(btrim(log.provider_message_id), '') IS NOT NULL
+      )
+      AND org.signal_tenant_id IS NOT NULL
+      AND btrim(org.signal_tenant_id) <> ''
+      AND candidate.signal_candidate_id IS NOT NULL
+      AND btrim(candidate.signal_candidate_id) <> ''
+    ON CONFLICT (provider, delivery_id) DO UPDATE SET
+      provider_message_id = COALESCE(
+        EXCLUDED.provider_message_id,
+        outreach_delivery_correlations.provider_message_id
+      ),
+      source_outreach_log_id = COALESCE(
+        outreach_delivery_correlations.source_outreach_log_id,
+        EXCLUDED.source_outreach_log_id
+      ),
+      updated_at = NOW();
+  `);
+
   console.log('  Creating outreach_org_suppressions table...');
   await execSafe(sql`
     CREATE TABLE IF NOT EXISTS outreach_org_suppressions (
@@ -1749,6 +1847,88 @@ export async function ensureAtsSchema(): Promise<void> {
     WHERE signal_candidate_id IS NOT NULL;
   `);
   await execSafe(sql`CREATE UNIQUE INDEX IF NOT EXISTS outreach_org_suppressions_provider_event_idx ON outreach_org_suppressions(provider_event_id);`);
+
+  console.log('  Creating outreach_hygiene_intents table...');
+  await execSafe(sql`
+    CREATE TABLE IF NOT EXISTS outreach_hygiene_intents (
+      id SERIAL PRIMARY KEY,
+      provider TEXT NOT NULL DEFAULT 'brevo',
+      provider_event_id TEXT NOT NULL,
+      organization_id INTEGER NOT NULL,
+      sourced_candidate_id INTEGER NOT NULL,
+      signal_tenant_id TEXT NOT NULL,
+      signal_candidate_id TEXT NOT NULL,
+      source_outreach_log_id INTEGER,
+      email_hash TEXT NOT NULL,
+      reason TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      next_attempt_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      lease_token TEXT,
+      lease_expires_at TIMESTAMP,
+      last_error TEXT,
+      memory_global_candidate_id TEXT,
+      synced_at TIMESTAMP,
+      dead_lettered_at TIMESTAMP,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      CONSTRAINT outreach_hygiene_intents_reason_check
+        CHECK (reason IN ('hard_bounce', 'complaint')),
+      CONSTRAINT outreach_hygiene_intents_status_check
+        CHECK (status IN ('pending', 'processing', 'synced', 'dead_letter')),
+      CONSTRAINT outreach_hygiene_intents_event_id_check
+        CHECK (provider_event_id ~ '^[0-9a-f]{64}$'),
+      CONSTRAINT outreach_hygiene_intents_email_hash_check
+        CHECK (email_hash ~ '^[0-9a-f]{64}$'),
+      CONSTRAINT outreach_hygiene_intents_attempts_check
+        CHECK (attempt_count >= 0),
+      CONSTRAINT outreach_hygiene_intents_dead_letter_pair_check
+        CHECK ((status = 'dead_letter') = (dead_lettered_at IS NOT NULL))
+    );
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    ADD COLUMN IF NOT EXISTS dead_lettered_at TIMESTAMP;
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_source_outreach_log_id_fkey;
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_status_check;
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    ADD CONSTRAINT outreach_hygiene_intents_status_check
+    CHECK (status IN ('pending', 'processing', 'synced', 'dead_letter'));
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_dead_letter_pair_check;
+  `);
+  await execSafe(sql`
+    ALTER TABLE outreach_hygiene_intents
+    ADD CONSTRAINT outreach_hygiene_intents_dead_letter_pair_check
+    CHECK ((status = 'dead_letter') = (dead_lettered_at IS NOT NULL));
+  `);
+  await execSafe(sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS outreach_hygiene_intents_provider_event_idx
+    ON outreach_hygiene_intents(provider, provider_event_id);
+  `);
+  await execSafe(sql`
+    CREATE INDEX IF NOT EXISTS outreach_hygiene_intents_due_idx
+    ON outreach_hygiene_intents(status, next_attempt_at);
+  `);
+  await execSafe(sql`
+    CREATE INDEX IF NOT EXISTS outreach_hygiene_intents_email_idx
+    ON outreach_hygiene_intents(email_hash);
+  `);
+  await execSafe(sql`
+    CREATE INDEX IF NOT EXISTS outreach_hygiene_intents_pending_complaint_idx
+    ON outreach_hygiene_intents(status)
+    WHERE reason = 'complaint' AND status <> 'synced';
+  `);
 
   console.log('  Creating candidate_outreach_schedules table...');
   await execSafe(sql`

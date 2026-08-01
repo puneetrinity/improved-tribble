@@ -768,6 +768,8 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
                     ? 'Email is suppressed platform-wide'
                   : delivery.reason === 'candidate_ineligible'
                     ? 'Candidate applied or is no longer shortlisted'
+                    : delivery.reason === 'hygiene_sync_pending'
+                      ? 'Suppression synchronization is pending; try again shortly'
                     : 'Email unavailable or suppressed',
               });
               skipped += 1;

@@ -16,6 +16,10 @@ import {
   startContactResolutionProcessor,
   stopContactResolutionProcessor,
 } from "./lib/contactResolutionProcessor";
+import {
+  startOutreachHygieneProcessor,
+  stopOutreachHygieneProcessor,
+} from "./lib/outreachHygieneProcessor";
 import { captureServerException, initServerMonitoring, isExpectedDisconnectError, monitoringRequestContext } from "./monitoring";
 
 initServerMonitoring();
@@ -199,6 +203,10 @@ import { initWebSocketServer } from "./websocket";
     // Recover shortlist-triggered contact lookups after deploys and disconnects.
     startContactResolutionProcessor();
 
+    // Deliver provider hygiene events to Memory without ever reopening the
+    // send window while Memory is slow or unavailable.
+    startOutreachHygieneProcessor();
+
     // Start ActiveKG graph sync processor (if enabled)
     if (process.env.ACTIVEKG_SYNC_ENABLED === 'true') {
       startApplicationGraphSyncProcessor();
@@ -217,6 +225,7 @@ import { initWebSocketServer } from "./websocket";
     stopApplicationGraphSyncProcessor();
     stopResumeImportProcessor();
     stopContactResolutionProcessor();
+    stopOutreachHygieneProcessor();
     server.close(() => {
       process.exit(0);
     });

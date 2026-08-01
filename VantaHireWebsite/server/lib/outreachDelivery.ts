@@ -4,6 +4,7 @@ import { and, eq, or, sql } from 'drizzle-orm';
 import {
   jobs,
   jobSourcedCandidates,
+  outreachDeliveryCorrelations,
   outreachOrgSuppressions,
   sourcedCandidateOutreachLog,
 } from '@shared/schema';
@@ -31,6 +32,46 @@ const OUTREACH_DELIVERY_UNCERTAIN = 'OUTREACH_DELIVERY_UNCERTAIN';
 function normalizeProviderMessageId(value: string | null): string | null {
   const normalized = value?.trim().replace(/^<|>$/g, '').toLowerCase() ?? '';
   return normalized || null;
+}
+
+async function ensureDeliveryCorrelation(input: {
+  deliveryId: string;
+  providerMessageId: string | null;
+  organizationId: number;
+  sourcedCandidateId: number;
+  signalTenantId: string;
+  signalCandidateId: string;
+  emailHash: string;
+  sourceOutreachLogId: number;
+}): Promise<void> {
+  if (!input.signalTenantId.trim() || !input.signalCandidateId.trim()) {
+    throw new Error('Outreach delivery is missing its durable Memory identity');
+  }
+  await db.insert(outreachDeliveryCorrelations).values({
+    provider: 'brevo',
+    ...input,
+  }).onConflictDoNothing({
+    target: [
+      outreachDeliveryCorrelations.provider,
+      outreachDeliveryCorrelations.deliveryId,
+    ],
+  });
+  const existing = await db.query.outreachDeliveryCorrelations.findFirst({
+    where: and(
+      eq(outreachDeliveryCorrelations.provider, 'brevo'),
+      eq(outreachDeliveryCorrelations.deliveryId, input.deliveryId),
+    ),
+  });
+  if (
+    !existing
+    || existing.organizationId !== input.organizationId
+    || existing.sourcedCandidateId !== input.sourcedCandidateId
+    || existing.signalTenantId !== input.signalTenantId
+    || existing.signalCandidateId !== input.signalCandidateId
+    || existing.emailHash !== input.emailHash
+  ) {
+    throw new Error('Outreach delivery correlation identity mismatch');
+  }
 }
 
 export class OutreachDeliveryUncertainError extends Error {
@@ -70,6 +111,7 @@ export type OutreachDeliveryResult =
       status: 'skipped';
       reason:
         | 'contact_unavailable'
+        | 'hygiene_sync_pending'
         | 'org_suppressed'
         | 'platform_suppressed'
         | 'candidate_ineligible';
@@ -100,11 +142,13 @@ export async function sendTrackedOutreachEmail(input: {
       email,
       input.contact.signalCandidateId,
     ),
-    deliver: (email) => withOutreachDispatchFence(
-      input.jobId,
-      input.sourcedCandidateId,
-      hashOutreachEmail(email),
-      async () => {
+    deliver: async (email) => {
+      const fenced = await withOutreachDispatchFence(
+        input.jobId,
+        input.sourcedCandidateId,
+        hashOutreachEmail(email),
+        input.contact.signalCandidateId ?? null,
+        async () => {
         const currentContact = await revalidateCandidateContact(input.contact);
         const currentEmail = currentContact.persisted && currentContact.state === 'found'
           ? currentContact.emails[0] ?? null
@@ -279,7 +323,10 @@ export async function sendTrackedOutreachEmail(input: {
             .update(sourcedCandidateOutreachLog)
             .set({
               ...insertValues,
-              deliveryId: existing.deliveryId ?? deliveryId,
+              // A definitively failed provider attempt gets a fresh correlation.
+              // Reusing the old id would make a later callback ambiguous when a
+              // retry selected a different validated address.
+              deliveryId,
             })
             .where(and(
               eq(sourcedCandidateOutreachLog.id, existing.id),
@@ -302,6 +349,17 @@ export async function sendTrackedOutreachEmail(input: {
         if (!log.deliveryId) {
           throw new Error('Outreach delivery correlation was not created');
         }
+
+        await ensureDeliveryCorrelation({
+          deliveryId: log.deliveryId,
+          providerMessageId: log.providerMessageId,
+          organizationId: input.organizationId,
+          sourcedCandidateId: input.sourcedCandidateId,
+          signalTenantId: input.contact.signalTenantId,
+          signalCandidateId: input.contact.signalCandidateId,
+          emailHash: hashOutreachEmail(email),
+          sourceOutreachLogId: log.id,
+        });
 
         let receipt;
         try {
@@ -349,6 +407,13 @@ export async function sendTrackedOutreachEmail(input: {
         const providerMessageId = normalizeProviderMessageId(receipt.messageId);
         const sentAt = new Date();
         await db
+          .update(outreachDeliveryCorrelations)
+          .set({ providerMessageId, updatedAt: sentAt })
+          .where(and(
+            eq(outreachDeliveryCorrelations.provider, 'brevo'),
+            eq(outreachDeliveryCorrelations.deliveryId, log.deliveryId),
+          ));
+        await db
           .update(sourcedCandidateOutreachLog)
           .set({
             status: 'sent',
@@ -377,8 +442,19 @@ export async function sendTrackedOutreachEmail(input: {
           sentAt,
           replayed: false,
         };
-      },
-    ),
+        },
+      );
+      if (fenced.status === 'blocked') {
+        return {
+          candidateIneligible: false as const,
+          orgSuppressed: false as const,
+          platformSuppressed: fenced.reason === 'hard_bounce',
+          contactUnavailable: false as const,
+          hygieneSyncPending: fenced.reason === 'hygiene_sync_pending',
+        };
+      }
+      return fenced.value;
+    },
   });
 
   if (delivery.status === 'skipped') {
@@ -386,6 +462,12 @@ export async function sendTrackedOutreachEmail(input: {
   }
   if (delivery.value.candidateIneligible) {
     return { status: 'skipped', reason: 'candidate_ineligible' };
+  }
+  if (
+    'hygieneSyncPending' in delivery.value
+    && delivery.value.hygieneSyncPending
+  ) {
+    return { status: 'skipped', reason: 'hygiene_sync_pending' };
   }
   if (delivery.value.platformSuppressed) {
     return { status: 'skipped', reason: 'platform_suppressed' };
@@ -395,6 +477,9 @@ export async function sendTrackedOutreachEmail(input: {
   }
   if (delivery.value.orgSuppressed) {
     return { status: 'skipped', reason: 'org_suppressed' };
+  }
+  if (!('outreachLogId' in delivery.value)) {
+    return { status: 'skipped', reason: 'contact_unavailable' };
   }
   return {
     status: 'sent',
