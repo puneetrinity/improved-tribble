@@ -33,11 +33,13 @@ import { registerBillingRoutes } from "./billing.routes";
 import { registerAdminSubscriptionRoutes } from "./admin-subscription.routes";
 import { registerCashfreeWebhook } from "./webhooks/cashfree.webhook";
 import { registerSignalWebhook } from "./webhooks/signal.webhook";
+import { registerBrevoWebhook } from "./webhooks/brevo.webhook";
 import { registerSignalRoutes } from "./signal.routes";
 import { registerColdOutreachRoutes } from "./coldOutreach.routes";
 import { registerCandidateSemanticRoutes } from "./candidates.semantic.routes";
 import { registerRecruiterDashboardRoutes } from "./recruiterDashboard.routes";
 import { registerCandidatePortalRoutes } from "./candidatePortal.routes";
+import { registerOutreachComplianceRoutes } from "./outreachCompliance.routes";
 import { isExpectedDisconnectError } from "./monitoring";
 import { ensureAtsSchema } from "./bootstrapSchema";
 
@@ -469,6 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register candidate portal routes (saved jobs)
   registerCandidatePortalRoutes(app, doubleCsrfProtection);
+  registerOutreachComplianceRoutes(app);
 
   // Register bulk resume import routes (staging/review/finalize flow)
   registerBulkResumeImportRoutes(app, doubleCsrfProtection, upload);
@@ -514,6 +517,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register Signal webhook (sourcing callbacks — no CSRF, uses JWT auth)
   registerSignalWebhook(app);
+  registerBrevoWebhook(app);
 
   // Register Signal sourcing routes (recruiter-facing, with CSRF)
   registerSignalRoutes(app, doubleCsrfProtection);

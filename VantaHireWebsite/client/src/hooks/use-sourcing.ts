@@ -29,7 +29,15 @@ export interface SourcedCandidateForUI {
   lastOutreachRound: number | null;
   lastOutreachCampaignId: string | null;
   lastOutreachAt: string | null;
-  lastOutreachStatus: "sent" | "failed" | null;
+  lastOutreachStatus:
+    | "sent"
+    | "failed"
+    | "soft_bounce"
+    | "hard_bounce"
+    | "complaint"
+    | "unsubscribed"
+    | "delivery_uncertain"
+    | null;
 
   crustdata: Record<string, any> | null;
   linkedinUrl: string | null;
@@ -194,6 +202,20 @@ export interface ColdOutreachHistoryResponse {
     candidateIds: number[];
   }>;
   maxCampaigns: number;
+  funnel: Array<{
+    stage: string;
+    count: number;
+  }>;
+  candidateStates: Array<{
+    candidateId: number;
+    name: string;
+    outreachCount: number;
+    lastRound: number | null;
+    lastStatus: string | null;
+    nextRound: number | null;
+    nextDueAt: string | null;
+    appliedAt: string | null;
+  }>;
   campaigns: Array<{
     campaignId: string;
     campaignRound: number;
@@ -210,7 +232,8 @@ export interface ColdOutreachHistoryResponse {
       recipientEmail: string;
       recipientName: string | null;
       subject: string;
-      status: "sent" | "failed";
+      status: "sending" | "sent" | "failed";
+      deliveryStatus: string | null;
       errorMessage: string | null;
       sentAt: string;
     }>;

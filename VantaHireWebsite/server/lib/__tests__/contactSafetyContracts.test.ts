@@ -25,16 +25,43 @@ describe('contact safety deployment contracts', () => {
     expect(bootstrapSource).toContain('transaction rolled back');
   });
 
+  it('keeps the hygiene outbox identical across schema and both deploy paths', () => {
+    const schemaSource = read('../../../shared/schema.ts');
+    const bootstrapSource = read('../../bootstrapSchema.ts');
+    const migrationSource = read('../../migrations/015_tier4_outreach_loop.sql');
+    const processorSource = read('../outreachHygieneProcessor.ts');
+
+    for (const source of [schemaSource, bootstrapSource, migrationSource]) {
+      expect(source).toContain('outreach_hygiene_intents');
+      expect(source).toContain('outreach_delivery_correlations');
+      expect(source).toContain('provider_event_id');
+      expect(source).toContain('signal_candidate_id');
+      expect(source).toContain('memory_global_candidate_id');
+    }
+    expect(schemaSource).toContain('Snapshot only. No FK');
+    expect(bootstrapSource).toContain(
+      'ALTER TABLE outreach_hygiene_intents\n    DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_source_outreach_log_id_fkey',
+    );
+    expect(migrationSource).toContain(
+      'DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_source_outreach_log_id_fkey',
+    );
+    expect(processorSource).toContain('source_outreach_log_id = NULL');
+    expect(processorSource).not.toContain('delivery.recipient_email');
+  });
+
   it('revalidates through Signal before manual and scheduled sends', () => {
     const manualSource = read('../../coldOutreach.routes.ts');
     const schedulerSource = read('../outreachScheduler.ts');
+    const deliverySource = read('../outreachDelivery.ts');
     const signalRoutesSource = read('../../signal.routes.ts');
 
-    expect(manualSource).toContain('deliverWithRevalidatedContact({');
+    expect(manualSource).toContain('sendTrackedOutreachEmail({');
     expect(manualSource).not.toContain('waitForEnrichmentCompletion');
     expect(manualSource).not.toMatch(/to:\s*candidate\.foundEmail/);
-    expect(schedulerSource).toContain('deliverWithRevalidatedContact({');
+    expect(schedulerSource).toContain('sendTrackedOutreachEmail({');
     expect(schedulerSource).not.toMatch(/to:\s*candidate\.foundEmail/);
+    expect(deliverySource).toContain('deliverWithRevalidatedContact(input.contact');
+    expect(deliverySource).toContain('isSuppressed:');
     expect(signalRoutesSource).toMatch(
       /app\.post\('\/api\/candidates\/:candidateId\/find-contact', csrfProtection,/,
     );
@@ -44,9 +71,86 @@ describe('contact safety deployment contracts', () => {
     const schedulerSource = read('../outreachScheduler.ts');
 
     expect(schedulerSource).toContain(
-      '.returning({ id: scheduledOutreachCampaigns.id })',
+      '.returning({ id: candidateOutreachSchedules.id })',
     );
     expect(schedulerSource).toContain('if (claimed.length === 0)');
+  });
+
+  it('serializes dispatch against applications and hygiene events', () => {
+    const deliverySource = read('../outreachDelivery.ts');
+    const applicationSource = read('../../applications.routes.ts');
+    const unsubscribeSource = read('../../outreachCompliance.routes.ts');
+    const webhookSource = read('../../webhooks/brevo.webhook.ts');
+    const concurrencySource = read('../outreachConcurrency.ts');
+    const hygieneProcessorSource = read('../outreachHygieneProcessor.ts');
+    const schedulerSource = read('../outreachScheduler.ts');
+
+    expect(deliverySource).toContain('withOutreachDispatchFence(');
+    expect(deliverySource).toContain('.insert(outreachDeliveryCorrelations)');
+    expect(deliverySource.indexOf('await ensureDeliveryCorrelation({')).toBeLessThan(
+      deliverySource.indexOf('sendEmailWithReceipt({'),
+    );
+    expect(deliverySource).toContain(
+      'const currentContact = await revalidateCandidateContact(input.contact)',
+    );
+    expect(deliverySource).toContain(
+      'hashOutreachEmail(currentEmail) !== hashOutreachEmail(email)',
+    );
+    expect(applicationSource).toContain('lockCandidateOutreach(tx, sourcedCandidate.id)');
+    expect(unsubscribeSource).toContain(
+      'lockCandidateOutreach(tx, claims.sourcedCandidateId)',
+    );
+    expect(unsubscribeSource).toContain(
+      'lockOutreachEmailHash(tx, claims.emailHash)',
+    );
+    expect(webhookSource).toContain(
+      'lockCandidateOutreach(tx, correlation.sourcedCandidateId)',
+    );
+    expect(webhookSource).toContain(
+      'lockOutreachEmailHash(tx, correlation.emailHash)',
+    );
+    expect(webhookSource).toContain('.insert(outreachHygieneIntents)');
+    expect(webhookSource).not.toContain('await suppressContactEvidence(');
+    expect(concurrencySource).toContain('FROM outreach_hygiene_intents');
+    expect(concurrencySource).toContain("reason = 'complaint'");
+    expect(concurrencySource).toContain("status <> 'synced'");
+    // Both hygiene gates must be person-scoped: a platform-wide condition would
+    // let one unsynced complaint stop every send.
+    expect(concurrencySource).toContain('signal_candidate_id = $1::text');
+    expect(concurrencySource).toContain('signal_candidate_id = $2::text');
+    expect(hygieneProcessorSource).toContain('await dependencies.suppress(');
+    expect(hygieneProcessorSource).toContain('FOR UPDATE SKIP LOCKED');
+    expect(deliverySource).toContain("reason: 'hygiene_sync_pending'");
+    expect(schedulerSource).toContain('getSkippedOutreachDisposition(delivery.reason)');
+    expect(schedulerSource).toContain(
+      'await hasBlockingOutreachHygieneIntent(candidate.signalCandidateId ?? null)',
+    );
+    expect(applicationSource).toContain(
+      'Application persistence and drip cancellation are one commit',
+    );
+    expect(applicationSource).toContain('executor: tx');
+    expect(webhookSource).toContain('const observedSentAt = lockedLog?.sentAt ?? now');
+    expect(webhookSource).toContain(
+      'COALESCE(${sourcedCandidateOutreachLog.sentAt}, ${observedSentAt})',
+    );
+    expect(webhookSource).toContain('const eventPrecedesRecordedDelivery = Boolean(');
+    expect(webhookSource).toContain("WHEN ${eventType} = 'hard_bounce'");
+  });
+
+  it('keeps unsubscribe scanner-safe and follow-ups automatic', () => {
+    const unsubscribeSource = read('../../outreachCompliance.routes.ts');
+    const manualSource = read('../../coldOutreach.routes.ts');
+
+    const getHandler = unsubscribeSource.slice(
+      unsubscribeSource.indexOf("app.get('/api/outreach/unsubscribe'"),
+      unsubscribeSource.indexOf("app.post('/api/outreach/unsubscribe'"),
+    );
+    expect(getHandler).not.toContain('suppressOrgEmail({');
+    expect(unsubscribeSource).toContain('<form method="post"');
+    expect(manualSource).toContain('if (campaignRound !== 1)');
+    expect(manualSource).toContain(
+      'Follow-up rounds are sent automatically after 3 days',
+    );
   });
 
   it('keeps a locally observed platform suppression monotonic', () => {

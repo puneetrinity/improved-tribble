@@ -13,9 +13,53 @@ function escapeHtml(str: string | null | undefined): string {
 }
 
 // Simple interface for our email service
+export interface EmailDeliveryOptions {
+  to: string;
+  subject: string;
+  text?: string;
+  html?: string;
+  headers?: Record<string, string>;
+}
+
+export interface EmailSendReceipt {
+  sent: boolean;
+  messageId: string | null;
+  uncertain?: boolean;
+}
+
 export interface EmailService {
   sendContactNotification(submission: ContactSubmission): Promise<boolean>;
-  sendEmail(opts: { to: string; subject: string; text?: string; html?: string }): Promise<boolean>;
+  sendEmail(opts: EmailDeliveryOptions): Promise<boolean>;
+  sendEmailWithReceipt(opts: EmailDeliveryOptions): Promise<EmailSendReceipt>;
+}
+
+export function isDefinitiveEmailSendFailure(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const candidate = error as {
+    code?: unknown;
+    command?: unknown;
+    responseCode?: unknown;
+  };
+  if (
+    typeof candidate.responseCode === 'number'
+    && candidate.responseCode >= 400
+    && candidate.responseCode < 600
+  ) {
+    return true;
+  }
+  if (
+    typeof candidate.code === 'string'
+    && ['EAUTH', 'EENVELOPE', 'EMESSAGE', 'EDNS'].includes(
+      candidate.code.toUpperCase(),
+    )
+  ) {
+    return true;
+  }
+  return (
+    typeof candidate.command === 'string'
+    && ['EHLO', 'HELO', 'STARTTLS', 'AUTH', 'MAIL FROM', 'RCPT TO']
+      .includes(candidate.command.toUpperCase())
+  );
 }
 
 // Generic SMTP email service (Brevo-compatible)
@@ -87,7 +131,7 @@ export class SMTPEmailService implements EmailService {
     }
   }
 
-  async sendEmail(opts: { to: string; subject: string; text?: string; html?: string }): Promise<boolean> {
+  async sendEmailWithReceipt(opts: EmailDeliveryOptions): Promise<EmailSendReceipt> {
     try {
       const info = await this.transporter.sendMail({
         from: this.buildFrom(),
@@ -95,13 +139,25 @@ export class SMTPEmailService implements EmailService {
         subject: opts.subject,
         text: opts.text,
         html: opts.html,
+        headers: opts.headers,
       });
       console.log('Email sent:', info.messageId);
-      return true;
+      return {
+        sent: true,
+        messageId: typeof info.messageId === 'string' ? info.messageId : null,
+      };
     } catch (e) {
       console.error('Email send error:', e);
-      return false;
+      return {
+        sent: false,
+        messageId: null,
+        uncertain: !isDefinitiveEmailSendFailure(e),
+      };
     }
+  }
+
+  async sendEmail(opts: EmailDeliveryOptions): Promise<boolean> {
+    return (await this.sendEmailWithReceipt(opts)).sent;
   }
 }
 
@@ -109,7 +165,7 @@ export class SMTPEmailService implements EmailService {
 export class TestEmailService implements EmailService {
   private transporter: nodemailer.Transporter | null = null;
   private fromEmail: string = 'info@ealana.com';
-  private fromName: string = 'VantaHire';
+  private fromName: string = 'Ealana';
   private notificationsTo?: string;
 
   constructor(notificationsTo?: string) {
@@ -152,7 +208,7 @@ export class TestEmailService implements EmailService {
     }
   }
 
-  async sendEmail(opts: { to: string; subject: string; text?: string; html?: string }): Promise<boolean> {
+  async sendEmailWithReceipt(opts: EmailDeliveryOptions): Promise<EmailSendReceipt> {
     try {
       await this.ensureTransporter();
       const info = await this.transporter!.sendMail({
@@ -161,13 +217,25 @@ export class TestEmailService implements EmailService {
         subject: opts.subject,
         text: opts.text,
         html: opts.html,
+        headers: opts.headers,
       });
       console.log('Ethereal preview URL:', nodemailer.getTestMessageUrl(info));
-      return true;
+      return {
+        sent: true,
+        messageId: typeof info.messageId === 'string' ? info.messageId : null,
+      };
     } catch (e) {
       console.error('Ethereal send error:', e);
-      return false;
+      return {
+        sent: false,
+        messageId: null,
+        uncertain: !isDefinitiveEmailSendFailure(e),
+      };
     }
+  }
+
+  async sendEmail(opts: EmailDeliveryOptions): Promise<boolean> {
+    return (await this.sendEmailWithReceipt(opts)).sent;
   }
 }
 
@@ -179,7 +247,7 @@ export async function getEmailService(): Promise<EmailService | null> {
   const provider = (process.env.EMAIL_PROVIDER || '').toLowerCase();
   const isProduction = process.env.NODE_ENV === 'production';
   const fromEmail = process.env.SEND_FROM_EMAIL;
-  const fromName = process.env.SEND_FROM_NAME || 'VantaHire';
+  const fromName = process.env.SEND_FROM_NAME || 'Ealana';
   const notificationsTo = process.env.NOTIFICATION_EMAIL || fromEmail;
 
   if (provider === 'brevo') {

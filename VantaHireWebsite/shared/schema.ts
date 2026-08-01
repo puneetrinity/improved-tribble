@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -951,7 +951,7 @@ export const webhookEvents = pgTable("webhook_events", {
   eventType: text("event_type").notNull(),
   payload: jsonb("payload").notNull(),
   processedAt: timestamp("processed_at").defaultNow().notNull(),
-  status: text("status").notNull(), // 'processed', 'skipped', 'failed'
+  status: text("status").notNull(), // 'processing', 'processed', 'skipped', 'failed'
   errorMessage: text("error_message"),
 }, (table) => ({
   eventIdIdx: uniqueIndex("webhook_events_event_id_idx").on(table.provider, table.eventId),
@@ -1093,6 +1093,11 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   stateIdx: index("job_sourced_candidates_state_idx").on(table.state),
   fitScoreIdx: index("job_sourced_candidates_fit_score_idx").on(table.fitScore),
   sourceTypeIdx: index("job_sourced_candidates_source_type_idx").on(table.sourceType),
+  ownershipIdx: uniqueIndex("job_sourced_candidates_id_org_job_idx").on(
+    table.id,
+    table.organizationId,
+    table.jobId,
+  ),
   emailResolutionDueIdx: index("job_sourced_candidates_email_resolution_due_idx").on(
     table.emailResolveNextAttemptAt,
     table.id,
@@ -1156,6 +1161,11 @@ export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_l
   aiDraftSubject: text("ai_draft_subject"),
   wasEdited: boolean("was_edited").notNull().default(false),
   status: text("status").notNull(),
+  deliveryKey: text("delivery_key"),
+  deliveryId: text("delivery_id"),
+  providerMessageId: text("provider_message_id"),
+  deliveryStatus: text("delivery_status"),
+  deliveryEventAt: timestamp("delivery_event_at"),
   errorMessage: text("error_message"),
   sentBy: integer("sent_by").notNull().references(() => users.id),
   sentAt: timestamp("sent_at").defaultNow().notNull(),
@@ -1164,6 +1174,195 @@ export const sourcedCandidateOutreachLog = pgTable("sourced_candidate_outreach_l
   candidateIdx: index("scol_candidate_idx").on(table.sourcedCandidateId),
   campaignIdx: index("scol_campaign_idx").on(table.campaignId),
   orgIdx: index("scol_org_idx").on(table.organizationId),
+  deliveryKeyIdx: uniqueIndex("scol_delivery_key_idx").on(table.deliveryKey),
+  deliveryIdIdx: uniqueIndex("scol_delivery_id_idx").on(table.deliveryId),
+  providerMessageIdx: uniqueIndex("scol_provider_message_idx").on(table.providerMessageId),
+}));
+
+// Immutable-enough, hash-only correlation data for provider hygiene callbacks.
+// These rows deliberately have no foreign keys: a complaint or bounce can arrive
+// after the owning org, job, candidate, or verbose delivery log was deleted.
+export const outreachDeliveryCorrelations = pgTable("outreach_delivery_correlations", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().default("brevo"),
+  deliveryId: text("delivery_id").notNull(),
+  providerMessageId: text("provider_message_id"),
+  organizationId: integer("organization_id").notNull(),
+  sourcedCandidateId: integer("sourced_candidate_id").notNull(),
+  signalTenantId: text("signal_tenant_id").notNull(),
+  signalCandidateId: text("signal_candidate_id").notNull(),
+  emailHash: text("email_hash").notNull(),
+  sourceOutreachLogId: integer("source_outreach_log_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  deliveryIdx: uniqueIndex("outreach_delivery_correlations_delivery_idx")
+    .on(table.provider, table.deliveryId),
+  messageIdx: uniqueIndex("outreach_delivery_correlations_message_idx")
+    .on(table.provider, table.providerMessageId)
+    .where(sql`${table.providerMessageId} IS NOT NULL`),
+  emailIdx: index("outreach_delivery_correlations_email_idx").on(table.emailHash),
+  deliveryNonblankCheck: check(
+    "outreach_delivery_correlations_delivery_nonblank",
+    sql`btrim(${table.deliveryId}) <> ''`,
+  ),
+  tenantNonblankCheck: check(
+    "outreach_delivery_correlations_tenant_nonblank",
+    sql`btrim(${table.signalTenantId}) <> ''`,
+  ),
+  candidateNonblankCheck: check(
+    "outreach_delivery_correlations_candidate_nonblank",
+    sql`btrim(${table.signalCandidateId}) <> ''`,
+  ),
+  emailHashCheck: check(
+    "outreach_delivery_correlations_email_hash_check",
+    sql`${table.emailHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+}));
+
+export const outreachOrgSuppressions = pgTable("outreach_org_suppressions", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  emailHash: text("email_hash").notNull(),
+  signalCandidateId: text("signal_candidate_id"),
+  reason: text("reason").notNull().default("unsubscribe"),
+  sourceOutreachLogId: integer("source_outreach_log_id").references(() => sourcedCandidateOutreachLog.id, { onDelete: 'set null' }),
+  providerEventId: text("provider_event_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  orgEmailIdx: uniqueIndex("outreach_org_suppressions_org_email_idx").on(table.organizationId, table.emailHash),
+  orgCandidateIdx: index("outreach_org_suppressions_org_candidate_lookup_idx")
+    .on(table.organizationId, table.signalCandidateId)
+    .where(sql`${table.signalCandidateId} IS NOT NULL`),
+  providerEventIdx: uniqueIndex("outreach_org_suppressions_provider_event_idx").on(table.providerEventId),
+  // Org-scoped suppression is for UNSUBSCRIBE only. Hard bounce and complaint
+  // are platform-wide and belong in Memory's hash-keyed tombstone table —
+  // recording them here would silently narrow a platform-wide obligation to one
+  // org and leave every other org free to mail a known-bad address.
+  reasonCheck: check(
+    "outreach_org_suppressions_reason_check",
+    sql`${table.reason} = 'unsubscribe'`,
+  ),
+}));
+
+// Durable, hash-only bridge from provider hygiene events to Memory. Pending
+// complaints intentionally create a global send hold until Memory confirms the
+// person-scoped suppression; hard bounces fence only the observed address.
+export const outreachHygieneIntents = pgTable("outreach_hygiene_intents", {
+  id: serial("id").primaryKey(),
+  provider: text("provider").notNull().default("brevo"),
+  providerEventId: text("provider_event_id").notNull(),
+  organizationId: integer("organization_id").notNull(),
+  sourcedCandidateId: integer("sourced_candidate_id").notNull(),
+  signalTenantId: text("signal_tenant_id").notNull(),
+  signalCandidateId: text("signal_candidate_id").notNull(),
+  // Snapshot only. No FK: the compliance fence must survive log/parent deletion.
+  sourceOutreachLogId: integer("source_outreach_log_id"),
+  emailHash: text("email_hash").notNull(),
+  reason: text("reason").notNull(),
+  status: text("status").notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at").defaultNow().notNull(),
+  leaseToken: text("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at"),
+  lastError: text("last_error"),
+  memoryGlobalCandidateId: text("memory_global_candidate_id"),
+  syncedAt: timestamp("synced_at"),
+  deadLetteredAt: timestamp("dead_lettered_at"),
+  // Bounded automatic recovery: a record-specific failure is a payload bug, so
+  // the remedy is a deploy. Dead letters are requeued once per restart until
+  // this cap, which removes the need for anyone to touch the database.
+  replayCount: integer("replay_count").notNull().default(0),
+  // The release that last replayed this row. A new release is a new fix, so it
+  // always earns a fresh attempt; the count only damps restart churn WITHIN a
+  // release. Together these mean no row is ever permanently stuck.
+  replayRelease: text("replay_release"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  providerEventIdx: uniqueIndex("outreach_hygiene_intents_provider_event_idx")
+    .on(table.provider, table.providerEventId),
+  dueIdx: index("outreach_hygiene_intents_due_idx")
+    .on(table.status, table.nextAttemptAt),
+  emailIdx: index("outreach_hygiene_intents_email_idx").on(table.emailHash),
+  pendingComplaintIdx: index("outreach_hygiene_intents_pending_complaint_idx")
+    .on(table.status)
+    .where(sql`${table.reason} = 'complaint' AND ${table.status} <> 'synced'`),
+  reasonCheck: check(
+    "outreach_hygiene_intents_reason_check",
+    sql`${table.reason} IN ('hard_bounce', 'complaint')`,
+  ),
+  statusCheck: check(
+    "outreach_hygiene_intents_status_check",
+    sql`${table.status} IN ('pending', 'processing', 'synced', 'dead_letter')`,
+  ),
+  eventIdCheck: check(
+    "outreach_hygiene_intents_event_id_check",
+    sql`${table.providerEventId} ~ '^[0-9a-f]{64}$'`,
+  ),
+  emailHashCheck: check(
+    "outreach_hygiene_intents_email_hash_check",
+    sql`${table.emailHash} ~ '^[0-9a-f]{64}$'`,
+  ),
+  // NOT NULL still admits ''. Without this the fence's "person unidentifiable"
+  // fallback — which stops ALL outreach — is reachable by an empty string.
+  candidateNonblankCheck: check(
+    "outreach_hygiene_intents_candidate_nonblank",
+    sql`btrim(${table.signalCandidateId}) <> ''`,
+  ),
+  tenantNonblankCheck: check(
+    "outreach_hygiene_intents_tenant_nonblank",
+    sql`btrim(${table.signalTenantId}) <> ''`,
+  ),
+  attemptsCheck: check(
+    "outreach_hygiene_intents_attempts_check",
+    sql`${table.attemptCount} >= 0`,
+  ),
+  deadLetterPairCheck: check(
+    "outreach_hygiene_intents_dead_letter_pair_check",
+    sql`(${table.status} = 'dead_letter') = (${table.deadLetteredAt} IS NOT NULL)`,
+  ),
+}));
+
+export const candidateOutreachSchedules = pgTable("candidate_outreach_schedules", {
+  id: serial("id").primaryKey(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
+  sourcedCandidateId: integer("sourced_candidate_id").notNull().references(() => jobSourcedCandidates.id, { onDelete: 'cascade' }),
+  nextRound: integer("next_round").notNull(),
+  dueAt: timestamp("due_at").notNull(),
+  status: text("status").notNull().default("pending"),
+  triggeredBy: integer("triggered_by").notNull().references(() => users.id),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  lastError: text("last_error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  candidateIdx: uniqueIndex("candidate_outreach_schedules_candidate_idx").on(table.sourcedCandidateId),
+  dueIdx: index("candidate_outreach_schedules_due_idx").on(table.status, table.dueAt),
+  orgJobIdx: index("candidate_outreach_schedules_org_job_idx").on(table.organizationId, table.jobId),
+  candidateOwnershipFk: foreignKey({
+    columns: [table.sourcedCandidateId, table.organizationId, table.jobId],
+    foreignColumns: [
+      jobSourcedCandidates.id,
+      jobSourcedCandidates.organizationId,
+      jobSourcedCandidates.jobId,
+    ],
+    name: "candidate_outreach_schedules_candidate_owner_fk",
+  }).onDelete("cascade"),
+  roundCheck: check(
+    "candidate_outreach_schedules_round_check",
+    sql`${table.nextRound} BETWEEN 2 AND 3`,
+  ),
+  statusCheck: check(
+    "candidate_outreach_schedules_status_check",
+    sql`${table.status} IN ('pending', 'sending', 'completed', 'cancelled')`,
+  ),
+  attemptCountCheck: check(
+    "candidate_outreach_schedules_attempt_count_check",
+    sql`${table.attemptCount} >= 0`,
+  ),
 }));
 
 // =====================================================
@@ -2753,6 +2952,10 @@ export type JobSourcedCandidate = typeof jobSourcedCandidates.$inferSelect;
 export type InsertJobSourcedCandidate = z.infer<typeof insertJobSourcedCandidateSchema>;
 export type SourcedCandidateOutreachCampaign = typeof sourcedCandidateOutreachCampaigns.$inferSelect;
 export type SourcedCandidateOutreachLog = typeof sourcedCandidateOutreachLog.$inferSelect;
+export type OutreachOrgSuppression = typeof outreachOrgSuppressions.$inferSelect;
+export type OutreachHygieneIntent = typeof outreachHygieneIntents.$inferSelect;
+export type OutreachDeliveryCorrelation = typeof outreachDeliveryCorrelations.$inferSelect;
+export type CandidateOutreachSchedule = typeof candidateOutreachSchedules.$inferSelect;
 
 // =====================================================
 // END SIGNAL SOURCING INSERT SCHEMAS & TYPES

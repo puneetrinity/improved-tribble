@@ -25,6 +25,7 @@ describe('contact send guard', () => {
     });
 
     expect(result.status).toBe('skipped');
+    expect(result).toMatchObject({ skipReason: 'platform_suppressed' });
     expect(deliver).not.toHaveBeenCalled();
   });
 
@@ -63,6 +64,28 @@ describe('contact send guard', () => {
       email: 'fresh@example.com',
       value: 'provider-message-id',
     });
+  });
+
+  it('never invokes delivery after an organization-scoped unsubscribe', async () => {
+    const deliver = vi.fn();
+    const isSuppressed = vi.fn(async () => true);
+    const result = await deliverWithRevalidatedContact(input, {
+      revalidate: async () => ({
+        persisted: true,
+        state: 'found',
+        emails: ['unsubscribed@example.com'],
+        errorCode: null,
+      }),
+      isSuppressed,
+      deliver,
+    });
+
+    expect(isSuppressed).toHaveBeenCalledWith('unsubscribed@example.com', input);
+    expect(result).toMatchObject({
+      status: 'skipped',
+      skipReason: 'org_suppressed',
+    });
+    expect(deliver).not.toHaveBeenCalled();
   });
 
   it('does not deliver if the authorized shortlisted row changed before persistence', async () => {

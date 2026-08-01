@@ -29,7 +29,9 @@ import {
   insertPipelineStageSchema,
   insertApplicationFeedbackSchema,
   applications,
+  candidateOutreachSchedules,
   jobSourcedCandidates,
+  sourcedCandidateOutreachLog,
   pipelineStages,
   applicationStageHistory,
   candidateResumes,
@@ -37,6 +39,7 @@ import {
   applicationFeedback,
   type Application,
   type Job,
+  type JobSourcedCandidate,
 } from '@shared/schema';
 import { uploadToGCS, getSignedDownloadUrl, downloadFromGCS } from './gcs-storage';
 import {
@@ -48,6 +51,8 @@ import {
 } from './notificationService';
 import { notifyRecruitersNewApplication } from './emailTemplateService';
 import { generateInterviewICS, getICSFilename } from './lib/icsGenerator';
+import { verifyOutreachApplicationToken } from './lib/outreachComplianceCore';
+import { lockCandidateOutreach } from './lib/outreachConcurrency';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
 import { isAIEnabled, generateCandidateSummary } from './aiJobAnalyzer';
 import { checkCircuitBreaker } from './lib/aiMatchingEngine';
@@ -119,37 +124,121 @@ async function matchApplicationToSourcedCandidate(params: {
   jobId: number;
   organizationId: number | null | undefined;
   appliedAt: Date;
+  outreachAttributionToken?: string | null;
+  executor?: any;
 }): Promise<void> {
-  const { applicationId, applicationEmail, jobId, organizationId, appliedAt } = params;
+  const {
+    applicationId,
+    applicationEmail,
+    jobId,
+    organizationId,
+    appliedAt,
+    outreachAttributionToken,
+    executor,
+  } = params;
   if (!organizationId) return;
 
-  const normalizedEmail = normalizeEmailAddress(applicationEmail);
-  if (!normalizedEmail) return;
+  const applyMatch = async (tx: any) => {
+    let sourcedCandidate: JobSourcedCandidate | null = null;
+    let attributedCampaignId: string | null = null;
+    let attributedRound: number | null = null;
+    if (outreachAttributionToken) {
+      try {
+        const claims = verifyOutreachApplicationToken(outreachAttributionToken);
+        if (claims.organizationId === organizationId && claims.jobId === jobId) {
+          const sentLog = await tx.query.sourcedCandidateOutreachLog.findFirst({
+            where: and(
+              eq(sourcedCandidateOutreachLog.organizationId, organizationId),
+              eq(sourcedCandidateOutreachLog.jobId, jobId),
+              eq(sourcedCandidateOutreachLog.sourcedCandidateId, claims.sourcedCandidateId),
+              eq(sourcedCandidateOutreachLog.campaignId, claims.campaignId),
+              eq(sourcedCandidateOutreachLog.campaignRound, claims.campaignRound),
+              eq(sourcedCandidateOutreachLog.status, 'sent'),
+            ),
+            columns: { id: true },
+          });
+          if (sentLog) {
+            sourcedCandidate = await tx.query.jobSourcedCandidates.findFirst({
+              where: and(
+                eq(jobSourcedCandidates.id, claims.sourcedCandidateId),
+                eq(jobSourcedCandidates.organizationId, organizationId),
+                eq(jobSourcedCandidates.jobId, jobId),
+              ),
+            }) ?? null;
+            if (sourcedCandidate) {
+              attributedCampaignId = claims.campaignId;
+              attributedRound = claims.campaignRound;
+            }
+          }
+        }
+      } catch {
+        // An invalid optional attribution token never blocks a valid application.
+      }
+    }
 
-  const sourcedCandidate = await db.query.jobSourcedCandidates.findFirst({
-    where: and(
-      eq(jobSourcedCandidates.organizationId, organizationId),
-      eq(jobSourcedCandidates.jobId, jobId),
-      sql`LOWER(TRIM(${jobSourcedCandidates.foundEmail})) = ${normalizedEmail}`,
-    ),
-    orderBy: [desc(jobSourcedCandidates.lastOutreachAt), desc(jobSourcedCandidates.updatedAt), desc(jobSourcedCandidates.id)],
-  });
+    if (!sourcedCandidate) {
+      const normalizedEmail = normalizeEmailAddress(applicationEmail);
+      if (!normalizedEmail) return;
+      sourcedCandidate = await tx.query.jobSourcedCandidates.findFirst({
+        where: and(
+          eq(jobSourcedCandidates.organizationId, organizationId),
+          eq(jobSourcedCandidates.jobId, jobId),
+          sql`LOWER(TRIM(${jobSourcedCandidates.foundEmail})) = ${normalizedEmail}`,
+          sql`(
+            ${jobSourcedCandidates.state} = 'shortlisted'
+            OR ${jobSourcedCandidates.outreachCount} > 0
+          )`,
+        ),
+        orderBy: [
+          desc(jobSourcedCandidates.lastOutreachAt),
+          desc(jobSourcedCandidates.updatedAt),
+          desc(jobSourcedCandidates.id),
+        ],
+      }) ?? null;
+      if (sourcedCandidate) {
+        attributedCampaignId = sourcedCandidate.lastOutreachCampaignId ?? null;
+        attributedRound = sourcedCandidate.lastOutreachRound
+          ?? (sourcedCandidate.state === 'shortlisted' ? 0 : null);
+      }
+    }
 
-  if (!sourcedCandidate) {
-    return;
+    if (!sourcedCandidate) return;
+
+    await lockCandidateOutreach(tx, sourcedCandidate.id);
+    await tx.execute(sql`
+      SELECT id
+      FROM job_sourced_candidates
+      WHERE id = ${sourcedCandidate.id}
+      FOR UPDATE
+    `);
+    await tx
+      .update(jobSourcedCandidates)
+      .set({
+        state: 'converted',
+        convertedApplicationId: applicationId,
+        appliedAt,
+        appliedFromCampaignId:
+          attributedCampaignId ?? sourcedCandidate.lastOutreachCampaignId ?? null,
+        appliedAfterRound:
+          attributedRound ?? sourcedCandidate.lastOutreachRound ?? null,
+        updatedAt: new Date(),
+      })
+      .where(eq(jobSourcedCandidates.id, sourcedCandidate.id));
+    await tx
+      .update(candidateOutreachSchedules)
+      .set({
+        status: 'cancelled',
+        lastError: 'candidate_applied',
+        updatedAt: new Date(),
+      })
+      .where(eq(candidateOutreachSchedules.sourcedCandidateId, sourcedCandidate.id));
+  };
+
+  if (executor) {
+    await applyMatch(executor);
+  } else {
+    await db.transaction(applyMatch);
   }
-
-  await db
-    .update(jobSourcedCandidates)
-    .set({
-      state: 'converted',
-      convertedApplicationId: applicationId,
-      appliedAt,
-      appliedFromCampaignId: sourcedCandidate.lastOutreachCampaignId ?? null,
-      appliedAfterRound: sourcedCandidate.lastOutreachRound ?? null,
-      updatedAt: new Date(),
-    })
-    .where(eq(jobSourcedCandidates.id, sourcedCandidate.id));
 }
 
 /**
@@ -219,6 +308,12 @@ export function registerApplicationsRoutes(
       }
 
       const rawResumeId = req.body?.resumeId;
+      const rawOutreachAttributionToken = req.body?.outreachAttributionToken;
+      const outreachAttributionToken =
+        typeof rawOutreachAttributionToken === 'string'
+        && rawOutreachAttributionToken.length <= 4096
+          ? rawOutreachAttributionToken
+          : null;
       const hasStoredResume =
         rawResumeId !== undefined &&
         rawResumeId !== null &&
@@ -318,6 +413,14 @@ export function registerApplicationsRoutes(
       });
 
       if (existingApp) {
+        await matchApplicationToSourcedCandidate({
+          applicationId: existingApp.id,
+          applicationEmail: existingApp.email,
+          jobId,
+          organizationId: job.organizationId,
+          appliedAt: existingApp.appliedAt ?? new Date(),
+          outreachAttributionToken,
+        });
         res.status(400).json({
           error: 'Duplicate application',
           message: `You have already applied for this position with ${applicationData.email}`,
@@ -403,29 +506,35 @@ export function registerApplicationsRoutes(
 
       const now = new Date();
 
-      // Create application record (with optional initial stage assignment)
-      const application = await storage.createApplication({
-        ...applicationData,
-        status: 'submitted',
-        jobId,
-        resumeUrl,
-        resumeFilename,
-        ...(resumeRecordId !== null && { resumeId: resumeRecordId }),
-        ...(extractedResumeText && { extractedResumeText }),
-        ...(verifiedCandidate && { userId: verifiedCandidate.id }),
-        ...(initialStageId !== null && {
-          currentStage: initialStageId,
-          stageChangedAt: now,
-          stageChangedBy: job.postedBy,
-        }),
-        ...(job.organizationId != null && { organizationId: job.organizationId }),
-      });
-      await matchApplicationToSourcedCandidate({
-        applicationId: application.id,
-        applicationEmail: application.email,
-        jobId,
-        organizationId: job.organizationId,
-        appliedAt: application.appliedAt ?? now,
+      // Application persistence and drip cancellation are one commit. A real
+      // applicant can never be stored while their remaining outreach stays live.
+      const application = await db.transaction(async (tx: any) => {
+        const created = await storage.createApplication({
+          ...applicationData,
+          status: 'submitted',
+          jobId,
+          resumeUrl,
+          resumeFilename,
+          ...(resumeRecordId !== null && { resumeId: resumeRecordId }),
+          ...(extractedResumeText && { extractedResumeText }),
+          ...(verifiedCandidate && { userId: verifiedCandidate.id }),
+          ...(initialStageId !== null && {
+            currentStage: initialStageId,
+            stageChangedAt: now,
+            stageChangedBy: job.postedBy,
+          }),
+          ...(job.organizationId != null && { organizationId: job.organizationId }),
+        }, tx);
+        await matchApplicationToSourcedCandidate({
+          applicationId: created.id,
+          applicationEmail: created.email,
+          jobId,
+          organizationId: job.organizationId,
+          appliedAt: created.appliedAt ?? now,
+          outreachAttributionToken,
+          executor: tx,
+        });
+        return created;
       });
 
       if (verifiedCandidate && resumeCountForCompletion !== null) {

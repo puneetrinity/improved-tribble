@@ -1,5 +1,5 @@
 import type { Express, NextFunction, Request, Response } from 'express';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
 import { requireRole, requireSeat } from './auth';
@@ -12,19 +12,28 @@ import { generateColdOutreachDraft, isAIEnabled } from './aiJobAnalyzer';
 import {
   jobSourcedCandidates,
   organizations,
+  outreachOrgSuppressions,
+  candidateOutreachSchedules,
   sourcedCandidateOutreachCampaigns,
   sourcedCandidateOutreachLog,
   userAiUsage,
   type SourcedCandidateOutreachCampaign,
   type SourcedCandidateOutreachLog,
   type JobSourcedCandidate,
+  type OutreachOrgSuppression,
+  type CandidateOutreachSchedule,
 } from '@shared/schema';
 import { flattenCandidateForUI } from './lib/services/signal-contracts';
 import { resolveAccessibleSignalJobContext } from './signal.routes';
 import type { CsrfMiddleware } from './types/routes';
-import { scheduleFollowUpCampaigns } from './lib/outreachScheduler';
+import { scheduleCandidateFollowUps } from './lib/outreachScheduler';
+import { isJobOpenForOutreach } from './lib/outreachSchedulerCore';
+import {
+  isOutreachDeliveryUncertainError,
+  sendTrackedOutreachEmail,
+} from './lib/outreachDelivery';
+import { hashOutreachEmail } from './lib/outreachSuppression';
 import { revalidateCandidateContact } from './lib/contactResolutionProcessor';
-import { deliverWithRevalidatedContact } from './lib/contactSendGuard';
 
 const MAX_OUTREACH_BATCH_SIZE = 50;
 const MAX_CAMPAIGN_ROUNDS = 3;
@@ -235,9 +244,24 @@ async function getSuccessfulOutreachCountMap(
     ),
   });
 
-  const countMap = new Map<number, number>();
+  const roundsByCandidate = new Map<number, Set<number>>();
   for (const log of sentLogs) {
-    countMap.set(log.sourcedCandidateId, (countMap.get(log.sourcedCandidateId) ?? 0) + 1);
+    if (
+      !Number.isInteger(log.campaignRound)
+      || (log.campaignRound ?? 0) < 1
+      || (log.campaignRound ?? 0) > MAX_CAMPAIGN_ROUNDS
+    ) {
+      continue;
+    }
+    const rounds = roundsByCandidate.get(log.sourcedCandidateId) ?? new Set<number>();
+    rounds.add(log.campaignRound!);
+    roundsByCandidate.set(log.sourcedCandidateId, rounds);
+  }
+  const countMap = new Map<number, number>();
+  for (const [candidateId, rounds] of roundsByCandidate) {
+    let contiguousRounds = 0;
+    while (rounds.has(contiguousRounds + 1)) contiguousRounds += 1;
+    countMap.set(candidateId, contiguousRounds);
   }
   return countMap;
 }
@@ -259,6 +283,21 @@ async function getCampaignState(jobId: number, organizationId: number) {
     ),
   });
   const eligibleCandidates = rawEligibleCandidates;
+  const suppressionRows: Array<Pick<
+    OutreachOrgSuppression,
+    'emailHash' | 'signalCandidateId'
+  >> = await db.query.outreachOrgSuppressions.findMany({
+    where: eq(outreachOrgSuppressions.organizationId, organizationId),
+    columns: { emailHash: true, signalCandidateId: true },
+  });
+  const suppressedEmailHashes = new Set(
+    suppressionRows.map((row) => row.emailHash),
+  );
+  const suppressedCandidateIds = new Set(
+    suppressionRows
+      .map((row) => row.signalCandidateId)
+      .filter((candidateId): candidateId is string => Boolean(candidateId)),
+  );
 
   const sentCountMap = await getSuccessfulOutreachCountMap(jobId, organizationId);
   const effectiveOutreachCount = (candidateId: number, fallbackCount: number | null | undefined) =>
@@ -271,15 +310,33 @@ async function getCampaignState(jobId: number, organizationId: number) {
   };
 
   await Promise.all(eligibleCandidates.map(async (candidate) => {
+    if (
+      candidate.emailResolveStatus === 'suppressed'
+      || candidate.appliedAt
+      || candidate.lastOutreachStatus === 'hard_bounce'
+      || candidate.lastOutreachStatus === 'complaint'
+      || candidate.lastOutreachStatus === 'unsubscribed'
+      || candidate.lastOutreachStatus === 'delivery_uncertain'
+      || suppressedCandidateIds.has(candidate.signalCandidateId)
+      || (
+        candidate.foundEmail
+        && suppressedEmailHashes.has(hashOutreachEmail(candidate.foundEmail))
+      )
+    ) {
+      return;
+    }
     const effectiveCount = effectiveOutreachCount(candidate.id, candidate.outreachCount);
-    if ((candidate.outreachCount ?? 0) !== effectiveCount) {
+    if ((candidate.outreachCount ?? 0) < effectiveCount) {
       await db
         .update(jobSourcedCandidates)
         .set({
           outreachCount: effectiveCount,
           updatedAt: new Date(),
         })
-        .where(eq(jobSourcedCandidates.id, candidate.id));
+        .where(and(
+          eq(jobSourcedCandidates.id, candidate.id),
+          lt(jobSourcedCandidates.outreachCount, effectiveCount),
+        ));
     }
 
     if (effectiveCount >= 0 && effectiveCount < MAX_CAMPAIGN_ROUNDS) {
@@ -289,7 +346,7 @@ async function getCampaignState(jobId: number, organizationId: number) {
     }
   }));
 
-  const nextAvailableRound = ([1, 2, 3] as const).find((round) => eligibleByRound[round].count > 0) ?? null;
+  const nextAvailableRound = eligibleByRound[1].count > 0 ? 1 : null;
 
   return {
     campaigns,
@@ -339,6 +396,10 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
 
         const { candidateIds, extraContext } = parsed.data;
         const campaignRound = parsed.data.campaignRound as 1 | 2 | 3;
+        if (campaignRound !== 1) {
+          res.status(400).json({ error: 'Follow-up rounds are sent automatically after 3 days' });
+          return;
+        }
         const contextResult = await resolveAccessibleSignalJobContext(req.user!, jobId);
         if (!contextResult.ok) {
           res.status(contextResult.error === 'JOB_NOT_FOUND' ? 404 : 403).json({ error: contextResult.error });
@@ -346,6 +407,10 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         }
 
         const { job, organizationId, signalTenantId } = contextResult.context;
+        if (!isJobOpenForOutreach(job)) {
+          res.status(400).json({ error: 'Outreach is unavailable for a closed job' });
+          return;
+        }
         if (!signalTenantId) {
           res.status(500).json({ error: 'Signal tenant is not configured' });
           return;
@@ -376,6 +441,15 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
 
         if (candidates.length !== candidateIds.length) {
           res.status(400).json({ error: 'Some candidates are invalid or not shortlisted for this job' });
+          return;
+        }
+        const eligibleCandidateIds = new Set(
+          campaignState.eligibleByRound[campaignRound].candidateIds,
+        );
+        if (!candidateIds.every((candidateId) => eligibleCandidateIds.has(candidateId))) {
+          res.status(400).json({
+            error: `Some candidates are not eligible for campaign round ${campaignRound}`,
+          });
           return;
         }
 
@@ -516,6 +590,10 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
 
         const { campaignId, extraContext, messages } = parsed.data;
         const campaignRound = parsed.data.campaignRound as 1 | 2 | 3;
+        if (campaignRound !== 1) {
+          res.status(400).json({ error: 'Follow-up rounds are sent automatically after 3 days' });
+          return;
+        }
         const contextResult = await resolveAccessibleSignalJobContext(req.user!, jobId);
         if (!contextResult.ok) {
           res.status(contextResult.error === 'JOB_NOT_FOUND' ? 404 : 403).json({ error: contextResult.error });
@@ -523,6 +601,10 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         }
 
         const { job, organizationId, signalTenantId } = contextResult.context;
+        if (!isJobOpenForOutreach(job)) {
+          res.status(400).json({ error: 'Outreach is unavailable for a closed job' });
+          return;
+        }
         if (!signalTenantId) {
           res.status(500).json({ error: 'Signal tenant is not configured' });
           return;
@@ -557,6 +639,15 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
           res.status(400).json({ error: 'Some candidates are invalid or not shortlisted for this job' });
           return;
         }
+        const eligibleCandidateIds = new Set(
+          campaignState.eligibleByRound[campaignRound].candidateIds,
+        );
+        if (!messages.every((message) => eligibleCandidateIds.has(message.candidateId))) {
+          res.status(400).json({
+            error: `Some candidates are not eligible for campaign round ${campaignRound}`,
+          });
+          return;
+        }
 
         const effectiveCountMap = await getEffectiveOutreachCountMapForCandidates(jobId, organizationId, candidates);
         // Only block on outreach-count mismatch — email resolution is handled below.
@@ -575,7 +666,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         const publicJobUrl = getPublicJobUrl(job);
         const emailService = await getEmailService();
 
-        if (!emailService || typeof emailService.sendEmail !== 'function') {
+        if (!emailService || typeof emailService.sendEmailWithReceipt !== 'function') {
           res.status(503).json({ error: 'Email service unavailable' });
           return;
         }
@@ -605,6 +696,10 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         let sent = 0;
         let failed = 0;
         let skipped = 0;
+        const successfullyDeliveredCandidates: Array<{
+          sourcedCandidateId: number;
+          completedAt: Date;
+        }> = [];
 
         for (const message of messages) {
           const candidate = candidateMap.get(message.candidateId);
@@ -631,53 +726,79 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
           let status: 'sent' | 'failed' = 'sent';
           let errorMessage: string | null = null;
           let recipientEmail: string | null = null;
+          let deliveryCampaignId = persistedCampaignId;
+          let deliverySentAt = new Date();
+          let replayed = false;
 
           try {
-            // Revalidate immediately before delivery. A cached address may
-            // have been suppressed after the campaign draft was created.
-            const delivery = await deliverWithRevalidatedContact({
-              candidateId: candidate.id,
+            const delivery = await sendTrackedOutreachEmail({
+              contact: {
+                candidateId: candidate.id,
+                organizationId,
+                jobId,
+                signalTenantId,
+                signalCandidateId: candidate.signalCandidateId ?? '',
+                externalJobId: `vanta:jobs:${jobId}`,
+                attempts: candidate.emailResolveAttempts ?? 0,
+              },
+              emailService,
               organizationId,
               jobId,
-              signalTenantId,
-              signalCandidateId: candidate.signalCandidateId ?? '',
-              externalJobId: `vanta:jobs:${jobId}`,
-              attempts: candidate.emailResolveAttempts ?? 0,
-            }, {
-              revalidate: revalidateCandidateContact,
-              deliver: async (email) => {
-                recipientEmail = email;
-                const sendResult = await emailService.sendEmail({
-                  to: email,
-                  subject: message.subject,
-                  text: finalText,
-                  html: finalHtml,
-                });
-                if (!sendResult) {
-                  throw new Error('Email delivery failed');
-                }
-                return sendResult;
-              },
+              sourcedCandidateId: candidate.id,
+              campaignId: persistedCampaignId,
+              campaignRound,
+              recipientName: getCandidateName(candidate),
+              subject: message.subject,
+              bodyText: finalText,
+              bodyHtml: finalHtml,
+              applicationUrl: publicJobUrl,
+              aiDraftBody: message.aiDraftBody,
+              aiDraftSubject: message.aiDraftSubject,
+              wasEdited: message.wasEdited,
+              sentBy: req.user!.id,
             });
             if (delivery.status === 'skipped') {
               results.push({
                 candidateId: candidate.id,
                 email: '',
                 status: 'skipped',
-                errorMessage: delivery.contact.state === 'suppressed'
-                  ? 'Email suppressed'
-                  : delivery.contact.state === 'pending'
-                    ? 'Email verification pending'
-                    : 'Email not found',
+                errorMessage: delivery.reason === 'org_suppressed'
+                  ? 'Candidate unsubscribed from this organization'
+                  : delivery.reason === 'platform_suppressed'
+                    ? 'Email is suppressed platform-wide'
+                  : delivery.reason === 'candidate_ineligible'
+                    ? 'Candidate applied or is no longer shortlisted'
+                    : delivery.reason === 'hygiene_sync_pending'
+                      ? 'Suppression synchronization is pending; try again shortly'
+                    : 'Email unavailable or suppressed',
               });
               skipped += 1;
               continue;
             }
-            sent += 1;
+            recipientEmail = delivery.email;
+            deliveryCampaignId = delivery.campaignId ?? persistedCampaignId;
+            deliverySentAt = delivery.sentAt;
+            replayed = delivery.replayed;
+            successfullyDeliveredCandidates.push({
+              sourcedCandidateId: candidate.id,
+              completedAt: delivery.sentAt,
+            });
+            replayed ? skipped += 1 : sent += 1;
           } catch (error) {
             status = 'failed';
             errorMessage = error instanceof Error ? error.message : 'Unknown error';
             failed += 1;
+            if (isOutreachDeliveryUncertainError(error)) {
+              await db
+                .update(jobSourcedCandidates)
+                .set({
+                  lastOutreachAt: new Date(),
+                  lastOutreachStatus: 'delivery_uncertain',
+                  updatedAt: new Date(),
+                })
+                .where(eq(jobSourcedCandidates.id, candidate.id));
+              errorMessage = 'Provider outcome is uncertain; automatic retry blocked';
+            }
           }
 
           if (!recipientEmail) {
@@ -689,24 +810,6 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
             });
             continue;
           }
-          await db.insert(sourcedCandidateOutreachLog).values({
-            organizationId,
-            jobId,
-            sourcedCandidateId: candidate.id,
-            campaignId: persistedCampaignId,
-            campaignRound,
-            recipientEmail,
-            recipientName: getCandidateName(candidate),
-            subject: message.subject,
-            body: finalText,
-            bodyHtml: finalHtml,
-            aiDraftBody: message.aiDraftBody,
-            aiDraftSubject: message.aiDraftSubject,
-            wasEdited: message.wasEdited,
-            status,
-            errorMessage,
-            sentBy: req.user!.id,
-          });
 
           await db
             .update(jobSourcedCandidates)
@@ -715,11 +818,18 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
                 ? {
                     outreachCount: Math.min(effectiveCount + 1, MAX_CAMPAIGN_ROUNDS),
                     lastOutreachRound: campaignRound,
-                    lastOutreachCampaignId: persistedCampaignId,
+                    lastOutreachCampaignId: deliveryCampaignId,
                   }
                 : {}),
-              lastOutreachAt: new Date(),
-              lastOutreachStatus: status,
+              lastOutreachAt: deliverySentAt,
+              lastOutreachStatus: sql<string>`
+                CASE
+                  WHEN ${jobSourcedCandidates.lastOutreachStatus}
+                    IN ('complaint', 'unsubscribed')
+                  THEN ${jobSourcedCandidates.lastOutreachStatus}
+                  ELSE ${status}
+                END
+              `,
               updatedAt: new Date(),
             })
             .where(eq(jobSourcedCandidates.id, candidate.id));
@@ -727,8 +837,8 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
           results.push({
             candidateId: candidate.id,
             email: recipientEmail,
-            status,
-            errorMessage,
+            status: replayed ? 'skipped' : status,
+            errorMessage: replayed ? 'Round already delivered' : errorMessage,
           });
         }
 
@@ -745,10 +855,14 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
           .where(eq(sourcedCandidateOutreachCampaigns.campaignId, persistedCampaignId));
 
         // Auto-schedule follow-up rounds after round 1 or 2 completes with at least some sends
-        if (sent > 0 && campaignRound < MAX_CAMPAIGN_ROUNDS) {
-          scheduleFollowUpCampaigns(jobId, organizationId, req.user!.id, campaignRound).catch((err) => {
-            console.error('[ColdOutreach] Failed to schedule follow-ups:', err);
-          });
+        if (successfullyDeliveredCandidates.length > 0 && campaignRound < MAX_CAMPAIGN_ROUNDS) {
+          await scheduleCandidateFollowUps(
+            successfullyDeliveredCandidates,
+            jobId,
+            organizationId,
+            req.user!.id,
+            campaignRound,
+          );
         }
 
         res.json({
@@ -801,6 +915,12 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
             eq(jobSourcedCandidates.jobId, jobId),
           ),
         });
+        const schedules: CandidateOutreachSchedule[] = await db.query.candidateOutreachSchedules.findMany({
+          where: and(
+            eq(candidateOutreachSchedules.organizationId, organizationId),
+            eq(candidateOutreachSchedules.jobId, jobId),
+          ),
+        });
 
         const messagesByCampaign = new Map<string, typeof logs>();
         for (const log of logs) {
@@ -817,12 +937,79 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
             (appliedByCampaign.get(candidate.appliedFromCampaignId) ?? 0) + 1,
           );
         }
+        const sentByRound = new Map<number, Set<number>>();
+        const contacted = new Set<number>();
+        const bounced = new Set<number>();
+        const complained = new Set<number>();
+        const unsubscribed = new Set<number>();
+        for (const log of logs) {
+          if (log.status === 'sent') {
+            contacted.add(log.sourcedCandidateId);
+            if (log.campaignRound) {
+              const roundSet = sentByRound.get(log.campaignRound) ?? new Set<number>();
+              roundSet.add(log.sourcedCandidateId);
+              sentByRound.set(log.campaignRound, roundSet);
+            }
+          }
+          if (log.deliveryStatus === 'hard_bounce' || log.deliveryStatus === 'soft_bounce') {
+            bounced.add(log.sourcedCandidateId);
+          }
+          if (log.deliveryStatus === 'unsubscribed') {
+            unsubscribed.add(log.sourcedCandidateId);
+          }
+          if (log.deliveryStatus === 'complaint') {
+            complained.add(log.sourcedCandidateId);
+          }
+        }
+        for (const candidate of convertedCandidates) {
+          if (candidate.lastOutreachStatus === 'unsubscribed') {
+            unsubscribed.add(candidate.id);
+          }
+        }
+        const shortlistCohort = convertedCandidates.filter((candidate) =>
+          candidate.state === 'shortlisted'
+          || (candidate.outreachCount ?? 0) > 0
+          || candidate.appliedAfterRound !== null,
+        );
+        const scheduleByCandidate = new Map(
+          schedules.map((schedule: CandidateOutreachSchedule) => [schedule.sourcedCandidateId, schedule]),
+        );
+        const funnel = [
+          { stage: 'Shortlisted', count: shortlistCohort.length },
+          { stage: 'Contacted', count: contacted.size },
+          { stage: 'Round 1', count: sentByRound.get(1)?.size ?? 0 },
+          { stage: 'Round 2', count: sentByRound.get(2)?.size ?? 0 },
+          { stage: 'Round 3', count: sentByRound.get(3)?.size ?? 0 },
+          { stage: 'Bounced', count: bounced.size },
+          { stage: 'Complaints', count: complained.size },
+          { stage: 'Unsubscribed', count: unsubscribed.size },
+          {
+            stage: 'Applied',
+            count: convertedCandidates.filter((candidate) => Boolean(candidate.appliedAt)).length,
+          },
+        ];
 
         res.json({
           nextAvailableRound: campaignState.nextAvailableRound,
           canStartAnyCampaign: campaignState.canStartAnyCampaign,
           eligibleByRound: campaignState.eligibleByRound,
           maxCampaigns: MAX_CAMPAIGN_ROUNDS,
+          funnel,
+          candidateStates: shortlistCohort.map((candidate) => {
+            const schedule = scheduleByCandidate.get(candidate.id);
+            return {
+              candidateId: candidate.id,
+              name: getCandidateName(candidate),
+              outreachCount: candidate.outreachCount ?? 0,
+              lastRound: candidate.lastOutreachRound,
+              lastStatus: candidate.lastOutreachStatus,
+              nextRound: schedule?.status === 'pending' ? schedule.nextRound : null,
+              nextDueAt: schedule?.status === 'pending'
+                ? schedule.dueAt.toISOString()
+                : null,
+              appliedAt: candidate.appliedAt?.toISOString() ?? null,
+            };
+          }),
           campaigns: campaignState.campaigns
             .sort((a, b) => b.round - a.round || b.launchedAt.getTime() - a.launchedAt.getTime())
             .map((campaign) => ({
@@ -842,7 +1029,8 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
                 recipientEmail: log.recipientEmail,
                 recipientName: log.recipientName,
                 subject: log.subject,
-                status: log.status as 'sent' | 'failed',
+                status: log.status as 'sending' | 'sent' | 'failed',
+                deliveryStatus: log.deliveryStatus,
                 errorMessage: log.errorMessage,
                 sentAt: log.sentAt.toISOString(),
               })),

@@ -15,12 +15,14 @@ export type GuardedContactDelivery<T> =
       email: null;
       value: null;
       contact: ContactRevalidationResult;
+      skipReason: 'contact_unavailable' | 'org_suppressed' | 'platform_suppressed';
     };
 
 export async function deliverWithRevalidatedContact<T>(
   input: ContactRevalidationInput,
   dependencies: {
     revalidate: (candidate: ContactRevalidationInput) => Promise<ContactRevalidationResult>;
+    isSuppressed?: (email: string, candidate: ContactRevalidationInput) => Promise<boolean>;
     deliver: (email: string) => Promise<T>;
   },
 ): Promise<GuardedContactDelivery<T>> {
@@ -34,6 +36,18 @@ export async function deliverWithRevalidatedContact<T>(
       email: null,
       value: null,
       contact,
+      skipReason: contact.state === 'suppressed'
+        ? 'platform_suppressed'
+        : 'contact_unavailable',
+    };
+  }
+  if (await dependencies.isSuppressed?.(email, input)) {
+    return {
+      status: 'skipped',
+      email: null,
+      value: null,
+      contact,
+      skipReason: 'org_suppressed',
     };
   }
 

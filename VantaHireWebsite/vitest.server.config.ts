@@ -10,6 +10,7 @@ export default defineConfig({
       'server/tests/hiring-manager-feedback-access.routes.test.ts',
       'server/tests/recruiter-dashboard-scoping.routes.test.ts',
       'server/tests/resumeExtractor.isolation.test.ts',
+      'server/tests/outreachHygieneConcurrency.pg.test.ts',
     ],
   },
   resolve: {

@@ -325,7 +325,15 @@ export interface SourcedCandidateForUI {
   lastOutreachRound: number | null;
   lastOutreachCampaignId: string | null;
   lastOutreachAt: string | null;
-  lastOutreachStatus: 'sent' | 'failed' | null;
+  lastOutreachStatus:
+    | 'sent'
+    | 'failed'
+    | 'soft_bounce'
+    | 'hard_bounce'
+    | 'complaint'
+    | 'unsubscribed'
+    | 'delivery_uncertain'
+    | null;
 
   // Flattened from candidateSummary
   crustdata: Record<string, any> | null;
@@ -633,9 +641,19 @@ export function flattenCandidateForUI(row: {
     lastOutreachRound: typeof row.lastOutreachRound === 'number' ? row.lastOutreachRound : null,
     lastOutreachCampaignId: safeString(row.lastOutreachCampaignId),
     lastOutreachAt: safeString(row.lastOutreachAt),
-    lastOutreachStatus: (row.lastOutreachStatus === 'sent' || row.lastOutreachStatus === 'failed'
-      ? row.lastOutreachStatus
-      : null) as SourcedCandidateForUI['lastOutreachStatus'],
+    lastOutreachStatus: (
+      [
+        'sent',
+        'failed',
+        'soft_bounce',
+        'hard_bounce',
+        'complaint',
+        'unsubscribed',
+        'delivery_uncertain',
+      ].includes(row.lastOutreachStatus ?? '')
+        ? row.lastOutreachStatus
+        : null
+    ) as SourcedCandidateForUI['lastOutreachStatus'],
 
     crustdata: ((cs as any)?.candidate?.searchMeta?.crustdata as Record<string, unknown>) || null,
     linkedinUrl: safeString(cs.linkedinUrl) ?? safeString((cs.candidate as any)?.linkedinUrl),

@@ -78,6 +78,7 @@ const statusBadgeBase = "inline-block py-1 px-3 rounded-full font-mono text-[0.6
 export default function JobDetailsPage() {
   const [match, params] = useRoute("/jobs/:id");
   const search = useSearch();
+  const outreachAttributionToken = new URLSearchParams(search).get("outreach");
   const { toast } = useToast();
   const { user } = useAuth();
   const candidateJobState = useCandidateJobState();
@@ -328,6 +329,9 @@ export default function JobDetailsPage() {
         formDataToSend.append("resumeId", selectedResumeId.toString());
       } else if (resumeFile) {
         formDataToSend.append('resume', resumeFile);
+      }
+      if (outreachAttributionToken) {
+        formDataToSend.append("outreachAttributionToken", outreachAttributionToken);
       }
       applicationMutation.mutate(formDataToSend);
     } catch (error) {

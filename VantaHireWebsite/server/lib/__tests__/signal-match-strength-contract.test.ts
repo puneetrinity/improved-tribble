@@ -43,6 +43,23 @@ describe('flattenCandidateForUI match strength', () => {
 
     expect(candidate.matchStrength).toBeNull();
   });
+
+  it.each([
+    'sent',
+    'failed',
+    'soft_bounce',
+    'hard_bounce',
+    'complaint',
+    'unsubscribed',
+    'delivery_uncertain',
+  ] as const)('preserves the outreach status %s for the recruiter UI', (status) => {
+    const candidate = flattenCandidateForUI({
+      ...rowWithCandidateSummary({}),
+      lastOutreachStatus: status,
+    });
+
+    expect(candidate.lastOutreachStatus).toBe(status);
+  });
 });
 
 describe('fitDescription', () => {
