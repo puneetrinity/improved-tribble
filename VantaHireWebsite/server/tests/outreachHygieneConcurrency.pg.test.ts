@@ -16,6 +16,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
   let outreachHygieneStore: typeof import('../lib/outreachHygieneProcessor').outreachHygieneStore;
   let purgeSyncedHygieneIntents: typeof import('../lib/outreachHygieneProcessor').purgeSyncedHygieneIntents;
   let purgeExpiredDeliveryCorrelations: typeof import('../lib/outreachHygieneProcessor').purgeExpiredDeliveryCorrelations;
+  let requeueDeadLetteredIntents: typeof import('../lib/outreachHygieneProcessor').requeueDeadLetteredIntents;
   let processHygieneEvent: typeof import('../webhooks/brevo.webhook').processHygieneEvent;
   let candidateLockNamespace: number;
   let emailLockNamespace: number;
@@ -85,6 +86,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
         memory_global_candidate_id TEXT,
         synced_at TIMESTAMP,
         dead_lettered_at TIMESTAMP,
+        replay_count INTEGER NOT NULL DEFAULT 0,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
         UNIQUE(provider, provider_event_id),
@@ -113,6 +115,7 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
     outreachHygieneStore = processor.outreachHygieneStore;
     purgeSyncedHygieneIntents = processor.purgeSyncedHygieneIntents;
     purgeExpiredDeliveryCorrelations = processor.purgeExpiredDeliveryCorrelations;
+    requeueDeadLetteredIntents = processor.requeueDeadLetteredIntents;
     processHygieneEvent = webhookModule.processHygieneEvent;
     runtimePool = dbModule.pool as Pool;
     webhook = await admin.connect();
@@ -637,5 +640,51 @@ describePostgres('outreach hygiene/send ordering (real Postgres)', () => {
     );
     expect(remaining.rows.map((row: { email_hash: string }) => row.email_hash))
       .toEqual([unresolvedHash]);
+  });
+
+  it('replays dead letters on restart, but only up to the cap', async () => {
+    // A record-specific failure is a payload bug, so the fix is a deploy — and
+    // the deploy restarts this process. Replaying here is what makes recovery
+    // automatic instead of someone editing the database. The cap stops an
+    // unfixed bug from churning on every restart forever.
+    await admin.query(`TRUNCATE ${schemaName}.outreach_hygiene_intents`);
+    await admin.query(
+      `INSERT INTO ${schemaName}.outreach_hygiene_intents
+         (provider_event_id, email_hash, reason, status, dead_lettered_at,
+          signal_candidate_id, attempt_count, replay_count)
+       VALUES ($1, $2, 'complaint', 'dead_letter', NOW(), 'sc-replay', 7, 0)`,
+      ['e5'.repeat(32), '5e'.repeat(32)],
+    );
+
+    expect(await requeueDeadLetteredIntents(2)).toBe(1);
+    const revived = await admin.query(
+      `SELECT status, attempt_count, replay_count, dead_lettered_at, last_error
+       FROM ${schemaName}.outreach_hygiene_intents`,
+    );
+    expect(revived.rows[0]).toMatchObject({
+      status: 'pending',
+      attempt_count: 0,
+      replay_count: 1,
+      dead_lettered_at: null,
+      last_error: 'requeued_after_restart',
+    });
+
+    // Second restart: still under the cap, so it replays again.
+    await admin.query(
+      `UPDATE ${schemaName}.outreach_hygiene_intents
+       SET status = 'dead_letter', dead_lettered_at = NOW()`,
+    );
+    expect(await requeueDeadLetteredIntents(2)).toBe(1);
+
+    // Third: cap reached, so it stays put and stays visible.
+    await admin.query(
+      `UPDATE ${schemaName}.outreach_hygiene_intents
+       SET status = 'dead_letter', dead_lettered_at = NOW()`,
+    );
+    expect(await requeueDeadLetteredIntents(2)).toBe(0);
+    const parked = await admin.query(
+      `SELECT status, replay_count FROM ${schemaName}.outreach_hygiene_intents`,
+    );
+    expect(parked.rows[0]).toMatchObject({ status: 'dead_letter', replay_count: 2 });
   });
 });

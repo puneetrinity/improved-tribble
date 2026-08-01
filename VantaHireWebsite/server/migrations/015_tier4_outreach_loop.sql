@@ -1,4 +1,10 @@
 -- Tier 4 outreach delivery hygiene and per-candidate follow-up scheduling.
+--
+-- AUTHORITY: server/bootstrapSchema.ts is what actually runs. Nothing executes
+-- the files in this directory — `npm run db:migrate` calls ensureAtsSchema().
+-- This file is the reviewable record of the same DDL and MUST be kept in step
+-- with bootstrapSchema.ts; a constraint that exists in only one of them is a
+-- drift bug, not a difference of opinion.
 
 ALTER TABLE sourced_candidate_outreach_log
   ADD COLUMN IF NOT EXISTS delivery_key TEXT,
@@ -183,6 +189,7 @@ CREATE TABLE IF NOT EXISTS outreach_hygiene_intents (
   memory_global_candidate_id TEXT,
   synced_at TIMESTAMP,
   dead_lettered_at TIMESTAMP,
+  replay_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   CONSTRAINT outreach_hygiene_intents_reason_check
@@ -196,8 +203,29 @@ CREATE TABLE IF NOT EXISTS outreach_hygiene_intents (
   CONSTRAINT outreach_hygiene_intents_attempts_check
     CHECK (attempt_count >= 0),
   CONSTRAINT outreach_hygiene_intents_dead_letter_pair_check
-    CHECK ((status = 'dead_letter') = (dead_lettered_at IS NOT NULL))
+    CHECK ((status = 'dead_letter') = (dead_lettered_at IS NOT NULL)),
+  -- NOT NULL still admits ''. An intent naming no person would trip the send
+  -- fence's "unidentifiable" fallback, which stops ALL outreach.
+  CONSTRAINT outreach_hygiene_intents_candidate_nonblank
+    CHECK (btrim(signal_candidate_id) <> ''),
+  CONSTRAINT outreach_hygiene_intents_tenant_nonblank
+    CHECK (btrim(signal_tenant_id) <> '')
 );
+
+-- Idempotent upgrade for tables created before these constraints existed.
+ALTER TABLE outreach_hygiene_intents
+  ADD COLUMN IF NOT EXISTS replay_count INTEGER NOT NULL DEFAULT 0;
+
+ALTER TABLE outreach_hygiene_intents
+  DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_candidate_nonblank;
+ALTER TABLE outreach_hygiene_intents
+  ADD CONSTRAINT outreach_hygiene_intents_candidate_nonblank
+  CHECK (btrim(signal_candidate_id) <> '');
+ALTER TABLE outreach_hygiene_intents
+  DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_tenant_nonblank;
+ALTER TABLE outreach_hygiene_intents
+  ADD CONSTRAINT outreach_hygiene_intents_tenant_nonblank
+  CHECK (btrim(signal_tenant_id) <> '');
 
 ALTER TABLE outreach_hygiene_intents
   ADD COLUMN IF NOT EXISTS dead_lettered_at TIMESTAMP;

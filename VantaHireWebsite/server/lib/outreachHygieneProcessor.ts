@@ -37,6 +37,10 @@ const CORRELATION_RETENTION_DAYS = readPositiveInteger(
   process.env.OUTREACH_CORRELATION_RETENTION_DAYS,
   180,
 );
+const MAX_DEAD_LETTER_REPLAYS = readPositiveInteger(
+  process.env.OUTREACH_HYGIENE_MAX_REPLAYS,
+  3,
+);
 const LEASE_MS = Math.max(
   readPositiveInteger(process.env.OUTREACH_HYGIENE_LEASE_MS, 60_000),
   Math.ceil(BATCH_SIZE / CONCURRENCY) * CONTACT_SUPPRESSION_TIMEOUT_MS + 30_000,
@@ -474,6 +478,48 @@ export async function purgeExpiredDeliveryCorrelations(
   return purged;
 }
 
+/**
+ * Recover dead letters automatically, without an operator.
+ *
+ * A record-specific failure means the payload we sent will never be accepted —
+ * so the remedy is a code fix, and the deploy that carries it restarts this
+ * process. Requeuing on start therefore replays exactly the records a fix was
+ * meant to repair, with no admin endpoint and nobody editing the database.
+ *
+ * Bounded by replay_count so an unfixed bug cannot churn forever: after
+ * MAX_DEAD_LETTER_REPLAYS restarts a row stays put and stays visible. Nothing is
+ * unsafe about that state — the affected person remains fenced locally either
+ * way; what is lost is only the mirror of that suppression in Memory.
+ */
+export async function requeueDeadLetteredIntents(
+  maxReplays = MAX_DEAD_LETTER_REPLAYS,
+  now: Date = new Date(),
+): Promise<number> {
+  const result = await db.execute(sql`
+    UPDATE outreach_hygiene_intents
+    SET status = 'pending',
+        dead_lettered_at = NULL,
+        attempt_count = 0,
+        replay_count = replay_count + 1,
+        next_attempt_at = ${now},
+        lease_token = NULL,
+        lease_expires_at = NULL,
+        last_error = 'requeued_after_restart',
+        updated_at = ${now}
+    WHERE status = 'dead_letter'
+      AND replay_count < ${maxReplays}
+    RETURNING id
+  `);
+  const requeued = result.rows?.length ?? 0;
+  if (requeued > 0) {
+    console.log('[OutreachHygiene] Requeued dead-lettered suppressions after restart', {
+      requeued,
+      maxReplays,
+    });
+  }
+  return requeued;
+}
+
 let running = false;
 let cycleInFlight = false;
 let wakeRequested = false;
@@ -556,7 +602,15 @@ export function startOutreachHygieneProcessor(): void {
     concurrency: CONCURRENCY,
     leaseMs: LEASE_MS,
   });
-  schedulePoll(0);
+  // A restart is the signal that a fix may have shipped. Replay dead letters
+  // before the first cycle so recovery needs no operator action.
+  void requeueDeadLetteredIntents()
+    .catch((error: unknown) => {
+      console.error('[OUTREACH_HYGIENE] Dead-letter requeue failed', {
+        errorType: error instanceof Error ? error.name : 'unknown',
+      });
+    })
+    .finally(() => schedulePoll(0));
 }
 
 export function stopOutreachHygieneProcessor(): void {

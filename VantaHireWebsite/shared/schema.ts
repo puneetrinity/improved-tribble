@@ -1270,6 +1270,10 @@ export const outreachHygieneIntents = pgTable("outreach_hygiene_intents", {
   memoryGlobalCandidateId: text("memory_global_candidate_id"),
   syncedAt: timestamp("synced_at"),
   deadLetteredAt: timestamp("dead_lettered_at"),
+  // Bounded automatic recovery: a record-specific failure is a payload bug, so
+  // the remedy is a deploy. Dead letters are requeued once per restart until
+  // this cap, which removes the need for anyone to touch the database.
+  replayCount: integer("replay_count").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
