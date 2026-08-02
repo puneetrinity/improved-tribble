@@ -3,6 +3,22 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 const TOKEN_VERSION = 1;
 const MIN_SECRET_LENGTH = 32;
 
+/**
+ * Attribution links go stale; opt-out links must not.
+ *
+ * The application token only credits an application to the campaign that caused
+ * it, and an expired one fails soft: applications.routes.ts swallows the error
+ * and falls back to matching on email, so the candidate still applies. Bounding
+ * it limits how long a URL sitting in browser history, proxy logs or a Referer
+ * header keeps carrying readable internal ids.
+ *
+ * There is deliberately no equivalent for the unsubscribe token. Someone who
+ * finds a two-year-old email must still be able to stop the outreach; an expired
+ * opt-out link is a compliance failure, not a security win. Its exposure is
+ * addressed by replacing the payload with an opaque lookup id, never by expiry.
+ */
+const APPLICATION_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
 export interface OutreachUnsubscribeClaims {
   v: typeof TOKEN_VERSION;
   organizationId: number;
@@ -159,6 +175,9 @@ export function verifyOutreachApplicationToken(token: string): OutreachApplicati
       !Number.isSafeInteger(claims.issuedAt) ||
       Number(claims.issuedAt) <= 0
     ) {
+      throw new Error('Invalid outreach application token');
+    }
+    if (Date.now() - Number(claims.issuedAt) > APPLICATION_TOKEN_MAX_AGE_MS) {
       throw new Error('Invalid outreach application token');
     }
     return claims as unknown as OutreachApplicationClaims;
