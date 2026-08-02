@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createOutreachApplicationToken,
@@ -115,5 +115,49 @@ describe('outreach compliance primitives', () => {
     });
     expect(url).toContain('?outreach=');
     expect(url).not.toContain('candidate@example.com');
+  });
+
+  it('expires an apply attribution token, but never an unsubscribe token', () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      const applicationToken = createOutreachApplicationToken({
+        organizationId: 9,
+        jobId: 17,
+        sourcedCandidateId: 41,
+        campaignId: 'campaign-1',
+        campaignRound: 2,
+      });
+      const unsubscribeToken = createOutreachUnsubscribeToken({
+        organizationId: 9,
+        sourcedCandidateId: 41,
+        campaignId: 'campaign-1',
+        campaignRound: 2,
+        email: 'candidate@example.com',
+      });
+
+      // Inside the window both still verify.
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z').getTime() + 29 * DAY_MS);
+      expect(verifyOutreachApplicationToken(applicationToken)).toMatchObject({
+        campaignId: 'campaign-1',
+      });
+
+      // One day past the bound the attribution token is refused...
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z').getTime() + 31 * DAY_MS);
+      expect(() => verifyOutreachApplicationToken(applicationToken)).toThrow(
+        'Invalid outreach application token',
+      );
+
+      // ...but the opt-out link must keep working, years later. A recipient who
+      // finds an old email has to be able to stop the outreach.
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z').getTime() + 900 * DAY_MS);
+      expect(verifyOutreachUnsubscribeToken(unsubscribeToken)).toMatchObject({
+        organizationId: 9,
+        emailHash: hashOutreachEmail('candidate@example.com'),
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
