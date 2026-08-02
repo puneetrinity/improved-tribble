@@ -160,4 +160,41 @@ describe('outreach compliance primitives', () => {
       vi.useRealTimers();
     }
   });
+
+  it('refuses an apply token stamped in the future, but tolerates small clock skew', () => {
+    const MINUTE_MS = 60 * 1000;
+    vi.useFakeTimers();
+    try {
+      // Minted by a replica whose clock runs ahead of this verifier's.
+      vi.setSystemTime(new Date('2026-01-01T01:00:00.000Z'));
+      const token = createOutreachApplicationToken({
+        organizationId: 9,
+        jobId: 17,
+        sourcedCandidateId: 41,
+        campaignId: 'campaign-1',
+        campaignRound: 2,
+      });
+
+      // 2 minutes ahead is ordinary skew and must still verify.
+      vi.setSystemTime(new Date('2026-01-01T00:58:00.000Z'));
+      expect(verifyOutreachApplicationToken(token)).toMatchObject({
+        campaignId: 'campaign-1',
+      });
+
+      // An hour ahead is not skew. Accepting it would grant the token its full
+      // 30-day window on top of the clock offset.
+      vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+      expect(() => verifyOutreachApplicationToken(token)).toThrow(
+        'Invalid outreach application token',
+      );
+
+      // Once the verifier's clock passes issuance it behaves normally again.
+      vi.setSystemTime(new Date('2026-01-01T01:00:00.000Z').getTime() + 5 * MINUTE_MS);
+      expect(verifyOutreachApplicationToken(token)).toMatchObject({
+        campaignId: 'campaign-1',
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

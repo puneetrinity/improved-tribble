@@ -19,6 +19,14 @@ const MIN_SECRET_LENGTH = 32;
  */
 const APPLICATION_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Tolerance for a token minted by a replica whose clock runs slightly ahead of
+ * the verifier's. Beyond this the timestamp is not skew, it is wrong: an
+ * issuedAt in the future would otherwise survive its whole max-age window PLUS
+ * however far ahead the clock was, which quietly defeats the bound above.
+ */
+const APPLICATION_TOKEN_CLOCK_SKEW_MS = 5 * 60 * 1000;
+
 export interface OutreachUnsubscribeClaims {
   v: typeof TOKEN_VERSION;
   organizationId: number;
@@ -177,7 +185,8 @@ export function verifyOutreachApplicationToken(token: string): OutreachApplicati
     ) {
       throw new Error('Invalid outreach application token');
     }
-    if (Date.now() - Number(claims.issuedAt) > APPLICATION_TOKEN_MAX_AGE_MS) {
+    const age = Date.now() - Number(claims.issuedAt);
+    if (age < -APPLICATION_TOKEN_CLOCK_SKEW_MS || age > APPLICATION_TOKEN_MAX_AGE_MS) {
       throw new Error('Invalid outreach application token');
     }
     return claims as unknown as OutreachApplicationClaims;
