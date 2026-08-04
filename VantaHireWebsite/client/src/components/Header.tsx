@@ -43,7 +43,7 @@ const Header = () => {
 
   const openConsultation = () => {
     trackEvent("cta_click", { location: "site_header", action: "schedule_consultation" });
-    window.open('https://cal.com/ealana/quick-connect', '_blank');
+    window.open('https://cal.com/puneet-kumar-2845nx/demo-ealana', '_blank');
   };
 
   const scrollToSection = (id: string) => {

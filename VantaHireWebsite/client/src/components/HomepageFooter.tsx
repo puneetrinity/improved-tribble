@@ -58,7 +58,7 @@ const HomepageFooter = ({
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li><Link href="/about" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">About</Link></li>
                 {!candidateAudience ? (
-                  <li><a href="https://cal.com/ealana/quick-connect" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
+                  <li><a href="https://cal.com/puneet-kumar-2845nx/demo-ealana" target="_blank" rel="noopener noreferrer" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Book a Demo</a></li>
                 ) : null}
                 <li><a href="mailto:info@ealana.com" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Contact</a></li>
               </ul>
