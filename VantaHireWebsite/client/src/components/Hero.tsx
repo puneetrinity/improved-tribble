@@ -40,7 +40,7 @@ const metricSubLabel = "text-[0.55rem] text-[#9ca3af] mb-1";
 const Hero = () => {
   const openCalendar = () => {
     trackEvent("cta_click", { location: "home_hero", action: "book_demo" });
-    window.open('https://cal.com/ealana/quick-connect', '_blank');
+    window.open('https://cal.com/puneet-kumar-2845nx/demo-ealana', '_blank');
   };
 
   return (

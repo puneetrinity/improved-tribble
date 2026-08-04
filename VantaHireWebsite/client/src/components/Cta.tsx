@@ -4,7 +4,7 @@ import { btnPrimary, btnSecondary, sectionLabel } from "@/lib/shared-styles";
 const Cta = () => {
   const openCalendar = () => {
     trackEvent("cta_click", { location: "cta_block", action: "book_demo" });
-    window.open('https://cal.com/ealana/quick-connect', '_blank');
+    window.open('https://cal.com/puneet-kumar-2845nx/demo-ealana', '_blank');
   };
 
   return (

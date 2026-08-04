@@ -206,7 +206,7 @@ export default function HomepageNav({
                 Start Here
               </div>
               <a
-                href="https://cal.com/ealana/quick-connect"
+                href="https://cal.com/puneet-kumar-2845nx/demo-ealana"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="mb-2 block rounded-lg border border-white/12 bg-white/[0.04] px-4 py-[9px] text-center text-[0.82rem] font-medium text-[#F4F5FA] no-underline transition-colors hover:bg-white/[0.07]"
@@ -326,7 +326,7 @@ export default function HomepageNav({
           {!candidateAudience ? (
             <>
               <a
-                href="https://cal.com/ealana/quick-connect"
+                href="https://cal.com/puneet-kumar-2845nx/demo-ealana"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={ghostButtonStyle}

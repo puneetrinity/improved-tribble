@@ -602,7 +602,7 @@ export default function PricingPage() {
                     Start Free
                   </a>
                   <a
-                    href="https://cal.com/ealana/quick-connect"
+                    href="https://cal.com/puneet-kumar-2845nx/demo-ealana"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="bg-transparent text-e-text border border-white/12 py-3 px-6 rounded-xl font-ui text-[0.875rem] font-medium leading-normal cursor-pointer no-underline transition-all duration-200 inline-block hover:border-white/25 hover:bg-white/[0.03] max-md:w-full max-md:text-center"

@@ -324,7 +324,7 @@ const Contact = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
             <div className={`transition-all duration-700 ${isInView ? 'animate-slide-left' : 'opacity-0 -translate-x-10'}`} style={{ animationDelay: '0.4s' }}>
               <div className="space-y-8">
-                {/* Calendly CTA - Primary */}
+                {/* Booking CTA - Primary */}
                 <div className="text-center md:text-left">
                   <h3 className="text-2xl font-bold mb-4 animate-gradient-text inline-block">
                     Start with a Free Strategy Call
@@ -350,7 +350,7 @@ const Contact = () => {
                     variant="gradient"
                     size="xl"
                     className="rounded-full premium-card hover:scale-105 transform transition-all duration-300 group w-full shadow-lg"
-                    onClick={() => window.open('https://calendly.com/ealana/30min', '_blank')}
+                    onClick={() => window.open('https://cal.com/puneet-kumar-2845nx/demo-ealana', '_blank')}
                   >
                     <Calendar className="w-5 h-5 mr-2 group-hover:animate-pulse" />
                     <span className="group-hover:tracking-wide transition-all duration-300">Book Your Free Call Now</span>

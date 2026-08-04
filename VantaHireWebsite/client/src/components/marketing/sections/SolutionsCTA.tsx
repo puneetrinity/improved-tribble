@@ -74,7 +74,7 @@ export default function SolutionsCTA() {
             Get Started -&gt;
           </motion.a>
           <motion.a
-            href="https://cal.com/ealana/quick-connect"
+            href="https://cal.com/puneet-kumar-2845nx/demo-ealana"
             target="_blank"
             rel="noopener noreferrer"
             whileHover={{ borderColor: "rgba(255,255,255,0.2)", color: "#F4F5FA" }}
