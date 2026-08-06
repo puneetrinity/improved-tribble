@@ -7,7 +7,6 @@ import { randomBytes } from "crypto";
 import {
   verifyWebhookSignature,
   parseWebhookEvent,
-  getOrderStatus,
   type CashfreeWebhookPayload,
 } from "../lib/cashfreeClient";
 import {
@@ -579,26 +578,38 @@ export function registerCashfreeWebhook(app: Express) {
   // Cashfree webhook endpoint (no CSRF, raw body needed for signature verification)
   app.post("/api/webhooks/cashfree", async (req: Request & { rawBody?: string }, res: Response) => {
     try {
+      if (!process.env.CASHFREE_WEBHOOK_SECRET) {
+        console.error('Cashfree webhook secret is not configured');
+        res.status(503).json({ error: 'Webhook unavailable' });
+        return;
+      }
+
+      const rawBody = req.rawBody;
+      if (!rawBody) {
+        console.error('Missing raw webhook body');
+        res.status(400).json({ error: 'Missing raw body' });
+        return;
+      }
+
       const signature = req.headers['x-webhook-signature'] as string;
       const timestamp = req.headers['x-webhook-timestamp'] as string;
 
-      // Get raw body for signature verification (captured by express.json verify option)
-      const rawBody = req.rawBody || JSON.stringify(req.body);
+      if (!signature || !timestamp) {
+        console.error('Missing webhook signature headers');
+        res.status(400).json({ error: 'Missing signature' });
+        return;
+      }
 
-      // Verify signature (if webhook secret is configured)
-      if (process.env.CASHFREE_WEBHOOK_SECRET) {
-        if (!signature || !timestamp) {
-          console.error('Missing webhook signature headers');
-          res.status(400).json({ error: 'Missing signature' });
-          return;
-        }
-
-        const isValid = verifyWebhookSignature(rawBody, signature, timestamp);
-        if (!isValid) {
-          console.error('Invalid webhook signature');
-          res.status(401).json({ error: 'Invalid signature' });
-          return;
-        }
+      let isValid = false;
+      try {
+        isValid = verifyWebhookSignature(rawBody, signature, timestamp);
+      } catch {
+        // Malformed signatures can make timingSafeEqual throw on unequal buffer lengths.
+      }
+      if (!isValid) {
+        console.error('Invalid webhook signature');
+        res.status(401).json({ error: 'Invalid signature' });
+        return;
       }
 
       const payload = req.body as CashfreeWebhookPayload;
@@ -677,42 +688,6 @@ export function registerCashfreeWebhook(app: Express) {
     } catch (error: any) {
       console.error('Webhook processing error:', error);
       res.status(500).json({ error: 'Webhook processing failed' });
-    }
-  });
-
-  // Manual order status check endpoint (for polling/return URL)
-  app.get("/api/webhooks/cashfree/verify/:orderId", async (req: Request, res: Response) => {
-    try {
-      const orderId = req.params.orderId ?? '';
-      if (!orderId) {
-        res.status(400).json({ error: 'Order ID is required' });
-        return;
-      }
-
-      const orderStatus = await getOrderStatus(orderId);
-
-      if (orderStatus.status === 'PAID') {
-        // Process as successful if not already processed
-        const transaction = await getTransactionByCashfreeOrder(orderId);
-        if (transaction && transaction.status !== 'completed') {
-          await handlePaymentSuccess(
-            orderId,
-            orderStatus.paymentId || '',
-            0,
-            orderStatus.paymentMethod || 'unknown'
-          );
-        }
-      }
-
-      res.json({
-        orderId,
-        status: orderStatus.status,
-        paymentId: orderStatus.paymentId,
-        paymentMethod: orderStatus.paymentMethod,
-      });
-    } catch (error: any) {
-      console.error('Error verifying order:', error);
-      res.status(500).json({ error: 'Failed to verify order' });
     }
   });
 }
