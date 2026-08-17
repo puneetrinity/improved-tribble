@@ -1794,19 +1794,19 @@ export function registerJobsRoutes(
         }
       }
 
-      const score = await generateJobScore(title, description, historicalData);
+      const { score, modelVersion } = await generateJobScore(title, description, historicalData);
 
       // Cache the score if jobId provided
       if (jobId) {
         await storage.updateJobAnalytics(jobId, {
           aiScoreCache: score,
-          aiModelVersion: "llama-3.3-70b-versatile"
+          aiModelVersion: modelVersion
         });
       }
 
       res.json({
         score,
-        model_version: "llama-3.3-70b-versatile",
+        model_version: modelVersion,
         timestamp: new Date().toISOString(),
         factors: {
           content_analysis: true,

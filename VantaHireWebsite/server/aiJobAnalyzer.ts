@@ -1,4 +1,5 @@
 import { getGroqClient, isGroqConfigured } from './lib/groqClient';
+import { getGroqModel } from './lib/aiModelConfig';
 import {
   JobAnalysisResponseSchema,
   EmailDraftResponseSchema,
@@ -25,7 +26,11 @@ export interface JobAnalysisResult {
   model_version: string;
 }
 
-export async function analyzeJobDescription(title: string, description: string): Promise<JobAnalysisResult> {
+export async function analyzeJobDescription(
+  title: string,
+  description: string,
+  model: string = getGroqModel(),
+): Promise<JobAnalysisResult> {
   try {
     const client = getGroqClient();
     const prompt = `Evaluate the following job description for clarity, inclusion, and SEO optimization. Provide specific, actionable feedback AND a fully rewritten, optimized version.
@@ -60,7 +65,7 @@ For the rewrite:
 Return only valid JSON without any additional text.`;
 
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages: [
         {
           role: "system",
@@ -88,7 +93,7 @@ Return only valid JSON without any additional text.`;
       seo_keywords: result.seo_keywords ?? [],
       suggestions: result.suggestions ?? [],
       rewrite: result.rewrite ?? '',
-      model_version: "llama-3.3-70b-versatile"
+      model_version: model
     };
 
   } catch (error) {
@@ -104,9 +109,10 @@ export async function generateJobScore(
   title: string, 
   description: string, 
   historicalData?: { averageViews: number; averageConversion: number }
-): Promise<number> {
+): Promise<{ score: number; modelVersion: string }> {
+  const model = getGroqModel();
   try {
-    const analysis = await analyzeJobDescription(title, description);
+    const analysis = await analyzeJobDescription(title, description, model);
     
     // Base score from AI analysis (70% weight)
     let score = analysis.overall_score * 0.7;
@@ -123,10 +129,13 @@ export async function generateJobScore(
       score = analysis.overall_score;
     }
     
-    return Math.round(Math.max(0, Math.min(100, score)));
+    return {
+      score: Math.round(Math.max(0, Math.min(100, score))),
+      modelVersion: model,
+    };
   } catch (error) {
     console.error('Job scoring error:', error);
-    return 0;
+    return { score: 0, modelVersion: model };
   }
 }
 
@@ -232,6 +241,7 @@ export async function generateEmailDraft(
 ): Promise<EmailDraftResult> {
   try {
     const client = getGroqClient();
+    const model = getGroqModel();
 
     const toneGuidance = tone === 'friendly'
       ? "Use a warm, conversational tone while maintaining professionalism. Be personable and engaging."
@@ -264,7 +274,7 @@ Return a JSON object with:
 Return only valid JSON.`;
 
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages: [
         {
           role: "system",
@@ -287,7 +297,7 @@ Return only valid JSON.`;
     return {
       subject: result.subject || templateSubject,
       body: result.body || templateBody,
-      model_version: "llama-3.3-70b-versatile",
+      model_version: model,
       tokensUsed: {
         input: usage?.prompt_tokens || 0,
         output: usage?.completion_tokens || 0
@@ -308,6 +318,7 @@ export async function generateColdOutreachDraft(
 ): Promise<EmailDraftResult> {
   try {
     const client = getGroqClient();
+    const model = getGroqModel();
 
     const prompt = `You are writing a personalized cold outreach email to a sourced candidate for a job opening.
 
@@ -355,7 +366,7 @@ Return valid JSON only with:
 - body`;
 
     const response = await client.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model,
       messages: [
         {
           role: 'system',
@@ -378,7 +389,7 @@ Return valid JSON only with:
     return {
       subject: result.subject ?? '',
       body: result.body ?? '',
-      model_version: 'llama-3.3-70b-versatile',
+      model_version: model,
       tokensUsed: {
         input: usage?.prompt_tokens || 0,
         output: usage?.completion_tokens || 0,
@@ -403,6 +414,7 @@ export async function generateCandidateSummary(
 ): Promise<CandidateSummaryResult> {
   try {
     const client = getGroqClient();
+    const model = getGroqModel();
 
     const prompt = `You are an expert technical recruiter reviewing a candidate for a position. Evaluate with STRICT attention to required vs. optional skills.
 
@@ -469,7 +481,7 @@ ${resumeText}
 Be objective, specific, and actionable. Focus on job-relevant qualifications. Return only valid JSON.`;
 
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages: [
         {
           role: "system",
@@ -503,7 +515,7 @@ Be objective, specific, and actionable. Focus on job-relevant qualifications. Re
       requiredSkillsDepthNotes: result.requiredSkillsAnalysis?.depthNotes ?? '',
       goodToHaveSkillsMatched: result.goodToHaveSkillsAnalysis?.matched ?? [],
       goodToHaveSkillsMissing: result.goodToHaveSkillsAnalysis?.missing ?? [],
-      model_version: "llama-3.3-70b-versatile",
+      model_version: model,
       tokensUsed: {
         input: usage?.prompt_tokens || 0,
         output: usage?.completion_tokens || 0
@@ -550,6 +562,7 @@ export async function enhancePipelineActions(
 ): Promise<PipelineActionsResult> {
   try {
     const client = getGroqClient();
+    const model = getGroqModel();
 
     const itemsDescription = items.map((item, i) =>
       `${i + 1}. [${item.priority.toUpperCase()}] ${item.title} (Category: ${item.category})`
@@ -578,7 +591,7 @@ Return a JSON object with:
 Be specific, practical, and encouraging. Focus on recruiter best practices. Return only valid JSON.`;
 
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages: [
         {
           role: "system",
@@ -611,7 +624,7 @@ Be specific, practical, and encouraging. Focus on recruiter best practices. Retu
     return {
       enhancements,
       additionalInsights: (result.additionalInsights ?? []).slice(0, 3),
-      model_version: "llama-3.3-70b-versatile",
+      model_version: model,
       tokensUsed: {
         input: usage?.prompt_tokens || 0,
         output: usage?.completion_tokens || 0
@@ -692,6 +705,7 @@ export async function generateFormQuestions(
 ): Promise<FormQuestionsResult> {
   try {
     const client = getGroqClient();
+    const model = getGroqModel();
 
     const goalsText = goals.length > 0
       ? goals.join(", ")
@@ -736,7 +750,7 @@ Return a JSON object with a "fields" array containing 5-8 questions. Make questi
 Return only valid JSON.`;
 
     const response = await client.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages: [
         {
           role: "system",
@@ -772,7 +786,7 @@ Return only valid JSON.`;
 
     return {
       fields: validatedFields,
-      model_version: "llama-3.3-70b-versatile",
+      model_version: model,
       tokensUsed: {
         input: usage?.prompt_tokens || 0,
         output: usage?.completion_tokens || 0

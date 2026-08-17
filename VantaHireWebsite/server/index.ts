@@ -1,3 +1,4 @@
+import './lib/aiModelStartupGuard';
 import express, { type Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import compression from "compression";
@@ -21,7 +22,6 @@ import {
   stopOutreachHygieneProcessor,
 } from "./lib/outreachHygieneProcessor";
 import { captureServerException, initServerMonitoring, isExpectedDisconnectError, monitoringRequestContext } from "./monitoring";
-
 initServerMonitoring();
 const app = express();
 
