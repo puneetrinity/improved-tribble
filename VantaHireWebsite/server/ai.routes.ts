@@ -34,6 +34,7 @@ import { syncProfileCompletionStatus } from './lib/profileCompletion';
 import { storage } from './storage';
 import { z } from 'zod';
 import { getGroqClient } from './lib/groqClient';
+import { getGroqModel } from './lib/aiModelConfig';
 import { getDashboardAiInsights, DashboardAiPayload } from "./lib/aiDashboard";
 import { randomUUID } from 'crypto';
 import { getUserOrganization } from './lib/organizationService';
@@ -256,8 +257,9 @@ export function registerAIRoutes(app: Express): void {
         }
 
         const client = getGroqClient();
+        const model = getGroqModel();
         const response = await client.chat.completions.create({
-          model: "llama-3.3-70b-versatile",
+          model,
           messages: [
             { role: "system", content: "You are a concise assistant for recruiter dashboards. Respond with short, clear text." },
             { role: "user", content: prompt }

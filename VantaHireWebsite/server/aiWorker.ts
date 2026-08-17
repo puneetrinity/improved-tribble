@@ -12,6 +12,7 @@
  * - Progress updates after each item
  */
 
+import './lib/aiModelStartupGuard';
 import { Worker, Job, UnrecoverableError } from 'bullmq';
 import { pool } from './db';
 import { storage } from './storage';

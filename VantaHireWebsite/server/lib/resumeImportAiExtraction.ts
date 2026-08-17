@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getGroqClient, isGroqConfigured } from './groqClient';
+import { getGroqModel } from './aiModelConfig';
 import { normalizePhone } from './resumeImportFieldExtraction';
 
 const groqStructuredResponseSchema = z.object({
@@ -24,8 +25,9 @@ export async function extractStructuredResumeFieldsWithGroq(text: string): Promi
   }
 
   try {
+    const model = getGroqModel();
     const completion = await getGroqClient().chat.completions.create({
-      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      model,
       response_format: { type: 'json_object' },
       temperature: 0,
       max_tokens: 180,

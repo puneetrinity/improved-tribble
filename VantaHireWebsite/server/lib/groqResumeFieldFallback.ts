@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { getGroqClient, isGroqConfigured } from './groqClient';
+import { getGroqModel } from './aiModelConfig';
 
 const groqNameResponseSchema = z.object({
   name: z.string().min(1).max(100).nullable(),
@@ -15,8 +16,9 @@ export async function inferCandidateNameWithGroq(text: string): Promise<string |
   }
 
   try {
+    const model = getGroqModel();
     const completion = await getGroqClient().chat.completions.create({
-      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      model,
       response_format: { type: 'json_object' },
       temperature: 0,
       max_tokens: 120,

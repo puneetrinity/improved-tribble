@@ -13,9 +13,9 @@
  */
 
 import { getGroqClient } from './groqClient';
+import { getGroqModel } from './aiModelConfig';
 import { JDDigestResponseSchema, safeParseAiResponse } from './aiResponseSchemas';
 
-const DIGEST_MODEL = 'llama-3.3-70b-versatile';
 // v3: adds relaxation-ladder adjacency. Bumping the version triggers background
 // regeneration of stale digests on next sourcing.
 export const CURRENT_DIGEST_VERSION = 3;
@@ -156,8 +156,9 @@ Job location: ${locationContext}
 Be concise. Extract only the most critical information. No explanations.`;
 
   try {
+    const model = getGroqModel();
     const completion = await getGroqClient().chat.completions.create({
-      model: DIGEST_MODEL,
+      model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1, // Low temperature for deterministic output
       max_tokens: 500,

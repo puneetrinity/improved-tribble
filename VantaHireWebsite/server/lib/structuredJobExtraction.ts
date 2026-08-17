@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import { getGroqClient, isGroqConfigured } from './groqClient';
-
-const EXTRACTION_MODEL = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+import { getGroqModel } from './aiModelConfig';
 
 const seniorityValues = ['intern', 'junior', 'mid', 'senior', 'lead', 'staff', 'principal', 'manager', 'director'] as const;
 const roleFamilyValues = [
@@ -468,8 +467,9 @@ export async function extractStructuredJobPosting(
   ].join('\n');
 
   try {
+    const model = getGroqModel();
     const completion = await getGroqClient().chat.completions.create({
-      model: EXTRACTION_MODEL,
+      model,
       response_format: { type: 'json_object' },
       temperature: 0,
       max_tokens: 1400,

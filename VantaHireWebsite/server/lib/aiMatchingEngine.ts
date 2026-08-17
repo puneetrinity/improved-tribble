@@ -13,9 +13,9 @@
 import { redisGet, redisSet, redisIncr, redisDecr } from './redis';
 import { formatDigestForPrompt, JDDigest } from './jdDigest';
 import { getGroqClient } from './groqClient';
+import { getGroqModel } from './aiModelConfig';
 import { FitScoreResponseSchema, safeParseAiResponse } from './aiResponseSchemas';
 
-const FIT_MODEL = 'llama-3.3-70b-versatile';
 const DAILY_AI_BUDGET_USD = parseFloat(process.env.DAILY_AI_BUDGET_USD || '100');
 const DAILY_AI_ALERT_USD = parseFloat(process.env.DAILY_AI_ALERT_USD || '50');
 const MAX_CONCURRENT_AI_CALLS = 5;
@@ -175,6 +175,7 @@ export async function computeFitScore(
   await incrementConcurrency();
 
   try {
+    const model = getGroqModel();
     const jobRequirements = formatDigestForPrompt(jdDigest);
 
     const prompt = `You are an expert recruiter evaluating candidate fit for a job.
@@ -206,7 +207,7 @@ Focus on:
 Be objective and concise. Provide 3-5 specific reasons.`;
 
     const completion = await getGroqClient().chat.completions.create({
-      model: FIT_MODEL,
+      model,
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
       max_tokens: 300,
@@ -239,7 +240,7 @@ Be objective and concise. Provide 3-5 specific reasons.`;
       score,
       label,
       reasons,
-      modelVersion: FIT_MODEL,
+      modelVersion: model,
       costUsd,
       tokensIn,
       tokensOut,

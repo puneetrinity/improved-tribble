@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { redisGet, redisSet } from "./redis";
 import { isAIEnabled } from "../aiJobAnalyzer";
 import { getGroqClient } from "./groqClient";
+import { getGroqModel } from "./aiModelConfig";
 import { DashboardInsightsResponseSchema, safeParseAiResponse } from "./aiResponseSchemas";
 
 export interface DashboardAiPayload {
@@ -65,8 +66,9 @@ Return JSON with this exact structure:
 }`;
 
   const client = getGroqClient();
+  const model = getGroqModel();
   const resp = await client.chat.completions.create({
-    model: "llama-3.3-70b-versatile",
+    model,
     messages: [
       { role: "system", content: "You are a concise assistant for recruiter dashboards. Respond with valid JSON only. Do not invent numbers." },
       { role: "user", content: prompt },
