@@ -290,58 +290,21 @@ export default function RecruiterDashboard() {
           {/* Header + filters + KPIs */}
           <div className="mt-0 space-y-4 pt-0">
             <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-4 sm:px-5 sm:py-4")} data-tour="dashboard-metrics">
-              <div className="relative space-y-4">
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-                  <div className="space-y-3">
+              <div className="relative space-y-3">
+                {/* Toolbar: page identity left, filters + actions right */}
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="min-w-0">
                     <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.header.eyebrow}</p>
-                    <div className="flex flex-wrap items-center gap-3">
+                    <div className="mt-1 flex flex-wrap items-center gap-2.5">
                       <h1 className={DASHBOARD_TITLE}>{recruiterDashboardCopy.header.title}</h1>
-                      <Badge variant="outline" className="rounded-full border-[#D8DBE6] bg-white/80 px-3 py-1 text-xs font-semibold text-[#4B8EF0]">
-                    {planName} Plan
-                  </Badge>
+                      <Badge variant="outline" className="rounded-full border-[#D8DBE6] bg-white/80 px-2.5 py-0.5 text-xs font-semibold text-[#4B8EF0]">
+                        {planName} Plan
+                      </Badge>
                     </div>
-                    <p className="max-w-2xl text-sm text-[#5F6675] md:text-[15px]">
-                      {recruiterDashboardCopy.header.subtitle}
-                    </p>
                   </div>
-                  <div className="flex flex-col items-stretch gap-3 sm:items-end">
-                    <Button
-                      size="sm"
-                      onClick={() => setLocation("/jobs/post")}
-                      className="h-11 rounded-[10px] bg-[#4B8EF0] px-5 text-[0.875rem] font-semibold text-white shadow-[0_2px_8px_rgba(75,142,240,0.20)] hover:bg-[#3679DB]"
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Post New Job
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowInviteHMDialog(true)}
-                      data-tour="invite-hiring-manager-btn"
-                      className="h-11 rounded-[10px] border-[#D9DDEA] bg-white px-5 text-[0.875rem] font-semibold text-[#1F2937] shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
-                    >
-                      <Mail className="mr-2 h-4 w-4" />
-                      {recruiterDashboardCopy.header.inviteHiringManager}
-                    </Button>
-                  </div>
-                </div>
-
-                <ProfileCompletionBanner />
-
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="text-sm text-[#687182]">
-                    {recruiterDashboardCopy.header.filterSummaryPrefix}{" "}
-                    <span className="font-semibold text-[#111827]">
-                      Last {RANGE_PRESETS[rangePreset]} days
-                    </span>{" "}
-                    ·{" "}
-                    <span className="font-semibold text-[#111827]">
-                      {selectedJobId === "all" ? recruiterDashboardCopy.header.allJobsLabel : `Job #${selectedJobId}`}
-                    </span>
-                  </div>
-                  <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto">
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:w-auto xl:justify-end">
                     <Select value={rangePreset} onValueChange={(val) => setRangePreset(val as keyof typeof RANGE_PRESETS)}>
-                      <SelectTrigger className="h-11 w-full min-w-0 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] px-5 text-[0.95rem] font-semibold text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] sm:w-[164px] [&>svg]:hidden">
+                      <SelectTrigger className="h-9 w-full min-w-0 rounded-[9px] border-[#E5E7EB] bg-[#FAFAFB] px-3.5 text-[13px] font-semibold text-[#111827] sm:w-[136px] [&>svg]:hidden">
                         <SelectValue placeholder={recruiterDashboardCopy.filters.dateRangePlaceholder} />
                         <ChevronDown className="h-4 w-4 text-[#4B5563]" />
                       </SelectTrigger>
@@ -355,7 +318,7 @@ export default function RecruiterDashboard() {
                       value={selectedJobId === "all" ? "all" : String(selectedJobId)}
                       onValueChange={(val) => setSelectedJobId(val === "all" ? "all" : Number(val))}
                     >
-                      <SelectTrigger className="h-11 w-full min-w-0 rounded-2xl border-[#E5E7EB] bg-[#FAFAFB] px-5 text-[0.95rem] font-semibold text-[#111827] shadow-[0_3px_10px_rgba(15,23,42,0.04)] sm:w-[154px] [&>svg]:hidden">
+                      <SelectTrigger className="h-9 w-full min-w-0 rounded-[9px] border-[#E5E7EB] bg-[#FAFAFB] px-3.5 text-[13px] font-semibold text-[#111827] sm:w-[148px] [&>svg]:hidden">
                         <SelectValue placeholder={recruiterDashboardCopy.filters.allJobsPlaceholder} />
                         <ChevronDown className="h-4 w-4 text-[#4B5563]" />
                       </SelectTrigger>
@@ -368,8 +331,45 @@ export default function RecruiterDashboard() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowInviteHMDialog(true)}
+                      data-tour="invite-hiring-manager-btn"
+                      className="h-9 rounded-[9px] border-[#D9DDEA] bg-white px-3.5 text-[13px] font-semibold text-[#1F2937] shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                    >
+                      <Mail className="mr-2 h-4 w-4" />
+                      {recruiterDashboardCopy.header.inviteHiringManager}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => setLocation("/jobs/post")}
+                      className="h-9 rounded-[9px] bg-[#4B8EF0] px-3.5 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(75,142,240,0.20)] hover:bg-[#3679DB]"
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Post New Job
+                    </Button>
                   </div>
                 </div>
+
+                {/* Subtitle + active-filter summary in one compact meta line */}
+                <div className="flex flex-col gap-1.5 lg:flex-row lg:items-center lg:justify-between">
+                  <p className="max-w-2xl text-[13px] text-[#5F6675]">
+                    {recruiterDashboardCopy.header.subtitle}
+                  </p>
+                  <div className="text-[13px] text-[#687182]">
+                    {recruiterDashboardCopy.header.filterSummaryPrefix}{" "}
+                    <span className="font-semibold text-[#111827]">
+                      Last {RANGE_PRESETS[rangePreset]} days
+                    </span>{" "}
+                    ·{" "}
+                    <span className="font-semibold text-[#111827]">
+                      {selectedJobId === "all" ? recruiterDashboardCopy.header.allJobsLabel : `Job #${selectedJobId}`}
+                    </span>
+                  </div>
+                </div>
+
+                <ProfileCompletionBanner />
 
                 <RecruiterKpiRibbon data={recruiterKpis} isLoading={kpisLoading} />
               </div>

@@ -655,18 +655,18 @@ function KpiCard({
     >
       <div
         className={cn(
-          "flex flex-col p-4 md:p-[14px] xl:p-4",
-          compact ? "min-h-[112px] md:min-h-[112px]" : "min-h-[136px] md:min-h-[136px]",
+          "flex flex-col p-3",
+          "min-h-[96px]",
           isMobile && "min-h-0 h-auto",
         )}
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-2">
-            <div className="kpi-label text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-slate-400">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 space-y-1.5">
+            <div className="kpi-label text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-slate-400">
               {card.label}
             </div>
             {showStatus ? (
-              <span className={cn("inline-flex rounded-full px-2.5 py-1 text-xs font-semibold", status.badge)}>
+              <span className={cn("inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold", status.badge)}>
                 {status.label}
               </span>
             ) : null}
@@ -687,17 +687,17 @@ function KpiCard({
           </Tooltip>
         </div>
 
-        <div className="mt-3.5 flex items-end justify-between gap-4">
+        <div className="mt-2 flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <div className="kpi-value text-[24px] font-bold leading-none tracking-[-0.04em] text-slate-900 md:text-[28px] xl:text-[29px]">
+            <div className="kpi-value text-[20px] font-bold leading-none tracking-[-0.03em] text-slate-900 md:text-[22px] [font-variant-numeric:tabular-nums]">
               {fallbackText(card.displayValue)}
             </div>
-            <div className="mt-1.5 text-[13px] font-medium text-slate-500">{fallbackText(card.contextLine)}</div>
+            <div className="mt-1 truncate text-[12px] font-medium text-slate-500">{fallbackText(card.contextLine)}</div>
           </div>
           {showTrend ? (
-            <div className={cn("inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold", trend.className)}>
+            <div className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", trend.className)}>
               <TrendIcon className="h-3.5 w-3.5" />
-              <span>{trendText}</span>
+              <span className="[font-variant-numeric:tabular-nums]">{trendText}</span>
             </div>
           ) : null}
         </div>
@@ -711,11 +711,10 @@ function KpiCard({
 function LoadingCard({ compact = false }: { compact?: boolean }) {
   return (
     <Card className="rounded-xl border-0 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
-      <div className={cn("flex animate-pulse flex-col p-5", compact ? "min-h-[130px]" : "min-h-[160px]")}>
-        <div className="h-3 w-24 rounded-full bg-slate-200" />
-        <div className="mt-3 h-6 w-24 rounded-full bg-slate-100" />
-        <div className="mt-8 h-9 w-28 rounded-md bg-slate-200" />
-        <div className="mt-3 h-4 w-32 rounded-md bg-slate-100" />
+      <div className={cn("flex animate-pulse flex-col p-3", compact ? "min-h-[96px]" : "min-h-[96px]")}>
+        <div className="h-3 w-20 rounded-full bg-slate-200" />
+        <div className="mt-2 h-4 w-16 rounded-full bg-slate-100" />
+        <div className="mt-3 h-6 w-20 rounded-md bg-slate-200" />
       </div>
     </Card>
   );
@@ -745,24 +744,12 @@ export function RecruiterKpiRibbon({ data, isLoading, className }: RecruiterKpiR
       ]
     : [];
 
-  const topCards = orderedCards.slice(0, 3);
-  const bottomCards = orderedCards.slice(3, 5);
-
   if (isLoading && !data) {
     return (
-      <div className={cn("space-y-[14px]", className)}>
-        <div className="grid gap-[14px] md:grid-cols-3">
-          {[0, 1, 2].map((index) => (
-            <LoadingCard key={index} />
-          ))}
-        </div>
-        <div className="flex justify-center">
-          <div className="grid w-full gap-[14px] md:w-[calc(66.666%-9.5px)] md:grid-cols-2">
-            {[0, 1].map((index) => (
-              <LoadingCard key={index} compact />
-            ))}
-          </div>
-        </div>
+      <div className={cn("grid grid-cols-1 gap-2.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5", className)}>
+        {[0, 1, 2, 3, 4].map((index) => (
+          <LoadingCard key={index} />
+        ))}
       </div>
     );
   }
@@ -791,40 +778,20 @@ export function RecruiterKpiRibbon({ data, isLoading, className }: RecruiterKpiR
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className={cn("space-y-[14px]", className)}>
-        <div className="grid grid-cols-1 items-start gap-[14px] md:grid-cols-3">
-          {topCards.map((card) => (
-            <div key={card.id} className="min-w-0">
-              <KpiCard
-                card={card}
-                expanded={activeCardId === card.id}
-                isMobile={isMobile}
-                isTouchDevice={isTouchDevice}
-                onOpen={() => handleOpen(card.id)}
-                onClose={() => handleClose(card.id)}
-                onToggle={() => handleToggle(card.id)}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-center">
-          <div className="grid w-full grid-cols-1 items-start gap-[14px] md:w-[calc(66.666%-9.5px)] md:grid-cols-2">
-            {bottomCards.map((card) => (
-              <div key={card.id} className="min-w-0">
-                <KpiCard
-                  card={card}
-                  compact
-                  expanded={activeCardId === card.id}
-                  isMobile={isMobile}
-                  isTouchDevice={isTouchDevice}
-                  onOpen={() => handleOpen(card.id)}
-                  onClose={() => handleClose(card.id)}
-                  onToggle={() => handleToggle(card.id)}
-                />
-              </div>
-            ))}
+      <div className={cn("grid grid-cols-1 items-start gap-2.5 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5", className)}>
+        {orderedCards.map((card) => (
+          <div key={card.id} className="min-w-0">
+            <KpiCard
+              card={card}
+              expanded={activeCardId === card.id}
+              isMobile={isMobile}
+              isTouchDevice={isTouchDevice}
+              onOpen={() => handleOpen(card.id)}
+              onClose={() => handleClose(card.id)}
+              onToggle={() => handleToggle(card.id)}
+            />
           </div>
-        </div>
+        ))}
       </div>
     </TooltipProvider>
   );
