@@ -376,17 +376,17 @@ export default function RecruiterDashboard() {
             </div>
           </div>
 
-          {/* Interviews + AI Actions */}
-          <div className="grid grid-cols-1 items-stretch gap-6 md:grid-cols-2">
-            <div>
-              <TodaysInterviewsPanel jobId={selectedJobId} />
-            </div>
+          {/* AI Actions promoted to the main work surface; Today's Interviews as right column */}
+          <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
             <div data-tour="pipeline-checklist">
               <AIActionsPanel range={rangePreset} jobId={selectedJobId} />
             </div>
+            <div>
+              <TodaysInterviewsPanel jobId={selectedJobId} />
+            </div>
           </div>
 
-          <div className="grid gri  d-cols-1 gap-6">
+          <div className="grid grid-cols-1 gap-5">
             <div data-tour="stage-funnel">
               <StageFunnel
                 title="Pipeline Stage Distribution"
