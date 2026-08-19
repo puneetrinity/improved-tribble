@@ -286,16 +286,16 @@ export default function RecruiterDashboard() {
   return (
     <Layout>
       <div className="recruiter-dashboard min-h-screen overflow-x-hidden bg-white px-4 pb-10 pt-6 md:px-8">
-        <div className="mx-auto max-w-[1500px] space-y-8">
+        <div className="mx-auto max-w-[1500px] space-y-5">
           {/* Header + filters + KPIs */}
-          <div className="mt-0 space-y-6 pt-3">
-            <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-8")} data-tour="dashboard-metrics">
-              <div className="relative space-y-6">
+          <div className="mt-0 space-y-4 pt-0">
+            <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-4 sm:px-5 sm:py-4")} data-tour="dashboard-metrics">
+              <div className="relative space-y-4">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                   <div className="space-y-3">
                     <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.header.eyebrow}</p>
                     <div className="flex flex-wrap items-center gap-3">
-                      <h1 className={cn(DASHBOARD_TITLE, "text-[28px] md:text-[34px]")}>{recruiterDashboardCopy.header.title}</h1>
+                      <h1 className={DASHBOARD_TITLE}>{recruiterDashboardCopy.header.title}</h1>
                       <Badge variant="outline" className="rounded-full border-[#D8DBE6] bg-white/80 px-3 py-1 text-xs font-semibold text-[#4B8EF0]">
                     {planName} Plan
                   </Badge>
@@ -308,7 +308,7 @@ export default function RecruiterDashboard() {
                     <Button
                       size="sm"
                       onClick={() => setLocation("/jobs/post")}
-                      className="h-11 rounded-2xl bg-[#4B8EF0] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
+                      className="h-11 rounded-[10px] bg-[#4B8EF0] px-5 text-[0.875rem] font-semibold text-white shadow-[0_2px_8px_rgba(75,142,240,0.20)] hover:bg-[#3679DB]"
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Post New Job
@@ -318,7 +318,7 @@ export default function RecruiterDashboard() {
                       size="sm"
                       onClick={() => setShowInviteHMDialog(true)}
                       data-tour="invite-hiring-manager-btn"
-                      className="h-11 rounded-2xl border-[#D9DDEA] bg-white px-5 text-[0.875rem] font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                      className="h-11 rounded-[10px] border-[#D9DDEA] bg-white px-5 text-[0.875rem] font-semibold text-[#1F2937] shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       {recruiterDashboardCopy.header.inviteHiringManager}

@@ -642,10 +642,10 @@ function KpiCard({
   return (
     <Card
       className={cn(
-        "rounded-xl border-0 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)] transition-[transform,box-shadow] duration-200 ease-out",
+        "rounded-xl border-0 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)] transition-[transform,box-shadow] duration-200 ease-out",
         expanded
-          ? "shadow-[0_18px_38px_rgba(15,23,42,0.10)] -translate-y-0.5"
-          : "hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,23,42,0.10)]",
+          ? "shadow-[0_4px_12px_rgba(15,23,42,0.10)] -translate-y-0.5"
+          : "hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)]",
       )}
       onMouseEnter={isTouchDevice ? undefined : onOpen}
       onMouseLeave={isTouchDevice ? undefined : onClose}
@@ -710,7 +710,7 @@ function KpiCard({
 
 function LoadingCard({ compact = false }: { compact?: boolean }) {
   return (
-    <Card className="rounded-xl border-0 bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
+    <Card className="rounded-xl border-0 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
       <div className={cn("flex animate-pulse flex-col p-5", compact ? "min-h-[130px]" : "min-h-[160px]")}>
         <div className="h-3 w-24 rounded-full bg-slate-200" />
         <div className="mt-3 h-6 w-24 rounded-full bg-slate-100" />

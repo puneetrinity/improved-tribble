@@ -173,7 +173,7 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
     <section
       className={cn(
         DASHBOARD_PANEL,
-        "actions-panel flex h-[492px] min-h-[492px] max-h-[492px] w-full flex-col rounded-[26px] bg-white/95",
+        "actions-panel flex h-[492px] min-h-[492px] max-h-[492px] w-full flex-col",
       )}
       data-testid="ai-actions-panel"
     >
