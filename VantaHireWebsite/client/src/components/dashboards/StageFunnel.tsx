@@ -444,10 +444,10 @@ export function StageFunnel({
   };
 
   return (
-    <Card className={cn(DASHBOARD_PANEL, "rounded-[28px] bg-white/95")}>
+    <Card className={cn(DASHBOARD_PANEL)}>
       <CardHeader className="pb-2">
         <p className={cn(DASHBOARD_EYEBROW, "mb-3")}>{recruiterDashboardCopy.funnel.eyebrow}</p>
-        <CardTitle className={cn(DASHBOARD_TITLE, "text-[22px] leading-tight")}>
+        <CardTitle className={cn(DASHBOARD_TITLE, "leading-tight")}>
           {title}
         </CardTitle>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#6B7280]">
@@ -456,9 +456,9 @@ export function StageFunnel({
       </CardHeader>
       <CardContent className="px-4 pb-4 pt-0 sm:px-6 sm:pb-6 lg:px-6 lg:pb-6 xl:px-8 xl:pb-8">
         {isLoading ? (
-          <div className="h-[420px] rounded-[24px] bg-[#F5F7FA] animate-pulse" />
+          <div className="h-[420px] rounded-[10px] bg-[#F5F7FA] animate-pulse" />
         ) : data.length === 0 ? (
-          <div className="flex h-[320px] items-center justify-center rounded-[24px] bg-[#F5F7FA] text-sm text-muted-foreground">
+          <div className="flex h-[320px] items-center justify-center rounded-[10px] bg-[#F5F7FA] text-sm text-muted-foreground">
             {recruiterDashboardCopy.funnel.noData}
           </div>
         ) : (
@@ -551,7 +551,7 @@ export function StageFunnel({
 
               <div
                 ref={detailPanelRef}
-                className={cn(DASHBOARD_PANEL_SOFT, "relative min-h-[360px] p-4 shadow-[0_10px_30px_rgba(77,65,223,0.08)] md:p-4 xl:min-h-[372px] xl:p-6")}
+                className={cn(DASHBOARD_PANEL_SOFT, "relative min-h-[360px] p-4 md:p-4 xl:min-h-[372px] xl:p-6")}
               >
                 <div
                   className={cn(

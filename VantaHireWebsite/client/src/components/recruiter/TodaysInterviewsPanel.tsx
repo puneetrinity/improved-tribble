@@ -162,7 +162,7 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
     <section
       className={cn(
         DASHBOARD_PANEL,
-        "interview-panel h-auto min-h-0 w-full rounded-[26px] bg-white/95 px-4 py-5 md:h-[492px] md:px-6 md:py-6",
+        "interview-panel h-auto min-h-0 w-full px-4 py-4 md:h-[492px] md:px-5 md:py-5",
       )}
     >
       <div className="flex items-center gap-4">

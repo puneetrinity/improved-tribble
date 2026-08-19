@@ -107,9 +107,9 @@ export default function HiringManagerDashboard() {
         className={cn(DASHBOARD_PAGE_BACKGROUND, "hiring-manager-dashboard min-h-screen overflow-x-hidden px-4 pb-10 pt-6 md:px-8")}
         data-tour="hm-dashboard"
       >
-        <div className="mx-auto max-w-[1500px] space-y-8">
+        <div className="mx-auto max-w-[1500px] space-y-5">
           <div className="mt-0 space-y-6 pt-3">
-            <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-8")}>
+            <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-4 sm:px-5 sm:py-4")}>
               <div className="relative space-y-6">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                   <div className="space-y-3">
@@ -133,7 +133,7 @@ export default function HiringManagerDashboard() {
                 <ProfileCompletionBanner />
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                  <Card className={cn(DASHBOARD_PANEL)}>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         {hiringManagerDashboardCopy.stats.myJobs}
@@ -148,7 +148,7 @@ export default function HiringManagerDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                  <Card className={cn(DASHBOARD_PANEL)}>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         {hiringManagerDashboardCopy.stats.totalCandidates}
@@ -163,7 +163,7 @@ export default function HiringManagerDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                  <Card className={cn(DASHBOARD_PANEL)}>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         {hiringManagerDashboardCopy.stats.requestedReviews}
@@ -178,7 +178,7 @@ export default function HiringManagerDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")} data-tour="pending-feedback">
+                  <Card className={cn(DASHBOARD_PANEL)} data-tour="pending-feedback">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         {hiringManagerDashboardCopy.stats.awaitingFeedback}
@@ -214,13 +214,13 @@ export default function HiringManagerDashboard() {
               </div>
 
           {jobsLoading ? (
-                <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                <Card className={cn(DASHBOARD_PANEL)}>
                   <CardContent className="py-12 text-center text-muted-foreground">
                     {hiringManagerDashboardCopy.sections.loadingJobs}
                   </CardContent>
                 </Card>
           ) : myJobs.length === 0 ? (
-                <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                <Card className={cn(DASHBOARD_PANEL)}>
               <CardContent className="py-12 text-center">
                 <Briefcase className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
                 <p className="text-muted-foreground">{hiringManagerDashboardCopy.sections.emptyJobs}</p>
@@ -242,7 +242,7 @@ export default function HiringManagerDashboard() {
                 return (
                       <Card
                         key={job.id}
-                        className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95 transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]")}
+                        className={cn(DASHBOARD_PANEL, "transition-all hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)]")}
                       >
                     <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
                       <div className="flex items-start gap-3">
@@ -318,7 +318,7 @@ export default function HiringManagerDashboard() {
               </div>
 
           {applicationsNeedingFeedback.length === 0 ? (
-                <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                <Card className={cn(DASHBOARD_PANEL)}>
               <CardContent className="py-12 text-center">
                 <MessageSquare className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
                 <p className="text-muted-foreground">No recruiter-requested reviews are waiting on you.</p>
@@ -332,7 +332,7 @@ export default function HiringManagerDashboard() {
               {applicationsNeedingFeedback.map((app) => (
                     <Card
                       key={app.id}
-                      className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95 transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)]")}
+                      className={cn(DASHBOARD_PANEL, "transition-all hover:-translate-y-0.5 hover:shadow-[0_4px_12px_rgba(15,23,42,0.10)]")}
                     >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between gap-4">

@@ -146,9 +146,9 @@ export default function HiringManagerReviewPage() {
       <div
         className={cn(DASHBOARD_PAGE_BACKGROUND, "hiring-manager-review min-h-screen overflow-x-hidden px-4 pb-10 pt-6 md:px-8")}
       >
-        <div className="mx-auto max-w-[1500px] space-y-8">
+        <div className="mx-auto max-w-[1500px] space-y-5">
           <div className="mt-0 space-y-6 pt-3">
-            <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-8")}>
+            <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-4 sm:px-5 sm:py-4")}>
               <div className="relative space-y-6">
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
                   <div className="space-y-3">
@@ -169,7 +169,7 @@ export default function HiringManagerReviewPage() {
                 </div>
 
                 {job && (
-                  <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                  <Card className={cn(DASHBOARD_PANEL)}>
                     <CardContent className="flex flex-col gap-4 p-6 lg:flex-row lg:items-center lg:justify-between">
                       <div>
                         <div className="flex items-center gap-2">
@@ -225,20 +225,20 @@ export default function HiringManagerReviewPage() {
           </div>
 
         {!jobsLoading && !job ? (
-            <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+            <Card className={cn(DASHBOARD_PANEL)}>
             <CardContent className="py-12 text-center">
               <Briefcase className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
               <p className="text-foreground">{hiringManagerReviewPageCopy.sections.inaccessibleJob}</p>
             </CardContent>
           </Card>
         ) : isLoading ? (
-            <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+            <Card className={cn(DASHBOARD_PANEL)}>
             <CardContent className="py-12 text-center text-muted-foreground">
               {hiringManagerReviewPageCopy.sections.loading}
             </CardContent>
           </Card>
         ) : applicationsError ? (
-            <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+            <Card className={cn(DASHBOARD_PANEL)}>
             <CardContent className="py-12 text-center">
               <MessageSquare className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
               <p className="text-foreground">Unable to load candidates for this job.</p>
@@ -246,7 +246,7 @@ export default function HiringManagerReviewPage() {
             </CardContent>
           </Card>
         ) : requestedApplications.length === 0 ? (
-            <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+            <Card className={cn(DASHBOARD_PANEL)}>
             <CardContent className="py-12 text-center">
               <ClipboardCheck className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
               <p className="text-foreground">{hiringManagerReviewPageCopy.sections.noRequestedReviews}</p>
@@ -255,7 +255,7 @@ export default function HiringManagerReviewPage() {
           </Card>
         ) : (
             <div className="grid gap-6 lg:grid-cols-[420px_minmax(0,1fr)]">
-              <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+              <Card className={cn(DASHBOARD_PANEL)}>
               <CardHeader>
                 <CardTitle>{hiringManagerReviewPageCopy.sections.candidates}</CardTitle>
                 <CardDescription>
@@ -272,7 +272,7 @@ export default function HiringManagerReviewPage() {
                       key={application.id}
                       type="button"
                       onClick={() => setSelectedApplicationId(application.id)}
-                        className={`w-full rounded-[22px] border p-4 text-left transition-colors ${
+                        className={`w-full rounded-[10px] border p-4 text-left transition-colors ${
                         isSelected
                             ? "border-[#C9D6F2] bg-[#F8FAFC]"
                             : cn(DASHBOARD_PANEL_MUTED, "border-[#E7E9F0] bg-white hover:border-[#D8DBE6] hover:bg-[#FAFAFB]")
@@ -323,7 +323,7 @@ export default function HiringManagerReviewPage() {
             <div className="space-y-4">
               {selectedApplication ? (
                 <>
-                    <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                    <Card className={cn(DASHBOARD_PANEL)}>
                     <CardHeader>
                       <CardTitle>{selectedApplication.name}</CardTitle>
                       <CardDescription>{selectedApplication.email}</CardDescription>
@@ -359,7 +359,7 @@ export default function HiringManagerReviewPage() {
                     </CardContent>
                   </Card>
 
-                    <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                    <Card className={cn(DASHBOARD_PANEL)}>
                     <CardHeader>
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -404,7 +404,7 @@ export default function HiringManagerReviewPage() {
                           />
                         </div>
                       ) : (
-                            <div className="rounded-[22px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-6 text-center">
+                            <div className="rounded-[10px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-6 text-center">
                           <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground/50" />
                           <p className="font-medium text-foreground">
                             {selectedApplication.resumeFilename || "Resume"}
@@ -420,7 +420,7 @@ export default function HiringManagerReviewPage() {
                   <FeedbackPanel applicationId={selectedApplication.id} jobId={jobId} />
                 </>
               ) : (
-                  <Card className={cn(DASHBOARD_PANEL, "rounded-[26px] bg-white/95")}>
+                  <Card className={cn(DASHBOARD_PANEL)}>
                   <CardContent className="py-12 text-center text-muted-foreground">
                     {hiringManagerReviewPageCopy.sections.chooseCandidate}
                   </CardContent>
