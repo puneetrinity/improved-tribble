@@ -1,5 +1,9 @@
 # Job Lifecycle Implementation - Testing Results
 
+> **Historical test record.** References below to `bootstrapSchema.ts` and
+> `MIGRATE_ON_START` document the former authority; they are not current
+> operator instructions after Gate 1A0-R.
+
 **Date**: October 28, 2025
 **Status**: ✅ ALL TESTS PASSED - READY FOR DEPLOYMENT
 

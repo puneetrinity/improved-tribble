@@ -91,7 +91,9 @@ Configure Railway’s health check path to `/api/health` (200 OK when healthy).
 ## 5) Deploy Steps
 - Connect the GitHub repo to Railway or push to a Railway Git repository.
 - Set variables in Railway as described above.
-- Optional: set `MIGRATE_ON_START=true` in your Web service to auto-apply schema (drizzle-kit push) on boot.
+- Do not place migration credentials or migration/adoption flags on a runtime
+  service. Schema changes run only through the private, manual
+  `flow-schema-release` service; runtime startup runs `schema-ready` read-only.
 - Deploy. Railway builds the client to `dist/public` and the server to `dist/index.js`.
 - On successful start, logs include the bound port and service startup confirmation.
 - If using the async AI queue, create a separate worker service:
@@ -135,22 +137,21 @@ Before deploying, verify:
 
 ## 7) Database Migrations
 
-### Automatic Migrations (Recommended)
-The application automatically runs migrations on startup via `ensureAtsSchema()` in `server/index.ts`. This includes:
-- Creating ATS tables (pipeline_stages, email_templates, etc.)
-- Creating Forms tables (forms, form_fields, form_invitations, form_responses, form_response_answers)
-- Adding userId column to applications table
-- Creating performance indexes on jobs, applications, and forms tables
+### Release migration (required and separately approved)
 
-No manual intervention required - migrations run on every deployment.
+Runtime web/worker processes never mutate the schema. A reviewed, private,
+manual `flow-schema-release` service is the sole production migration
+authority. After its target identity and catalog evidence are verified, it
+runs:
 
-### Manual Migration (Optional)
-If you need to run migrations manually:
 ```bash
-npm run db:push
+npm run db:migrate:release
 ```
 
-This runs the standalone migration script at `server/scripts/runMigrations.ts`.
+Every runtime start then runs `npm run schema:ready` with the restricted
+runtime credential and fails closed on an incomplete, foreign, or
+over-privileged database. Existing production uses the separately gated
+one-time adoption procedure; it must never execute `0000_baseline.sql`.
 
 ### Seeding Default Data
 

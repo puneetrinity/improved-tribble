@@ -1,5 +1,9 @@
 # Job Lifecycle Implementation - Complete Guide
 
+> **Historical implementation note.** References to automatic startup
+> migration or `MIGRATE_ON_START` are superseded by the append-only release
+> migrator and read-only `schema-ready` startup contract in Flow Gate 1A0-R.
+
 ## 🎯 Overview
 
 This document outlines the complete implementation of the **Job Deactivation/Reactivation System** for VantaHire. This feature allows jobs to be deactivated while preserving all application data, and enables admins to reactivate jobs when needed.

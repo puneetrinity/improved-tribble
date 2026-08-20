@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: [
+      'server/schema-control/__tests__/**/*.test.ts',
       'server/lib/__tests__/**/*.test.ts',
       'server/tests/ai.routes.test.ts',
       'server/tests/hiring-manager-feedback-access.routes.test.ts',

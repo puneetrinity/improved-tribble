@@ -1,5 +1,9 @@
 # Phase 2: SEO & Google Jobs Integration - Implementation Summary
 
+> **Historical change record.** Automatic `bootstrapSchema.ts` startup
+> migration described below is superseded by Gate 1A0-R's manual release job
+> and read-only startup readiness.
+
 ## ✅ **Status: COMPLETE**
 
 All Phase 2 features have been successfully implemented. Ready for local testing before deployment.

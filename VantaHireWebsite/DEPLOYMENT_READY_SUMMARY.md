@@ -1,5 +1,9 @@
 # VantaHire - Production Deployment Ready ✅
 
+> **Historical snapshot — not an operational runbook.** Its
+> `MIGRATE_ON_START`/startup-bootstrap instructions are retired by Flow Gate
+> 1A0-R. Use `DEPLOY_RAILWAY.md` and the schema-control migration docs instead.
+
 **Date**: October 28, 2025
 **Status**: ✅ **PRODUCTION READY**
 **Deployment Confidence**: **HIGH (95%)**

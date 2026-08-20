@@ -1047,8 +1047,8 @@ export const jobSourcingRuns = pgTable("job_sourcing_runs", {
   orgJobIdx: index("job_sourcing_runs_org_job_idx").on(table.organizationId, table.jobId),
   requestIdIdx: uniqueIndex("job_sourcing_runs_request_id_idx").on(table.requestId),
   statusIdx: index("job_sourcing_runs_status_idx").on(table.status),
-  // NOTE: partial unique index for active run dedupe is in bootstrapSchema.ts
-  // (Drizzle doesn't support WHERE clause on unique indexes)
+  // NOTE: the partial unique index for active-run dedupe is owned by the
+  // append-only schema migration catalog (Drizzle cannot express its WHERE).
   expiresAtIdx: index("job_sourcing_runs_expires_at_idx").on(table.expiresAt),
 }));
 
