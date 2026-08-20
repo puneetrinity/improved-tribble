@@ -12,23 +12,9 @@ permissions:
 jobs:
   server-contracts:
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: flow_test
-          POSTGRES_PASSWORD: flow_test
-          POSTGRES_DB: flow_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U flow_test -d flow_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     env:
-      DATABASE_URL: postgresql://flow_test:flow_test@localhost:5432/flow_test
-      FLOW_POSTGRES_TEST_URL: postgresql://flow_test:flow_test@localhost:5432/flow_test
+      DATABASE_URL: postgresql://flow_test:flow_test@127.0.0.1:5432/flow_test
+      FLOW_POSTGRES_TEST_URL: postgresql://flow_test:flow_test@127.0.0.1:5432/flow_test
       DATABASE_SSL: 'false'
     defaults:
       run:
@@ -40,27 +26,36 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: VantaHireWebsite/package-lock.json
+      - name: Start runner-local PostgreSQL 16 and prepare test identities
+        run: |
+          sudo systemctl start postgresql
+          server_version_num="$(sudo -u postgres psql -d postgres -Atqc 'SHOW server_version_num')"
+          if [[ "$server_version_num" != 16* ]]; then
+            echo "Expected runner-local PostgreSQL 16; got server_version_num=$server_version_num" >&2
+            exit 1
+          fi
+          sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          DROP DATABASE IF EXISTS flow_schema_control_test_ci WITH (FORCE);
+          DROP DATABASE IF EXISTS flow_test WITH (FORCE);
+          DROP ROLE IF EXISTS flow_schema_control_test_runtime;
+          DROP ROLE IF EXISTS flow_schema_control_test_runner;
+          DROP ROLE IF EXISTS flow_test;
+          CREATE ROLE flow_test LOGIN SUPERUSER PASSWORD 'flow_test';
+          CREATE DATABASE flow_test OWNER flow_test;
+          CREATE ROLE flow_schema_control_test_runner LOGIN SUPERUSER PASSWORD 'runner-test-only';
+          CREATE ROLE flow_schema_control_test_runtime LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'runtime-test-only';
+          CREATE DATABASE flow_schema_control_test_ci OWNER flow_schema_control_test_runner;
+          SQL
+          pg_isready -h 127.0.0.1 -p 5432 -d flow_test -U flow_test
       - run: npm ci
       - run: npm run check:schema-control
       - run: npm run check:server
       - run: npm run check:client
       - run: npm run test:server
-      - name: Prepare disposable schema-control database and roles
-        env:
-          PGPASSWORD: flow_test
-        run: |
-          psql -h localhost -U flow_test -d flow_test -v ON_ERROR_STOP=1 <<'SQL'
-          DROP DATABASE IF EXISTS flow_schema_control_test_ci WITH (FORCE);
-          DROP ROLE IF EXISTS flow_schema_control_test_runtime;
-          DROP ROLE IF EXISTS flow_schema_control_test_runner;
-          CREATE ROLE flow_schema_control_test_runner LOGIN SUPERUSER PASSWORD 'runner-test-only';
-          CREATE ROLE flow_schema_control_test_runtime LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD 'runtime-test-only';
-          CREATE DATABASE flow_schema_control_test_ci OWNER flow_schema_control_test_runner;
-          SQL
       - name: Run disposable schema-control matrix
         env:
           NODE_ENV: test
           FLOW_SCHEMA_TEST_DISPOSABLE: '1'
-          FLOW_SCHEMA_TEST_DATABASE_URL: postgresql://flow_schema_control_test_runner:runner-test-only@localhost:5432/flow_schema_control_test_ci
-          FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL: postgresql://flow_schema_control_test_runtime:runtime-test-only@localhost:5432/flow_schema_control_test_ci
+          FLOW_SCHEMA_TEST_DATABASE_URL: postgresql://flow_schema_control_test_runner:runner-test-only@127.0.0.1:5432/flow_schema_control_test_ci
+          FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL: postgresql://flow_schema_control_test_runtime:runtime-test-only@127.0.0.1:5432/flow_schema_control_test_ci
         run: npm run test:schema-control:pg

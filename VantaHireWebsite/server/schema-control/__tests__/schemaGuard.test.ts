@@ -185,3 +185,20 @@ describe("schema-control caller guard mutation coverage", () => {
     }
   });
 });
+
+describe("schema-control CI isolation", () => {
+  it("runs the PostgreSQL matrix on runner loopback instead of a service-container bridge", () => {
+    const workflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
+
+    expect(workflow).not.toMatch(/^\s+services:\s*$/m);
+    expect(workflow).toContain("sudo systemctl start postgresql");
+    expect(workflow).toContain("SHOW server_version_num");
+    expect(workflow).toContain("pg_isready -h 127.0.0.1");
+    expect(workflow).toMatch(
+      /FLOW_SCHEMA_TEST_DATABASE_URL:\s+postgresql:\/\/[^\s]+@127\.0\.0\.1:5432\/flow_schema_control_test_ci/,
+    );
+    expect(workflow).toMatch(
+      /FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL:\s+postgresql:\/\/[^\s]+@127\.0\.0\.1:5432\/flow_schema_control_test_ci/,
+    );
+  });
+});
