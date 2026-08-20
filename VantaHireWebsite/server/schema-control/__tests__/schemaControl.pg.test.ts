@@ -159,7 +159,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
     try {
       const result = await client.query(
         `SELECT current_database() AS database, current_user AS role,
-                inet_server_addr()::text AS server_addr`,
+                host(inet_server_addr()) AS server_addr`,
       );
       const row = result.rows[0] ?? {};
       if (
@@ -178,7 +178,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
     try {
       const result = await runtime.query(
         `SELECT current_database() AS database, current_user AS role,
-                inet_server_addr()::text AS server_addr`,
+                host(inet_server_addr()) AS server_addr`,
       );
       const row = result.rows[0] ?? {};
       if (

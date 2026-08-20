@@ -201,4 +201,15 @@ describe("schema-control CI isolation", () => {
       /FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL:\s+postgresql:\/\/[^\s]+@127\.0\.0\.1:5432\/flow_schema_control_test_ci/,
     );
   });
+
+  it("compares PostgreSQL server hosts without inet network-mask suffixes", () => {
+    const integration = readFileSync(
+      join(appRoot, "server/schema-control/__tests__/schemaControl.pg.test.ts"),
+      "utf8",
+    );
+
+    expect(integration.match(/host\(inet_server_addr\(\)\) AS server_addr/g)).toHaveLength(2);
+    expect(integration).not.toContain("inet_server_addr()::text AS server_addr");
+    expect(integration).toContain('[null, "127.0.0.1", "::1"].includes');
+  });
 });
