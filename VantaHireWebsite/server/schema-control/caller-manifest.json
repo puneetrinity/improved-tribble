@@ -1,0 +1,38 @@
+{
+  "deploymentSurfaces": [
+    ".github/workflows/ci.yml",
+    "Procfile",
+    "railway.json",
+    "VantaHireWebsite/Procfile",
+    "VantaHireWebsite/nixpacks.toml",
+    "VantaHireWebsite/railway.json",
+    "VantaHireWebsite/railway.schema-release.json"
+  ],
+  "runtimeEntrypoints": [
+    "VantaHireWebsite/server/index.ts",
+    "VantaHireWebsite/server/worker.ts",
+    "VantaHireWebsite/server/aiWorker.ts"
+  ],
+  "commandSurfaces": [
+    "package.json",
+    "start.sh",
+    "VantaHireWebsite/package.json"
+  ],
+  "releaseSurfaces": [
+    "VantaHireWebsite/railway.schema-release.json"
+  ],
+  "retiredAuthorities": [
+    "VantaHireWebsite/.github/workflows/ci.yml",
+    "VantaHireWebsite/server/bootstrapSchema.ts",
+    "VantaHireWebsite/server/migrate.ts",
+    "VantaHireWebsite/server/scripts/runMigrations.ts",
+    "VantaHireWebsite/server/migrations"
+  ],
+  "separateSchemaAuthorities": [
+    {
+      "path": "VantaHireWebsite/provisioning-portal/package.json",
+      "system": "provisioning-portal",
+      "reason": "Separate application/database; its Drizzle commands are not Flow schema authorities."
+    }
+  ]
+}

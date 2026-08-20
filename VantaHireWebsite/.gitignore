@@ -42,3 +42,6 @@ Screenshot*
 *:Zone.Identifier
 *.cjs
 *.mjs
+!scripts/check-schema-control.mjs
+!scripts/normalize-schema-catalog.mjs
+!scripts/compare-schema-catalog.mjs

@@ -68,7 +68,7 @@ These scripts are included here for reference. The runnable copies live in `serv
 
 1. **Read** [ARCHITECTURE.md](ARCHITECTURE.md) — understand the flow
 2. **Check env** — ensure `ACTIVEKG_BASE_URL`, `VANTAHIRE_JWT_PRIVATE_KEY`, `ACTIVEKG_SYNC_ENABLED=true` are set
-3. **Bootstrap schema once** — start Vanta once so `bootstrapSchema.ts` creates `application_graph_sync_jobs` (required for queue checks)
+3. **Prepare the schema explicitly** — run the approved release migration for a disposable database, then require `npm run schema:ready` to pass (ordinary startup never creates tables)
 4. **Run smoke test** — `npm run test:activekg` — confirms JWT + write + read + search work
 5. **Check queue** — `npm run check:activekg-sync` — see what's pending/succeeded/failed
 6. **Look at payloads** — [PAYLOAD_REFERENCE.md](PAYLOAD_REFERENCE.md) — see exactly what Vanta sends to ActiveKG

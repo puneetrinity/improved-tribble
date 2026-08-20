@@ -41,7 +41,9 @@ JWT_AUDIENCE=activekg
 JWT_PUBLIC_KEY=<matching RSA public key PEM>
 ```
 
-Before running DB queue diagnostics (`npm run check:activekg-sync`), start Vanta at least once so `bootstrapSchema.ts` creates `application_graph_sync_jobs`.
+Before running DB queue diagnostics (`npm run check:activekg-sync`), prepare the
+database through the explicit schema-release path and require `schema:ready` to
+pass. Starting a web or worker process never creates the queue table.
 
 ---
 

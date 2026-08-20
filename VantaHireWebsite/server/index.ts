@@ -5,11 +5,9 @@ import compression from "compression";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { startJobScheduler } from "./jobScheduler";
-import { createAdminUser, createTestRecruiter } from "./createAdminUser";
+import { createTestRecruiter } from "./createAdminUser";
 import { createTestJobs } from "./createTestJobs";
 import { seedAllATSDefaults } from "./seedATSDefaults";
-import { ensureAtsSchema } from "./bootstrapSchema";
-import { seedDefaultWhatsAppTemplates } from "./seedWhatsAppTemplates";
 import { startApplicationGraphSyncProcessor, stopApplicationGraphSyncProcessor } from "./lib/applicationGraphSyncProcessor";
 import { startResumeImportProcessor, stopResumeImportProcessor } from "./lib/resumeImportProcessor";
 import { startOutreachScheduler } from "./lib/outreachScheduler";
@@ -158,25 +156,10 @@ import { initWebSocketServer } from "./websocket";
   }, async () => {
     log(`serving on port ${port}`);
 
-    // Initialize database: Create schema, sync admin, seed data
+    // Development fixtures are explicit and never schema/provisioning authority.
     try {
-      // Production entrypoints complete the fail-closed migrator before this
-      // process starts. Keep the legacy convenience bootstrap development-only.
-      if (process.env.NODE_ENV !== 'production' && process.env.ENABLE_BOOTSTRAP === "true") {
-        console.log("🔧 Running DB bootstrap...");
-        await ensureAtsSchema();
-      } else if (process.env.NODE_ENV !== 'production') {
-        console.log("⚡ Skipping DB bootstrap (fast startup)");
-      }
-
-      // 2. Ensure admin user exists (no-op if already present)
-      await createAdminUser();
-
-      // 3. Seed WhatsApp templates (runs in all environments)
-      await seedDefaultWhatsAppTemplates();
-      console.log('✅ WhatsApp templates seeded');
-
-      // 4. Development-only: Create test data (NEVER run in production)
+      // Development-only: Create test data (NEVER run in production).
+      // Preparing the database itself is an explicit release-runner action.
       if (process.env.NODE_ENV !== 'production' && process.env.SEED_DEFAULTS === 'true') {
         console.log('🔧 Development mode: Seeding test data...');
         await createTestRecruiter();
@@ -189,7 +172,7 @@ import { initWebSocketServer } from "./websocket";
     } catch (error) {
       captureServerException(error, {
         area: "server",
-        action: "startup-initialization",
+        action: "development-fixture-seeding",
       });
       console.error('Error initializing database:', error);
     }

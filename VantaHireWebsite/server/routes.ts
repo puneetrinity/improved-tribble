@@ -41,7 +41,6 @@ import { registerRecruiterDashboardRoutes } from "./recruiterDashboard.routes";
 import { registerCandidatePortalRoutes } from "./candidatePortal.routes";
 import { registerOutreachComplianceRoutes } from "./outreachCompliance.routes";
 import { isExpectedDisconnectError } from "./monitoring";
-import { ensureAtsSchema } from "./bootstrapSchema";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup security middleware with environment-aware CSP
@@ -134,20 +133,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Health check endpoint
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
-  });
-
-  // Local dev helper: force ATS schema bootstrap in the running app process
-  app.post("/api/dev/ensure-ats-schema", async (_req: Request, res: Response, next: NextFunction) => {
-    try {
-      if (process.env.NODE_ENV === "production") {
-        res.status(404).json({ error: "Not found" });
-        return;
-      }
-      await ensureAtsSchema();
-      res.json({ success: true });
-    } catch (error) {
-      next(error);
-    }
   });
 
   // Platform healthcheck endpoints (Railway, k8s, etc.)

@@ -1,5 +1,9 @@
 # Deployment Checklist - Phase A & Phase 2 SEO
 
+> **Historical snapshot — do not execute its migration steps.** The listed
+> `bootstrapSchema.ts`, `MIGRATE_ON_START`, and startup migration authority are
+> retired by Flow Gate 1A0-R; current instructions live in `DEPLOY_RAILWAY.md`.
+
 ## ✅ Pre-Deployment Verification (Completed)
 
 ### **1. Railway Environment Variables**

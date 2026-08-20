@@ -1,5 +1,9 @@
 # Railway Environment Variables - Status Report
 
+> **Historical 2025 snapshot — not current configuration authority.** In
+> particular, `MIGRATE_ON_START` is a retired Flow schema authority and must be
+> removed during the separately approved 1A0-R production cutover.
+
 **Last Updated:** 2025-01-24
 **Railway Project:** alluring-balance
 **Environment:** production

@@ -6,32 +6,31 @@ function read(relativeUrl: string): string {
 }
 
 describe('contact safety deployment contracts', () => {
-  it('runs the fail-closed schema migrator before every production process', () => {
+  it('runs only read-only schema readiness before every production process', () => {
     const packageJson = JSON.parse(read('../../../package.json')) as {
       scripts?: Record<string, string>;
     };
-    const bootstrapSource = read('../../bootstrapSchema.ts');
 
     expect(packageJson.scripts?.['start:web']).toMatch(
-      /node dist\/migrate\.js && .*node dist\/index\.js/,
+      /node dist\/schema-ready\.js && .*node dist\/index\.js/,
     );
     expect(packageJson.scripts?.['start:worker']).toMatch(
-      /node dist\/migrate\.js && .*node dist\/worker\.js/,
+      /node dist\/schema-ready\.js && .*node dist\/worker\.js/,
     );
     expect(packageJson.scripts?.['start:ai-worker']).toMatch(
-      /node dist\/migrate\.js && .*node dist\/aiWorker\.js/,
+      /node dist\/schema-ready\.js && .*node dist\/aiWorker\.js/,
     );
-    expect(bootstrapSource).toContain('if (bootstrapFailures > 0)');
-    expect(bootstrapSource).toContain('transaction rolled back');
+    for (const command of ['start:web', 'start:worker', 'start:ai-worker']) {
+      expect(packageJson.scripts?.[command]).not.toMatch(/dist\/migrate|db:push|db:migrate(?!:release)/);
+    }
   });
 
   it('keeps the hygiene outbox identical across schema and both deploy paths', () => {
     const schemaSource = read('../../../shared/schema.ts');
-    const bootstrapSource = read('../../bootstrapSchema.ts');
-    const migrationSource = read('../../migrations/015_tier4_outreach_loop.sql');
+    const baselineSource = read('../../schema-migrations/0000_baseline.sql');
     const processorSource = read('../outreachHygieneProcessor.ts');
 
-    for (const source of [schemaSource, bootstrapSource, migrationSource]) {
+    for (const source of [schemaSource, baselineSource]) {
       expect(source).toContain('outreach_hygiene_intents');
       expect(source).toContain('outreach_delivery_correlations');
       expect(source).toContain('provider_event_id');
@@ -39,11 +38,8 @@ describe('contact safety deployment contracts', () => {
       expect(source).toContain('memory_global_candidate_id');
     }
     expect(schemaSource).toContain('Snapshot only. No FK');
-    expect(bootstrapSource).toContain(
-      'ALTER TABLE outreach_hygiene_intents\n    DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_source_outreach_log_id_fkey',
-    );
-    expect(migrationSource).toContain(
-      'DROP CONSTRAINT IF EXISTS outreach_hygiene_intents_source_outreach_log_id_fkey',
+    expect(baselineSource).not.toContain(
+      'outreach_hygiene_intents_source_outreach_log_id_fkey',
     );
     expect(processorSource).toContain('source_outreach_log_id = NULL');
     expect(processorSource).not.toContain('delivery.recipient_email');

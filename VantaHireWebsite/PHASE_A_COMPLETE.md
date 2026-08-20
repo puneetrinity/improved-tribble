@@ -1,5 +1,9 @@
 # Phase A: SEO Implementation - COMPLETE ✅
 
+> **Historical change record.** Any references below to
+> `server/bootstrapSchema.ts` describe the old implementation and are not
+> current deployment instructions; that authority is retired by Gate 1A0-R.
+
 ## Summary
 
 Phase A (Route-level meta + Small hardening) has been successfully completed. All items from the original checklist are implemented and tested locally.

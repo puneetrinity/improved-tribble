@@ -9,7 +9,10 @@
   "scripts": {
     "postinstall": "npm --prefix VantaHireWebsite ci --no-audit --no-fund || npm --prefix VantaHireWebsite install",
     "build": "cd VantaHireWebsite && npm run build",
-    "db:migrate": "cd VantaHireWebsite && npm run db:migrate",
+    "db:migrate:release": "cd VantaHireWebsite && npm run db:migrate:release",
+    "db:adopt-existing": "cd VantaHireWebsite && npm run db:adopt-existing",
+    "db:provision-runtime-role": "cd VantaHireWebsite && npm run db:provision-runtime-role",
+    "schema:ready": "cd VantaHireWebsite && npm run schema:ready",
     "start": "cd VantaHireWebsite && npm run start",
     "start:web": "cd VantaHireWebsite && npm run start:web",
     "start:worker": "cd VantaHireWebsite && npm run start:worker",

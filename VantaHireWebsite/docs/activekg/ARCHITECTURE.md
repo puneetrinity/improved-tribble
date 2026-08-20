@@ -312,7 +312,7 @@ Dead-letter after `ACTIVEKG_SYNC_MAX_ATTEMPTS` (default: 8).
    ACTIVEKG_TENANT_STRATEGY=shared
    ```
 
-4. **Table auto-creates** via `bootstrapSchema.ts` on boot
+4. **Table is release-owned** by the append-only Flow schema manifest; ordinary startup only checks readiness
 
 5. **Verify**: submit application → check DB:
    ```sql
@@ -372,8 +372,8 @@ WHERE status = 'processing' AND updated_at < NOW() - INTERVAL '5 minutes';
 |---|---|
 | `shared/schema.ts` | `applicationGraphSyncJobs` table + types |
 | `server/storage.ts` | DB queue methods (enqueue, claim, succeed, retry, dead-letter) |
-| `server/bootstrapSchema.ts` | DDL for auto-creating table on boot |
-| `server/migrations/004_add_application_graph_sync_jobs.sql` | Migration file |
+| `server/schema-migrations/0000_baseline.sql` | Exact existing-schema baseline (fresh disposable databases only; never execute against adopted production) |
+| `server/schema-ready.ts` | Read-only startup assertion; it never creates or repairs the queue table |
 | `server/lib/services/activekg-client.ts` | HTTP client with RS256 scoped JWT |
 | `server/lib/services/jwt-signer.ts` | RS256 JWT signing (shared with Signal) |
 | `server/lib/activekgChunker.ts` | Resume text chunker (sentence-aware splits) |
