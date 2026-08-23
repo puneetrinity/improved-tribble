@@ -24,6 +24,10 @@ import { resolveActiveKGTenantId } from './activekgTenant';
 import { extractResumeLinks, extractResumeLinksFromBuffer, type ResumeLinks } from './resumeLinkExtractor';
 import { downloadFromGCS } from '../gcs-storage';
 import type { ApplicationGraphSyncJob } from '@shared/schema';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from '../candidate-privacy/decision';
 
 /** Minimum length of extractedResumeText required for graph sync */
 export const MIN_RESUME_TEXT_LENGTH = 50;
@@ -99,13 +103,26 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
   }
 
   // Step 1: Load application
-  const application = await storage.getApplication(job.applicationId);
+  const application = await storage.getApplicationForPrivacyWorker(job.applicationId);
   if (!application) {
     await storage.markApplicationGraphSyncJobDeadLetter(
       job.id,
       `Application ${job.applicationId} not found`
     );
     return;
+  }
+
+  try {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: application.id },
+      { globalUse: true, newGlobalOperation: true },
+    );
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      await storage.markApplicationGraphSyncJobPrivacyRestricted(job.id);
+      return;
+    }
+    throw error;
   }
 
   // Step 2: Validate prerequisites
@@ -147,6 +164,10 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
   // falling back to text-based regex if download fails or file has no embedded links
   let resumeLinks: ResumeLinks;
   if (application.resumeUrl) {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: application.id },
+      { globalUse: true, newGlobalOperation: true },
+    );
     try {
       const buffer = await downloadFromGCS(application.resumeUrl);
       resumeLinks = await extractResumeLinksFromBuffer(buffer, application.extractedResumeText);
@@ -165,11 +186,19 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
 
   // Step 5: Ensure parent node (idempotent)
   let parentNodeId: string;
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: application.id },
+    { globalUse: true, newGlobalOperation: true },
+  );
   const existingParent = await getNodeByExternalId(tenantId, parentExternalId);
 
   if (existingParent) {
     parentNodeId = existingParent.id;
   } else {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: application.id },
+      { globalUse: true, newGlobalOperation: true },
+    );
     const parentResponse = await createNode(
       tenantId,
       {
@@ -232,12 +261,20 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
   // Step 7: Ensure chunk nodes + edges
   for (const chunk of chunks) {
     // Check if chunk already exists
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: application.id },
+      { globalUse: true, newGlobalOperation: true },
+    );
     const existingChunk = await getNodeByExternalId(tenantId, chunk.externalId);
     let chunkNodeId: string;
 
     if (existingChunk) {
       chunkNodeId = existingChunk.id;
     } else {
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: application.id },
+        { globalUse: true, newGlobalOperation: true },
+      );
       const chunkResponse = await createNode(
         tenantId,
         {
@@ -284,6 +321,10 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
 
     // Ensure DERIVED_FROM edge (chunk -> parent)
     try {
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: application.id },
+        { globalUse: true, newGlobalOperation: true },
+      );
       await createEdge(
         tenantId,
         {
@@ -334,6 +375,10 @@ async function handleJobFailure(
   job: ApplicationGraphSyncJob,
   error: unknown
 ): Promise<void> {
+  if (error instanceof CandidatePrivacyRestrictedError) {
+    await storage.markApplicationGraphSyncJobPrivacyRestricted(job.id);
+    return;
+  }
   const errorMessage = error instanceof Error ? error.message : String(error);
   const retryable = isRetryableError(error);
 

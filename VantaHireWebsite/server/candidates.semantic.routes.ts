@@ -18,8 +18,9 @@ import { getSignedDownloadUrl, getSignedViewUrl, downloadFromGCS } from './gcs-s
 import type { CsrfMiddleware } from './types/routes';
 import { db } from './db';
 import { applicationStageHistory, applications, organizations, type Application } from '@shared/schema';
-import { inArray } from 'drizzle-orm';
+import { and, inArray, sql } from 'drizzle-orm';
 import { pickInitialPipelineStage } from './lib/pipelineStageSelection';
+import { privacyAllowedSql } from './candidate-privacy/decision';
 
 // ── Validation schemas ─────────────────────────────────────────────
 
@@ -314,9 +315,17 @@ export function registerCandidateSemanticRoutes(
         }
 
         // ── Call ActiveKG /search ──────────────────────────────
+        const requestedTopK = top_k ?? defaults.topK;
+        // Memory already applies its own directive fence. Flow can still have
+        // a newer local restriction waiting in the outbox, so over-fetch to
+        // the bounded provider maximum and apply the authoritative Flow SQL
+        // fence before the caller-visible limit. If that bounded window is
+        // exhausted and cannot fill the requested page, return uncertainty
+        // instead of silently presenting an incomplete ranking.
+        const privacyCandidateFetchLimit = 100;
         const searchPayloadBase = {
           query,
-          top_k: top_k ?? defaults.topK,
+          top_k: privacyCandidateFetchLimit,
           use_hybrid: defaults.mode === 'hybrid',
           use_reranker: use_reranker ?? defaults.useReranker,
         };
@@ -327,6 +336,7 @@ export function registerCandidateSemanticRoutes(
         };
 
         let activekgResults: ActiveKGSearchResult[] = [];
+        let providerResultSaturated = false;
         let scoreType: SemanticScoreType = inferScoreType(searchPayloadBase.use_hybrid);
         const strategy = getTenantStrategy();
         const searchedTenants: string[] = [];
@@ -353,6 +363,9 @@ export function registerCandidateSemanticRoutes(
               const explicit = scored.find((s) => s !== 'unknown');
               if (explicit) scoreType = explicit;
               activekgResults = responses.flatMap((r) => r.results);
+              providerResultSaturated = responses.some(
+                (response) => response.results.length >= privacyCandidateFetchLimit,
+              );
             }
           } else {
             searchedTenants.push(tenantId);
@@ -364,6 +377,7 @@ export function registerCandidateSemanticRoutes(
             const explicit = scoreTypeFromResponse(response);
             if (explicit !== 'unknown') scoreType = explicit;
             activekgResults = response.results;
+            providerResultSaturated = response.results.length >= privacyCandidateFetchLimit;
           }
         } else {
           searchedTenants.push(tenantId);
@@ -379,6 +393,7 @@ export function registerCandidateSemanticRoutes(
           const explicit = scoreTypeFromResponse(response);
           if (explicit !== 'unknown') scoreType = explicit;
           activekgResults = response.results;
+          providerResultSaturated = response.results.length >= privacyCandidateFetchLimit;
         }
 
         // ── Group by application ───────────────────────────────
@@ -420,7 +435,10 @@ export function registerCandidateSemanticRoutes(
         let apps: Application[] = [];
         if (appIds.length > 0) {
           apps = isSuperAdminGlobalSearch
-            ? await db.select().from(applications).where(inArray(applications.id, appIds))
+            ? await db.select().from(applications).where(and(
+                inArray(applications.id, appIds),
+                sql.raw(privacyAllowedSql('application', 'applications.id', { globalUse: true })),
+              ))
             : await storage.getApplicationsByIdsForOrg(appIds, orgId!);
         }
         const appMap = new Map(apps.map((a) => [a.id, a]));
@@ -429,7 +447,9 @@ export function registerCandidateSemanticRoutes(
           .filter((applicationId) => !appMap.has(applicationId));
         searchDiagnostics.hydratedApplicationCount = apps.length;
         searchDiagnostics.droppedApplicationCount = droppedApplicationIds.length;
-        searchDiagnostics.droppedApplicationIds = droppedApplicationIds.slice(0, 50);
+        // A filtered hit is deliberately indistinguishable from any other
+        // hydration miss. Never return or log the hidden application IDs.
+        searchDiagnostics.droppedApplicationIds = [];
         if (droppedApplicationIds.length > 0) {
           console.warn('[SEMANTIC_SEARCH] Dropped ActiveKG hits during hydration', {
             userId: req.user!.id,
@@ -440,7 +460,7 @@ export function registerCandidateSemanticRoutes(
             rawResultCount: activekgResults.length,
             groupedApplicationCount: grouped.length,
             hydratedApplicationCount: apps.length,
-            droppedApplicationIds: droppedApplicationIds.slice(0, 50),
+            droppedApplicationCount: droppedApplicationIds.length,
           });
         }
         const jobIds = Array.from(new Set(apps.map((a) => a.jobId)));
@@ -704,8 +724,17 @@ export function registerCandidateSemanticRoutes(
             byEmail.set(email, r);
           }
         }
-        const finalResults = [...byEmail.values(), ...withoutEmail];
-        finalResults.sort((a, b) => Number(b.rankingScoreRaw) - Number(a.rankingScoreRaw));
+        const privacyFilteredResults = [...byEmail.values(), ...withoutEmail];
+        privacyFilteredResults.sort((a, b) => Number(b.rankingScoreRaw) - Number(a.rankingScoreRaw));
+        if (
+          searchDiagnostics.droppedApplicationCount > 0
+          && providerResultSaturated
+          && privacyFilteredResults.length < requestedTopK
+        ) {
+          res.status(503).json({ code: 'candidate_privacy_reconciliation_required' });
+          return;
+        }
+        const finalResults = privacyFilteredResults.slice(0, requestedTopK);
 
         const rawScores = finalResults
           .map((r) => Number(r.matchScoreRaw))

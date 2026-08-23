@@ -5,6 +5,23 @@ import { jobs, savedJobs, type Job } from "@shared/schema";
 import { requireVerifiedCandidate } from "./auth";
 import { db } from "./db";
 import type { CsrfMiddleware } from "./types/routes";
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from "./candidate-privacy/decision";
+
+async function requireCandidatePortalAllowed(req: Request): Promise<void> {
+  await requireCandidatePrivacyAllowed(
+    { type: "candidate_user", id: req.user!.id },
+    { globalUse: false },
+  );
+}
+
+function candidatePortalRestricted(error: unknown, res: Response): boolean {
+  if (!(error instanceof CandidatePrivacyRestrictedError)) return false;
+  res.status(200).json({ restricted: true, savedJobs: [] });
+  return true;
+}
 
 type JobAvailability = Pick<Job, "deadline" | "expiresAt" | "isActive" | "status">;
 type PublicJob = Pick<
@@ -96,6 +113,7 @@ export function registerCandidatePortalRoutes(
     requireVerifiedCandidate,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
+        await requireCandidatePortalAllowed(req);
         const rows = await db
           .select({
             id: savedJobs.id,
@@ -115,6 +133,7 @@ export function registerCandidatePortalRoutes(
           })),
         });
       } catch (error) {
+        if (candidatePortalRestricted(error, res)) return;
         next(error);
       }
     },
@@ -126,6 +145,7 @@ export function registerCandidatePortalRoutes(
     requireVerifiedCandidate,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
+        await requireCandidatePortalAllowed(req);
         const jobId = parseJobId(req.params.jobId);
         if (jobId === null) {
           res.status(400).json({ error: "Invalid job ID" });
@@ -169,6 +189,10 @@ export function registerCandidatePortalRoutes(
 
         res.json({ saved: true, jobId });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         next(error);
       }
     },
@@ -180,6 +204,7 @@ export function registerCandidatePortalRoutes(
     requireVerifiedCandidate,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
+        await requireCandidatePortalAllowed(req);
         const jobId = parseJobId(req.params.jobId);
         if (jobId === null) {
           res.status(400).json({ error: "Invalid job ID" });
@@ -195,6 +220,10 @@ export function registerCandidatePortalRoutes(
 
         res.json({ saved: false, jobId });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         next(error);
       }
     },

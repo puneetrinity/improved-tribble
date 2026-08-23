@@ -34,6 +34,14 @@ import {
 } from './lib/outreachDelivery';
 import { hashOutreachEmail } from './lib/outreachSuppression';
 import { revalidateCandidateContact } from './lib/contactResolutionProcessor';
+import {
+  privacyAllowedSql,
+  requireCandidatePrivacyAllowed,
+} from './candidate-privacy/decision';
+
+const sourcedCandidatePrivacyAllowed = () => sql.raw(
+  privacyAllowedSql('job_sourced_candidate', 'job_sourced_candidates.id', { globalUse: true }),
+);
 
 const MAX_OUTREACH_BATCH_SIZE = 50;
 const MAX_CAMPAIGN_ROUNDS = 3;
@@ -280,6 +288,7 @@ async function getCampaignState(jobId: number, organizationId: number) {
       eq(jobSourcedCandidates.organizationId, organizationId),
       eq(jobSourcedCandidates.jobId, jobId),
       eq(jobSourcedCandidates.state, 'shortlisted'),
+      sourcedCandidatePrivacyAllowed(),
     ),
   });
   const eligibleCandidates = rawEligibleCandidates;
@@ -435,6 +444,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
             eq(jobSourcedCandidates.jobId, jobId),
             eq(jobSourcedCandidates.state, 'shortlisted'),
             inArray(jobSourcedCandidates.id, candidateIds),
+            sourcedCandidatePrivacyAllowed(),
           ),
         });
         const candidates = rawCandidates;
@@ -507,6 +517,10 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         } as const;
 
         for (const candidate of candidates) {
+          await requireCandidatePrivacyAllowed(
+            { type: 'job_sourced_candidate', id: candidate.id },
+            { globalUse: true },
+          );
           const contact = await revalidateCandidateContact({
             candidateId: candidate.id,
             organizationId,
@@ -525,6 +539,11 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
             draftPayload.extraContext = extraContext;
           }
           const draft = await generateColdOutreachDraft(draftPayload);
+
+          await requireCandidatePrivacyAllowed(
+            { type: 'job_sourced_candidate', id: candidate.id },
+            { globalUse: true },
+          );
 
           const durationMs = Date.now() - startTime;
           await db.insert(userAiUsage).values({
@@ -631,6 +650,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
             eq(jobSourcedCandidates.jobId, jobId),
             eq(jobSourcedCandidates.state, 'shortlisted'),
             inArray(jobSourcedCandidates.id, messages.map((message) => message.candidateId)),
+            sourcedCandidatePrivacyAllowed(),
           ),
         });
         const candidates = rawCandidates;

@@ -11,6 +11,11 @@ import {
 } from "@shared/schema";
 import { eq, and, sql, count, desc, gte, isNotNull } from "drizzle-orm";
 import { getOrganizationSubscription } from "./subscriptionService";
+import { privacyAllowedSql } from "../candidate-privacy/decision";
+
+const applicationPrivacyAllowed = (qualifiedId = "applications.id") => sql.raw(
+  privacyAllowedSql('application', qualifiedId, { globalUse: false }),
+);
 
 // ===== Overview Stats =====
 
@@ -70,7 +75,7 @@ export async function getOrgAnalyticsOverview(orgId: number): Promise<OrgAnalyti
       hired: sql<number>`COUNT(*) FILTER (WHERE ${applications.status} = 'hired')`,
     })
     .from(applications)
-    .where(eq(applications.organizationId, orgId));
+    .where(and(eq(applications.organizationId, orgId), applicationPrivacyAllowed()));
 
   // Average time to fill (for hired candidates in last 90 days)
   const [timeToFill] = await db
@@ -82,7 +87,8 @@ export async function getOrgAnalyticsOverview(orgId: number): Promise<OrgAnalyti
       and(
         eq(applications.organizationId, orgId),
         eq(applications.status, 'hired'),
-        gte(applications.updatedAt, ninetyDaysAgo)
+        gte(applications.updatedAt, ninetyDaysAgo),
+        applicationPrivacyAllowed(),
       )
     );
 
@@ -156,8 +162,8 @@ export async function getTimeToFillByJob(orgId: number): Promise<TimeToFillByJob
       jobTitle: jobs.title,
       postedAt: jobs.createdAt,
       status: jobs.status,
-      totalApplications: sql<number>`(SELECT COUNT(*) FROM applications WHERE applications.job_id = ${jobs.id})`,
-      hiredAt: sql<Date | null>`(SELECT MIN(updated_at) FROM applications WHERE applications.job_id = ${jobs.id} AND applications.status = 'hired')`,
+      totalApplications: sql<number>`(SELECT COUNT(*) FROM applications WHERE applications.job_id = ${jobs.id} AND ${applicationPrivacyAllowed()})`,
+      hiredAt: sql<Date | null>`(SELECT MIN(updated_at) FROM applications WHERE applications.job_id = ${jobs.id} AND applications.status = 'hired' AND ${applicationPrivacyAllowed()})`,
     })
     .from(jobs)
     .where(
@@ -218,7 +224,7 @@ export async function getTimeInStageBreakdown(orgId: number): Promise<StageBreak
     })
     .from(applicationStageHistory)
     .innerJoin(applications, eq(applicationStageHistory.applicationId, applications.id))
-    .where(eq(applications.organizationId, orgId))
+    .where(and(eq(applications.organizationId, orgId), applicationPrivacyAllowed()))
     .groupBy(applicationStageHistory.toStage);
 
   // Calculate average time in stage using a subquery approach
@@ -232,6 +238,7 @@ export async function getTimeInStageBreakdown(orgId: number): Promise<StageBreak
       FROM application_stage_history ash
       INNER JOIN applications a ON ash.application_id = a.id
       WHERE a.organization_id = ${orgId}
+        AND ${applicationPrivacyAllowed('a.id')}
     )
     SELECT to_stage, AVG(days_in_stage) as avg_days
     FROM stage_times
@@ -260,7 +267,7 @@ export async function getTimeInStageBreakdown(orgId: number): Promise<StageBreak
       count: count(),
     })
     .from(applications)
-    .where(eq(applications.organizationId, orgId))
+    .where(and(eq(applications.organizationId, orgId), applicationPrivacyAllowed()))
     .groupBy(applications.currentStage);
 
   const currentMap = new Map<number | null, number>(
@@ -304,7 +311,8 @@ export async function getSourcePerformance(orgId: number): Promise<SourcePerform
     .where(
       and(
         eq(applications.organizationId, orgId),
-        gte(applications.appliedAt, ninetyDaysAgo)
+        gte(applications.appliedAt, ninetyDaysAgo),
+        applicationPrivacyAllowed(),
       )
     )
     .groupBy(sql`COALESCE(${applications.source}, 'public_apply')`)
@@ -342,6 +350,7 @@ export async function getRecruiterPerformance(orgId: number): Promise<RecruiterP
         SELECT COUNT(*) FROM application_stage_history ash
         INNER JOIN applications a ON ash.application_id = a.id
         WHERE ash.changed_by = ${users.id} AND a.organization_id = ${orgId}
+          AND ${applicationPrivacyAllowed('a.id')}
       )`,
     })
     .from(users)
@@ -358,7 +367,7 @@ export async function getRecruiterPerformance(orgId: number): Promise<RecruiterP
     })
     .from(applicationStageHistory)
     .innerJoin(applications, eq(applicationStageHistory.applicationId, applications.id))
-    .where(eq(applications.organizationId, orgId))
+    .where(and(eq(applications.organizationId, orgId), applicationPrivacyAllowed()))
     .groupBy(applicationStageHistory.changedBy);
 
   const firstActionMap = new Map(firstActionTimes.map((f: { changedBy: number | null; avgDays: number | null }) => [f.changedBy, Number(f.avgDays ?? 0)]));
@@ -394,7 +403,8 @@ export async function getHiringManagerPerformance(orgId: number): Promise<Hiring
       (SELECT COUNT(*) FROM jobs j WHERE j.hiring_manager_id = u.id AND j.organization_id = ${orgId}) as jobs_assigned,
       (SELECT COUNT(*) FROM application_feedback af
        INNER JOIN applications a ON af.application_id = a.id
-       WHERE af.author_id = u.id AND a.organization_id = ${orgId}) as feedback_given
+       WHERE af.author_id = u.id AND a.organization_id = ${orgId}
+         AND ${applicationPrivacyAllowed('a.id')}) as feedback_given
     FROM users u
     WHERE u.id IN (
       SELECT hiring_manager_id FROM jobs
@@ -470,7 +480,7 @@ export async function getTeamActivity(orgId: number): Promise<TeamMemberActivity
     })
     .from(applications)
     .innerJoin(jobs, eq(applications.jobId, jobs.id))
-    .where(eq(jobs.organizationId, orgId))
+    .where(and(eq(jobs.organizationId, orgId), applicationPrivacyAllowed()))
     .groupBy(jobs.postedBy);
 
   const appCountMap = new Map(appCounts.map((a: { postedBy: number; count: number }) => [a.postedBy, Number(a.count)]));
@@ -650,7 +660,7 @@ export async function getHiringFunnel(orgId: number): Promise<HiringFunnelStats>
       count: count(),
     })
     .from(applications)
-    .where(eq(applications.organizationId, orgId))
+    .where(and(eq(applications.organizationId, orgId), applicationPrivacyAllowed()))
     .groupBy(applications.currentStage);
 
   const stageCountMap = new Map(stageCounts.map((s: { stage: number | null; count: number }) => [s.stage, Number(s.count)]));
@@ -662,7 +672,7 @@ export async function getHiringFunnel(orgId: number): Promise<HiringFunnelStats>
       rejected: sql<number>`COUNT(*) FILTER (WHERE ${applications.status} = 'rejected')`,
     })
     .from(applications)
-    .where(eq(applications.organizationId, orgId));
+    .where(and(eq(applications.organizationId, orgId), applicationPrivacyAllowed()));
 
   const total = Number(statusCounts?.total ?? 0);
 

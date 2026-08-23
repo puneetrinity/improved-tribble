@@ -10,6 +10,11 @@
 import { db } from '../db';
 import { applications, applicationStageHistory, pipelineStages, jobs } from '@shared/schema';
 import { eq, and, gte, lte, sql, desc } from 'drizzle-orm';
+import { privacyAllowedSql } from '../candidate-privacy/decision';
+
+const applicationPrivacyAllowed = () => sql.raw(
+  privacyAllowedSql('application', 'applications.id', { globalUse: false }),
+);
 
 export interface TimeToFillMetric {
   jobId: number;
@@ -91,7 +96,10 @@ export async function calculateTimeToFill(
   }
 
   // Build query conditions
-  const conditions = [eq(applicationStageHistory.toStage, hiredStageId)];
+  const conditions = [
+    eq(applicationStageHistory.toStage, hiredStageId),
+    applicationPrivacyAllowed(),
+  ];
 
   if (startDate) {
     conditions.push(gte(applicationStageHistory.changedAt, startDate));
@@ -198,7 +206,12 @@ export async function calculateTimeInStage(
 
   // Get all stage history entries
   // Filter by organization to ensure data isolation (0 = no filter for super_admin)
-  let historyQuery = db
+  const historyConditions = [applicationPrivacyAllowed()];
+  if (organizationId > 0) {
+    historyConditions.push(eq(jobs.organizationId, organizationId));
+  }
+
+  const historyEntries = await db
     .select({
       applicationId: applicationStageHistory.applicationId,
       fromStage: applicationStageHistory.fromStage,
@@ -208,13 +221,9 @@ export async function calculateTimeInStage(
     })
     .from(applicationStageHistory)
     .innerJoin(applications, eq(applicationStageHistory.applicationId, applications.id))
-    .innerJoin(jobs, eq(applications.jobId, jobs.id));
-
-  if (organizationId > 0) {
-    historyQuery = historyQuery.where(eq(jobs.organizationId, organizationId)) as typeof historyQuery;
-  }
-
-  const historyEntries = await historyQuery.orderBy(applicationStageHistory.applicationId, applicationStageHistory.changedAt);
+    .innerJoin(jobs, eq(applications.jobId, jobs.id))
+    .where(and(...historyConditions))
+    .orderBy(applicationStageHistory.applicationId, applicationStageHistory.changedAt);
 
   // Filter by date range and jobId if specified
   let filteredHistory = historyEntries;
@@ -331,7 +340,7 @@ export async function getHiringMetrics(
 
   // Get total application count
   // Build conditions array to combine all filters (0 = no org filter for super_admin)
-  const countConditions: ReturnType<typeof eq>[] = [];
+  const countConditions: ReturnType<typeof eq>[] = [applicationPrivacyAllowed()];
   if (organizationId > 0) {
     countConditions.push(eq(jobs.organizationId, organizationId));
   }

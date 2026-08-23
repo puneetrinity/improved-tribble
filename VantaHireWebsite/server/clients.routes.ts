@@ -9,7 +9,7 @@
  */
 
 import type { Express, Request, Response, NextFunction } from 'express';
-import { sql, inArray, eq } from 'drizzle-orm';
+import { sql, inArray, eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
 import { storage } from './storage';
@@ -26,6 +26,11 @@ import {
 import type { CsrfMiddleware } from './types/routes';
 import { getUserOrganization } from './lib/organizationService';
 import { updateMemberActivity } from './lib/membershipService';
+import { privacyAllowedSql } from './candidate-privacy/decision';
+
+const applicationPrivacyAllowed = () => sql.raw(
+  privacyAllowedSql('application', 'applications.id', { globalUse: false }),
+);
 
 // Validation schema for client updates
 const updateClientSchema = insertClientSchema.partial();
@@ -503,7 +508,11 @@ export function registerClientsRoutes(
             count: sql<number>`COUNT(${clientShortlistItems.id})::int`,
           })
           .from(clientShortlistItems)
-          .where(inArray(clientShortlistItems.shortlistId, shortlistIds))
+          .innerJoin(applications, eq(clientShortlistItems.applicationId, applications.id))
+          .where(and(
+            inArray(clientShortlistItems.shortlistId, shortlistIds),
+            applicationPrivacyAllowed(),
+          ))
           .groupBy(clientShortlistItems.shortlistId);
 
         countsByShortlistId = counts.reduce((acc: Record<number, number>, row) => {
@@ -572,7 +581,11 @@ export function registerClientsRoutes(
         const countResult = await db
           .select({ count: sql<number>`COUNT(DISTINCT ${clientShortlistItems.applicationId})::int` })
           .from(clientShortlistItems)
-          .where(inArray(clientShortlistItems.shortlistId, shortlistIds));
+          .innerJoin(applications, eq(clientShortlistItems.applicationId, applications.id))
+          .where(and(
+            inArray(clientShortlistItems.shortlistId, shortlistIds),
+            applicationPrivacyAllowed(),
+          ));
         totalCandidatesSent = countResult[0]?.count ?? 0;
       }
 
@@ -584,7 +597,7 @@ export function registerClientsRoutes(
         })
         .from(clientFeedback)
         .innerJoin(applications, eq(clientFeedback.applicationId, applications.id))
-        .where(eq(applications.jobId, jobId))
+        .where(and(eq(applications.jobId, jobId), applicationPrivacyAllowed()))
         .groupBy(clientFeedback.recommendation);
 
       const feedbackCounts = {
@@ -607,13 +620,21 @@ export function registerClientsRoutes(
         const itemCount = await db
           .select({ count: sql<number>`COUNT(*)::int` })
           .from(clientShortlistItems)
-          .where(eq(clientShortlistItems.shortlistId, s.id));
+          .innerJoin(applications, eq(clientShortlistItems.applicationId, applications.id))
+          .where(and(
+            eq(clientShortlistItems.shortlistId, s.id),
+            applicationPrivacyAllowed(),
+          ));
 
         // Count feedback for this shortlist
         const feedbackCount = await db
           .select({ count: sql<number>`COUNT(*)::int` })
           .from(clientFeedback)
-          .where(eq(clientFeedback.shortlistId, s.id));
+          .innerJoin(applications, eq(clientFeedback.applicationId, applications.id))
+          .where(and(
+            eq(clientFeedback.shortlistId, s.id),
+            applicationPrivacyAllowed(),
+          ));
 
         return {
           id: s.id,

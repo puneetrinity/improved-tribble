@@ -19,6 +19,11 @@ import {
   startOutreachHygieneProcessor,
   stopOutreachHygieneProcessor,
 } from "./lib/outreachHygieneProcessor";
+import {
+  startCandidatePrivacyProcessor,
+  stopCandidatePrivacyProcessor,
+} from "./candidate-privacy/processor";
+import { assertCandidatePrivacyRuntimeConfig } from "./candidate-privacy/config";
 import { captureServerException, initServerMonitoring, isExpectedDisconnectError, monitoringRequestContext } from "./monitoring";
 initServerMonitoring();
 const app = express();
@@ -110,6 +115,7 @@ import { initWebSocketServer } from "./websocket";
 
 (async () => {
   const server = await registerRoutes(app);
+  assertCandidatePrivacyRuntimeConfig();
   initWebSocketServer(server);
 
   if (process.env.SENTRY_DSN) {
@@ -177,6 +183,10 @@ import { initWebSocketServer } from "./websocket";
       console.error('Error initializing database:', error);
     }
 
+    // Privacy delivery/feed starts first so every candidate processor consumes
+    // the freshest local restrictive projection available for this runtime.
+    startCandidatePrivacyProcessor();
+
     // Start job scheduler for automatic job expiration
     startJobScheduler();
 
@@ -209,6 +219,7 @@ import { initWebSocketServer } from "./websocket";
     stopResumeImportProcessor();
     stopContactResolutionProcessor();
     stopOutreachHygieneProcessor();
+    stopCandidatePrivacyProcessor();
     server.close(() => {
       process.exit(0);
     });

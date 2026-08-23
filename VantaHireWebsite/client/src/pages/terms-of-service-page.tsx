@@ -81,6 +81,14 @@ const sections: LegalSection[] = [
           </ul>
         </div>
         <div className={subsectionCls}>
+          <h4 className={h4Cls}>Candidate Privacy Requests</h4>
+          <p>
+            Candidate privacy requests are handled as described in our{" "}
+            <a href="/privacy-policy" className={linkCls}>Privacy Policy</a>. Removing someone from a recruiter’s
+            talent pool removes only that organization-scoped membership; it is not a global erasure or global opt-out.
+          </p>
+        </div>
+        <div className={subsectionCls}>
           <h4 className={h4Cls}>Account Termination</h4>
           <p>
             We reserve the right to suspend or terminate your account at any time for violation of
@@ -330,7 +338,7 @@ export default function TermsOfServicePage() {
         sectionLabel="Terms of Service"
         heroTitle="Fair terms, clear expectations."
         heroDesc="Please read these terms carefully before using ealana. They outline your rights, responsibilities, and the rules that govern our platform."
-        lastUpdated="Last Updated: January 2025"
+        lastUpdated="Last Updated: August 2026"
         sections={sections}
       />
     </>

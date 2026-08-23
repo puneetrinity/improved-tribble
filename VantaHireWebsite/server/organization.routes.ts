@@ -796,6 +796,10 @@ export function registerOrganizationRoutes(
 
   // ===== Organization Analytics =====
 
+  // Candidate privacy is enforced inside orgAnalyticsService in SQL before
+  // every application count/group. These routes pass only the authenticated
+  // caller's organization and never post-filter an already-computed result.
+
   // Get organization analytics overview
   app.get("/api/organizations/analytics", requireAuth, async (req, res) => {
     try {

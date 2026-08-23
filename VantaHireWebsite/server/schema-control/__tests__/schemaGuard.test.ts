@@ -34,6 +34,7 @@ const fixtureFiles = [
   "VantaHireWebsite/server/aiWorker.ts",
   "VantaHireWebsite/server/schema-control/caller-manifest.json",
   "VantaHireWebsite/server/schema-migrations/0000_baseline.sql",
+  "VantaHireWebsite/server/schema-migrations/0001_candidate_privacy_flow.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
   "VantaHireWebsite/scripts/check-schema-control.mjs",

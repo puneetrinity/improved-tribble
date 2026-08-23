@@ -40,6 +40,7 @@ import { registerCandidateSemanticRoutes } from "./candidates.semantic.routes";
 import { registerRecruiterDashboardRoutes } from "./recruiterDashboard.routes";
 import { registerCandidatePortalRoutes } from "./candidatePortal.routes";
 import { registerOutreachComplianceRoutes } from "./outreachCompliance.routes";
+import { registerCandidatePrivacyRoutes } from "./candidate-privacy/routes";
 import { isExpectedDisconnectError } from "./monitoring";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -456,6 +457,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register candidate portal routes (saved jobs)
   registerCandidatePortalRoutes(app, doubleCsrfProtection);
+  registerCandidatePrivacyRoutes(app, doubleCsrfProtection);
   registerOutreachComplianceRoutes(app);
 
   // Register bulk resume import routes (staging/review/finalize flow)

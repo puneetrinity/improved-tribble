@@ -56,6 +56,7 @@ import {
   useCandidateJobState,
   type CandidateApplicationSummary,
 } from "@/hooks/use-candidate-job-state";
+import { CandidatePrivacyPanel } from "@/components/candidate-privacy/CandidatePrivacyPanel";
 
 export default function CandidateDashboard() {
   const { user } = useAuth();
@@ -332,7 +333,7 @@ function CandidateDashboardContent({ user }: { user: AuthUser }) {
   const stats = getApplicationStats();
   const hasMatchCredits = !fitScoring || !aiLimits || aiLimits.fitRemainingThisMonth > 0;
   const requestedTab = new URLSearchParams(search).get("tab");
-  const activeTab = ["profile", "applications", "saved", "resumes"].includes(
+  const activeTab = ["profile", "applications", "saved", "resumes", "privacy"].includes(
     requestedTab ?? "",
   )
     ? requestedTab!
@@ -745,11 +746,12 @@ function CandidateDashboardContent({ user }: { user: AuthUser }) {
             onValueChange={(tab) => navigate(`/my-dashboard?tab=${tab}`)}
             className="w-full"
           >
-            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-4">
+            <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-5">
               <TabsTrigger value="profile">Profile</TabsTrigger>
               <TabsTrigger value="applications">My Applications ({stats.total})</TabsTrigger>
               <TabsTrigger value="saved">Saved ({savedJobs.length})</TabsTrigger>
               <TabsTrigger value="resumes">Resume Library</TabsTrigger>
+              <TabsTrigger value="privacy">Privacy &amp; Data</TabsTrigger>
             </TabsList>
 
             <TabsContent value="profile" className="mt-6" data-tour="profile-settings">
@@ -1230,6 +1232,9 @@ function CandidateDashboardContent({ user }: { user: AuthUser }) {
                   )}
                 </CardContent>
               </Card>
+            </TabsContent>
+            <TabsContent value="privacy" className="mt-6">
+              <CandidatePrivacyPanel />
             </TabsContent>
           </Tabs>
           </div>

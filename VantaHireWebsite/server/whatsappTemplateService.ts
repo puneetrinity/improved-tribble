@@ -10,6 +10,10 @@ import { eq } from 'drizzle-orm';
 import { getWhatsAppService } from './whatsappService';
 import { formatToE164, getDefaultCountry } from './lib/phoneUtils';
 import type { WhatsappTemplate } from '../shared/schema';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from './candidate-privacy/decision';
 
 export interface WhatsAppTemplateVariables {
   candidate_name?: string;
@@ -124,6 +128,11 @@ export async function sendWhatsAppTemplatedMessage(
   templateId: number,
   customVariables: Partial<WhatsAppTemplateVariables> = {}
 ): Promise<void> {
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: applicationId },
+    { globalUse: false },
+  );
+
   // Fetch application with job and recruiter data
   const application = await db.query.applications.findFirst({
     where: eq(applications.id, applicationId),
@@ -205,6 +214,10 @@ export async function sendWhatsAppTemplatedMessage(
       const orderedParams = getOrderedParameters(template.templateType, variables);
 
       // Send message with ordered parameters
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: applicationId },
+        { globalUse: false },
+      );
       const result = await svc.sendTemplateMessage({
         to: formattedPhone,
         templateName: template.metaTemplateName,
@@ -223,6 +236,9 @@ export async function sendWhatsAppTemplatedMessage(
       }
     }
   } catch (error: any) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      throw error;
+    }
     status = 'failed';
     errorMessage = error?.message || 'Unknown error';
     console.error(`[WhatsApp] Failed to send ${template.name} to ${formattedPhone}:`, error);

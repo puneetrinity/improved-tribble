@@ -45,3 +45,4 @@ Screenshot*
 !scripts/check-schema-control.mjs
 !scripts/normalize-schema-catalog.mjs
 !scripts/compare-schema-catalog.mjs
+!scripts/check-candidate-privacy-surfaces.mjs

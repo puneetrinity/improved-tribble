@@ -35,6 +35,10 @@ import {
   isJobOpenForOutreach,
   OUTREACH_MAX_ROUNDS,
 } from './outreachSchedulerCore';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from '../candidate-privacy/decision';
 
 const MAX_CAMPAIGN_ROUNDS = OUTREACH_MAX_ROUNDS;
 const MAX_SCHEDULE_ATTEMPTS = 8;
@@ -218,6 +222,19 @@ async function fireScheduledCandidate(
     return;
   }
 
+  try {
+    await requireCandidatePrivacyAllowed(
+      { type: 'job_sourced_candidate', id: candidate.id },
+      { globalUse: true, newGlobalOperation: true },
+    );
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      await cancel('candidate_privacy_restricted');
+      return;
+    }
+    throw error;
+  }
+
   const emailService = await getEmailService();
   if (!emailService || typeof emailService.sendEmailWithReceipt !== 'function') {
     await retry('email_service_unavailable');
@@ -261,6 +278,10 @@ async function fireScheduledCandidate(
   });
 
   try {
+    await requireCandidatePrivacyAllowed(
+      { type: 'job_sourced_candidate', id: candidate.id },
+      { globalUse: true, newGlobalOperation: true },
+    );
     const draft = await generateColdOutreachDraft({
         job: {
           title: job.title,
@@ -283,6 +304,10 @@ async function fireScheduledCandidate(
     const finalHtml = buildOutreachHtml(normalizedBody, publicJobUrl, recruiterName, recruiterEmail, org.name);
     const finalText = buildOutreachText(normalizedBody, publicJobUrl, recruiterName, recruiterEmail, org.name);
 
+    await requireCandidatePrivacyAllowed(
+      { type: 'job_sourced_candidate', id: candidate.id },
+      { globalUse: true, newGlobalOperation: true },
+    );
     const delivery = await sendTrackedOutreachEmail({
       contact: {
         candidateId: candidate.id,

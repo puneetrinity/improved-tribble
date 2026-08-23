@@ -216,7 +216,8 @@ export function registerTalentPoolRoutes(app: Express) {
 
   /**
    * DELETE /api/talent-pool/:id
-   * Delete a talent pool candidate
+   * Remove a candidate from this organization's talent pool. This never
+   * globally deletes or opts the person out.
    */
   app.delete(
     "/api/talent-pool/:id",
@@ -244,13 +245,13 @@ export function registerTalentPoolRoutes(app: Express) {
         }
 
         if (existing.recruiterId !== req.user!.id && req.user!.role !== 'super_admin') {
-          res.status(403).json({ error: 'Not authorized to delete this candidate' });
+          res.status(403).json({ error: 'Not authorized to remove this organization’s pool membership' });
           return;
         }
 
-        const deleted = await storage.deleteTalentPoolCandidate(id);
-        if (!deleted) {
-          res.status(500).json({ error: 'Failed to delete candidate' });
+        const removed = await storage.removeTalentPoolCandidate(id, req.user!.id);
+        if (!removed) {
+          res.status(409).json({ error: 'Candidate is already removed from this organization’s talent pool' });
           return;
         }
 
@@ -259,6 +260,47 @@ export function registerTalentPoolRoutes(app: Express) {
         next(error);
       }
     }
+  );
+
+  /** Restore a previously removed organization-local pool membership. */
+  app.post(
+    "/api/talent-pool/:id/restore",
+    requireAuth,
+    requireRole(['recruiter', 'super_admin']),
+    csrf,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const id = Number(req.params.id);
+        if (!Number.isInteger(id) || id <= 0) {
+          res.status(400).json({ error: 'Invalid candidate ID' });
+          return;
+        }
+        const existing = await storage.getRemovedTalentPoolCandidate(id);
+        if (!existing) {
+          res.status(404).json({ error: 'Candidate not found' });
+          return;
+        }
+        if (existing.recruiterId !== req.user!.id && req.user!.role !== 'super_admin') {
+          res.status(403).json({ error: 'Not authorized to restore this organization’s pool membership' });
+          return;
+        }
+        const restored = await storage.restoreTalentPoolCandidate(id, req.user!.id);
+        if (!restored) {
+          res.status(404).json({ error: 'Candidate not found' });
+          return;
+        }
+        res.json({
+          candidate: restored,
+          message: 'Candidate restored to this organization’s talent pool',
+        });
+      } catch (error: any) {
+        if (error?.code === '23505') {
+          res.status(409).json({ error: 'An active pool membership already exists for this candidate' });
+          return;
+        }
+        next(error);
+      }
+    },
   );
 
   /**
@@ -338,23 +380,23 @@ export function registerTalentPoolRoutes(app: Express) {
         }
 
         // Convert to application
-        const result = await storage.convertTalentPoolToApplication(id, jobId, req.user!.id);
+        const result = await storage.convertTalentPoolToApplication(
+          id,
+          jobId,
+          req.user!.id,
+          deleteFromPool,
+        );
         if (!result) {
           res.status(500).json({ error: 'Failed to convert candidate to application' });
           return;
-        }
-
-        // Optionally delete from talent pool after conversion
-        if (deleteFromPool) {
-          await storage.deleteTalentPoolCandidate(id);
         }
 
         res.status(201).json({
           application: result.application,
           talentPoolCandidate: deleteFromPool ? null : result.talentPool,
           message: deleteFromPool
-            ? 'Candidate converted to application and removed from talent pool'
-            : 'Candidate converted to application (still in talent pool)',
+            ? 'Candidate converted to application and removed from this organization’s talent pool'
+            : 'Candidate converted to application (still in this organization’s talent pool)',
         });
       } catch (error) {
         next(error);

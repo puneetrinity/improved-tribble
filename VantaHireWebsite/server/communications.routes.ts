@@ -16,6 +16,7 @@ import { requireRole, requireSeat } from './auth';
 import { getUserOrganization } from './lib/organizationService';
 import { requireFeatureAccess, FEATURES } from './lib/featureGating';
 import { getAiCreditExhaustionPayload, hasEnoughCredits, useCredits } from './lib/creditService';
+import { requireCandidatePrivacyAllowed } from './candidate-privacy/decision';
 import { queueMauticOutreachSync } from './lib/mauticService';
 import {
   insertEmailTemplateSchema,
@@ -197,6 +198,10 @@ export function registerCommunicationsRoutes(
         ...(subject ? { subjectOverride: subject } : {}),
         ...(body ? { bodyOverride: body } : {}),
       };
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: appData.id },
+        { globalUse: false },
+      );
       await sendTemplatedEmail(appId, templateId, sendOptions);
       queueMauticOutreachSync(req.user!.id, appData.organizationId ?? null, 'email');
       res.json({ success: true });
@@ -265,6 +270,11 @@ export function registerCommunicationsRoutes(
         job.title,
         'VantaHire',
         tone
+      );
+
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: application.id },
+        { globalUse: false },
       );
 
       const durationMs = Date.now() - startTime;

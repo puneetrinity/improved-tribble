@@ -195,10 +195,10 @@ const sections: LegalSection[] = [
           {[
             { right: "Access", desc: "Request a copy of your personal data" },
             { right: "Rectification", desc: "Correct inaccurate or incomplete information" },
-            { right: "Deletion", desc: "Request deletion of your account and associated data" },
+            { right: "Erasure review", desc: "Ask us to restrict active use and review data for erasure" },
             { right: "Portability", desc: "Receive your data in a structured, machine-readable format" },
             { right: "Objection", desc: "Object to certain types of data processing" },
-            { right: "Withdrawal", desc: "Withdraw consent for optional data processing" },
+            { right: "Global matching opt-out", desc: "Stop new global matching and recommendations" },
           ].map((item) => (
             <div key={item.right} className={rightItemCls}>
               <span className={rightNameCls}>{item.right}</span>
@@ -207,7 +207,15 @@ const sections: LegalSection[] = [
           ))}
         </div>
         <p>
-          To exercise these rights, please contact us using the information provided below.
+          Signed-in candidates can use <a href="/my-dashboard?tab=privacy" className={linkCls}>Privacy &amp; Data</a>.
+          If you cannot sign in, contact us using the support path below. A request immediately restricts the
+          covered active use and places it in a reversible quarantine while secure delivery and review continue;
+          it is not a promise of immediate hard deletion.
+        </p>
+        <p>
+          Stopping global matching prevents new cross-organization matching, recommendations and promotion.
+          Existing organization-private application, workflow and audit records may remain restricted to the
+          organization that already received them.
         </p>
       </>
     ),
@@ -220,14 +228,16 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          We retain your personal information for as long as necessary to provide our services and
-          comply with legal obligations. Specifically:
+          We retain personal information only as needed to provide the service, protect its integrity,
+          support existing organization workflows and meet applicable requirements. Our current controls
+          restrict active use and place an erasure request into protected review; automated hard-deletion
+          schedules are not yet part of this control.
         </p>
         <ul className={listCls}>
-          <li><strong>Active accounts</strong> - Data retained while your account is active</li>
-          <li><strong>Inactive accounts</strong> - May be deleted after 2 years of inactivity</li>
-          <li><strong>Application data</strong> - Retained as long as the job posting is active plus 1 year</li>
-          <li><strong>Legal requirements</strong> - Data may be retained longer if required by law</li>
+          <li><strong>Candidate controls</strong> - Global matching can be stopped and active profile use can be restricted for erasure review</li>
+          <li><strong>Existing applications</strong> - Organization-private workflow and audit records may remain restricted rather than being immediately destroyed</li>
+          <li><strong>Hard deletion</strong> - Any later destructive action follows a separately reviewed retention and authority process</li>
+          <li><strong>Support</strong> - Contact us if the signed-in Privacy &amp; Data controls are unavailable</li>
         </ul>
       </>
     ),
@@ -327,7 +337,7 @@ export default function PrivacyPolicyPage() {
         sectionLabel="Privacy Policy"
         heroTitle="Your data, your trust."
         heroDesc="We take your privacy seriously. Here's everything you need to know about how we collect, use, and protect your information."
-        lastUpdated="Last Updated: January 2025"
+        lastUpdated="Last Updated: August 2026"
         sections={sections}
       />
     </>

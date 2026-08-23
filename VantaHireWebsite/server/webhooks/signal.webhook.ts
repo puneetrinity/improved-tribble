@@ -41,6 +41,7 @@ import {
   buildSignalExecutionPredicates,
   commitIfSignalExecutionCurrent,
 } from '../lib/services/signal-execution-fence';
+import { requireNewCandidateIdentityAllowed } from '../candidate-privacy/decision';
 
 const WEBHOOK_PROVIDER = 'signal';
 
@@ -152,7 +153,7 @@ export function registerSignalWebhook(app: Express) {
 
     const payload = req.body as SignalCallbackPayload;
     if (!payload.requestId || !payload.status) {
-      console.error('Signal callback: Invalid payload body', payload);
+      console.error('Signal callback: Invalid payload body');
       res.status(400).json({ error: 'Invalid payload' });
       return;
     }
@@ -252,6 +253,10 @@ export function registerSignalWebhook(app: Express) {
           try {
             console.log(`👤 [WEBHOOK] LIVE ENRICHMENT FOR CANDIDATE: ${payload.candidateData.id}`);
 
+            await requireNewCandidateIdentityAllowed([
+              { identifier_type: 'signal_candidate_id', value: payload.candidateData.id },
+            ]);
+
             const committed = await commitIfSignalExecutionCurrent(
               payload.requestId,
               callbackExecution,
@@ -320,6 +325,9 @@ export function registerSignalWebhook(app: Express) {
               return;
             }
 
+            await requireNewCandidateIdentityAllowed([
+              { identifier_type: 'signal_candidate_id', value: payload.candidateData.id },
+            ]);
             broadcastSourcingUpdate(run.jobId, {
               type: 'candidate_enriched',
               candidateId: payload.candidateData.id,

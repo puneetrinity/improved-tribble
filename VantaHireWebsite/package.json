@@ -22,6 +22,7 @@
     "test:resume-extractor": "vitest run --config vitest.server.config.ts",
     "test:server": "vitest run --config vitest.server.config.ts",
     "test:schema-control:pg": "vitest run --config vitest.server.config.ts server/schema-control/__tests__/schemaControl.pg.test.ts",
+    "test:candidate-privacy:pg": "vitest run --config vitest.server.config.ts server/tests/candidatePrivacy.pg.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:bulk-import:integration": "vitest run server/tests/bulkResumeImport.finalize.integration.test.ts",
@@ -41,6 +42,7 @@
     "db:provision-runtime-role": "cross-env NODE_ENV=production node dist/provision-runtime-role.js",
     "schema:ready": "cross-env NODE_ENV=production node dist/schema-ready.js",
     "check:schema-control": "node scripts/check-schema-control.mjs",
+    "check:candidate-privacy-surfaces": "node scripts/check-candidate-privacy-surfaces.mjs",
     "schema:catalog:lint": "node scripts/normalize-schema-catalog.mjs --lint-sql server/schema-control/catalog-census.sql",
     "schema:catalog:normalize": "node scripts/normalize-schema-catalog.mjs",
     "schema:catalog:compare": "node scripts/compare-schema-catalog.mjs"
