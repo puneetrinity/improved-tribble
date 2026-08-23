@@ -39,6 +39,15 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { resolveActiveKGTenantId } from './lib/activekgTenant';
+import {
+  CandidatePrivacyRestrictedError,
+  privacyAllowedSql,
+  requireCandidatePrivacyAllowed,
+} from './candidate-privacy/decision';
+
+const sourcedCandidatePrivacyAllowed = (qualifiedId = 'job_sourced_candidates.id') => sql.raw(
+  privacyAllowedSql('job_sourced_candidate', qualifiedId, { globalUse: true }),
+);
 
 function normalizeSkillList(skills: unknown): string[] {
   if (!Array.isArray(skills)) {
@@ -682,6 +691,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           where: and(
             eq(jobSourcedCandidates.organizationId, organizationId),
             eq(jobSourcedCandidates.jobId, jobId),
+            sourcedCandidatePrivacyAllowed(),
           ),
           orderBy: [desc(jobSourcedCandidates.fitScore), asc(jobSourcedCandidates.id)],
         }) as Promise<JobSourcedCandidate[]>,
@@ -698,8 +708,20 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       const runMeta = (latestRunForMeta?.meta as Record<string, unknown>) ?? {};
 
       // Flatten to UI shape and preserve Signal's assembly order when rank exists.
+      const stillAllowed = (await Promise.all(candidates.map(async (candidate) => {
+        try {
+          await requireCandidatePrivacyAllowed(
+            { type: 'job_sourced_candidate', id: candidate.id },
+            { globalUse: true },
+          );
+          return candidate;
+        } catch (error) {
+          if (error instanceof CandidatePrivacyRestrictedError) return null;
+          throw error;
+        }
+      }))).filter((candidate): candidate is JobSourcedCandidate => candidate !== null);
       const enriched = sortSourcedCandidatesForDisplay(
-        candidates.map((c: JobSourcedCandidate) => flattenCandidateForUI(c)),
+        stillAllowed.map((c: JobSourcedCandidate) => flattenCandidateForUI(c)),
       );
 
       // Stage-5B: attach canonical resume pointers. Memory knows which of
@@ -979,6 +1001,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           eq(jobSourcedCandidates.id, candidateId),
           eq(jobSourcedCandidates.jobId, jobId),
           eq(jobSourcedCandidates.organizationId, organizationId),
+          sourcedCandidatePrivacyAllowed(),
         ),
       });
 
@@ -986,6 +1009,10 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         res.status(404).json({ error: 'Candidate not found' });
         return;
       }
+      await requireCandidatePrivacyAllowed(
+        { type: 'job_sourced_candidate', id: candidate.id },
+        { globalUse: true },
+      );
 
       // Block updates while the candidate's sourcing run is still active.
       // NOTE: We intentionally allow actions once the run is terminal, even if enrichment
@@ -1025,6 +1052,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           WHERE id = ${candidateId}
             AND job_id = ${jobId}
             AND organization_id = ${organizationId}
+            AND ${sourcedCandidatePrivacyAllowed('job_sourced_candidates.id')}
           FOR UPDATE
         `);
         const locked = lockedResult.rows?.[0] as {
@@ -1100,6 +1128,10 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       if (process.env.FEEDBACK_CAPTURE_ENABLED === 'true'
         && ['shortlisted', 'hidden', 'converted'].includes(newState)) {
         try {
+          await requireCandidatePrivacyAllowed(
+            { type: 'job_sourced_candidate', id: candidate.id },
+            { globalUse: true },
+          );
           const { randomUUID } = await import('crypto');
 
           // Get candidate summary fields (already on the row)
@@ -1201,7 +1233,12 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       // Map local candidate IDs to signal candidate IDs
       const candidates = await db.query.jobSourcedCandidates.findMany({
-        where: inArray(jobSourcedCandidates.id, candidateIds)
+        where: and(
+          inArray(jobSourcedCandidates.id, candidateIds),
+          eq(jobSourcedCandidates.jobId, jobId),
+          eq(jobSourcedCandidates.organizationId, contextResult.context.organizationId),
+          sourcedCandidatePrivacyAllowed(),
+        ),
       });
 
       const signalCandidateIds = candidates.map((c: (typeof candidates)[number]) => c.signalCandidateId).filter((id: string | null): id is string => id !== null);
@@ -1218,6 +1255,10 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       }
       const externalJobId = `vanta:jobs:${jobId}`;
 
+      await Promise.all(candidates.map((candidate: JobSourcedCandidate) => requireCandidatePrivacyAllowed(
+        { type: 'job_sourced_candidate', id: candidate.id },
+        { globalUse: true },
+      )));
       const response = await enrichBatch(signalTenantId, externalJobId, signalCandidateIds);
       res.json(response);
     } catch (error) {
@@ -1235,13 +1276,20 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       // Need signalTenantId for the candidate. Since candidates are job-scoped, we look up the candidate.
       const candidate = await db.query.jobSourcedCandidates.findFirst({
-        where: eq(jobSourcedCandidates.id, candidateId),
+        where: and(
+          eq(jobSourcedCandidates.id, candidateId),
+          sourcedCandidatePrivacyAllowed(),
+        ),
       });
 
       if (!candidate) {
         res.status(404).json({ error: 'Candidate not found' });
         return;
       }
+      await requireCandidatePrivacyAllowed(
+        { type: 'job_sourced_candidate', id: candidate.id },
+        { globalUse: true },
+      );
 
       const contextResult = await resolveAccessibleSignalJobContext(req.user as SignalRouteUser, candidate.jobId);
       if (!contextResult.ok) {

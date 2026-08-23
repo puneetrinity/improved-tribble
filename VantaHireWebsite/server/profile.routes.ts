@@ -22,6 +22,19 @@ import { getEmailService } from './simpleEmailService';
 import { initializeMemberCredits } from './lib/creditService';
 import { getOrganizationSubscription } from './lib/subscriptionService';
 import crypto from 'crypto';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from './candidate-privacy/decision';
+
+async function requireCandidateProfileAllowed(req: Request): Promise<void> {
+  if (req.user?.role === 'candidate') {
+    await requireCandidatePrivacyAllowed(
+      { type: 'candidate_user', id: req.user.id },
+      { globalUse: false },
+    );
+  }
+}
 
 // Validation schema for user updates (firstName, lastName)
 const updateUserSchema = z.object({
@@ -82,6 +95,7 @@ export function registerProfileRoutes(
     try {
       const userId = req.user!.id;
       const user = req.user!;
+      await requireCandidateProfileAllowed(req);
 
       // Get user profile (may not exist yet)
       let profile = await storage.getUserProfile(userId);
@@ -118,6 +132,10 @@ export function registerProfileRoutes(
       });
       return;
     } catch (error) {
+      if (error instanceof CandidatePrivacyRestrictedError) {
+        res.status(200).json({ restricted: true, user: null, profile: null });
+        return;
+      }
       next(error);
     }
   });
@@ -129,6 +147,7 @@ export function registerProfileRoutes(
   app.patch("/api/user", csrfProtection, requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
+      await requireCandidateProfileAllowed(req);
 
       // Validate input
       const parseResult = updateUserSchema.safeParse(req.body);
@@ -183,6 +202,10 @@ export function registerProfileRoutes(
       });
       return;
     } catch (error) {
+      if (error instanceof CandidatePrivacyRestrictedError) {
+        res.status(503).json({ code: error.code });
+        return;
+      }
       next(error);
     }
   });
@@ -194,6 +217,7 @@ export function registerProfileRoutes(
   app.patch("/api/profile", csrfProtection, requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const userId = req.user!.id;
+      await requireCandidateProfileAllowed(req);
 
       // Validate input
       const parseResult = updateProfileSchema.safeParse(req.body);
@@ -258,6 +282,10 @@ export function registerProfileRoutes(
       });
       return;
     } catch (error) {
+      if (error instanceof CandidatePrivacyRestrictedError) {
+        res.status(503).json({ code: error.code });
+        return;
+      }
       next(error);
     }
   });

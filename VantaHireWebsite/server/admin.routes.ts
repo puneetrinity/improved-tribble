@@ -15,7 +15,6 @@ import type { Express, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { sql, eq, and, desc, gte, inArray, or, isNull } from 'drizzle-orm';
 import { db } from './db';
-import { backfillExtractedResumeText } from './lib/backfillResumeText';
 import { storage } from './storage';
 import { requireRole } from './auth';
 import { mergeDuplicatePipelineStagesForOrg, type MergeDuplicateStagesResult } from './lib/pipelineStageMerge';
@@ -37,6 +36,11 @@ import {
   clients,
 } from '@shared/schema';
 import type { CsrfMiddleware } from './types/routes';
+import { privacyAllowedSql } from './candidate-privacy/decision';
+
+const applicationPrivacyAllowed = () => sql.raw(
+  privacyAllowedSql('application', 'applications.id', { globalUse: false }),
+);
 
 /**
  * Register all admin routes
@@ -305,7 +309,8 @@ export function registerAdminRoutes(
       }
 
       // Get aggregated stats
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      conditions.push(applicationPrivacyAllowed());
+      const whereClause = and(...conditions);
 
       const usageRecords = await db
         .select({
@@ -486,6 +491,7 @@ export function registerAdminRoutes(
         .select({ count: sql<number>`count(*)::int` })
         .from(formResponses)
         .innerJoin(formInvitations, eq(formResponses.invitationId, formInvitations.id))
+        .innerJoin(applications, eq(formResponses.applicationId, applications.id))
         .where(whereClause);
 
       // Get responses with joins
@@ -530,7 +536,9 @@ export function registerAdminRoutes(
           totalResponses: sql<number>`count(*)::int`,
           responsesToday: sql<number>`count(*) filter (where ${formResponses.submittedAt} >= ${today})::int`,
         })
-        .from(formResponses);
+        .from(formResponses)
+        .innerJoin(applications, eq(formResponses.applicationId, applications.id))
+        .where(applicationPrivacyAllowed());
 
       // Calculate completion rate (answered vs total invitations)
       const [invitationStats] = await db
@@ -576,7 +584,8 @@ export function registerAdminRoutes(
         }
       }
 
-      const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+      conditions.push(applicationPrivacyAllowed());
+      const whereClause = and(...conditions);
 
       let responses = await db
         .select({
@@ -759,11 +768,7 @@ export function registerAdminRoutes(
         })
         .from(applications)
         .innerJoin(jobs, eq(applications.jobId, jobs.id))
-        .where(
-          clientFilter
-            ? and(gte(applications.appliedAt, startDate), clientFilter)
-            : gte(applications.appliedAt, startDate)
-        );
+        .where(and(gte(applications.appliedAt, startDate), clientFilter, applicationPrivacyAllowed()));
 
       const applicationIdsInRange = applicationsInRange.map((a: { id: number }) => a.id);
 
@@ -815,7 +820,8 @@ export function registerAdminRoutes(
           sql`${applications.appliedAt} < ${overdueThreshold}`,
           sql`${applicationStageHistory.id} IS NULL`,
           eq(applications.status, 'submitted'),
-          clientFilter
+          clientFilter,
+          applicationPrivacyAllowed(),
         ));
       const overdueApplications = overdueAppsResult[0]?.count || 0;
 
@@ -832,7 +838,8 @@ export function registerAdminRoutes(
           sql`${applications.interviewDate} IS NOT NULL`,
           sql`${applications.interviewDate} < ${interviewFeedbackThreshold}`,
           sql`${applicationFeedback.id} IS NULL`,
-          clientFilter
+          clientFilter,
+          applicationPrivacyAllowed(),
         ));
       const overdueInterviews = overdueInterviewsResult[0]?.count || 0;
 
@@ -843,7 +850,8 @@ export function registerAdminRoutes(
         .innerJoin(jobs, eq(applications.jobId, jobs.id))
         .where(and(
           sql`${applications.status} NOT IN ('rejected', 'hired', 'withdrawn')`,
-          clientFilter
+          clientFilter,
+          applicationPrivacyAllowed(),
         ));
       const inPipeline = inPipelineResult[0]?.count || 0;
 
@@ -863,7 +871,8 @@ export function registerAdminRoutes(
           .where(and(
             eq(applications.currentStage, offerStage[0].id),
             sql`${applications.stageChangedAt} >= ${startDate}`,
-            clientFilter
+            clientFilter,
+            applicationPrivacyAllowed(),
           ));
         offersOut = offersResult[0]?.count || 0;
       }
@@ -876,7 +885,8 @@ export function registerAdminRoutes(
         .where(and(
           eq(applications.status, 'hired'),
           sql`${applications.updatedAt} >= ${startDate}`,
-          clientFilter
+          clientFilter,
+          applicationPrivacyAllowed(),
         ));
       const hires = hiresResult[0]?.count || 0;
 
@@ -940,7 +950,11 @@ export function registerAdminRoutes(
           count: sql<number>`count(*)::int`,
         })
         .from(emailAuditLog)
-        .where(sql`${emailAuditLog.sentAt} >= ${startDate}`)
+        .leftJoin(applications, eq(emailAuditLog.applicationId, applications.id))
+        .where(and(
+          sql`${emailAuditLog.sentAt} >= ${startDate}`,
+          or(isNull(emailAuditLog.applicationId), applicationPrivacyAllowed()),
+        ))
         .groupBy(emailAuditLog.status);
 
       const emailStats = {
@@ -963,9 +977,11 @@ export function registerAdminRoutes(
           sentAt: emailAuditLog.sentAt,
         })
         .from(emailAuditLog)
+        .leftJoin(applications, eq(emailAuditLog.applicationId, applications.id))
         .where(and(
           eq(emailAuditLog.status, 'failed'),
-          sql`${emailAuditLog.sentAt} >= ${startDate}`
+          sql`${emailAuditLog.sentAt} >= ${startDate}`,
+          or(isNull(emailAuditLog.applicationId), applicationPrivacyAllowed()),
         ))
         .orderBy(desc(emailAuditLog.sentAt))
         .limit(10);
@@ -982,7 +998,8 @@ export function registerAdminRoutes(
           eq(applications.status, 'rejected'),
           sql`${applications.updatedAt} >= ${startDate}`,
           sql`${applications.rejectionReason} IS NOT NULL`,
-          clientFilter
+          clientFilter,
+          applicationPrivacyAllowed(),
         ))
         .groupBy(applications.rejectionReason);
 
@@ -1015,7 +1032,8 @@ export function registerAdminRoutes(
         .innerJoin(jobs, eq(applications.jobId, jobs.id))
         .where(and(
           sql`${applications.appliedAt} >= ${startDate}`,
-          clientFilter
+          clientFilter,
+          applicationPrivacyAllowed(),
         ))
         .groupBy(applications.currentStage);
 
@@ -1033,7 +1051,8 @@ export function registerAdminRoutes(
         .where(and(
           sql`${applications.appliedAt} >= ${startDate}`,
           sql`${applications.status} IN ('hired', 'rejected', 'withdrawn')`,
-          clientFilter
+          clientFilter,
+          applicationPrivacyAllowed(),
         ))
         .groupBy(applications.status);
 
@@ -1128,7 +1147,10 @@ export function registerAdminRoutes(
         })
         .from(applications)
         .innerJoin(jobs, eq(applications.jobId, jobs.id))
-        .where(sql`${jobs.clientId} IS NOT NULL`)
+        .where(and(
+          sql`${jobs.clientId} IS NOT NULL`,
+          applicationPrivacyAllowed(),
+        ))
         .groupBy(jobs.clientId);
 
       type ClientAppMetricRow = { clientId: number | null; inPipeline: number; hired: number; rejected: number };
@@ -1247,36 +1269,12 @@ export function registerAdminRoutes(
    * POST /api/admin/applications/backfill-resume-text
    * Run backfill for applications.extracted_resume_text (admin only)
    */
-  app.post("/api/admin/applications/backfill-resume-text", csrfProtection, requireRole(['super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const bodySchema = z.object({
-        batchSize: z.number().int().positive().max(500).optional(),
-        limit: z.number().int().positive().optional(),
-        dryRun: z.boolean().optional(),
-      });
-
-      const parsed = bodySchema.safeParse(req.body ?? {});
-      if (!parsed.success) {
-        res.status(400).json({ error: 'Validation error', details: parsed.error.errors });
-        return;
-      }
-
-      const options: { batchSize?: number; limit?: number; dryRun?: boolean } = {};
-      if (parsed.data.batchSize !== undefined) options.batchSize = parsed.data.batchSize;
-      if (parsed.data.limit !== undefined) options.limit = parsed.data.limit;
-      if (parsed.data.dryRun !== undefined) options.dryRun = parsed.data.dryRun;
-
-      const result = await backfillExtractedResumeText(options);
-
-      res.status(200).json({
-        success: true,
-        ...result,
-      });
-      return;
-    } catch (error) {
-      console.error('[Admin] Backfill extracted resume text failed:', error);
-      next(error);
-    }
+  app.post("/api/admin/applications/backfill-resume-text", csrfProtection, requireRole(['super_admin']), async (_req: Request, res: Response): Promise<void> => {
+    // The legacy helper performs provider-backed resume extraction across the
+    // whole table and cannot enforce a directive that races the scan. Keep the
+    // administrative registration fail-closed until a future exact lock gives
+    // the backfill its own per-row load/pre-provider/pre-write contract.
+    res.status(503).json({ code: 'candidate_privacy_reconciliation_required' });
   });
 
   // ============= ORGANIZATION ID BACKFILL & MONITORING =============

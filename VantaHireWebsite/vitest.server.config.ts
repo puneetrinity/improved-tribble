@@ -12,6 +12,7 @@ export default defineConfig({
       'server/tests/recruiter-dashboard-scoping.routes.test.ts',
       'server/tests/resumeExtractor.isolation.test.ts',
       'server/tests/outreachHygieneConcurrency.pg.test.ts',
+      'server/tests/candidatePrivacy.pg.test.ts',
     ],
   },
   resolve: {

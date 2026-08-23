@@ -20,6 +20,30 @@ import { getUserOrganization } from './lib/organizationService';
 import { updateMemberActivity } from './lib/membershipService';
 import { requireFeatureAccess, FEATURES } from './lib/featureGating';
 import { getAiCreditExhaustionPayload, hasEnoughCredits, useCredits } from './lib/creditService';
+import {
+  CandidatePrivacyRestrictedError,
+  privacyAllowedSql,
+  requireCandidatePrivacyAllowed,
+  requireNewCandidateIdentityAllowed,
+} from './candidate-privacy/decision';
+
+async function requireFormSubjectAllowed(invitation: {
+  applicationId?: number | null;
+  email?: string | null;
+}): Promise<void> {
+  if (invitation.applicationId) {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: invitation.applicationId },
+      { globalUse: false },
+    );
+    return;
+  }
+  if (invitation.email?.trim()) {
+    await requireNewCandidateIdentityAllowed([
+      { identifier_type: 'email', value: invitation.email.trim().toLowerCase() },
+    ]);
+  }
+}
 
 // Environment configuration
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
@@ -657,6 +681,7 @@ VantaHire Team`;
         if (!application) {
           return res.status(404).json({ error: 'Application not found' });
         }
+        await requireFormSubjectAllowed(application);
 
         // Use isRecruiterOnJob to check access (includes co-recruiters)
         const hasAccess = application.job && await storage.isRecruiterOnJob(application.job.id, req.user!.id, userOrgId);
@@ -741,6 +766,7 @@ VantaHire Team`;
         }).returning();
 
         // 7. Send email and update status
+        await requireFormSubjectAllowed(application);
         const emailResult = await sendFormInvitationEmail(
           invitation.id,
           application.email,
@@ -862,6 +888,19 @@ VantaHire Team`;
         const validApplications: typeof fetchedApplications = [];
 
         for (const app of fetchedApplications) {
+          try {
+            await requireFormSubjectAllowed(app);
+          } catch (error) {
+            if (error instanceof CandidatePrivacyRestrictedError) {
+              results.push({
+                applicationId: app.id,
+                status: 'skipped',
+                error: 'Candidate is not available for this action',
+              });
+              continue;
+            }
+            throw error;
+          }
           // Check ownership (use isRecruiterOnJob to include co-recruiters)
           const hasAccess = app.job && await storage.isRecruiterOnJob(app.job.id, req.user!.id, userOrgId);
           if (!hasAccess) {
@@ -957,6 +996,7 @@ VantaHire Team`;
         // 7. Phase 2: Send emails (best-effort, mark failures)
         for (const { invitation, application } of createdInvitations) {
           try {
+            await requireFormSubjectAllowed(application);
             const emailResult = await sendFormInvitationEmail(
               invitation.id,
               application.email,
@@ -1057,6 +1097,12 @@ VantaHire Team`;
 
         const { formId, email, candidateName, jobId, customMessage, expiresInDays } = bodySchema.parse(req.body);
 
+        // This is a raw-identity ingest/provider boundary. Check Memory before
+        // duplicate lookup, token persistence, or outbound email.
+        await requireNewCandidateIdentityAllowed([
+          { identifier_type: 'email', value: email.trim().toLowerCase() },
+        ]);
+
         // Get user's organization for access control
         const orgResult = await getUserOrganization(req.user!.id);
         const userOrgId = orgResult?.organization.id;
@@ -1155,6 +1201,9 @@ VantaHire Team`;
         const invitation = await storage.createExternalFormInvitation(invitationData);
 
         // 8. Send email invitation (invitationId is first parameter)
+        await requireNewCandidateIdentityAllowed([
+          { identifier_type: 'email', value: email.trim().toLowerCase() },
+        ]);
         const emailResult = await sendFormInvitationEmail(
           invitation.id,
           email,
@@ -1238,6 +1287,7 @@ VantaHire Team`;
         if (!application) {
           return res.status(404).json({ error: 'Application not found' });
         }
+        await requireFormSubjectAllowed(application);
 
         // Use isRecruiterOnJob to check access (includes co-recruiters)
         const hasAccess = application.job && await storage.isRecruiterOnJob(application.job.id, req.user!.id, userOrgId);
@@ -1296,6 +1346,14 @@ VantaHire Team`;
         if (!invitation) {
           return res.status(404).json({ error: 'Invitation not found' });
         }
+        if (invitation.application) {
+          await requireCandidatePrivacyAllowed(
+            { type: 'application', id: invitation.application.id },
+            { globalUse: false },
+          );
+        } else {
+          await requireFormSubjectAllowed(invitation);
+        }
 
         // Verify ownership (use isRecruiterOnJob to include co-recruiters)
         const hasAccess = invitation.application?.job && await storage.isRecruiterOnJob(invitation.application.job.id, req.user!.id, userOrgId);
@@ -1320,6 +1378,10 @@ VantaHire Team`;
         }
 
         // Send reminder email
+        await requireCandidatePrivacyAllowed(
+          { type: 'application', id: invitation.application.id },
+          { globalUse: false },
+        );
         const emailResult = await sendFormInvitationEmail(
           invitation.id,
           invitation.application.email,
@@ -1381,6 +1443,7 @@ VantaHire Team`;
         if (!invitation) {
           return res.status(403).json(FORM_ERRORS.INVALID_TOKEN);
         }
+        await requireFormSubjectAllowed(invitation);
 
         // Check if expired
         if (invitation.expiresAt < new Date()) {
@@ -1442,6 +1505,7 @@ VantaHire Team`;
         if (!invitation) {
           return res.status(403).json(FORM_ERRORS.INVALID_TOKEN);
         }
+        await requireFormSubjectAllowed(invitation);
 
         // Check if expired
         if (invitation.expiresAt < new Date()) {
@@ -1490,6 +1554,14 @@ VantaHire Team`;
           return res.status(400).json({ error: 'Answers must be an array' });
         }
 
+        const preflightInvitation = await db.query.formInvitations.findFirst({
+          where: eq(formInvitations.token, token ?? ''),
+        });
+        if (!preflightInvitation) {
+          return res.status(403).json(FORM_ERRORS.INVALID_TOKEN);
+        }
+        await requireFormSubjectAllowed(preflightInvitation);
+
         // Use transaction with row lock to prevent concurrent submissions
         await db.transaction(async (tx: any) => {
           // Lock invitation row
@@ -1500,6 +1572,17 @@ VantaHire Team`;
 
           if (!invitation) {
             throw { ...FORM_ERRORS.INVALID_TOKEN };
+          }
+
+          if (invitation.applicationId) {
+            const decision = await tx.execute(sql`
+              SELECT NOT (${sql.raw(privacyAllowedSql('application', 'a.id', { globalUse: false }))}) AS blocked
+                FROM applications a
+               WHERE a.id=${invitation.applicationId}
+            `);
+            if (decision.rows?.[0]?.blocked === true) {
+              throw { ...FORM_ERRORS.INVALID_TOKEN };
+            }
           }
 
           // Re-check expiry
@@ -1656,6 +1739,7 @@ VantaHire Team`;
         if (!application) {
           return res.status(404).json({ error: 'Application not found' });
         }
+        await requireFormSubjectAllowed(application);
 
         // Use isRecruiterOnJob to check access (includes co-recruiters)
         const hasAccess = application.job && await storage.isRecruiterOnJob(application.job.id, req.user!.id, userOrgId);
@@ -1733,7 +1817,10 @@ VantaHire Team`;
           .from(formResponses)
           .innerJoin(formInvitations, eq(formResponses.invitationId, formInvitations.id))
           .innerJoin(applications, eq(formResponses.applicationId, applications.id))
-          .where(eq(formInvitations.formId, formId))
+          .where(and(
+            eq(formInvitations.formId, formId),
+            sql.raw(privacyAllowedSql('application', 'applications.id', { globalUse: false })),
+          ))
           .orderBy(desc(formResponses.submittedAt));
 
         type ResponseRow = typeof responses[number];

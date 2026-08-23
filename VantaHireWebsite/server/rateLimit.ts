@@ -193,3 +193,16 @@ export const recruiterAddRateLimit: RateLimitRequestHandler = rateLimit({
   keyGenerator: (req) => req.user?.id?.toString() || req.ip || 'anonymous',
   handler: createRateLimitHandler('Candidate addition limit reached (50/day). Try again tomorrow.'),
 });
+
+/** Recent-password verification: five attempts per account/session/IP in 15 minutes. */
+export const candidatePrivacyReauthRateLimit: RateLimitRequestHandler = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => isTestEnv,
+  keyGenerator: (req) => `${req.user?.id ?? "anonymous"}:${req.sessionID ?? "none"}:${req.ip ?? "unknown"}`,
+  handler: (_req, res) => {
+    res.status(429).json({ code: "candidate_privacy_reauth_limited" });
+  },
+});

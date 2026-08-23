@@ -20,6 +20,13 @@ declare global {
   }
 }
 
+declare module "express-session" {
+  interface SessionData {
+    privacyReauthenticatedAt?: number;
+    privacyPasswordVersion?: string;
+  }
+}
+
 const scryptAsync = promisify(scrypt);
 
 // Generate a secure verification token and its hash
@@ -32,6 +39,10 @@ function generateVerificationToken(): { token: string; hash: string } {
 // Hash a token for lookup
 function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+export function privacyPasswordVersion(storedPassword: string): string {
+  return createHash("sha256").update(storedPassword).digest("hex");
 }
 
 function getPublicBaseUrl(): string {
@@ -593,6 +604,13 @@ export function setupAuth(app: Express) {
           next(loginErr);
           return;
         }
+        if (user.role === "candidate") {
+          req.session.privacyReauthenticatedAt = Date.now();
+          req.session.privacyPasswordVersion = privacyPasswordVersion(user.password);
+        } else {
+          delete req.session.privacyReauthenticatedAt;
+          delete req.session.privacyPasswordVersion;
+        }
         queueMauticFirstLoginSync(user.id);
         // Link any existing applications (by email) to this user account for proper candidate access
         // Await to ensure immediate visibility on first dashboard load; log but do not fail login
@@ -623,6 +641,8 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/logout", (req: Request, res: Response, next: NextFunction): void => {
+    delete req.session.privacyReauthenticatedAt;
+    delete req.session.privacyPasswordVersion;
     req.logout((err) => {
       if (err) {
         next(err);

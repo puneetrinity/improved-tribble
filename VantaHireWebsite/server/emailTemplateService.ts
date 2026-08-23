@@ -8,6 +8,10 @@ import { emailTemplates, applications, emailAuditLog, automationEvents } from '.
 import { eq, asc, and, or, isNull } from 'drizzle-orm';
 import { getEmailService } from './simpleEmailService';
 import type { EmailTemplate } from '../shared/schema';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from './candidate-privacy/decision';
 
 /**
  * Log an automation event for the Operations Command Center
@@ -42,6 +46,10 @@ export async function logAutomationEvent(
 }
 
 async function getOrganizationIdForApplication(applicationId: number): Promise<number | undefined> {
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: applicationId },
+    { globalUse: false },
+  );
   const application = await db.query.applications.findFirst({
     where: eq(applications.id, applicationId),
     with: { job: true },
@@ -152,6 +160,11 @@ export async function sendTemplatedEmail(
   templateId: number,
   customVariablesOrOptions: Partial<TemplateVariables> | SendTemplatedEmailOptions = {}
 ): Promise<void> {
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: applicationId },
+    { globalUse: false },
+  );
+
   // Fetch application with job and recruiter data
   const application = await db.query.applications.findFirst({
     where: eq(applications.id, applicationId),
@@ -220,6 +233,12 @@ export async function sendTemplatedEmail(
       status = 'failed';
       errorMessage = 'Email service unavailable';
     } else {
+      // Recheck at the provider boundary so a request accepted after the load
+      // cannot race into an outbound candidate message.
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: applicationId },
+        { globalUse: false },
+      );
       const result = await svc.sendEmail({
         to: application.email,
         subject,
@@ -237,6 +256,9 @@ export async function sendTemplatedEmail(
       console.log(`✉️  Sent ${template.name} to ${application.email}`);
     }
   } catch (error: any) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      throw error;
+    }
     status = 'failed';
     errorMessage = error?.message || 'Unknown error';
     console.error(`Failed to send ${template.name} to ${application.email}:`, error);
@@ -591,6 +613,11 @@ export async function notifyRecruitersNewApplication(
     location: string;
   }
 ): Promise<void> {
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: applicationId },
+    { globalUse: false },
+  );
+
   const svc = await getEmailService();
   if (!svc) {
     console.warn('[RecruiterNotify] Email service unavailable, skipping notification');
@@ -654,6 +681,12 @@ export async function notifyRecruitersNewApplication(
 
   const sendPromises = recruiters.map(async (recruiter) => {
     try {
+      // Each provider write gets its own last-moment check because this fan-out
+      // can span long enough for the privacy projection to change mid-send.
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: applicationId },
+        { globalUse: false },
+      );
       await svc.sendEmail({
         to: recruiter.username,
         subject,
@@ -662,6 +695,9 @@ export async function notifyRecruitersNewApplication(
       successCount++;
       console.log(`[RecruiterNotify] Notified ${recruiter.username} about application ${applicationId}`);
     } catch (err) {
+      if (err instanceof CandidatePrivacyRestrictedError) {
+        throw err;
+      }
       failedCount++;
       failedEmails.push(recruiter.username);
       console.error(`[RecruiterNotify] Failed to notify ${recruiter.username}:`, err);

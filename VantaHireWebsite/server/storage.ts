@@ -1,4 +1,5 @@
 import slugify from 'slugify';
+import { randomUUID } from 'node:crypto';
 import {
   users,
   contactSubmissions,
@@ -18,6 +19,7 @@ import {
   clientShortlistItems,
   clientFeedback,
   talentPool,
+  talentPoolMembershipEvents,
   formInvitations,
   forms,
   formResponses,
@@ -81,6 +83,75 @@ import { pickInitialPipelineStage } from "./lib/pipelineStageSelection";
 import { computeResumeImportBatchStatus } from "./lib/resumeImportFieldExtraction";
 
 export type JobHealthStatus = 'green' | 'amber' | 'red';
+
+// Correlated privacy fence. It is composed into WHERE before grouping/order/
+// limit. Existing organization workflow can retain global-opt-out rows;
+// erasure/review never exposes active candidate content.
+const privacyAllowedFor = (
+  subjectType: 'candidate_user' | 'application' | 'candidate_resume' | 'talent_pool' | 'job_sourced_candidate',
+  subjectColumn: 'candidate_user_id' | 'application_id' | 'candidate_resume_id' | 'talent_pool_id' | 'job_sourced_candidate_id',
+  subjectId: unknown,
+  globalUse = false,
+) => sql`NOT EXISTS (
+  SELECT 1
+    FROM candidate_privacy_subject_links privacy_link
+    JOIN candidate_privacy_requests privacy_request
+      ON privacy_request.request_id=privacy_link.request_id
+    LEFT JOIN candidate_privacy_remote_projection privacy_remote
+      ON privacy_remote.request_id=privacy_request.request_id
+   WHERE privacy_link.subject_type=${subjectType}
+     AND ${sql.raw(`privacy_link.${subjectColumn}`)}=${subjectId}
+     AND privacy_request.state IN ('accepted_local','delivery_pending','memory_active','needs_review')
+     AND COALESCE(
+       privacy_remote.decision,
+       CASE WHEN privacy_request.state='needs_review' THEN 'review'
+            WHEN privacy_request.action='request_erasure' THEN 'block_all'
+            ELSE 'block_global' END
+     ) IN ${globalUse
+       ? sql`('block_global','block_all','review')`
+       : sql`('block_all','review')`}
+)`;
+
+const applicationPrivacyAllowed = (globalUse = false) => privacyAllowedFor(
+  'application',
+  'application_id',
+  applications.id,
+  globalUse,
+);
+
+const candidateUserPrivacyAllowed = (globalUse = false) => privacyAllowedFor(
+  'candidate_user',
+  'candidate_user_id',
+  users.id,
+  globalUse,
+);
+
+const talentPoolPrivacyAllowed = (globalUse = false) => privacyAllowedFor(
+  'talent_pool',
+  'talent_pool_id',
+  talentPool.id,
+  globalUse,
+);
+
+const applicationPrivacyAllowedAlias = (alias: "a", globalUse = false) => sql.raw(`NOT EXISTS (
+  SELECT 1
+    FROM candidate_privacy_subject_links privacy_link
+    JOIN candidate_privacy_requests privacy_request
+      ON privacy_request.request_id=privacy_link.request_id
+    LEFT JOIN candidate_privacy_remote_projection privacy_remote
+      ON privacy_remote.request_id=privacy_request.request_id
+   WHERE privacy_link.subject_type='application'
+     AND privacy_link.application_id=${alias}.id
+     AND privacy_request.state IN ('accepted_local','delivery_pending','memory_active','needs_review')
+     AND COALESCE(
+       privacy_remote.decision,
+       CASE WHEN privacy_request.state='needs_review' THEN 'review'
+            WHEN privacy_request.action='request_erasure' THEN 'block_all'
+            ELSE 'block_global' END
+     ) IN ${globalUse
+       ? "('block_global','block_all','review')"
+       : "('block_all','review')"}
+)`);
 
 export interface JobHealthSummary {
   jobId: number;
@@ -182,6 +253,7 @@ export interface IStorage {
   getApplicationsByJob(jobId: number): Promise<Application[]>;
   getApplicationsByUser(email: string): Promise<Application[]>;
   getApplication(id: number): Promise<Application | undefined>;
+  getApplicationForPrivacyWorker(id: number): Promise<Application | undefined>;
   getClientFeedbackCountsByApplicationIds(applicationIds: number[]): Promise<Record<number, number>>;
   updateApplicationStatus(id: number, status: string, notes?: string): Promise<Application | undefined>;
   updateApplicationsStatus(ids: number[], status: string, notes?: string): Promise<number>;
@@ -340,6 +412,7 @@ export interface IStorage {
   markApplicationGraphSyncJobSucceeded(id: number, parentNodeId: string, chunkCount: number): Promise<void>;
   markApplicationGraphSyncJobRetry(id: number, error: string, nextAttemptAt: Date): Promise<void>;
   markApplicationGraphSyncJobDeadLetter(id: number, error: string): Promise<void>;
+  markApplicationGraphSyncJobPrivacyRestricted(id: number): Promise<void>;
 
   // Sync skip tracking
   updateApplicationSyncSkippedReason(id: number, reason: string): Promise<void>;
@@ -663,6 +736,14 @@ export class DatabaseStorage implements IStorage {
     createdBy: number;
     organizationId?: number;
   }): Promise<ClientShortlist> {
+    const { requireCandidatePrivacyAllowed } = await import('./candidate-privacy/decision');
+    await Promise.all(data.applicationIds.map((applicationId) =>
+      requireCandidatePrivacyAllowed(
+        { type: 'application', id: applicationId },
+        { globalUse: false },
+      )
+    ));
+
     // Generate secure random token (32 bytes = 64 hex chars)
     const { randomBytes } = await import('crypto');
     const token = randomBytes(32).toString('hex');
@@ -749,7 +830,10 @@ export class DatabaseStorage implements IStorage {
       })
       .from(clientShortlistItems)
       .innerJoin(applications, eq(applications.id, clientShortlistItems.applicationId))
-      .where(eq(clientShortlistItems.shortlistId, shortlist.id))
+      .where(and(
+        eq(clientShortlistItems.shortlistId, shortlist.id),
+        applicationPrivacyAllowed(false),
+      ))
       .orderBy(clientShortlistItems.position);
 
     const items = itemsData.map((item: { applicationId: number; position: number; notes: string | null; application: Application }) => ({
@@ -771,6 +855,11 @@ export class DatabaseStorage implements IStorage {
     shortlistId?: number;
     organizationId?: number;
   }): Promise<ClientFeedback> {
+    const { requireCandidatePrivacyAllowed } = await import('./candidate-privacy/decision');
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: data.applicationId },
+      { globalUse: false },
+    );
     const [feedback] = await db
       .insert(clientFeedback)
       .values({
@@ -789,12 +878,16 @@ export class DatabaseStorage implements IStorage {
 
   async getClientFeedbackForApplication(applicationId: number): Promise<ClientFeedback[]> {
     const feedback = await db
-      .select()
+      .select({ feedback: clientFeedback })
       .from(clientFeedback)
-      .where(eq(clientFeedback.applicationId, applicationId))
+      .innerJoin(applications, eq(clientFeedback.applicationId, applications.id))
+      .where(and(
+        eq(clientFeedback.applicationId, applicationId),
+        applicationPrivacyAllowed(false),
+      ))
       .orderBy(desc(clientFeedback.createdAt));
 
-    return feedback;
+    return feedback.map((row: { feedback: ClientFeedback }) => row.feedback);
   }
 
   async getClientShortlistsByJob(jobId: number): Promise<Array<ClientShortlist & { client: Client | null }>> {
@@ -1213,7 +1306,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(jobs.hiringManagerId, users.id))
       .leftJoin(clients, eq(jobs.clientId, clients.id))
       .leftJoin(jobRecruiters, eq(jobRecruiters.jobId, jobs.id))
-      .where(and(...whereConditions))
+      .where(and(...whereConditions, applicationPrivacyAllowed(false)))
       .groupBy(jobs.id, users.id, users.firstName, users.lastName, users.username, clients.id, clients.name)
       .orderBy(desc(jobs.createdAt));
 
@@ -1235,7 +1328,7 @@ export class DatabaseStorage implements IStorage {
         notes,
         updatedAt: new Date()
       })
-      .where(eq(applications.id, id))
+      .where(and(eq(applications.id, id), applicationPrivacyAllowed(false)))
       .returning();
     return application || undefined;
   }
@@ -1248,7 +1341,7 @@ export class DatabaseStorage implements IStorage {
         notes,
         updatedAt: new Date()
       })
-      .where(inArray(applications.id, ids));
+      .where(and(inArray(applications.id, ids), applicationPrivacyAllowed(false)));
     return result.rowCount || 0;
   }
 
@@ -1260,7 +1353,7 @@ export class DatabaseStorage implements IStorage {
         status: 'reviewed',
         updatedAt: new Date()
       })
-      .where(eq(applications.id, id))
+      .where(and(eq(applications.id, id), applicationPrivacyAllowed(false)))
       .returning();
     return application || undefined;
   }
@@ -1272,7 +1365,7 @@ export class DatabaseStorage implements IStorage {
         downloadedAt: new Date(),
         updatedAt: new Date()
       })
-      .where(eq(applications.id, id))
+      .where(and(eq(applications.id, id), applicationPrivacyAllowed(false)))
       .returning();
     return application || undefined;
   }
@@ -1443,6 +1536,24 @@ export class DatabaseStorage implements IStorage {
     stageChangedBy?: number;
     organizationId?: number;
   }, executor: any = db): Promise<Application> {
+    const {
+      requireCandidatePrivacyAllowed,
+      requireNewCandidateIdentityAllowed,
+    } = await import('./candidate-privacy/decision');
+    if (application.userId) {
+      await requireCandidatePrivacyAllowed(
+        { type: 'candidate_user', id: application.userId },
+        { globalUse: true, newGlobalOperation: true },
+      );
+    } else {
+      const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [
+        { identifier_type: 'email', value: application.email.trim().toLowerCase() },
+      ];
+      if (application.phone?.trim()) {
+        identifiers.push({ identifier_type: 'phone', value: application.phone.trim() });
+      }
+      await requireNewCandidateIdentityAllowed(identifiers);
+    }
     const [result] = await executor
       .insert(applications)
       .values({
@@ -1456,14 +1567,26 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApplicationsByJob(jobId: number): Promise<Application[]> {
-    return await db.select().from(applications).where(eq(applications.jobId, jobId)).orderBy(desc(applications.appliedAt));
+    return await db.select().from(applications)
+      .where(and(eq(applications.jobId, jobId), applicationPrivacyAllowed(false)))
+      .orderBy(desc(applications.appliedAt));
   }
 
   async getApplicationsByUser(email: string): Promise<Application[]> {
-    return await db.select().from(applications).where(eq(applications.email, email)).orderBy(desc(applications.appliedAt));
+    return await db.select().from(applications)
+      .where(and(eq(applications.email, email), applicationPrivacyAllowed(false)))
+      .orderBy(desc(applications.appliedAt));
   }
 
   async getApplication(id: number): Promise<Application | undefined> {
+    const [application] = await db.select().from(applications)
+      .where(and(eq(applications.id, id), applicationPrivacyAllowed(false)));
+    return application || undefined;
+  }
+
+  // Worker-only raw load. Callers must perform the privacy decision immediately
+  // after loading and again at every provider/publication boundary.
+  async getApplicationForPrivacyWorker(id: number): Promise<Application | undefined> {
     const [application] = await db.select().from(applications).where(eq(applications.id, id));
     return application || undefined;
   }
@@ -1606,7 +1729,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(applications)
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(eq(applications.email, email))
+      .where(and(eq(applications.email, email), applicationPrivacyAllowed(false)))
       .orderBy(desc(applications.appliedAt));
 
     return results.map((result: any) => ({
@@ -1656,7 +1779,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(applications)
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
-      .where(whereClause)
+      .where(and(whereClause, applicationPrivacyAllowed(false)))
       .orderBy(desc(applications.appliedAt));
 
     return results.map((result: any) => ({
@@ -1694,7 +1817,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const whereClause = and(...conditions);
+    const whereClause = and(...conditions, applicationPrivacyAllowed(false));
 
     const results = await db
       .select({
@@ -1763,7 +1886,8 @@ export class DatabaseStorage implements IStorage {
     try {
       const result: any = await db.execute(
         sql`UPDATE applications SET user_id = ${userId}
-            WHERE user_id IS NULL AND LOWER(email) = LOWER(${username})`
+            WHERE user_id IS NULL AND LOWER(email) = LOWER(${username})
+              AND ${applicationPrivacyAllowed(false)}`
       );
       // Some drivers return rowCount, fallback to 0 if unavailable
       const updated = typeof result?.rowCount === 'number' ? result.rowCount : 0;
@@ -1816,7 +1940,7 @@ export class DatabaseStorage implements IStorage {
           array_agg(a.tags) FILTER (WHERE a.tags IS NOT NULL AND array_length(a.tags, 1) > 0) as all_tags_arrays
         FROM applications a
         INNER JOIN jobs j ON a.job_id = j.id
-        WHERE 1=1
+        WHERE ${applicationPrivacyAllowedAlias("a", false)}
       `;
     } else {
       const membership = await db.query.organizationMembers.findFirst({
@@ -1837,8 +1961,9 @@ export class DatabaseStorage implements IStorage {
           FROM applications a
           INNER JOIN jobs j ON a.job_id = j.id
           LEFT JOIN job_recruiters jr ON jr.job_id = j.id
-          WHERE j.organization_id = ${membership.organizationId}
-             OR (j.organization_id IS NULL AND (j.posted_by = ${recruiterId} OR jr.recruiter_id = ${recruiterId}))
+          WHERE ${applicationPrivacyAllowedAlias("a", false)}
+            AND (j.organization_id = ${membership.organizationId}
+             OR (j.organization_id IS NULL AND (j.posted_by = ${recruiterId} OR jr.recruiter_id = ${recruiterId})))
         `;
       } else {
         // Legacy recruiters without org see candidates for their own legacy jobs only
@@ -1853,7 +1978,8 @@ export class DatabaseStorage implements IStorage {
           FROM applications a
           INNER JOIN jobs j ON a.job_id = j.id
           LEFT JOIN job_recruiters jr ON jr.job_id = j.id
-          WHERE j.organization_id IS NULL
+          WHERE ${applicationPrivacyAllowedAlias("a", false)}
+            AND j.organization_id IS NULL
             AND (j.posted_by = ${recruiterId} OR jr.recruiter_id = ${recruiterId})
         `;
       }
@@ -1924,7 +2050,8 @@ export class DatabaseStorage implements IStorage {
     const pendingJobsResult = await db.select({ count: count() }).from(jobs).where(eq(jobs.status, 'pending'));
     
     // Get application statistics
-    const applicationsResult = await db.select({ count: count() }).from(applications);
+    const applicationsResult = await db.select({ count: count() }).from(applications)
+      .where(applicationPrivacyAllowed(false));
     
     // Get user statistics
     const usersResult = await db.select({ count: count() }).from(users);
@@ -1971,6 +2098,7 @@ export class DatabaseStorage implements IStorage {
         count: count(),
       })
       .from(applications)
+      .where(applicationPrivacyAllowed(false))
       .groupBy(applications.jobId);
 
     const applicationCountMap = jobApplicationCounts.reduce((acc: Record<number, number>, item: any) => {
@@ -2009,6 +2137,7 @@ export class DatabaseStorage implements IStorage {
       .from(applications)
       .innerJoin(jobs, eq(applications.jobId, jobs.id))
       .leftJoin(pipelineStages, eq(applications.currentStage, pipelineStages.id))
+      .where(applicationPrivacyAllowed(false))
       .orderBy(desc(applications.appliedAt));
 
     return applicationsWithDetails.map((app: any) => ({
@@ -2042,6 +2171,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(users)
       .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
+      .where(or(sql`${users.role} <> 'candidate'`, candidateUserPrivacyAllowed(false)))
       .orderBy(desc(users.id)); // Order by ID since createdAt doesn't exist
 
     // Get job counts for recruiters
@@ -2066,6 +2196,7 @@ export class DatabaseStorage implements IStorage {
       })
       .from(jobs)
       .leftJoin(applications, eq(applications.jobId, jobs.id))
+      .where(applicationPrivacyAllowed(false))
       .groupBy(jobs.postedBy);
 
     const recruiterCandidateMap = recruiterCandidateCounts.reduce((acc: Record<number, number>, item: any) => {
@@ -2080,6 +2211,7 @@ export class DatabaseStorage implements IStorage {
         count: count(),
       })
       .from(applications)
+      .where(applicationPrivacyAllowed(false))
       .groupBy(applications.email);
 
     const applicationCountMap = applicationCounts.reduce((acc: Record<string, number>, item: any) => {
@@ -2094,6 +2226,8 @@ export class DatabaseStorage implements IStorage {
         count: count(),
       })
       .from(candidateResumes)
+      .innerJoin(users, eq(candidateResumes.userId, users.id))
+      .where(candidateUserPrivacyAllowed(false))
       .groupBy(candidateResumes.userId);
 
     const resumeCountMap = resumeCounts.reduce((acc: Record<number, number>, item: any) => {
@@ -2368,18 +2502,22 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(jobAnalytics, eq(jobs.id, jobAnalytics.jobId))
       .leftJoin(applications, eq(applications.jobId, jobs.id));
 
+    const privacyCondition = applicationPrivacyAllowed(false);
     // Filter by organization for org-wide analytics (owner/admin view)
     if (organizationId) {
-      query = query.where(eq(jobs.organizationId, organizationId)) as any;
+      query = query.where(and(eq(jobs.organizationId, organizationId), privacyCondition)) as any;
     } else if (userId) {
       // Include jobs where user is primary (postedBy) OR co-recruiter (in job_recruiters)
       const coRecruiterJobIds = db.select({ id: jobRecruiters.jobId }).from(jobRecruiters).where(eq(jobRecruiters.recruiterId, userId));
-      query = query.where(
+      query = query.where(and(
         or(
           eq(jobs.postedBy, userId),
           inArray(jobs.id, coRecruiterJobIds)
-        )
-      ) as any;
+        ),
+        privacyCondition,
+      )) as any;
+    } else {
+      query = query.where(privacyCondition) as any;
     }
 
     const rows = await query
@@ -2485,18 +2623,22 @@ export class DatabaseStorage implements IStorage {
       .from(applications)
       .innerJoin(jobs, eq(applications.jobId, jobs.id));
 
+    const privacyCondition = applicationPrivacyAllowed(false);
     // Filter by organization for org-wide analytics (owner/admin view)
     if (organizationId) {
-      query = query.where(eq(jobs.organizationId, organizationId)) as any;
+      query = query.where(and(eq(jobs.organizationId, organizationId), privacyCondition)) as any;
     } else if (userId) {
       // Include jobs where user is primary (postedBy) OR co-recruiter (in job_recruiters)
       const coRecruiterJobIds = db.select({ id: jobRecruiters.jobId }).from(jobRecruiters).where(eq(jobRecruiters.recruiterId, userId));
-      query = query.where(
+      query = query.where(and(
         or(
           eq(jobs.postedBy, userId),
           inArray(jobs.id, coRecruiterJobIds)
-        )
-      ) as any;
+        ),
+        privacyCondition,
+      )) as any;
+    } else {
+      query = query.where(privacyCondition) as any;
     }
 
     const rows = await query;
@@ -2574,18 +2716,22 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(jobs, eq(jobs.clientId, clients.id))
       .leftJoin(applications, eq(applications.jobId, jobs.id));
 
+    const privacyCondition = applicationPrivacyAllowed(false);
     // Filter by organization for org-wide analytics (owner/admin view)
     if (organizationId) {
-      query = query.where(eq(clients.organizationId, organizationId)) as any;
+      query = query.where(and(eq(clients.organizationId, organizationId), privacyCondition)) as any;
     } else if (userId) {
       // Include jobs where user is primary (postedBy) OR co-recruiter (in job_recruiters)
       const coRecruiterJobIds = db.select({ id: jobRecruiters.jobId }).from(jobRecruiters).where(eq(jobRecruiters.recruiterId, userId));
-      query = query.where(
+      query = query.where(and(
         or(
           eq(jobs.postedBy, userId),
           inArray(jobs.id, coRecruiterJobIds)
-        )
-      ) as any;
+        ),
+        privacyCondition,
+      )) as any;
+    } else {
+      query = query.where(privacyCondition) as any;
     }
 
     const rows = await query
@@ -2646,7 +2792,11 @@ export class DatabaseStorage implements IStorage {
             .select({ stageId: applications.currentStage, count: sql<number>`count(*)::int` })
             .from(applications)
             .innerJoin(jobs, eq(applications.jobId, jobs.id))
-            .where(and(eq(jobs.organizationId, organizationId), inArray(applications.currentStage, defaultDuplicateIds)))
+            .where(and(
+              eq(jobs.organizationId, organizationId),
+              inArray(applications.currentStage, defaultDuplicateIds),
+              applicationPrivacyAllowed(false),
+            ))
             .groupBy(applications.currentStage);
 
           const usedDefaultIds = new Set<number>();
@@ -2705,7 +2855,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApplicationsInStage(stageId: number): Promise<Application[]> {
-    return db.select().from(applications).where(eq(applications.currentStage, stageId));
+    return db.select().from(applications).where(
+      and(eq(applications.currentStage, stageId), applicationPrivacyAllowed(false)),
+    );
   }
 
   async updateApplicationStage(appId: number, newStageId: number, changedBy: number, notes?: string): Promise<void> {
@@ -2713,7 +2865,7 @@ export class DatabaseStorage implements IStorage {
     await db.transaction(async (tx: any) => {
       // Get current application state
       const app = await tx.query.applications.findFirst({
-        where: eq(applications.id, appId)
+        where: and(eq(applications.id, appId), applicationPrivacyAllowed(false))
       });
 
       if (!app) {
@@ -2728,7 +2880,7 @@ export class DatabaseStorage implements IStorage {
           stageChangedBy: changedBy,
           updatedAt: new Date()
         })
-        .where(eq(applications.id, appId));
+        .where(and(eq(applications.id, appId), applicationPrivacyAllowed(false)));
 
       // Insert stage history
       await tx.insert(applicationStageHistory).values({
@@ -2742,7 +2894,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getApplicationStageHistory(appId: number): Promise<any[]> {
-    return db.select().from(applicationStageHistory).where(eq(applicationStageHistory.applicationId, appId)).orderBy(desc(applicationStageHistory.changedAt));
+    const rows = await db
+      .select({ history: applicationStageHistory })
+      .from(applicationStageHistory)
+      .innerJoin(applications, eq(applicationStageHistory.applicationId, applications.id))
+      .where(and(
+        eq(applicationStageHistory.applicationId, appId),
+        applicationPrivacyAllowed(false),
+      ))
+      .orderBy(desc(applicationStageHistory.changedAt));
+    return rows.map((row: { history: typeof applicationStageHistory.$inferSelect }) => row.history);
   }
 
   async scheduleInterview(appId: number, fields: { date?: Date; time?: string; location?: string; notes?: string }): Promise<Application | undefined> {
@@ -2754,7 +2915,7 @@ export class DatabaseStorage implements IStorage {
         interviewNotes: fields.notes || null,
         updatedAt: new Date(),
       })
-      .where(eq(applications.id, appId))
+      .where(and(eq(applications.id, appId), applicationPrivacyAllowed(false)))
       .returning();
     return result || undefined;
   }
@@ -2775,7 +2936,7 @@ export class DatabaseStorage implements IStorage {
           interviewNotes: interviewFields.notes || null,
           updatedAt: new Date(),
         })
-        .where(eq(applications.id, appId))
+        .where(and(eq(applications.id, appId), applicationPrivacyAllowed(false)))
         .returning();
 
       if (!updatedApp) {
@@ -2800,7 +2961,7 @@ export class DatabaseStorage implements IStorage {
               stageChangedBy: stageUpdate.changedBy,
               updatedAt: new Date()
             })
-            .where(eq(applications.id, appId));
+            .where(and(eq(applications.id, appId), applicationPrivacyAllowed(false)));
 
           // Insert stage history
           await tx.insert(applicationStageHistory).values({
@@ -2824,7 +2985,7 @@ export class DatabaseStorage implements IStorage {
         recruiterNotes: sql`COALESCE(${applications.recruiterNotes}, ARRAY[]::text[]) || ARRAY[${note}]`,
         updatedAt: new Date(),
       })
-      .where(eq(applications.id, appId))
+      .where(and(eq(applications.id, appId), applicationPrivacyAllowed(false)))
       .returning();
     return result || undefined;
   }
@@ -2832,7 +2993,7 @@ export class DatabaseStorage implements IStorage {
   async setApplicationRating(appId: number, rating: number): Promise<Application | undefined> {
     const [result] = await db.update(applications)
       .set({ rating, updatedAt: new Date() })
-      .where(eq(applications.id, appId))
+      .where(and(eq(applications.id, appId), applicationPrivacyAllowed(false)))
       .returning();
     return result || undefined;
   }
@@ -3017,6 +3178,7 @@ export class DatabaseStorage implements IStorage {
           ),
           sql`${jobs.id} <> ${jobId}`,
           sql`${applications.aiFitScore} IS NOT NULL AND ${applications.aiFitScore} >= ${minFit}`,
+          applicationPrivacyAllowed(true),
           job.skills && job.skills.length > 0
             ? sql`${jobs.skills} && ${job.skills}` // array overlap operator
             : sql`TRUE`
@@ -3033,12 +3195,26 @@ export class DatabaseStorage implements IStorage {
   async getTalentPoolByRecruiter(recruiterId: number): Promise<TalentPool[]> {
     return db.select()
       .from(talentPool)
-      .where(eq(talentPool.recruiterId, recruiterId))
+      .where(and(
+        eq(talentPool.recruiterId, recruiterId),
+        isNull(talentPool.removedAt),
+        talentPoolPrivacyAllowed(false),
+      ))
       .orderBy(desc(talentPool.createdAt));
   }
 
   async getTalentPoolCandidate(id: number): Promise<TalentPool | undefined> {
-    const [result] = await db.select().from(talentPool).where(eq(talentPool.id, id));
+    const [result] = await db.select().from(talentPool).where(
+      and(eq(talentPool.id, id), isNull(talentPool.removedAt), talentPoolPrivacyAllowed(false)),
+    );
+    return result || undefined;
+  }
+
+  async getRemovedTalentPoolCandidate(id: number): Promise<TalentPool | undefined> {
+    const [result] = await db.select().from(talentPool).where(and(
+      eq(talentPool.id, id),
+      talentPoolPrivacyAllowed(false),
+    ));
     return result || undefined;
   }
 
@@ -3047,12 +3223,20 @@ export class DatabaseStorage implements IStorage {
       .from(talentPool)
       .where(and(
         eq(talentPool.recruiterId, recruiterId),
-        eq(talentPool.email, email.toLowerCase())
+        eq(talentPool.email, email.toLowerCase()),
+        isNull(talentPool.removedAt),
+        talentPoolPrivacyAllowed(false),
       ));
     return result || undefined;
   }
 
   async createTalentPoolCandidate(data: InsertTalentPool & { recruiterId: number }): Promise<TalentPool> {
+    const { requireNewCandidateIdentityAllowed } = await import('./candidate-privacy/decision');
+    const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [
+      { identifier_type: 'email', value: data.email.trim().toLowerCase() },
+    ];
+    if (data.phone?.trim()) identifiers.push({ identifier_type: 'phone', value: data.phone.trim() });
+    await requireNewCandidateIdentityAllowed(identifiers);
     const [result] = await db.insert(talentPool).values({
       ...data,
       email: data.email.toLowerCase(),
@@ -3061,6 +3245,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateTalentPoolCandidate(id: number, data: Partial<InsertTalentPool>): Promise<TalentPool | undefined> {
+    const { requireCandidatePrivacyAllowed, requireNewCandidateIdentityAllowed } = await import('./candidate-privacy/decision');
+    await requireCandidatePrivacyAllowed(
+      { type: 'talent_pool', id },
+      { globalUse: false },
+    );
+    if (data.email || data.phone) {
+      const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+      if (data.email?.trim()) identifiers.push({ identifier_type: 'email', value: data.email.trim().toLowerCase() });
+      if (data.phone?.trim()) identifiers.push({ identifier_type: 'phone', value: data.phone.trim() });
+      await requireNewCandidateIdentityAllowed(identifiers);
+    }
     const updateData = { ...data, updatedAt: new Date() };
     if (data.email) {
       updateData.email = data.email.toLowerCase();
@@ -3068,14 +3263,79 @@ export class DatabaseStorage implements IStorage {
     const [result] = await db
       .update(talentPool)
       .set(updateData)
-      .where(eq(talentPool.id, id))
+      .where(and(
+        eq(talentPool.id, id),
+        isNull(talentPool.removedAt),
+        talentPoolPrivacyAllowed(false),
+      ))
       .returning();
     return result || undefined;
   }
 
-  async deleteTalentPoolCandidate(id: number): Promise<boolean> {
-    const result = await db.delete(talentPool).where(eq(talentPool.id, id));
-    return (result.rowCount || 0) > 0;
+  async removeTalentPoolCandidate(
+    id: number,
+    actorUserId: number,
+    reason: 'organization_pool_removal' | 'converted_to_application' = 'organization_pool_removal',
+  ): Promise<boolean> {
+    return db.transaction(async (tx: any) => {
+      const [removed] = await tx.update(talentPool)
+        .set({
+          removedAt: new Date(),
+          removedByUserId: actorUserId,
+          removalReason: reason,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(talentPool.id, id),
+          isNull(talentPool.removedAt),
+          talentPoolPrivacyAllowed(false),
+        ))
+        .returning({ id: talentPool.id, organizationId: talentPool.organizationId });
+      if (!removed) return false;
+      await tx.insert(talentPoolMembershipEvents).values({
+        eventId: randomUUID(),
+        talentPoolId: removed.id,
+        organizationId: removed.organizationId,
+        actorUserId,
+        eventType: 'removed',
+        reasonCode: reason,
+      });
+      return true;
+    });
+  }
+
+  async restoreTalentPoolCandidate(id: number, actorUserId: number): Promise<TalentPool | undefined> {
+    return db.transaction(async (tx: any) => {
+      const [restored] = await tx.update(talentPool)
+        .set({
+          removedAt: null,
+          removedByUserId: null,
+          removalReason: null,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(talentPool.id, id),
+          sql`${talentPool.removedAt} IS NOT NULL`,
+          talentPoolPrivacyAllowed(false),
+        ))
+        .returning();
+      if (!restored) {
+        const [current] = await tx.select().from(talentPool).where(and(
+          eq(talentPool.id, id),
+          talentPoolPrivacyAllowed(false),
+        ));
+        return current || undefined;
+      }
+      await tx.insert(talentPoolMembershipEvents).values({
+        eventId: randomUUID(),
+        talentPoolId: restored.id,
+        organizationId: restored.organizationId,
+        actorUserId,
+        eventType: 'restored',
+        reasonCode: 'operator_restore',
+      });
+      return restored;
+    });
   }
 
   // Check if an application exists for email + job combination
@@ -3084,7 +3344,8 @@ export class DatabaseStorage implements IStorage {
       .from(applications)
       .where(and(
         sql`LOWER(${applications.email}) = LOWER(${email})`,
-        eq(applications.jobId, jobId)
+        eq(applications.jobId, jobId),
+        applicationPrivacyAllowed(false),
       ));
     return result || undefined;
   }
@@ -3093,7 +3354,8 @@ export class DatabaseStorage implements IStorage {
   async convertTalentPoolToApplication(
     talentPoolId: number,
     jobId: number,
-    recruiterId: number
+    recruiterId: number,
+    removeFromPool = false,
   ): Promise<{ application: Application; talentPool: TalentPool } | undefined> {
     const candidate = await this.getTalentPoolCandidate(talentPoolId);
     if (!candidate || candidate.recruiterId !== recruiterId) {
@@ -3107,24 +3369,52 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
 
+    const { requireCandidatePrivacyAllowed } = await import('./candidate-privacy/decision');
+    await requireCandidatePrivacyAllowed(
+      { type: 'talent_pool', id: talentPoolId },
+      { globalUse: true, newGlobalOperation: true },
+    );
+
     // Get first pipeline stage for initial placement
     const stages = await this.getPipelineStages(job.organizationId ?? null);
     const firstStage = pickInitialPipelineStage(stages, job.organizationId ?? null);
 
-    // Create application from talent pool data
-    const [application] = await db.insert(applications).values({
-      jobId,
-      name: candidate.name,
-      email: candidate.email,
-      phone: candidate.phone || null,
-      resumeUrl: candidate.resumeUrl || null,
-      currentStage: firstStage?.id || null,
-      source: 'talent_pool',
-      status: 'submitted',
-      organizationId: job.organizationId ?? undefined,
-    }).returning();
-
-    return { application, talentPool: candidate };
+    return db.transaction(async (tx: any) => {
+      // Create application from talent pool data and, when requested, remove
+      // only this organization membership in the same transaction.
+      const [application] = await tx.insert(applications).values({
+        jobId,
+        name: candidate.name,
+        email: candidate.email,
+        phone: candidate.phone || null,
+        resumeUrl: candidate.resumeUrl || null,
+        currentStage: firstStage?.id || null,
+        source: 'talent_pool',
+        status: 'submitted',
+        organizationId: job.organizationId ?? undefined,
+      }).returning();
+      if (removeFromPool) {
+        const [removed] = await tx.update(talentPool)
+          .set({
+            removedAt: new Date(),
+            removedByUserId: recruiterId,
+            removalReason: 'converted_to_application',
+            updatedAt: new Date(),
+          })
+          .where(and(eq(talentPool.id, talentPoolId), isNull(talentPool.removedAt)))
+          .returning({ id: talentPool.id, organizationId: talentPool.organizationId });
+        if (!removed) throw new Error('talent_pool_removal_conflict');
+        await tx.insert(talentPoolMembershipEvents).values({
+          eventId: randomUUID(),
+          talentPoolId: removed.id,
+          organizationId: removed.organizationId,
+          actorUserId: recruiterId,
+          eventType: 'removed',
+          reasonCode: 'converted_to_application',
+        });
+      }
+      return { application, talentPool: candidate };
+    });
   }
 
   // ===== EXTERNAL FORM INVITATIONS =====
@@ -3210,6 +3500,11 @@ export class DatabaseStorage implements IStorage {
     }
 
     const recruiterId = form.recruiterId;
+
+    const { requireNewCandidateIdentityAllowed } = await import('./candidate-privacy/decision');
+    await requireNewCandidateIdentityAllowed([
+      { identifier_type: 'email', value: invitation.email.trim().toLowerCase() },
+    ]);
 
     // If invitation has a jobId, create an application
     if (invitation.jobId) {
@@ -3738,6 +4033,11 @@ export class DatabaseStorage implements IStorage {
     effectiveRecruiterId: number;
     activekgTenantId: string;
   }): Promise<ApplicationGraphSyncJob> {
+    const { requireCandidatePrivacyAllowed } = await import('./candidate-privacy/decision');
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: input.applicationId },
+      { globalUse: true, newGlobalOperation: true },
+    );
     // Upsert: if already succeeded, keep unchanged; otherwise reset to pending
     const [job] = await db
       .insert(applicationGraphSyncJobs)
@@ -3832,6 +4132,16 @@ export class DatabaseStorage implements IStorage {
       .set({
         status: 'dead_letter',
         lastError: error,
+        updatedAt: new Date(),
+      })
+      .where(eq(applicationGraphSyncJobs.id, id));
+  }
+
+  async markApplicationGraphSyncJobPrivacyRestricted(id: number): Promise<void> {
+    await db.update(applicationGraphSyncJobs)
+      .set({
+        status: 'privacy_restricted',
+        lastError: 'candidate_privacy_restricted',
         updatedAt: new Date(),
       })
       .where(eq(applicationGraphSyncJobs.id, id));
@@ -4149,6 +4459,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         inArray(applications.id, applicationIds),
         eq(applications.organizationId, organizationId),
+        applicationPrivacyAllowed(false),
       ));
   }
 
@@ -4159,6 +4470,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(applications.jobId, jobId),
         sql`LOWER(${applications.email}) = LOWER(${email})`,
+        applicationPrivacyAllowed(false),
       ))
       .limit(1);
     return row || undefined;

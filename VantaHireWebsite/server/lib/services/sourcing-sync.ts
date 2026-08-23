@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { db } from '../../db';
 import { getResults } from './signal-client';
@@ -7,10 +8,33 @@ import type {
 } from './signal-contracts';
 import type { SignalExecutionIdentity } from './signal-callback-ack';
 import { commitIfSignalExecutionCurrent } from './signal-execution-fence';
+import { loadCandidatePrivacyConfig } from '../../candidate-privacy/config';
+import { checkMemoryEligibilityBatch } from '../../candidate-privacy/memory-client';
 
 const ENRICHED_STATUSES = new Set(['completed', 'enriched']);
 const PENDING_STATUSES = new Set(['pending', 'queued']);
 const FAILED_STATUSES = new Set(['failed', 'error']);
+
+async function filterPrivacyAllowedCandidates(
+  candidates: SignalResultCandidateV3[],
+): Promise<SignalResultCandidateV3[]> {
+  if (candidates.length === 0) return [];
+  const config = loadCandidatePrivacyConfig();
+  const subjects = candidates.map((candidate) => ({
+    candidate,
+    requestRef: randomUUID(),
+  }));
+  const decisions = await checkMemoryEligibilityBatch({
+    subjects: subjects.map(({ candidate, requestRef }) => ({
+      requestRef,
+      identifiers: [{ identifier_type: 'signal_candidate_id' as const, value: candidate.candidate.id }],
+    })),
+    timeoutMs: config.memoryTimeoutMs,
+  });
+  return subjects
+    .filter(({ requestRef }) => decisions.get(requestRef) === 'allow')
+    .map(({ candidate }) => candidate);
+}
 
 function readOptionalStringOrNull(
   input: Record<string, unknown> | null | undefined,
@@ -154,11 +178,14 @@ export async function upsertSignalCandidates(
   candidates: SignalResultCandidateV3[],
   onCandidateUpserted?: (candidate: SignalResultCandidateV3, rank: number) => void,
   execution?: SignalExecutionIdentity,
-): Promise<number> {
-  if (candidates.length === 0) return 0;
+): Promise<{ count: number; candidates: SignalResultCandidateV3[] }> {
+  if (candidates.length === 0) return { count: 0, candidates: [] };
+
+  const allowedCandidates = await filterPrivacyAllowedCandidates(candidates);
+  if (allowedCandidates.length === 0) return { count: 0, candidates: [] };
 
   // Build all row values for a single bulk INSERT
-  const rows = candidates.map((c) => {
+  const rows = allowedCandidates.map((c) => {
     const fitScore = normalizeFitScoreForStorage(c.fitScore ?? null);
     const searchSnippet = (c.candidate as unknown as { searchSnippet?: unknown }).searchSnippet ?? null;
     const searchMeta = (c.candidate as unknown as { searchMeta?: unknown }).searchMeta ?? null;
@@ -255,13 +282,14 @@ export async function upsertSignalCandidates(
 
   // Fire per-candidate callbacks after the batch
   if (onCandidateUpserted) {
-    for (let i = 0; i < candidates.length; i++) {
-      const c = candidates[i]!;
+    const publishableCandidates = await filterPrivacyAllowedCandidates(allowedCandidates);
+    for (let i = 0; i < publishableCandidates.length; i++) {
+      const c = publishableCandidates[i]!;
       onCandidateUpserted(c, c.sourcingContext?.rank ?? c.rank ?? i + 1);
     }
   }
 
-  return candidates.length;
+  return { count: allowedCandidates.length, candidates: allowedCandidates };
 }
 
 
@@ -284,9 +312,10 @@ export async function syncSignalResultsIntoVanta(
     : [];
   let candidateCount = fetchedResults.resultCount ?? 0;
   let upsertedCount = 0;
+  let privacyAllowedCandidates: SignalResultCandidateV3[] = [];
 
   if (candidates.length > 0) {
-    upsertedCount = await upsertSignalCandidates(
+    const upserted = await upsertSignalCandidates(
       params.organizationId,
       params.jobId,
       params.requestId,
@@ -294,11 +323,16 @@ export async function syncSignalResultsIntoVanta(
       onCandidateUpserted,
       params.execution,
     );
-    candidateCount = candidates.length;
+    upsertedCount = upserted.count;
+    privacyAllowedCandidates = upserted.candidates;
+    candidateCount = upsertedCount;
   }
 
-  const enrichmentProgress = computeEnrichmentProgress(candidates);
-  const metaPatch = buildSignalRunMetaPatch(fetchedResults, enrichmentProgress);
+  const enrichmentProgress = computeEnrichmentProgress(privacyAllowedCandidates);
+  const metaPatch = buildSignalRunMetaPatch(
+    { ...fetchedResults, resultCount: candidateCount },
+    enrichmentProgress,
+  );
 
   return {
     fetchedResults,

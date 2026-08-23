@@ -40,6 +40,15 @@ import { randomUUID } from 'crypto';
 import { getUserOrganization } from './lib/organizationService';
 import { getAiCreditExhaustionPayload, getMemberCreditBalance, useCredits, hasEnoughCredits } from './lib/creditService';
 import { requireFeatureAccess, FEATURES } from './lib/featureGating';
+import {
+  CandidatePrivacyRestrictedError,
+  privacyAllowedSql,
+  requireCandidatePrivacyAllowed,
+} from './candidate-privacy/decision';
+
+const applicationPrivacyAllowed = () => sql.raw(
+  privacyAllowedSql('application', 'applications.id', { globalUse: false }),
+);
 
 const AI_MATCH_ENABLED = process.env.AI_MATCH_ENABLED === 'true';
 const AI_RESUME_ENABLED = process.env.AI_RESUME_ENABLED === 'true';
@@ -352,6 +361,11 @@ export function registerAIRoutes(app: Express): void {
         const userId = req.user!.id;
         const file = req.file;
 
+        await requireCandidatePrivacyAllowed(
+          { type: 'candidate_user', id: userId },
+          { globalUse: true, newGlobalOperation: true },
+        );
+
         if (!file) {
           res.status(400).json({ error: 'Resume file is required' });
          return;
@@ -402,6 +416,10 @@ export function registerAIRoutes(app: Express): void {
         }
 
         // Upload to GCS
+        await requireCandidatePrivacyAllowed(
+          { type: 'candidate_user', id: userId },
+          { globalUse: true, newGlobalOperation: true },
+        );
         const gcsPath = await uploadToGCS(file.buffer, file.originalname);
 
         // If this is set as default, unset other defaults
@@ -413,6 +431,10 @@ export function registerAIRoutes(app: Express): void {
         }
 
         // Save resume
+        await requireCandidatePrivacyAllowed(
+          { type: 'candidate_user', id: userId },
+          { globalUse: true, newGlobalOperation: true },
+        );
         const [resume] = await db
           .insert(candidateResumes)
           .values({
@@ -442,6 +464,10 @@ export function registerAIRoutes(app: Express): void {
           },
         });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         console.error('Resume upload error:', error);
         res.status(500).json({ error: 'Internal server error' });
      return;
@@ -460,6 +486,11 @@ export function registerAIRoutes(app: Express): void {
       try {
         const userId = req.user!.id;
 
+        await requireCandidatePrivacyAllowed(
+          { type: 'candidate_user', id: userId },
+          { globalUse: false },
+        );
+
         const resumes = await db.query.candidateResumes.findMany({
           where: eq(candidateResumes.userId, userId),
           columns: {
@@ -473,6 +504,10 @@ export function registerAIRoutes(app: Express): void {
 
         res.json({ resumes });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(200).json({ resumes: [], privacyRestricted: true });
+          return;
+        }
         console.error('Resume list error:', error);
         res.status(500).json({ error: 'Internal server error' });
      return;
@@ -595,8 +630,12 @@ export function registerAIRoutes(app: Express): void {
         // Check ownership
         if (application.userId !== userId) {
           res.status(403).json({ error: 'Unauthorized' });
-       return;
+         return;
         }
+        await requireCandidatePrivacyAllowed(
+          { type: 'application', id: applicationId },
+          { globalUse: false },
+        );
 
         // Check if fit is fresh (cache-aware) - do this BEFORE free-tier check
         // Prefer application-linked resume; otherwise fall back to user's default resume,
@@ -648,6 +687,10 @@ export function registerAIRoutes(app: Express): void {
         if (!resumeText && application.resumeUrl) {
           // Fall back to application resume URL if no library resume
           try {
+            await requireCandidatePrivacyAllowed(
+              { type: 'application', id: applicationId },
+              { globalUse: false },
+            );
             const buffer = await downloadFromGCS(application.resumeUrl);
             const extraction = await extractResumeText(buffer);
 
@@ -727,7 +770,15 @@ export function registerAIRoutes(app: Express): void {
         }
         reservation = reservationResult.reservation;
 
+        await requireCandidatePrivacyAllowed(
+          { type: 'application', id: applicationId },
+          { globalUse: false },
+        );
         const result = await computeFitScore(resumeText, jdDigest);
+        await requireCandidatePrivacyAllowed(
+          { type: 'application', id: applicationId },
+          { globalUse: false },
+        );
         const computedAt = await finalizeFitCredit(
           reservation,
           result,
@@ -773,6 +824,10 @@ export function registerAIRoutes(app: Express): void {
             return;
           }
         }
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         console.error('Fit computation error:', error);
 
         if (error.message?.includes('Circuit breaker') || error.message?.includes('budget')) {
@@ -817,7 +872,7 @@ export function registerAIRoutes(app: Express): void {
 
         // Fetch all applications (validate ownership)
         const apps = await db.query.applications.findMany({
-          where: inArray(applications.id, applicationIds),
+          where: and(inArray(applications.id, applicationIds), applicationPrivacyAllowed()),
           with: {
             job: true,
           },
@@ -849,6 +904,24 @@ export function registerAIRoutes(app: Express): void {
               error: 'Unauthorized or invalid application ID',
             });
             continue;
+          }
+
+          try {
+            await requireCandidatePrivacyAllowed(
+              { type: 'application', id: appId },
+              { globalUse: false },
+            );
+          } catch (error) {
+            if (error instanceof CandidatePrivacyRestrictedError) {
+              results.push({
+                applicationId: appId,
+                success: false,
+                status: 'unauthorized',
+                error: 'Candidate is not available for this action',
+              });
+              continue;
+            }
+            throw error;
           }
 
           // Check if fit is fresh
@@ -903,6 +976,10 @@ export function registerAIRoutes(app: Express): void {
             if (!resumeText && app.resumeUrl) {
               // Fall back to application resume URL if no library resume
               try {
+                await requireCandidatePrivacyAllowed(
+                  { type: 'application', id: appId },
+                  { globalUse: false },
+                );
                 const buffer = await downloadFromGCS(app.resumeUrl);
                 const extraction = await extractResumeText(buffer);
 
@@ -994,7 +1071,15 @@ export function registerAIRoutes(app: Express): void {
             }
             reservation = reservationResult.reservation;
 
+            await requireCandidatePrivacyAllowed(
+              { type: 'application', id: appId },
+              { globalUse: false },
+            );
             const result = await computeFitScore(resumeText, jdDigest);
+            await requireCandidatePrivacyAllowed(
+              { type: 'application', id: appId },
+              { globalUse: false },
+            );
             const computedAt = await finalizeFitCredit(
               reservation,
               result,
@@ -1220,6 +1305,10 @@ export function registerAIRoutes(app: Express): void {
           res.status(404).json({ error: 'Application not found' });
           return;
         }
+        await requireCandidatePrivacyAllowed(
+          { type: 'application', id: applicationId },
+          { globalUse: false },
+        );
 
         // Get resume for staleness check
         let resumeData = application.resumeId
@@ -1270,6 +1359,10 @@ export function registerAIRoutes(app: Express): void {
         }
 
         // Create DB job first with unique placeholder bullJobId
+        await requireCandidatePrivacyAllowed(
+          { type: 'application', id: applicationId },
+          { globalUse: false },
+        );
         const dbJob = await storage.createAiFitJob({
           bullJobId: `pending-${randomUUID()}`,
           queueName: QUEUES.INTERACTIVE,
@@ -1280,6 +1373,10 @@ export function registerAIRoutes(app: Express): void {
 
         // Enqueue with real dbJobId, then update bullJobId
         try {
+          await requireCandidatePrivacyAllowed(
+            { type: 'application', id: applicationId },
+            { globalUse: false },
+          );
           const bullJobId = await enqueueInteractive({ applicationId, userId, dbJobId: dbJob.id });
           await storage.updateAiFitJobBullId(dbJob.id, bullJobId);
         } catch (enqueueError) {
@@ -1298,6 +1395,10 @@ export function registerAIRoutes(app: Express): void {
           totalCount: 1,
         });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         console.error('Async queue error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }
@@ -1340,7 +1441,7 @@ export function registerAIRoutes(app: Express): void {
 
         // Fetch applications and check ownership first (needed for stale check)
         const apps = await db.query.applications.findMany({
-          where: inArray(applications.id, applicationIds),
+          where: and(inArray(applications.id, applicationIds), applicationPrivacyAllowed()),
           with: { job: true },
         });
 
@@ -1466,6 +1567,12 @@ export function registerAIRoutes(app: Express): void {
         };
 
         // Create DB job first with unique placeholder bullJobId and initial cached results
+        for (const applicationId of staleIds) {
+          await requireCandidatePrivacyAllowed(
+            { type: 'application', id: applicationId },
+            { globalUse: false },
+          );
+        }
         const dbJob = await storage.createAiFitJob({
           bullJobId: `pending-${randomUUID()}`,
           queueName: QUEUES.BATCH,
@@ -1477,6 +1584,12 @@ export function registerAIRoutes(app: Express): void {
 
         // Enqueue with real dbJobId, then update bullJobId
         try {
+          for (const applicationId of staleIds) {
+            await requireCandidatePrivacyAllowed(
+              { type: 'application', id: applicationId },
+              { globalUse: false },
+            );
+          }
           const bullJobId = await enqueueBatch({ applicationIds: staleIds, userId, dbJobId: dbJob.id });
           await storage.updateAiFitJobBullId(dbJob.id, bullJobId);
         } catch (enqueueError) {
@@ -1496,6 +1609,10 @@ export function registerAIRoutes(app: Express): void {
           cachedCount: cachedResults.length,
         });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         console.error('Async batch queue error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }
@@ -1530,6 +1647,17 @@ export function registerAIRoutes(app: Express): void {
           return;
         }
 
+        const jobApplicationIds = [
+          ...(job.applicationId ? [job.applicationId] : []),
+          ...(Array.isArray(job.applicationIds) ? job.applicationIds : []),
+        ];
+        for (const applicationId of jobApplicationIds) {
+          await requireCandidatePrivacyAllowed(
+            { type: 'application', id: applicationId },
+            { globalUse: false },
+          );
+        }
+
         res.json({
           id: job.id,
           status: job.status,
@@ -1544,6 +1672,10 @@ export function registerAIRoutes(app: Express): void {
           completedAt: job.completedAt,
         });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(404).json({ code: 'candidate_privacy_restricted' });
+          return;
+        }
         console.error('Get job status error:', error);
         res.status(500).json({ error: 'Internal server error' });
       }

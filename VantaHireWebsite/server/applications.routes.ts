@@ -64,9 +64,60 @@ import { normalizeStageName } from './lib/pipelineStageUtils';
 import { resolveActiveKGTenantId } from './lib/activekgTenant';
 import { MIN_RESUME_TEXT_LENGTH } from './lib/applicationGraphSyncProcessor';
 import { pickInitialPipelineStage } from './lib/pipelineStageSelection';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+  requireNewCandidateIdentityAllowed,
+} from './candidate-privacy/decision';
 
 // Base URL for email links
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+
+async function requireApplicationIngestAllowed(input: {
+  userId?: number;
+  email: string;
+  phone?: string | null;
+}): Promise<void> {
+  if (input.userId) {
+    await requireCandidatePrivacyAllowed(
+      { type: 'candidate_user', id: input.userId },
+      { globalUse: true, newGlobalOperation: true },
+    );
+    return;
+  }
+  const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [
+    { identifier_type: 'email', value: input.email.trim().toLowerCase() },
+  ];
+  if (input.phone?.trim()) identifiers.push({ identifier_type: 'phone', value: input.phone.trim() });
+  await requireNewCandidateIdentityAllowed(identifiers);
+}
+
+function sendPrivacyRestriction(error: unknown, res: Response): boolean {
+  if (!(error instanceof CandidatePrivacyRestrictedError)) return false;
+  res.status(503).json({ code: error.code });
+  return true;
+}
+
+function runPrivacyCheckedApplicationSideEffect(
+  applicationId: number,
+  label: string,
+  sideEffect: () => Promise<unknown>,
+): void {
+  void (async () => {
+    try {
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: applicationId },
+        { globalUse: false },
+      );
+      await sideEffect();
+    } catch (error) {
+      const code = error instanceof CandidatePrivacyRestrictedError
+        ? error.code
+        : 'side_effect_failed';
+      console.error(`[APPLICATION_SIDE_EFFECT] ${label}:`, { code });
+    }
+  })();
+}
 
 function toCandidateApplicationView(application: Application & { job: Job }) {
   return {
@@ -379,6 +430,14 @@ export function registerApplicationsRoutes(
         whatsappConsent: req.body?.whatsappConsent,
       });
 
+      // Before duplicate disclosure, GCS, extraction, candidate-resume insert,
+      // application insert, notifications or queueing.
+      await requireApplicationIngestAllowed({
+        ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
+        email: applicationData.email,
+        phone: applicationData.phone,
+      });
+
       let resumeUrl = '';
       let resumeRecordId: number | null = null;
       let resumeCountForCompletion: number | null = null;
@@ -405,12 +464,7 @@ export function registerApplicationsRoutes(
       }
 
       // Duplicate detection (case-insensitive email check)
-      const existingApp = await db.query.applications.findFirst({
-        where: and(
-          eq(applications.jobId, jobId),
-          sql`LOWER(${applications.email}) = LOWER(${applicationData.email})`
-        )
-      });
+      const existingApp = await storage.findApplicationByJobAndEmail(jobId, applicationData.email);
 
       if (existingApp) {
         await matchApplicationToSourcedCandidate({
@@ -436,6 +490,11 @@ export function registerApplicationsRoutes(
       if (req.file) {
         resumeFilename = req.file.originalname ?? null;
         try {
+          await requireApplicationIngestAllowed({
+            ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
+            email: applicationData.email,
+            phone: applicationData.phone,
+          });
           resumeUrl = await uploadToGCS(req.file.buffer, req.file.originalname);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -464,6 +523,10 @@ export function registerApplicationsRoutes(
       // If candidate is authenticated, persist resume + extracted text for AI
       if (verifiedCandidate && req.file?.buffer) {
         try {
+          await requireCandidatePrivacyAllowed(
+            { type: 'candidate_user', id: verifiedCandidate.id },
+            { globalUse: true, newGlobalOperation: true },
+          );
           // Enforce soft limit of 3 resumes like resume upload endpoint
           const existingResumes = await db.query.candidateResumes.findMany({
             where: eq(candidateResumes.userId, verifiedCandidate.id),
@@ -555,7 +618,11 @@ export function registerApplicationsRoutes(
       // Fire-and-forget: candidate confirmation via email and WhatsApp (if enabled)
       const autoNotifications = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1' || process.env.NOTIFICATION_AUTOMATION_ENABLED === 'true';
       if (autoNotifications) {
-        sendApplicationReceivedNotification(application.id).catch(err => console.error('Application received notification error:', err));
+        runPrivacyCheckedApplicationSideEffect(
+          application.id,
+          'candidate_notification',
+          () => sendApplicationReceivedNotification(application.id),
+        );
       }
 
       // Send notification email to all recruiters on this job (if enabled)
@@ -565,20 +632,24 @@ export function registerApplicationsRoutes(
           job.organizationId ?? undefined
         );
         if (shouldNotifyRecruiter) {
-          notifyRecruitersNewApplication(
+          runPrivacyCheckedApplicationSideEffect(
             application.id,
-            job.id,
-            {
-              name: application.name,
-              email: application.email,
-              phone: application.phone,
-              coverLetter: application.coverLetter,
-            },
-            {
-              title: job.title,
-              location: job.location,
-            }
-          ).catch(err => console.error('Failed to send recruiter notification:', err));
+            'recruiter_notification',
+            () => notifyRecruitersNewApplication(
+              application.id,
+              job.id,
+              {
+                name: application.name,
+                email: application.email,
+                phone: application.phone,
+                coverLetter: application.coverLetter,
+              },
+              {
+                title: job.title,
+                location: job.location,
+              },
+            ),
+          );
         }
       } catch (emailError) {
         console.error('Failed to send recruiter notification:', emailError);
@@ -622,6 +693,7 @@ export function registerApplicationsRoutes(
       });
       return;
     } catch (error) {
+      if (sendPrivacyRestriction(error, res)) return;
       if (error instanceof z.ZodError) {
         res.status(400).json({
           error: 'Validation error',
@@ -683,13 +755,14 @@ export function registerApplicationsRoutes(
         // Validate with dedicated schema
         const applicationData = recruiterAddApplicationSchema.parse(req.body);
 
-        // Duplicate detection (case-insensitive email check)
-        const existingApp = await db.query.applications.findFirst({
-          where: and(
-            eq(applications.jobId, jobId),
-            sql`LOWER(${applications.email}) = LOWER(${applicationData.email})`
-          )
+        // Before duplicate disclosure, GCS, extraction or persistence.
+        await requireApplicationIngestAllowed({
+          email: applicationData.email,
+          phone: applicationData.phone,
         });
+
+        // Duplicate detection (case-insensitive email check)
+        const existingApp = await storage.findApplicationByJobAndEmail(jobId, applicationData.email);
 
         if (existingApp) {
           res.status(400).json({
@@ -703,6 +776,10 @@ export function registerApplicationsRoutes(
         // Upload resume
         let resumeUrl = '';
         try {
+          await requireApplicationIngestAllowed({
+            email: applicationData.email,
+            phone: applicationData.phone,
+          });
           resumeUrl = await uploadToGCS(req.file.buffer, req.file.originalname);
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -808,7 +885,6 @@ export function registerApplicationsRoutes(
           applicationId: application.id,
           recruiterId: req.user!.id,
           jobId,
-          candidateEmail: applicationData.email,
           source: applicationData.source,
           timestamp: new Date().toISOString()
         });
@@ -851,6 +927,7 @@ export function registerApplicationsRoutes(
         });
         return;
       } catch (error) {
+        if (sendPrivacyRestriction(error, res)) return;
         if (error instanceof z.ZodError) {
           res.status(400).json({
             error: 'Validation error',
@@ -980,12 +1057,14 @@ export function registerApplicationsRoutes(
             if (autoNotifications) {
               const dateStr = slotDate.toISOString();
               const timeLabel = timeRangeLabel ?? "";
-              sendInterviewInvitationNotification(appId, {
-                date: dateStr,
-                time: timeLabel,
-                location,
-              }).catch((err) =>
-                console.error("Bulk interview notification error:", err)
+              runPrivacyCheckedApplicationSideEffect(
+                appId,
+                'bulk_interview_notification',
+                () => sendInterviewInvitationNotification(appId, {
+                  date: dateStr,
+                  time: timeLabel,
+                  location,
+                }),
               );
             }
 
@@ -1508,11 +1587,15 @@ export function registerApplicationsRoutes(
       if (autoNotifications && targetStage.name) {
         const stageName = targetStage.name.toLowerCase();
         if (stageName.includes('offer') || stageName.includes('hired')) {
-          sendOfferNotification(appId).catch(err => console.error('Offer notification error:', err));
+          runPrivacyCheckedApplicationSideEffect(appId, 'offer_notification', () => sendOfferNotification(appId));
         } else if (stageName.includes('reject')) {
-          sendRejectionNotification(appId).catch(err => console.error('Rejection notification error:', err));
+          runPrivacyCheckedApplicationSideEffect(appId, 'rejection_notification', () => sendRejectionNotification(appId));
         } else {
-          sendStatusUpdateNotification(appId, targetStage.name).catch(err => console.error('Status notification error:', err));
+          runPrivacyCheckedApplicationSideEffect(
+            appId,
+            'status_notification',
+            () => sendStatusUpdateNotification(appId, targetStage.name),
+          );
         }
       }
 
@@ -1660,7 +1743,11 @@ export function registerApplicationsRoutes(
 
       const autoNotifications = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1' || process.env.NOTIFICATION_AUTOMATION_ENABLED === 'true';
       if (autoNotifications && date && time && location) {
-        sendInterviewInvitationNotification(appId, { date, time, location }).catch(err => console.error('Interview notification error:', err));
+        runPrivacyCheckedApplicationSideEffect(
+          appId,
+          'interview_notification',
+          () => sendInterviewInvitationNotification(appId, { date, time, location }),
+        );
       }
 
       res.json(updated);
@@ -1804,6 +1891,10 @@ export function registerApplicationsRoutes(
 
       if (!resumeText && application.resumeUrl && application.resumeUrl.startsWith('gs://')) {
         try {
+          await requireCandidatePrivacyAllowed(
+            { type: 'application', id: appId },
+            { globalUse: false },
+          );
           const buffer = await downloadFromGCS(application.resumeUrl);
           const extraction = await extractResumeText(buffer);
           if (extraction.success && validateResumeText(extraction.text)) {
@@ -1826,6 +1917,10 @@ export function registerApplicationsRoutes(
       }
 
       const startTime = Date.now();
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: appId },
+        { globalUse: false },
+      );
       const summaryResult = await generateCandidateSummary(
         effectiveText,
         job.title,
@@ -1838,6 +1933,10 @@ export function registerApplicationsRoutes(
 
       const costUsd = calculateAiCost(summaryResult.tokensUsed.input, summaryResult.tokensUsed.output);
 
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: appId },
+        { globalUse: false },
+      );
       await db
         .update(applications)
         .set({
@@ -1904,6 +2003,10 @@ export function registerApplicationsRoutes(
       });
       return;
     } catch (error) {
+      if (error instanceof CandidatePrivacyRestrictedError) {
+        res.status(503).json({ code: error.code });
+        return;
+      }
       console.error('[AI Summary] Error:', error);
       if (error instanceof Error) {
         res.status(500).json({
@@ -2100,6 +2203,15 @@ export function registerApplicationsRoutes(
         for (const app of apps) {
           const hasAccess = await storage.isRecruiterOnJob(app.jobId, userId, userOrgId);
           if (hasAccess) {
+            try {
+              await requireCandidatePrivacyAllowed(
+                { type: 'application', id: app.id },
+                { globalUse: false },
+              );
+            } catch (error) {
+              if (error instanceof CandidatePrivacyRestrictedError) continue;
+              throw error;
+            }
             accessibleApps.push(app);
           }
         }
@@ -2160,6 +2272,12 @@ export function registerApplicationsRoutes(
 
         // Create DB job
         const appIdsToProcess = appsNeedingSummary.map(app => app.id);
+        for (const applicationId of appIdsToProcess) {
+          await requireCandidatePrivacyAllowed(
+            { type: 'application', id: applicationId },
+            { globalUse: false },
+          );
+        }
         const dbJob = await storage.createAiFitJob({
           bullJobId: `pending-${randomUUID()}`,
           queueName: QUEUES.BATCH,
@@ -2179,6 +2297,12 @@ export function registerApplicationsRoutes(
 
         // Enqueue the job
         try {
+          for (const applicationId of appIdsToProcess) {
+            await requireCandidatePrivacyAllowed(
+              { type: 'application', id: applicationId },
+              { globalUse: false },
+            );
+          }
           const bullJobId = await enqueueSummaryBatch({
             applicationIds: appIdsToProcess,
             recruiterId: userId,
@@ -2204,6 +2328,10 @@ export function registerApplicationsRoutes(
           skippedCount: accessibleApps.length - appsNeedingSummary.length,
         });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         console.error('[AI Summary Queue] Error:', error);
         next(error);
       }
@@ -2239,6 +2367,17 @@ export function registerApplicationsRoutes(
           return;
         }
 
+        const applicationIds = [
+          ...(job.applicationId ? [job.applicationId] : []),
+          ...(Array.isArray(job.applicationIds) ? job.applicationIds : []),
+        ];
+        for (const applicationId of applicationIds) {
+          await requireCandidatePrivacyAllowed(
+            { type: 'application', id: applicationId },
+            { globalUse: false },
+          );
+        }
+
         res.json({
           id: job.id,
           status: job.status,
@@ -2253,6 +2392,10 @@ export function registerApplicationsRoutes(
           completedAt: job.completedAt,
         });
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(404).json({ code: 'candidate_privacy_restricted' });
+          return;
+        }
         console.error('[AI Summary Job Status] Error:', error);
         next(error);
       }

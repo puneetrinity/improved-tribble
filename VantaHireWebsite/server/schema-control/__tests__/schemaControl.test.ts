@@ -241,7 +241,9 @@ describe("read-only readiness", () => {
   const m = loadManifest(dir);
 
   it("checks restricted runtime privileges and ownership using catalog reads only", async () => {
-    const check = FLOW_CRITICAL_POSTCONDITIONS[1]!.check;
+    const check = FLOW_CRITICAL_POSTCONDITIONS.find(
+      (postcondition) => postcondition.name === "Runtime role has application rights without DDL or ownership authority",
+    )!.check;
     let observedSql = "";
     const pg: PgLike = {
       async query(text: string) {

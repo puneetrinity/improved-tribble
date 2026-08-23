@@ -12,6 +12,11 @@ import {
   type ContactRevalidationStore,
   type ContactResolutionStore,
 } from './contactResolutionCore';
+import {
+  CandidatePrivacyRestrictedError,
+  privacyAllowedSql,
+  requireNewCandidateIdentityAllowed,
+} from '../candidate-privacy/decision';
 
 const POLL_INTERVAL_MS = readPositiveInteger(
   process.env.CONTACT_RESOLUTION_POLL_INTERVAL_MS,
@@ -28,6 +33,35 @@ const LEASE_MS = Math.max(
   SIGNAL_TIMEOUT_MS + 30_000,
 );
 const SIGNAL_PENDING_RETRY_DELAYS_MS = [30_000, 120_000, 300_000, 900_000, 3_600_000, 21_600_000];
+
+async function findContactWithPrivacyFence(
+  signalTenantId: string,
+  signalCandidateId: string,
+  externalJobId: string,
+) {
+  try {
+    await requireNewCandidateIdentityAllowed([
+      { identifier_type: 'signal_candidate_id', value: signalCandidateId },
+    ]);
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      return { success: true, state: 'not_found' as const, emails: [] };
+    }
+    throw error;
+  }
+  const result = await findContact(signalTenantId, signalCandidateId, externalJobId);
+  try {
+    await requireNewCandidateIdentityAllowed([
+      { identifier_type: 'signal_candidate_id', value: signalCandidateId },
+    ]);
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      return { success: true, state: 'not_found' as const, emails: [] };
+    }
+    throw error;
+  }
+  return result;
+}
 
 let running = false;
 let cycleInFlight = false;
@@ -52,6 +86,11 @@ const contactResolutionStore: ContactResolutionStore = {
         FROM job_sourced_candidates
         WHERE email_resolve_status = 'pending'
           AND state = 'shortlisted'
+          AND ${sql.raw(privacyAllowedSql(
+            'job_sourced_candidate',
+            'job_sourced_candidates.id',
+            { globalUse: true },
+          ))}
           AND btrim(COALESCE(signal_candidate_id, '')) <> ''
           AND COALESCE(email_resolve_next_attempt_at, updated_at, NOW()) <= ${now}
           AND (
@@ -115,6 +154,11 @@ const contactResolutionStore: ContactResolutionStore = {
         eq(jobSourcedCandidates.state, 'shortlisted'),
         eq(jobSourcedCandidates.emailResolveStatus, 'pending'),
         eq(jobSourcedCandidates.emailResolveLeaseToken, leaseToken),
+        sql.raw(privacyAllowedSql(
+          'job_sourced_candidate',
+          'job_sourced_candidates.id',
+          { globalUse: true },
+        )),
       ));
   },
 
@@ -137,6 +181,11 @@ const contactResolutionStore: ContactResolutionStore = {
         eq(jobSourcedCandidates.state, 'shortlisted'),
         eq(jobSourcedCandidates.emailResolveStatus, 'pending'),
         eq(jobSourcedCandidates.emailResolveLeaseToken, leaseToken),
+        sql.raw(privacyAllowedSql(
+          'job_sourced_candidate',
+          'job_sourced_candidates.id',
+          { globalUse: true },
+        )),
       ));
   },
 
@@ -159,6 +208,11 @@ const contactResolutionStore: ContactResolutionStore = {
         eq(jobSourcedCandidates.state, 'shortlisted'),
         eq(jobSourcedCandidates.emailResolveStatus, 'pending'),
         eq(jobSourcedCandidates.emailResolveLeaseToken, leaseToken),
+        sql.raw(privacyAllowedSql(
+          'job_sourced_candidate',
+          'job_sourced_candidates.id',
+          { globalUse: true },
+        )),
       ));
   },
 };
@@ -191,6 +245,11 @@ const contactRevalidationStore: ContactRevalidationStore = {
         AND job_id = ${jobId}
         AND signal_candidate_id = ${signalCandidateId}
         AND state = 'shortlisted'
+        AND ${sql.raw(privacyAllowedSql(
+          'job_sourced_candidate',
+          'job_sourced_candidates.id',
+          { globalUse: true },
+        ))}
         AND (
           ${status} = 'suppressed'
           OR email_resolve_status IS DISTINCT FROM 'suppressed'
@@ -206,7 +265,7 @@ export async function revalidateCandidateContact(
 ): Promise<ContactRevalidationResult> {
   const result = await revalidateContactResolution(input, {
     store: contactRevalidationStore,
-    resolveContact: findContact,
+    resolveContact: findContactWithPrivacyFence,
     now: () => new Date(),
     retryDelayMs,
   });
@@ -231,7 +290,7 @@ async function pollCycle(): Promise<void> {
     await runContactResolutionCycle(
       {
         store: contactResolutionStore,
-        resolveContact: findContact,
+        resolveContact: findContactWithPrivacyFence,
         createLeaseToken: randomUUID,
         now: () => new Date(),
       },
@@ -302,6 +361,11 @@ export async function enqueueCandidateContactResolution(candidateId: number): Pr
         updated_at = NOW()
     WHERE id = ${candidateId}
       AND state = 'shortlisted'
+      AND ${sql.raw(privacyAllowedSql(
+        'job_sourced_candidate',
+        'job_sourced_candidates.id',
+        { globalUse: true },
+      ))}
       AND btrim(COALESCE(signal_candidate_id, '')) <> ''
       AND email_resolve_status IS DISTINCT FROM 'suppressed'
     RETURNING id

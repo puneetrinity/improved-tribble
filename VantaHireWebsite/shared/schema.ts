@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -575,12 +575,32 @@ export const talentPool = pgTable("talent_pool", {
   formResponseId: integer("form_response_id").references(() => formResponses.id),
   notes: text("notes"),
   resumeUrl: text("resume_url"), // Optional resume URL from form response
+  removedAt: timestamp("removed_at", { withTimezone: true }),
+  removedByUserId: integer("removed_by_user_id").references(() => users.id),
+  removalReason: text("removal_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
-  recruiterEmailIdx: uniqueIndex("talent_pool_recruiter_email_idx").on(table.recruiterId, table.email),
+  recruiterEmailIdx: uniqueIndex("talent_pool_recruiter_email_unique")
+    .on(table.recruiterId, sql`lower(${table.email})`)
+    .where(sql`${table.removedAt} IS NULL`),
   recruiterIdIdx: index("talent_pool_recruiter_id_idx").on(table.recruiterId),
   createdAtIdx: index("talent_pool_created_at_idx").on(table.createdAt),
+  activeRecruiterIdx: index("talent_pool_active_recruiter_idx")
+    .on(table.recruiterId, table.createdAt)
+    .where(sql`${table.removedAt} IS NULL`),
+  activeOrganizationIdx: index("talent_pool_active_organization_idx")
+    .on(table.organizationId, table.createdAt)
+    .where(sql`${table.removedAt} IS NULL`),
+  removalShapeCheck: check(
+    "talent_pool_removal_shape_check",
+    sql`(
+      (${table.removedAt} IS NULL AND ${table.removedByUserId} IS NULL AND ${table.removalReason} IS NULL)
+      OR
+      (${table.removedAt} IS NOT NULL AND ${table.removedByUserId} IS NOT NULL
+        AND ${table.removalReason} IN ('organization_pool_removal', 'converted_to_application'))
+    )`,
+  ),
 }));
 
 // Hiring Manager Invitations: Invite hiring managers via email
@@ -1102,6 +1122,147 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
     table.emailResolveNextAttemptAt,
     table.id,
   ).where(sql`${table.emailResolveStatus} = 'pending'`),
+}));
+
+// Candidate Privacy Phase 1AF. These tables hold only stable local anchors and
+// bounded control-plane state; raw identifiers are never copied into them.
+export const candidatePrivacyRequests = pgTable("candidate_privacy_requests", {
+  requestId: uuid("request_id").primaryKey(),
+  directiveId: uuid("directive_id").unique(),
+  action: text("action").notNull(),
+  authorityType: text("authority_type").notNull(),
+  actorUserId: integer("actor_user_id").notNull().references(() => users.id),
+  reasonCode: text("reason_code").notNull(),
+  state: text("state").notNull().default("accepted_local"),
+  version: integer("version").notNull().default(1),
+  effectiveAt: timestamp("effective_at", { withTimezone: true }).defaultNow().notNull(),
+  lastDeliveryStatus: text("last_delivery_status").notNull().default("pending"),
+  lastErrorCode: text("last_error_code"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  actorIdx: index("candidate_privacy_requests_actor_idx").on(table.actorUserId, table.createdAt),
+  directiveVersionIdx: index("candidate_privacy_requests_directive_version_idx")
+    .on(table.directiveId, table.version)
+    .where(sql`${table.directiveId} IS NOT NULL`),
+  activeIdx: index("candidate_privacy_requests_active_idx")
+    .on(table.state, table.effectiveAt)
+    .where(sql`${table.state} IN ('accepted_local', 'delivery_pending', 'memory_active', 'needs_review')`),
+}));
+
+export const candidatePrivacyRequestEvents = pgTable("candidate_privacy_request_events", {
+  eventId: uuid("event_id").primaryKey(),
+  requestId: uuid("request_id").notNull().references(() => candidatePrivacyRequests.requestId),
+  eventType: text("event_type").notNull(),
+  action: text("action").notNull(),
+  authorityType: text("authority_type").notNull(),
+  actorUserId: integer("actor_user_id").notNull().references(() => users.id),
+  evidenceRef: uuid("evidence_ref").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  priorState: text("prior_state"),
+  resultingState: text("resulting_state").notNull(),
+  expectedVersion: integer("expected_version"),
+  resultingVersion: integer("resulting_version").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  requestIdx: index("candidate_privacy_request_events_request_idx")
+    .on(table.requestId, table.resultingVersion, table.occurredAt),
+}));
+
+export const candidatePrivacySubjectLinks = pgTable("candidate_privacy_subject_links", {
+  linkId: uuid("link_id").primaryKey(),
+  requestId: uuid("request_id").notNull().references(() => candidatePrivacyRequests.requestId),
+  subjectType: text("subject_type").notNull(),
+  candidateUserId: integer("candidate_user_id").references(() => users.id),
+  applicationId: integer("application_id").references(() => applications.id),
+  candidateResumeId: integer("candidate_resume_id").references(() => candidateResumes.id),
+  talentPoolId: integer("talent_pool_id").references(() => talentPool.id),
+  jobSourcedCandidateId: integer("job_sourced_candidate_id").references(() => jobSourcedCandidates.id),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  userIdx: uniqueIndex("candidate_privacy_subject_links_user_idx")
+    .on(table.requestId, table.candidateUserId)
+    .where(sql`${table.candidateUserId} IS NOT NULL`),
+  applicationIdx: uniqueIndex("candidate_privacy_subject_links_application_idx")
+    .on(table.requestId, table.applicationId)
+    .where(sql`${table.applicationId} IS NOT NULL`),
+  resumeIdx: uniqueIndex("candidate_privacy_subject_links_resume_idx")
+    .on(table.requestId, table.candidateResumeId)
+    .where(sql`${table.candidateResumeId} IS NOT NULL`),
+  talentPoolIdx: uniqueIndex("candidate_privacy_subject_links_talent_pool_idx")
+    .on(table.requestId, table.talentPoolId)
+    .where(sql`${table.talentPoolId} IS NOT NULL`),
+  sourcedIdx: uniqueIndex("candidate_privacy_subject_links_sourced_idx")
+    .on(table.requestId, table.jobSourcedCandidateId)
+    .where(sql`${table.jobSourcedCandidateId} IS NOT NULL`),
+  organizationIdx: index("candidate_privacy_subject_links_org_idx")
+    .on(table.organizationId, table.subjectType),
+}));
+
+export const candidatePrivacyOutbox = pgTable("candidate_privacy_outbox", {
+  outboxId: uuid("outbox_id").primaryKey(),
+  requestId: uuid("request_id").notNull().unique().references(() => candidatePrivacyRequests.requestId),
+  operation: text("operation").notNull().default("create_directive"),
+  state: text("state").notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  availableAt: timestamp("available_at", { withTimezone: true }).defaultNow().notNull(),
+  leaseToken: uuid("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  lastErrorCode: text("last_error_code"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  dueIdx: index("candidate_privacy_outbox_due_idx")
+    .on(table.availableAt, table.createdAt)
+    .where(sql`${table.state} IN ('pending', 'retry')`),
+  leaseIdx: index("candidate_privacy_outbox_lease_idx")
+    .on(table.leaseExpiresAt)
+    .where(sql`${table.state} = 'leased'`),
+}));
+
+export const candidatePrivacyRemoteProjection = pgTable("candidate_privacy_remote_projection", {
+  directiveId: uuid("directive_id").primaryKey(),
+  requestId: uuid("request_id").notNull().unique().references(() => candidatePrivacyRequests.requestId),
+  action: text("action").notNull(),
+  scope: text("scope").notNull(),
+  state: text("state").notNull(),
+  decision: text("decision").notNull(),
+  version: integer("version").notNull(),
+  effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
+  generation: bigint("generation", { mode: "number" }).notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  activeIdx: index("candidate_privacy_remote_active_idx")
+    .on(table.decision, table.effectiveAt)
+    .where(sql`${table.decision} <> 'allow'`),
+  generationIdx: index("candidate_privacy_remote_generation_idx").on(table.generation, table.directiveId),
+}));
+
+export const candidatePrivacySyncState = pgTable("candidate_privacy_sync_state", {
+  consumerName: text("consumer_name").primaryKey(),
+  cursor: bigint("cursor", { mode: "number" }).notNull().default(0),
+  activeGeneration: bigint("active_generation", { mode: "number" }).notNull().default(0),
+  status: text("status").notNull().default("uninitialized"),
+  lastSuccessAt: timestamp("last_success_at", { withTimezone: true }),
+  lastSnapshotAt: timestamp("last_snapshot_at", { withTimezone: true }),
+  lastErrorCode: text("last_error_code"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const talentPoolMembershipEvents = pgTable("talent_pool_membership_events", {
+  eventId: uuid("event_id").primaryKey(),
+  talentPoolId: integer("talent_pool_id").notNull().references(() => talentPool.id),
+  organizationId: integer("organization_id").references(() => organizations.id),
+  actorUserId: integer("actor_user_id").notNull().references(() => users.id),
+  eventType: text("event_type").notNull(),
+  reasonCode: text("reason_code").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  candidateIdx: index("talent_pool_membership_events_candidate_idx")
+    .on(table.talentPoolId, table.occurredAt),
+  organizationIdx: index("talent_pool_membership_events_org_idx")
+    .on(table.organizationId, table.occurredAt),
 }));
 
 export const sourcedCandidateOutreachCampaigns = pgTable("sourced_candidate_outreach_campaigns", {
@@ -2658,7 +2819,7 @@ export type InsertResumeImportItem = z.infer<typeof insertResumeImportItemSchema
 // Batch fit result types (for clarity)
 export interface BatchFitResultItem {
   applicationId: number;
-  status: 'success' | 'cached' | 'requiresPaid' | 'error';
+  status: 'success' | 'cached' | 'requiresPaid' | 'restricted' | 'error';
   score?: number;
   label?: string;
   reasons?: string[];
@@ -2672,6 +2833,7 @@ export interface BatchFitResult {
     succeeded: number;
     cached: number;
     requiresPaid: number;
+    restricted?: number;
     errors: number;
   };
 }
@@ -2956,6 +3118,13 @@ export type OutreachOrgSuppression = typeof outreachOrgSuppressions.$inferSelect
 export type OutreachHygieneIntent = typeof outreachHygieneIntents.$inferSelect;
 export type OutreachDeliveryCorrelation = typeof outreachDeliveryCorrelations.$inferSelect;
 export type CandidateOutreachSchedule = typeof candidateOutreachSchedules.$inferSelect;
+export type CandidatePrivacyRequest = typeof candidatePrivacyRequests.$inferSelect;
+export type CandidatePrivacyRequestEvent = typeof candidatePrivacyRequestEvents.$inferSelect;
+export type CandidatePrivacySubjectLink = typeof candidatePrivacySubjectLinks.$inferSelect;
+export type CandidatePrivacyOutbox = typeof candidatePrivacyOutbox.$inferSelect;
+export type CandidatePrivacyRemoteProjection = typeof candidatePrivacyRemoteProjection.$inferSelect;
+export type CandidatePrivacySyncState = typeof candidatePrivacySyncState.$inferSelect;
+export type TalentPoolMembershipEvent = typeof talentPoolMembershipEvents.$inferSelect;
 
 // =====================================================
 // END SIGNAL SOURCING INSERT SCHEMAS & TYPES

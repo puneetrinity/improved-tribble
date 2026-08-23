@@ -19,6 +19,7 @@ import {
   normalizePhone,
 } from './lib/resumeImportFieldExtraction';
 import { MIN_RESUME_TEXT_LENGTH } from './lib/applicationGraphSyncProcessor';
+import { extractResumeTextRaw } from './lib/resumeExtractor';
 import { extractResumeTextWithFallback } from './lib/resumeImportExtraction';
 import { extractStructuredResumeFieldsWithGroq, isGroqAdvancedExtractionEnabled } from './lib/resumeImportAiExtraction';
 import { resolveActiveKGTenantId } from './lib/activekgTenant';
@@ -27,6 +28,10 @@ import {
   finalizeResumeImportItemInTransaction,
   type FinalizeResumeImportItemResult,
 } from './lib/resumeImportFinalize';
+import {
+  CandidatePrivacyRestrictedError,
+  requireNewCandidateIdentityAllowed,
+} from './candidate-privacy/decision';
 
 const patchResumeImportItemSchema = z.object({
   parsedName: z.string().trim().min(1).max(100).optional().nullable(),
@@ -215,6 +220,31 @@ export function registerBulkResumeImportRoutes(
           return;
         }
 
+        // Bulk upload has no caller-supplied candidate identity. Extract only
+        // local/native text first, derive a deterministic identity, and check
+        // Memory before creating the batch, uploading to GCS, or queueing. A
+        // scan that would require provider OCR is review-required rather than
+        // sent to a provider before its identity is known.
+        const preflightFields = new Map<string, ReturnType<typeof extractResumeFields>>();
+        for (const file of files) {
+          const rawExtraction = await extractResumeTextRaw(file.buffer);
+          const fields = rawExtraction.success
+            ? extractResumeFields(rawExtraction.text)
+            : { name: null, email: null, phone: null };
+          const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+          if (fields.email?.trim()) {
+            identifiers.push({ identifier_type: 'email', value: fields.email.trim().toLowerCase() });
+          }
+          if (fields.phone?.trim()) {
+            identifiers.push({ identifier_type: 'phone', value: fields.phone.trim() });
+          }
+          if (identifiers.length === 0) {
+            throw new CandidatePrivacyRestrictedError('candidate_privacy_review_required');
+          }
+          await requireNewCandidateIdentityAllowed(identifiers);
+          preflightFields.set(createHash('sha256').update(file.buffer).digest('hex'), fields);
+        }
+
         const batch = await storage.createResumeImportBatch({
           organizationId: access.organizationId,
           jobId: access.jobId,
@@ -232,6 +262,7 @@ export function registerBulkResumeImportRoutes(
 
         for (const file of files) {
           const contentHash = createHash('sha256').update(file.buffer).digest('hex');
+          const privacyCheckedFields = preflightFields.get(contentHash)!;
           const duplicatePath = seenHashes.get(contentHash);
 
           if (duplicatePath) {
@@ -251,6 +282,9 @@ export function registerBulkResumeImportRoutes(
                 mimeType: file.mimetype,
                 duplicateOfHash: contentHash,
               },
+              parsedName: privacyCheckedFields.name,
+              parsedEmail: privacyCheckedFields.email,
+              parsedPhone: privacyCheckedFields.phone,
             });
             continue;
           }
@@ -272,6 +306,9 @@ export function registerBulkResumeImportRoutes(
                 fileSize: file.size,
                 mimeType: file.mimetype,
               },
+              parsedName: privacyCheckedFields.name,
+              parsedEmail: privacyCheckedFields.email,
+              parsedPhone: privacyCheckedFields.phone,
             });
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -303,6 +340,10 @@ export function registerBulkResumeImportRoutes(
         });
         return;
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         next(error);
       }
     },
@@ -402,6 +443,15 @@ export function registerBulkResumeImportRoutes(
           phone: parsed.parsedPhone === undefined ? item.parsedPhone : parsed.parsedPhone,
         };
 
+        if (nextFields.email || nextFields.phone) {
+          const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+          if (nextFields.email) identifiers.push({ identifier_type: 'email', value: nextFields.email });
+          if (nextFields.phone) identifiers.push({ identifier_type: 'phone', value: nextFields.phone });
+          await requireNewCandidateIdentityAllowed(identifiers);
+        } else {
+          throw new CandidatePrivacyRestrictedError('candidate_privacy_review_required');
+        }
+
         if (nextFields.email) {
           const existingApplication = await storage.findApplicationByJobAndEmail(item.jobId, nextFields.email);
           if (existingApplication && existingApplication.id !== item.applicationId) {
@@ -445,6 +495,10 @@ export function registerBulkResumeImportRoutes(
         res.json({ item: updated });
         return;
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         if (error instanceof z.ZodError) {
           res.status(400).json({
             error: 'Validation error',
@@ -504,6 +558,15 @@ export function registerBulkResumeImportRoutes(
           return;
         }
 
+        if (item.parsedEmail || item.parsedPhone) {
+          const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+          if (item.parsedEmail) identifiers.push({ identifier_type: 'email', value: item.parsedEmail });
+          if (item.parsedPhone) identifiers.push({ identifier_type: 'phone', value: item.parsedPhone });
+          await requireNewCandidateIdentityAllowed(identifiers);
+        } else {
+          throw new CandidatePrivacyRestrictedError('candidate_privacy_review_required');
+        }
+
         const buffer = await downloadFromGCS(item.gcsPath);
         const extraction = await extractResumeTextWithFallback(buffer, item.originalFilename, {
           gcsPath: item.gcsPath,
@@ -526,6 +589,14 @@ export function registerBulkResumeImportRoutes(
         }
 
         const deterministicFields = extractResumeFields(rawText || canonicalText);
+        if (deterministicFields.email || deterministicFields.phone) {
+          const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+          if (deterministicFields.email?.trim()) {
+            identifiers.push({ identifier_type: 'email', value: deterministicFields.email.trim().toLowerCase() });
+          }
+          if (deterministicFields.phone?.trim()) identifiers.push({ identifier_type: 'phone', value: deterministicFields.phone.trim() });
+          await requireNewCandidateIdentityAllowed(identifiers);
+        }
         const aiFields = await extractStructuredResumeFieldsWithGroq(rawText || canonicalText);
 
         const mergedFields = {
@@ -533,6 +604,17 @@ export function registerBulkResumeImportRoutes(
           email: pickMergedEmail(item.parsedEmail, deterministicFields.email, aiFields?.email),
           phone: pickMergedPhone(item.parsedPhone, deterministicFields.phone, aiFields?.phone),
         };
+
+        if (mergedFields.email || mergedFields.phone) {
+          const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+          if (mergedFields.email?.trim()) {
+            identifiers.push({ identifier_type: 'email', value: mergedFields.email.trim().toLowerCase() });
+          }
+          if (mergedFields.phone?.trim()) identifiers.push({ identifier_type: 'phone', value: mergedFields.phone.trim() });
+          await requireNewCandidateIdentityAllowed(identifiers);
+        } else {
+          throw new CandidatePrivacyRestrictedError('candidate_privacy_review_required');
+        }
 
         if (mergedFields.email) {
           const existingApplication = await storage.findApplicationByJobAndEmail(item.jobId, mergedFields.email);
@@ -583,6 +665,10 @@ export function registerBulkResumeImportRoutes(
         res.json({ item: updated ?? item });
         return;
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         next(error);
       }
     },
@@ -625,6 +711,13 @@ export function registerBulkResumeImportRoutes(
         let updated = 0;
         for (const item of reprocessable) {
           const fields = extractResumeFields(item.extractedText!);
+          if (!fields.email && !fields.phone) {
+            throw new CandidatePrivacyRestrictedError('candidate_privacy_review_required');
+          }
+          const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+          if (fields.email) identifiers.push({ identifier_type: 'email', value: fields.email });
+          if (fields.phone) identifiers.push({ identifier_type: 'phone', value: fields.phone });
+          await requireNewCandidateIdentityAllowed(identifiers);
           const assessment = assessResumeImportItem(fields, item.extractedText);
           await storage.updateResumeImportItem(item.id, {
             parsedName: fields.name,
@@ -639,6 +732,10 @@ export function registerBulkResumeImportRoutes(
         res.json({ reprocessed: updated, total: allItems.length });
         return;
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         next(error);
       }
     },
@@ -688,6 +785,15 @@ export function registerBulkResumeImportRoutes(
         const syncWarnings: Array<{ itemId: number; applicationId: number; reason: string }> = [];
 
         for (const selectedItem of items) {
+          if (selectedItem.status !== 'finalized' && selectedItem.parsedEmail) {
+            const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [
+              { identifier_type: 'email', value: selectedItem.parsedEmail.trim().toLowerCase() },
+            ];
+            if (selectedItem.parsedPhone?.trim()) {
+              identifiers.push({ identifier_type: 'phone', value: selectedItem.parsedPhone.trim() });
+            }
+            await requireNewCandidateIdentityAllowed(identifiers);
+          }
           const result = await db.transaction(async (tx: any): Promise<FinalizeResumeImportItemResult> =>
             finalizeResumeImportItemInTransaction(tx, {
               itemId: selectedItem.id,
@@ -751,6 +857,10 @@ export function registerBulkResumeImportRoutes(
         });
         return;
       } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
         if (error instanceof z.ZodError) {
           res.status(400).json({
             error: 'Validation error',

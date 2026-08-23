@@ -30,6 +30,11 @@ import type { CsrfMiddleware } from './types/routes';
 import { db } from './db';
 import { and, eq, gte, lte, inArray, or, desc, sql } from 'drizzle-orm';
 import { extractStructuredJobPosting } from './lib/structuredJobExtraction';
+import { privacyAllowedSql } from './candidate-privacy/decision';
+
+const applicationPrivacyAllowed = () => sql.raw(
+  privacyAllowedSql('application', 'applications.id', { globalUse: false }),
+);
 
 const MIN_DESCRIPTION_WORDS = 200;
 const countWords = (value: string): number =>
@@ -636,7 +641,7 @@ export function registerJobsRoutes(
         })
         .from(jobs)
         .leftJoin(applications, eq(applications.jobId, jobs.id))
-        .where(eq(jobs.hiringManagerId, req.user!.id))
+        .where(and(eq(jobs.hiringManagerId, req.user!.id), applicationPrivacyAllowed()))
         .groupBy(jobs.id)
         .orderBy(desc(jobs.createdAt));
 
@@ -1095,6 +1100,7 @@ export function registerJobsRoutes(
 
       // Fetch relevant applications (scoped by organization)
       const whereClauses: any[] = [];
+      whereClauses.push(applicationPrivacyAllowed());
       if (parsedStart) whereClauses.push(gte(applications.appliedAt, parsedStart));
       if (parsedEnd) whereClauses.push(lte(applications.appliedAt, parsedEnd));
       if (parsedJobId) whereClauses.push(eq(applications.jobId, parsedJobId));
@@ -1191,6 +1197,7 @@ export function registerJobsRoutes(
       }
 
       const whereClauses: any[] = [];
+      whereClauses.push(applicationPrivacyAllowed());
       if (parsedStart) whereClauses.push(gte(applications.appliedAt, parsedStart));
       if (parsedEnd) whereClauses.push(lte(applications.appliedAt, parsedEnd));
       if (parsedJobId) whereClauses.push(eq(applications.jobId, parsedJobId));
@@ -1289,6 +1296,7 @@ export function registerJobsRoutes(
       let organizationId: number | undefined;
 
       const whereClauses: any[] = [];
+      whereClauses.push(applicationPrivacyAllowed());
       if (parsedStart) whereClauses.push(gte(applicationStageHistory.changedAt, parsedStart));
       if (parsedEnd) whereClauses.push(lte(applicationStageHistory.changedAt, parsedEnd));
       if (parsedJobId) whereClauses.push(eq(applications.jobId, parsedJobId));
@@ -1481,6 +1489,7 @@ export function registerJobsRoutes(
 
       // Load applications within range for these jobs
       const appFilters: any[] = [];
+      appFilters.push(applicationPrivacyAllowed());
       if (jobIds.length) appFilters.push(inArray(applications.jobId, jobIds));
       if (parsedStart) appFilters.push(gte(applications.appliedAt, parsedStart));
       if (parsedEnd) appFilters.push(lte(applications.appliedAt, parsedEnd));

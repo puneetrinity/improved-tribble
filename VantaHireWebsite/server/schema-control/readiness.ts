@@ -34,6 +34,13 @@ const FLOW_CORE_RELATIONS = [
   "public.applications",
   "public.pipeline_stages",
   "public.candidate_resumes",
+  "public.candidate_privacy_requests",
+  "public.candidate_privacy_request_events",
+  "public.candidate_privacy_subject_links",
+  "public.candidate_privacy_outbox",
+  "public.candidate_privacy_remote_projection",
+  "public.candidate_privacy_sync_state",
+  "public.talent_pool_membership_events",
 ] as const;
 
 /** Minimum catalog facts every Flow web/worker process requires to start. */
@@ -50,6 +57,48 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
         [[...FLOW_CORE_RELATIONS]],
       );
       return Number(result.rows[0]?.missing ?? FLOW_CORE_RELATIONS.length) === 0;
+    },
+  },
+  {
+    name: "Candidate privacy tables and append-only guards are exact",
+    async check(pg) {
+      const result = await pg.query(`
+        SELECT
+          (SELECT COUNT(*) = 7
+             FROM unnest(ARRAY[
+               'public.candidate_privacy_requests',
+               'public.candidate_privacy_request_events',
+               'public.candidate_privacy_subject_links',
+               'public.candidate_privacy_outbox',
+               'public.candidate_privacy_remote_projection',
+               'public.candidate_privacy_sync_state',
+               'public.talent_pool_membership_events'
+             ]::text[]) AS expected(name)
+            WHERE to_regclass(expected.name) IS NOT NULL)
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_attribute
+             WHERE attrelid='public.talent_pool'::regclass AND attname='removed_at' AND NOT attisdropped
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_attribute
+             WHERE attrelid='public.talent_pool'::regclass AND attname='removed_by_user_id' AND NOT attisdropped
+          )
+          AND EXISTS (
+            SELECT 1 FROM pg_catalog.pg_attribute
+             WHERE attrelid='public.talent_pool'::regclass AND attname='removal_reason' AND NOT attisdropped
+          )
+          AND (
+            SELECT COUNT(*) = 2
+              FROM pg_catalog.pg_trigger t
+             WHERE NOT t.tgisinternal
+               AND t.tgname IN (
+                 'candidate_privacy_request_events_append_only',
+                 'talent_pool_membership_events_append_only'
+               )
+               AND t.tgenabled <> 'D'
+          ) AS ok
+      `);
+      return result.rows[0]?.ok === true;
     },
   },
   {

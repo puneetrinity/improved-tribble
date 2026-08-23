@@ -26,6 +26,10 @@ import {
   isOrgContactSuppressed,
 } from './outreachSuppression';
 import { withOutreachDispatchFence } from './outreachConcurrency';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from '../candidate-privacy/decision';
 
 const OUTREACH_DELIVERY_UNCERTAIN = 'OUTREACH_DELIVERY_UNCERTAIN';
 
@@ -135,6 +139,17 @@ export async function sendTrackedOutreachEmail(input: {
   wasEdited: boolean;
   sentBy: number;
 }): Promise<OutreachDeliveryResult> {
+  try {
+    await requireCandidatePrivacyAllowed(
+      { type: 'job_sourced_candidate', id: input.sourcedCandidateId },
+      { globalUse: true, newGlobalOperation: true },
+    );
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      return { status: 'skipped', reason: 'candidate_ineligible' };
+    }
+    throw error;
+  }
   const delivery = await deliverWithRevalidatedContact(input.contact, {
     revalidate: revalidateCandidateContact,
     isSuppressed: (email) => isOrgContactSuppressed(
@@ -149,6 +164,22 @@ export async function sendTrackedOutreachEmail(input: {
         hashOutreachEmail(email),
         input.contact.signalCandidateId ?? null,
         async () => {
+        try {
+          await requireCandidatePrivacyAllowed(
+            { type: 'job_sourced_candidate', id: input.sourcedCandidateId },
+            { globalUse: true, newGlobalOperation: true },
+          );
+        } catch (error) {
+          if (error instanceof CandidatePrivacyRestrictedError) {
+            return {
+              candidateIneligible: true as const,
+              orgSuppressed: false as const,
+              platformSuppressed: false as const,
+              contactUnavailable: false as const,
+            };
+          }
+          throw error;
+        }
         const currentContact = await revalidateCandidateContact(input.contact);
         const currentEmail = currentContact.persisted && currentContact.state === 'found'
           ? currentContact.emails[0] ?? null
@@ -363,6 +394,10 @@ export async function sendTrackedOutreachEmail(input: {
 
         let receipt;
         try {
+          await requireCandidatePrivacyAllowed(
+            { type: 'job_sourced_candidate', id: input.sourcedCandidateId },
+            { globalUse: true, newGlobalOperation: true },
+          );
           receipt = await input.emailService.sendEmailWithReceipt({
             to: email,
             subject: input.subject,

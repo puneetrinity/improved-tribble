@@ -43,6 +43,11 @@ import {
   reconcileTerminalInteractiveFitCollision,
   type FreshFitSnapshot,
 } from './lib/fitCollisionReconciliation';
+import {
+  CandidatePrivacyRestrictedError,
+  requireCandidatePrivacyAllowed,
+} from './candidate-privacy/decision';
+import { assertCandidatePrivacyRuntimeConfig } from './candidate-privacy/config';
 
 // Summary batch result types
 interface SummaryBatchResultItem {
@@ -81,6 +86,10 @@ async function getResumeForApplication(applicationId: number, userId: number): P
   });
 
   if (!app) return null;
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: applicationId },
+    { globalUse: false },
+  );
 
   // Get resume from library or application
   let resumeData = app.resumeId
@@ -106,6 +115,10 @@ async function getResumeForApplication(applicationId: number, userId: number): P
 
   // Fallback to application resume URL
   if (!resumeText && app.resumeUrl) {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: applicationId },
+      { globalUse: false },
+    );
     try {
       const buffer = await downloadFromGCS(app.resumeUrl);
       const extraction = await extractResumeText(buffer);
@@ -146,6 +159,10 @@ async function processOneApplication(
   if (!app || app.userId !== userId) {
     throw new Error(`Application ${applicationId} not found or unauthorized`);
   }
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: applicationId },
+    { globalUse: false },
+  );
 
   // Get resume data
   const resume = await getResumeForApplication(applicationId, userId);
@@ -210,7 +227,15 @@ async function processOneApplication(
   let reservation: FitCreditReservation | null = reservationResult.reservation;
 
   try {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: applicationId },
+      { globalUse: false },
+    );
     const result = await computeFitScore(resume.text, jdDigest);
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: applicationId },
+      { globalUse: false },
+    );
     await finalizeFitCredit(
       reservation,
       result,
@@ -312,6 +337,7 @@ function buildBatchResult(results: WorkerBatchFitResultItem[]): BatchFitResult {
       succeeded: results.filter(r => r.status === 'success').length,
       cached: results.filter(r => r.status === 'cached').length,
       requiresPaid: results.filter(r => r.status === 'requiresPaid').length,
+      restricted: results.filter(r => r.status === 'restricted').length,
       errors: results.filter(r => r.status === 'error').length,
     },
   };
@@ -354,6 +380,14 @@ async function processFitJob(job: Job<FitJobData>): Promise<{ success: boolean; 
     return { success: true, result };
   } catch (error: any) {
     console.error(`[AI Worker] Interactive job ${job.id} failed:`, error);
+
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      await storage.updateAiFitJobStatus(dbJobId, 'completed', {
+        completedAt: new Date(),
+        result: { privacyRestricted: true },
+      });
+      return { success: true, result: { privacyRestricted: true } };
+    }
 
     if (
       error instanceof FitComputationInProgressError ||
@@ -463,8 +497,16 @@ async function processBatchFitJob(job: Job<BatchFitJobData>): Promise<BatchFitRe
         throw error;
       }
 
-      // Capture individual failures - don't throw!
-      if (error instanceof FitQuotaExceededError) {
+      // Privacy restrictions are successful containment, not provider errors,
+      // and must not be retried or charged.
+      if (error instanceof CandidatePrivacyRestrictedError) {
+        results.push({
+          applicationId: appId,
+          status: 'restricted',
+          error: 'candidate_privacy_restricted',
+        });
+        finalProcessedIds.push(appId);
+      } else if (error instanceof FitQuotaExceededError) {
         // Mark this and remaining as requiresPaid
         results.push({
           applicationId: appId,
@@ -533,6 +575,10 @@ async function getResumeTextForApplication(applicationId: number): Promise<strin
   });
 
   if (!app) return null;
+  await requireCandidatePrivacyAllowed(
+    { type: 'application', id: applicationId },
+    { globalUse: false },
+  );
 
   // First try to get from candidate resume library
   if (app.resumeId) {
@@ -559,6 +605,10 @@ async function getResumeTextForApplication(applicationId: number): Promise<strin
 
   // Fallback to extracting from resume URL
   if (app.resumeUrl) {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: applicationId },
+      { globalUse: false },
+    );
     try {
       const buffer = await downloadFromGCS(app.resumeUrl);
       const extraction = await extractResumeText(buffer);
@@ -592,6 +642,17 @@ async function processOneSummary(
 
   if (!app) {
     return { status: 'error', error: 'Application not found' };
+  }
+  try {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: applicationId },
+      { globalUse: false },
+    );
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      return { status: 'skipped', error: 'candidate_privacy_restricted' };
+    }
+    throw error;
   }
 
   // Check if already has summary and not regenerating
@@ -634,6 +695,17 @@ async function processOneSummary(
     app.job.skills || [],
     app.job.goodToHaveSkills || []
   );
+  try {
+    await requireCandidatePrivacyAllowed(
+      { type: 'application', id: applicationId },
+      { globalUse: false },
+    );
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) {
+      return { status: 'skipped', error: 'candidate_privacy_restricted' };
+    }
+    throw error;
+  }
   const durationMs = Date.now() - startTime;
 
   // Calculate cost using shared pricing helper
@@ -808,6 +880,7 @@ const REDIS_NAMESPACE = process.env.NODE_ENV || 'development';
 
 // Main entry
 async function main(): Promise<void> {
+  assertCandidatePrivacyRuntimeConfig();
   console.log('[AI Worker] Starting AI worker...');
   console.log(`[AI Worker] Interactive concurrency: ${INTERACTIVE_CONCURRENCY}`);
   console.log(`[AI Worker] Batch concurrency: ${BATCH_CONCURRENCY}`);

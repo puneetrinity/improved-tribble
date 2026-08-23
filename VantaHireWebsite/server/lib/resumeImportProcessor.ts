@@ -3,6 +3,10 @@ import { storage } from '../storage';
 import { downloadFromGCS } from '../gcs-storage';
 import { assessResumeImportItem, extractResumeFields } from './resumeImportFieldExtraction';
 import { extractResumeTextWithFallback } from './resumeImportExtraction';
+import {
+  CandidatePrivacyRestrictedError,
+  requireNewCandidateIdentityAllowed,
+} from '../candidate-privacy/decision';
 
 const POLL_INTERVAL_MS = parseInt(process.env.BULK_RESUME_IMPORT_POLL_INTERVAL_MS || '5000', 10);
 const BATCH_SIZE = parseInt(process.env.BULK_RESUME_IMPORT_BATCH_SIZE || '10', 10);
@@ -46,6 +50,19 @@ async function processResumeImportItem(item: ResumeImportItem): Promise<void> {
     return;
   }
 
+  const preflightIdentifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+  if (item.parsedEmail?.trim()) {
+    preflightIdentifiers.push({ identifier_type: 'email', value: item.parsedEmail.trim().toLowerCase() });
+  }
+  if (item.parsedPhone?.trim()) {
+    preflightIdentifiers.push({ identifier_type: 'phone', value: item.parsedPhone.trim() });
+  }
+  if (preflightIdentifiers.length === 0) {
+    await storage.markResumeImportItemFailed(item.id, 'candidate_privacy_review_required');
+    return;
+  }
+  await requireNewCandidateIdentityAllowed(preflightIdentifiers);
+
   const buffer = await downloadFromGCS(item.gcsPath);
   const extraction = await extractResumeTextWithFallback(buffer, item.originalFilename, {
     gcsPath: item.gcsPath,
@@ -61,6 +78,18 @@ async function processResumeImportItem(item: ResumeImportItem): Promise<void> {
   }
 
   const parsedFields = extractResumeFields(extraction.rawText || extraction.text);
+
+  if (parsedFields.email || parsedFields.phone) {
+    const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [];
+    if (parsedFields.email?.trim()) {
+      identifiers.push({ identifier_type: 'email', value: parsedFields.email.trim().toLowerCase() });
+    }
+    if (parsedFields.phone?.trim()) identifiers.push({ identifier_type: 'phone', value: parsedFields.phone.trim() });
+    await requireNewCandidateIdentityAllowed(identifiers);
+  } else {
+    await storage.markResumeImportItemFailed(item.id, 'candidate_privacy_review_required');
+    return;
+  }
 
   if (parsedFields.email) {
     const existingApplication = await storage.findApplicationByJobAndEmail(item.jobId, parsedFields.email);
@@ -97,6 +126,10 @@ async function processResumeImportItem(item: ResumeImportItem): Promise<void> {
 }
 
 async function handleJobFailure(item: ResumeImportItem, error: unknown): Promise<void> {
+  if (error instanceof CandidatePrivacyRestrictedError) {
+    await storage.markResumeImportItemFailed(item.id, error.code);
+    return;
+  }
   const message = error instanceof Error ? error.message : String(error);
   if (!isRetryableError(error) || item.attempts >= MAX_ATTEMPTS) {
     await storage.markResumeImportItemFailed(item.id, message);

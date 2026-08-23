@@ -21,6 +21,10 @@ vi.mock("../../auth", () => ({
     next: () => void,
   ) => next(),
 }));
+vi.mock("../../candidate-privacy/decision", () => ({
+  CandidatePrivacyRestrictedError: class CandidatePrivacyRestrictedError extends Error {},
+  requireCandidatePrivacyAllowed: vi.fn(async () => undefined),
+}));
 
 let canCandidateApplyToJob: typeof import("../../candidatePortal.routes").canCandidateApplyToJob;
 let registerCandidatePortalRoutes: typeof import("../../candidatePortal.routes").registerCandidatePortalRoutes;

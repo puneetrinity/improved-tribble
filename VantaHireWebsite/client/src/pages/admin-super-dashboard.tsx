@@ -62,6 +62,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { AdminPrivacyRequestPanel } from "@/components/admin/AdminPrivacyRequestPanel";
 
 // Types for analytics data
 type HiringMetrics = {
@@ -862,6 +863,10 @@ export default function AdminSuperDashboard() {
             <TabsTrigger value="users" className="flex items-center gap-1.5">
               <Users className="h-4 w-4" />
               Users
+            </TabsTrigger>
+            <TabsTrigger value="privacy" className="flex items-center gap-1.5">
+              <Shield className="h-4 w-4" />
+              Privacy requests
             </TabsTrigger>
             <TabsTrigger value="analytics" className="flex items-center gap-1.5">
               <BarChart3 className="h-4 w-4" />
@@ -2140,6 +2145,25 @@ export default function AdminSuperDashboard() {
           </TabsContent>
 
           {/* Analytics Tab */}
+          <TabsContent value="privacy" className="space-y-6">
+            <AdminPrivacyRequestPanel
+              anchors={[
+                ...(users ?? [])
+                  .filter((candidate) => candidate.role === "candidate")
+                  .map((candidate) => ({
+                    type: "candidate_user" as const,
+                    id: candidate.id,
+                    label: `Candidate #${candidate.id}: ${candidate.firstName || candidate.username} ${candidate.lastName || ""}`.trim(),
+                  })),
+                ...(applications ?? []).map((application) => ({
+                  type: "application" as const,
+                  id: application.id,
+                  label: `Application #${application.id}: ${application.fullName}`,
+                })),
+              ]}
+            />
+          </TabsContent>
+
           <TabsContent value="analytics" className="space-y-6">
             <div className="space-y-6">
               {/* Time to Fill & Time in Stage */}
