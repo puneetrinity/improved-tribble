@@ -125,6 +125,22 @@ function validateStaticContracts(root, problems) {
   if (!repository.includes("transientIdentifiersForRequest") || !repository.includes("evidence_ref")) {
     problems.push("privacy delivery no longer reconstructs its transient body from durable authority rows.");
   }
+  const feedApply = exportedFunctionSource(repository, "applyMemoryChanges");
+  const snapshotReplace = exportedFunctionSource(repository, "replaceProjectionFromSnapshot");
+  if ((feedApply.match(/syncLocalRequestState\(/g) ?? []).length < 2) {
+    problems.push("Memory feed no longer advances the local privacy request lifecycle atomically.");
+  }
+  if (!snapshotReplace.includes("syncLocalRequestState(")) {
+    problems.push("Memory snapshot no longer advances the local privacy request lifecycle atomically.");
+  }
+  for (const state of ["memory_active", "needs_review", "released", "superseded"]) {
+    if (!repository.includes(`return \"${state}\"`)) {
+      problems.push(`remote privacy state mapping lost local state ${state}.`);
+    }
+  }
+  if (!repository.includes("'remote_projection'") || !repository.includes("knownDirectiveCount !== mapped.length")) {
+    problems.push("remote lifecycle audit or missing-directive snapshot fence is incomplete.");
+  }
 
   assertBefore(
     problems,

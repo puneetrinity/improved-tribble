@@ -441,6 +441,76 @@ describe.skipIf(!enabled)("candidate privacy disposable PostgreSQL", () => {
       input.anchor,
       { globalUse: true },
     )).toBe("allow_existing_org_workflow");
+    const client = await clientFor(migrationUrl);
+    try {
+      expect((await client.query(
+        `SELECT r.state,r.version,p.state AS remote_state,p.version AS remote_version,
+                COUNT(e.event_id) FILTER (WHERE e.event_type='remote_projection')::integer AS projection_events
+           FROM candidate_privacy_requests r
+           JOIN candidate_privacy_remote_projection p USING (request_id)
+           LEFT JOIN candidate_privacy_request_events e USING (request_id)
+          GROUP BY r.state,r.version,p.state,p.version`,
+      )).rows[0]).toEqual({
+        state: "released",
+        version: 3,
+        remote_state: "released",
+        remote_version: 2,
+        projection_events: 1,
+      });
+    } finally {
+      await client.end();
+    }
+  });
+
+  it("advances local lifecycle once for a newer feed event and not for a duplicate", async () => {
+    const userId = await createCandidate();
+    const input = requestInput(userId);
+    await repository.createLocalPrivacyRequest(input);
+    const claim = await repository.claimPrivacyOutbox(5_000);
+    const directiveId = randomUUID();
+    const effectiveAt = new Date().toISOString();
+    await repository.markOutboxDelivered(claim!, {
+      request_id: input.requestId,
+      directive_id: directiveId,
+      action: input.action,
+      scope: "global_matching",
+      state: "active_quarantine",
+      version: 1,
+      effective_at: effectiveAt,
+      decision: "block_global",
+    });
+
+    const released = {
+      event_id: randomUUID(),
+      directive_id: directiveId,
+      action: input.action,
+      scope: "global_matching" as const,
+      state: "released" as const,
+      version: 2,
+      effective_at: effectiveAt,
+    };
+    expect(await repository.applyMemoryChanges([{ ...released, cursor: 1 }])).toBe(1);
+    expect(await repository.applyMemoryChanges([{ ...released, cursor: 2 }])).toBe(2);
+
+    const client = await clientFor(migrationUrl);
+    try {
+      expect((await client.query(
+        `SELECT r.state,r.version,p.state AS remote_state,p.version AS remote_version,
+                COUNT(e.event_id) FILTER (WHERE e.event_type='remote_projection')::integer AS projection_events
+           FROM candidate_privacy_requests r
+           JOIN candidate_privacy_remote_projection p USING (request_id)
+           LEFT JOIN candidate_privacy_request_events e USING (request_id)
+          GROUP BY r.state,r.version,p.state,p.version`,
+      )).rows[0]).toEqual({
+        state: "released",
+        version: 3,
+        remote_state: "released",
+        remote_version: 2,
+        projection_events: 1,
+      });
+    } finally {
+      await client.end();
+    }
   });
 
   it("keeps request and pool membership event ledgers append-only", async () => {

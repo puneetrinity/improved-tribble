@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "1ba36b8f708bfa471ae477c04a9fd11caac001d7c71a27701d01663356515701",
+  "source_census_sha256": "e4f36e3505039bc664736686fdbd9e933aee633047502a5a3d0e633904acdcf9",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
@@ -182,8 +182,8 @@
       "direction": "read_write_queue",
       "privacy_action": ["withdraw_global_matching", "request_erasure"],
       "organization_scope": "platform_with_local_links",
-      "enforcement": "Advisory-lock idempotency, append-only event plus CAS projection, body-free leased outbox and atomic cursor/snapshot transactions.",
-      "anchors": ["pg_advisory_xact_lock", "FOR UPDATE SKIP LOCKED", "replaceProjectionFromSnapshot", "privacyDecisionForAnchor"]
+      "enforcement": "Advisory-lock idempotency, append-only local/remote lifecycle events plus CAS projection, body-free leased outbox, missing-directive refusal and atomic cursor/snapshot transactions.",
+      "anchors": ["pg_advisory_xact_lock", "FOR UPDATE SKIP LOCKED", "syncLocalRequestState", "remote_projection", "knownDirectiveCount", "replaceProjectionFromSnapshot", "privacyDecisionForAnchor"]
     },
     {
       "id": "privacy-web-processor",
