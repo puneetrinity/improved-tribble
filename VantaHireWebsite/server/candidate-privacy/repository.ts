@@ -7,11 +7,13 @@ import {
   type MemoryDirectiveResponse,
   type MemorySnapshotDirective,
   type MinimalPrivacyRequest,
+  type LocalPrivacyState,
   type PrivacyAction,
   type PrivacyAuthority,
   type PrivacyIdentifier,
   type PrivacyReason,
   type RemotePrivacyDecision,
+  type RemotePrivacyState,
 } from "./models";
 
 export class CandidatePrivacyConflict extends Error {}
@@ -73,6 +75,65 @@ function rowToMinimal(row: any): MinimalPrivacyRequest {
     remoteState: row.remote_state ?? null,
     decision: row.remote_decision ?? null,
   };
+}
+
+function localStateForRemote(state: RemotePrivacyState): LocalPrivacyState {
+  if (state === "needs_review") return "needs_review";
+  if (state === "released") return "released";
+  if (state === "superseded") return "superseded";
+  return "memory_active";
+}
+
+async function syncLocalRequestState(
+  client: CandidatePrivacyPg,
+  request: any,
+  remoteState: RemotePrivacyState,
+  effectiveAt: string,
+  forceTransition = false,
+): Promise<void> {
+  const resultingState = localStateForRemote(remoteState);
+  if (request.request_state === resultingState && !forceTransition) return;
+
+  const priorVersion = Number(request.request_version);
+  const resultingVersion = priorVersion + 1;
+  const updated = await client.query(
+    `UPDATE candidate_privacy_requests
+        SET state=$2,version=$3,effective_at=$4,last_error_code=NULL,updated_at=now()
+      WHERE request_id=$1 AND state=$5 AND version=$6
+      RETURNING request_id`,
+    [
+      request.request_id,
+      resultingState,
+      resultingVersion,
+      effectiveAt,
+      request.request_state,
+      priorVersion,
+    ],
+  );
+  if (!updated.rowCount) {
+    throw new CandidatePrivacyConflict("candidate_privacy_request_projection_conflict");
+  }
+  await client.query(
+    `INSERT INTO candidate_privacy_request_events
+       (event_id,request_id,event_type,action,authority_type,actor_user_id,evidence_ref,
+        reason_code,prior_state,resulting_state,expected_version,resulting_version)
+     VALUES ($1,$2,'remote_projection',$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [
+      randomUUID(),
+      request.request_id,
+      request.request_action,
+      request.request_authority_type,
+      request.request_actor_user_id,
+      request.accepted_evidence_ref,
+      request.request_reason_code,
+      request.request_state,
+      resultingState,
+      priorVersion,
+      resultingVersion,
+    ],
+  );
+  request.request_state = resultingState;
+  request.request_version = resultingVersion;
 }
 
 async function resolveRootSubject(
@@ -453,9 +514,21 @@ export async function applyMemoryChanges(events: MemoryChange[]): Promise<number
         break;
       }
       const current = (await client.query(
-        `SELECT p.*, r.action AS request_action FROM candidate_privacy_remote_projection p
+        `SELECT p.*, r.request_id, r.action AS request_action,
+                r.state AS request_state, r.version AS request_version,
+                r.authority_type AS request_authority_type,
+                r.actor_user_id AS request_actor_user_id,
+                r.reason_code AS request_reason_code,
+                accepted.evidence_ref AS accepted_evidence_ref
+           FROM candidate_privacy_remote_projection p
           JOIN candidate_privacy_requests r ON r.request_id=p.request_id
-         WHERE p.directive_id=$1 FOR UPDATE`,
+          JOIN LATERAL (
+            SELECT e.evidence_ref
+              FROM candidate_privacy_request_events e
+             WHERE e.request_id=r.request_id AND e.event_type='accepted'
+             ORDER BY e.occurred_at,e.event_id LIMIT 1
+          ) accepted ON true
+         WHERE p.directive_id=$1 FOR UPDATE OF p,r`,
         [event.directive_id],
       )).rows[0];
       if (!current) {
@@ -479,6 +552,7 @@ export async function applyMemoryChanges(events: MemoryChange[]): Promise<number
           conflictCode = "candidate_privacy_projection_conflict";
           break;
         }
+        await syncLocalRequestState(client, current, event.state, event.effective_at);
         cursor = event.cursor;
         continue;
       }
@@ -492,6 +566,7 @@ export async function applyMemoryChanges(events: MemoryChange[]): Promise<number
           WHERE directive_id=$1`,
         [event.directive_id, event.state, expectedDecision, event.version, event.effective_at],
       );
+      await syncLocalRequestState(client, current, event.state, event.effective_at, true);
       cursor = event.cursor;
     }
     if (conflictCode) {
@@ -529,10 +604,25 @@ export async function replaceProjectionFromSnapshot(input: {
     const nextGeneration = Number((await client.query(
       "SELECT COALESCE(active_generation,0)+1 AS generation FROM candidate_privacy_sync_state WHERE consumer_name='flow' FOR UPDATE",
     )).rows[0]?.generation ?? 1);
-    const mapped: Array<{ directive: MemorySnapshotDirective; requestId: string }> = [];
+    const mapped: Array<{ directive: MemorySnapshotDirective; request: any }> = [];
     for (const directive of input.directives) {
       const request = (await client.query(
-        "SELECT request_id,action FROM candidate_privacy_requests WHERE directive_id=$1",
+        `SELECT r.request_id,r.action AS request_action,r.state AS request_state,
+                r.version AS request_version,r.authority_type AS request_authority_type,
+                r.actor_user_id AS request_actor_user_id,r.reason_code AS request_reason_code,
+                p.action AS remote_action,p.scope AS remote_scope,p.state AS remote_state,
+                p.decision AS remote_decision,p.version AS remote_version,
+                accepted.evidence_ref AS accepted_evidence_ref
+           FROM candidate_privacy_requests r
+           JOIN candidate_privacy_remote_projection p ON p.request_id=r.request_id
+           JOIN LATERAL (
+             SELECT e.evidence_ref
+               FROM candidate_privacy_request_events e
+              WHERE e.request_id=r.request_id AND e.event_type='accepted'
+              ORDER BY e.occurred_at,e.event_id LIMIT 1
+           ) accepted ON true
+          WHERE r.directive_id=$1
+          FOR UPDATE OF r,p`,
         [directive.directive_id],
       )).rows[0];
       if (!request) {
@@ -546,8 +636,8 @@ export async function replaceProjectionFromSnapshot(input: {
         );
         return "candidate_privacy_unknown_directive";
       }
-      const expectedScope = request.action === "request_erasure" ? "active_profile" : "global_matching";
-      if (directive.action !== request.action || directive.scope !== expectedScope) {
+      const expectedScope = request.request_action === "request_erasure" ? "active_profile" : "global_matching";
+      if (directive.action !== request.request_action || directive.scope !== expectedScope) {
         await client.query(
           `INSERT INTO candidate_privacy_sync_state
              (consumer_name,cursor,status,last_error_code,updated_at)
@@ -558,10 +648,44 @@ export async function replaceProjectionFromSnapshot(input: {
         );
         return "candidate_privacy_authority_conflict";
       }
-      mapped.push({ directive, requestId: String(request.request_id) });
+      const expectedDecision = decisionForRemote(directive.state, directive.action);
+      if (
+        directive.version < Number(request.remote_version) ||
+        (directive.version === Number(request.remote_version) && (
+          directive.action !== request.remote_action ||
+          directive.scope !== request.remote_scope ||
+          directive.state !== request.remote_state ||
+          expectedDecision !== request.remote_decision
+        ))
+      ) {
+        await client.query(
+          `INSERT INTO candidate_privacy_sync_state
+             (consumer_name,cursor,status,last_error_code,updated_at)
+           VALUES ('flow',$1,'needs_reconciliation','snapshot_conflict',now())
+           ON CONFLICT (consumer_name) DO UPDATE
+             SET status='needs_reconciliation',last_error_code='snapshot_conflict',updated_at=now()`,
+          [input.highWaterCursor],
+        );
+        return "candidate_privacy_snapshot_conflict";
+      }
+      mapped.push({ directive, request });
+    }
+    const knownDirectiveCount = Number((await client.query(
+      "SELECT COUNT(*)::integer AS count FROM candidate_privacy_requests WHERE directive_id IS NOT NULL",
+    )).rows[0]?.count ?? 0);
+    if (knownDirectiveCount !== mapped.length) {
+      await client.query(
+        `INSERT INTO candidate_privacy_sync_state
+           (consumer_name,cursor,status,last_error_code,updated_at)
+         VALUES ('flow',$1,'needs_reconciliation','missing_directive',now())
+         ON CONFLICT (consumer_name) DO UPDATE
+           SET status='needs_reconciliation',last_error_code='missing_directive',updated_at=now()`,
+        [input.highWaterCursor],
+      );
+      return "candidate_privacy_missing_directive";
     }
     for (const item of mapped) {
-      const { directive, requestId } = item;
+      const { directive, request } = item;
       await client.query(
         `INSERT INTO candidate_privacy_remote_projection
            (directive_id,request_id,action,scope,state,decision,version,effective_at,generation)
@@ -571,10 +695,17 @@ export async function replaceProjectionFromSnapshot(input: {
            decision=EXCLUDED.decision,version=EXCLUDED.version,
            effective_at=EXCLUDED.effective_at,generation=EXCLUDED.generation,updated_at=now()`,
         [
-          directive.directive_id, requestId, directive.action, directive.scope,
+          directive.directive_id, request.request_id, directive.action, directive.scope,
           directive.state, decisionForRemote(directive.state, directive.action),
           directive.version, directive.effective_at, nextGeneration,
         ],
+      );
+      await syncLocalRequestState(
+        client,
+        request,
+        directive.state,
+        directive.effective_at,
+        directive.version > Number(request.remote_version),
       );
     }
     await client.query(

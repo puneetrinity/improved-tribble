@@ -126,6 +126,28 @@ describe('candidate privacy surface guard', () => {
     expect(problems.some((problem) => problem.includes('physical talent-pool deletion'))).toBe(true);
   });
 
+  it('rejects a missing feed lifecycle transition', () => {
+    const problems = mutate(fixture(), 'server/candidate-privacy/repository.ts', (source) => {
+      const start = source.indexOf('export async function applyMemoryChanges');
+      const call = source.indexOf('await syncLocalRequestState(', start);
+      return `${source.slice(0, call)}await Promise.resolve(${source.slice(call + 'await syncLocalRequestState('.length)}`;
+    });
+    expect(problems).toContain(
+      'Memory feed no longer advances the local privacy request lifecycle atomically.',
+    );
+  });
+
+  it('rejects a missing snapshot lifecycle transition', () => {
+    const problems = mutate(fixture(), 'server/candidate-privacy/repository.ts', (source) => {
+      const start = source.indexOf('export async function replaceProjectionFromSnapshot');
+      const call = source.indexOf('await syncLocalRequestState(', start);
+      return `${source.slice(0, call)}await Promise.resolve(${source.slice(call + 'await syncLocalRequestState('.length)}`;
+    });
+    expect(problems).toContain(
+      'Memory snapshot no longer advances the local privacy request lifecycle atomically.',
+    );
+  });
+
   it('rejects a new unclassified candidate-bearing source', () => {
     const root = fixture();
     writeFileSync(
