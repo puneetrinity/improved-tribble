@@ -41,6 +41,16 @@ function fixture(): string {
   cpSync(join(APP_ROOT, "server"), join(root, "server"), { recursive: true });
   cpSync(join(APP_ROOT, "shared"), join(root, "shared"), { recursive: true });
   cpSync(join(APP_ROOT, "scripts"), join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "client", "src", "components", "kanban"), { recursive: true });
+  mkdirSync(join(root, "client", "src", "pages"), { recursive: true });
+  cpSync(
+    join(APP_ROOT, "client", "src", "components", "kanban", "ApplicationDetailPanel.tsx"),
+    join(root, "client", "src", "components", "kanban", "ApplicationDetailPanel.tsx"),
+  );
+  cpSync(
+    join(APP_ROOT, "client", "src", "pages", "application-management-page.tsx"),
+    join(root, "client", "src", "pages", "application-management-page.tsx"),
+  );
   for (const file of ["package.json", "package-lock.json", "vitest.server.config.ts"] as const) {
     cpSync(join(APP_ROOT, file), join(root, file));
   }
@@ -117,7 +127,7 @@ describe("object authorization surface guard", () => {
     const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
       source.replace("FROM authorized_application", "FROM applications"),
     );
-    expect(problems).toContain("both protected histories must read through the authorized CTE.");
+    expect(problems).toContain("all three protected application readers must read through the authorized CTE.");
   });
 
   it("rejects a raw email subject projection", () => {
@@ -176,5 +186,78 @@ describe("object authorization surface guard", () => {
     expect(problems).toContain(
       "strict application-id parser lost required anchor: !/^[1-9][0-9]*$/.test(value)",
     );
+  });
+
+  it("rejects an interview field moved outside the authorized CTE", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace(
+        'authorized_application.candidate_name AS "candidateName"',
+        '${applications.name} AS "candidateName"',
+      ),
+    );
+    expect(problems).toContain(
+      'interview projection anchor is missing: authorized_application.candidate_name AS "candidateName"',
+    );
+  });
+
+  it("rejects a post-authorization application re-read", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace(
+        'authorized_application.interview_notes AS "interviewNotes"\n        FROM authorized_application',
+        'authorized_application.interview_notes AS "interviewNotes"\n'
+          + '        FROM authorized_application\n'
+          + '        INNER JOIN ${applications} ON ${applications.id} = authorized_application.application_id',
+      ),
+    );
+    expect(problems).toContain("interview target fields are re-read outside the authorized CTE.");
+  });
+
+  it("rejects an expanded interview target projection", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace(
+        'authorized_application.interview_notes AS "interviewNotes"',
+        'authorized_application.interview_notes AS "interviewNotes",\n'
+          + '             authorized_application.application_id AS "applicationId"',
+      ),
+    );
+    expect(problems).toContain("interview reader no longer returns the exact seven-field projection.");
+    expect(problems).toContain("interview reader selects a forbidden target field.");
+  });
+
+  it("rejects an id-only application read restored in the ICS route", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedApplicationInterviewInvite(",
+        "await storage.getApplication(appId);\n      const result = await readAuthorizedApplicationInterviewInvite(",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/interview/ics reaches an id-only or raw target read.",
+    );
+  });
+
+  it("rejects ICS generation moved before authorization", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedApplicationInterviewInvite(",
+        "generateInterviewICS(interviewDetails);\n      const result = await readAuthorizedApplicationInterviewInvite(",
+      ),
+    );
+    expect(problems).toContain("the ICS route must invoke its generator exactly once.");
+    expect(problems).toContain("ICS generation occurs before statement-bound authorization.");
+  });
+
+  it("rejects loss of focused ICS route-test collection", () => {
+    const problems = mutate(fixture(), "vitest.server.config.ts", (source) =>
+      source.replace("      'server/tests/interviewIcsAuthorization.routes.test.ts',\n", ""),
+    );
+    expect(problems).toContain("the focused ICS authorization route test is not collected by Vitest.");
+  });
+
+  it("rejects drift in the frozen ICS generator", () => {
+    const problems = mutate(fixture(), "server/lib/icsGenerator.ts", (source) =>
+      `${source}\n// forbidden generator drift\n`,
+    );
+    expect(problems).toContain("governed/frozen file drifted: server/lib/icsGenerator.ts");
   });
 });

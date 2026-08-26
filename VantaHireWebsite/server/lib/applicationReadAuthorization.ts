@@ -8,7 +8,7 @@ import {
   organizationMembers,
   users,
 } from "@shared/schema";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { applicationPrivacyAllowed } from "../storage";
 
@@ -29,8 +29,22 @@ export interface ApplicationEmailHistoryProjection {
   sentBy: { firstName: string; lastName: string } | null;
 }
 
+export interface InterviewInviteProjection {
+  candidateName: string;
+  candidateEmail: string;
+  jobTitle: string;
+  interviewDate: string | null;
+  interviewTime: string | null;
+  interviewLocation: string | null;
+  interviewNotes: string | null;
+}
+
 export type AuthorizedApplicationRead<T> =
   | { ok: true; rows: T[] }
+  | { ok: false; reason: "not_found" | "unavailable" };
+
+export type AuthorizedApplicationInterviewInviteRead =
+  | { ok: true; interview: InterviewInviteProjection }
   | { ok: false; reason: "not_found" | "unavailable" };
 
 export interface ApplicationReadPolicy {
@@ -83,6 +97,10 @@ function isoTimestamp(value: unknown): string {
   return date.toISOString();
 }
 
+function nullableIsoTimestamp(value: unknown): string | null {
+  return value === null ? null : isoTimestamp(value);
+}
+
 function sender(value: unknown): { firstName: string; lastName: string } | null {
   if (value === null) return null;
   if (typeof value !== "object" || Array.isArray(value)) {
@@ -105,9 +123,11 @@ function authorizedApplicationCte(
   actorId: number,
   applicationId: number,
   allowPlatformAdmin: boolean,
+  projection: SQL = sql``,
 ) {
   return sql`
     SELECT ${applications.id} AS application_id
+           ${projection}
       FROM ${applications}
       INNER JOIN ${jobs}
         ON ${jobs.id} = ${applications.jobId}
@@ -141,6 +161,63 @@ function authorizedApplicationCte(
          )
        )
   `;
+}
+
+export async function readAuthorizedApplicationInterviewInvite(
+  actorId: number,
+  applicationId: number,
+  policy: ApplicationReadPolicy,
+): Promise<AuthorizedApplicationInterviewInviteRead> {
+  if (!validInputs(actorId, applicationId, policy)) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  try {
+    const result = await db.execute(sql`
+      WITH authorized_application AS (
+        ${authorizedApplicationCte(
+          actorId,
+          applicationId,
+          policy.allowPlatformAdmin,
+          sql`,
+            ${applications.name} AS candidate_name,
+            ${applications.email} AS candidate_email,
+            ${jobs.title} AS job_title,
+            ${applications.interviewDate} AS interview_date,
+            ${applications.interviewTime} AS interview_time,
+            ${applications.interviewLocation} AS interview_location,
+            ${applications.interviewNotes} AS interview_notes
+          `,
+        )}
+      )
+      SELECT authorized_application.candidate_name AS "candidateName",
+             authorized_application.candidate_email AS "candidateEmail",
+             authorized_application.job_title AS "jobTitle",
+             authorized_application.interview_date AS "interviewDate",
+             authorized_application.interview_time AS "interviewTime",
+             authorized_application.interview_location AS "interviewLocation",
+             authorized_application.interview_notes AS "interviewNotes"
+        FROM authorized_application
+    `);
+    const rawRows = rowsFrom(result);
+    if (rawRows.length === 0) return { ok: false, reason: "not_found" };
+    if (rawRows.length !== 1) throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+    const row = rawRows[0]!;
+    return {
+      ok: true,
+      interview: {
+        candidateName: text(row.candidateName),
+        candidateEmail: text(row.candidateEmail),
+        jobTitle: text(row.jobTitle),
+        interviewDate: nullableIsoTimestamp(row.interviewDate),
+        interviewTime: nullableText(row.interviewTime),
+        interviewLocation: nullableText(row.interviewLocation),
+        interviewNotes: nullableText(row.interviewNotes),
+      },
+    };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
 }
 
 export async function readAuthorizedApplicationStageHistory(

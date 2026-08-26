@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_MANIFEST = "server/object-authorization/surfaces.json";
-const SOURCE_COMMIT = "3570fee4f0e31e381f6e248c0501958ab955eada";
+const SOURCE_COMMIT = "db91e84d4a1f82d6f0137319014211eab7ed21be";
 const ROUTE_METHOD = /\bapp\.(?:get|post|put|patch|delete)\s*\(/g;
 const SKIP_ROUTE_PARTS = new Set(["__tests__", "tests", "scripts", "dist", "node_modules"]);
 
@@ -77,6 +77,7 @@ function validateKernel(root, problems) {
   const storage = read(root, "server/storage.ts");
   const auth = read(root, "server/auth.ts");
   const routes = read(root, "server/applications.routes.ts");
+  const testConfig = read(root, "vitest.server.config.ts");
 
   for (const anchor of [
     "function parsePositiveDecimalApplicationId",
@@ -102,8 +103,8 @@ function validateKernel(root, problems) {
     ["FROM authorized_application", "history is no longer selected through the authorized CTE."],
   ];
   for (const [anchor, label] of sharedAnchors) requireAnchor(problems, kernel, anchor, label);
-  if (count(kernel, "FROM authorized_application") !== 2) {
-    problems.push("both protected histories must read through the authorized CTE.");
+  if (count(kernel, "FROM authorized_application") !== 3) {
+    problems.push("all three protected application readers must read through the authorized CTE.");
   }
   if (count(kernel, "LEFT JOIN ${applicationStageHistory}") !== 1
     || count(kernel, "LEFT JOIN ${emailAuditLog}") !== 1) {
@@ -114,6 +115,7 @@ function validateKernel(root, problems) {
   for (const symbol of [
     "readAuthorizedApplicationStageHistory",
     "readAuthorizedApplicationEmailHistory",
+    "readAuthorizedApplicationInterviewInvite",
   ]) {
     const source = exportedFunctionSource(kernel, symbol);
     if (!source) problems.push(`authorization reader is missing: ${symbol}`);
@@ -135,6 +137,43 @@ function validateKernel(root, problems) {
     "status: text(row.status)",
     "sentBy: sender(row.sentBy)",
   ]) requireAnchor(problems, kernel, anchor, `email projection anchor is missing: ${anchor}`);
+
+  const interviewReader = exportedFunctionSource(kernel, "readAuthorizedApplicationInterviewInvite");
+  for (const anchor of [
+    "${applications.name} AS candidate_name",
+    "${applications.email} AS candidate_email",
+    "${jobs.title} AS job_title",
+    "${applications.interviewDate} AS interview_date",
+    "${applications.interviewTime} AS interview_time",
+    "${applications.interviewLocation} AS interview_location",
+    "${applications.interviewNotes} AS interview_notes",
+    'authorized_application.candidate_name AS "candidateName"',
+    'authorized_application.candidate_email AS "candidateEmail"',
+    'authorized_application.job_title AS "jobTitle"',
+    'authorized_application.interview_date AS "interviewDate"',
+    'authorized_application.interview_time AS "interviewTime"',
+    'authorized_application.interview_location AS "interviewLocation"',
+    'authorized_application.interview_notes AS "interviewNotes"',
+  ]) requireAnchor(problems, interviewReader, anchor, `interview projection anchor is missing: ${anchor}`);
+  if (/\b(?:JOIN|FROM)\s+\$\{(?:applications|jobs)\}/.test(interviewReader)) {
+    problems.push("interview target fields are re-read outside the authorized CTE.");
+  }
+  const interviewSelect = interviewReader.match(/SELECT authorized_application\.candidate_name[\s\S]*?FROM authorized_application/)?.[0] ?? "";
+  const interviewAliases = [...interviewSelect.matchAll(/AS\s+"([A-Za-z]+)"/g)].map((match) => match[1]);
+  if (JSON.stringify(interviewAliases) !== JSON.stringify([
+    "candidateName",
+    "candidateEmail",
+    "jobTitle",
+    "interviewDate",
+    "interviewTime",
+    "interviewLocation",
+    "interviewNotes",
+  ])) {
+    problems.push("interview reader no longer returns the exact seven-field projection.");
+  }
+  if (/\b(?:phone|resume|organization|applicationId|jobId|userId|score|consent|source)\b/i.test(interviewSelect)) {
+    problems.push("interview reader selects a forbidden target field.");
+  }
 
   const emailSelect = kernel.match(/SELECT authorized_application\.application_id AS "authorizedApplicationId",[\s\S]*?FROM authorized_application/g)?.[1] ?? "";
   if (/AS\s+"?(?:subject|errorMessage|previewUrl|templateId|senderId|username)"?/i.test(emailSelect)) {
@@ -179,6 +218,46 @@ function validateKernel(root, problems) {
       problems.push(`${route[1]} responds before its authorization read.`);
     }
   }
+
+  const interviewRoute = routeCall(routes, "get", "/api/applications/:id/interview/ics");
+  if (interviewRoute.count !== 1 || !interviewRoute.source) {
+    problems.push("route registration must exist exactly once: GET /api/applications/:id/interview/ics");
+  } else {
+    const handler = interviewRoute.source;
+    for (const anchor of [
+      "requireRole(['recruiter', 'super_admin'])",
+      "requireSeat()",
+      "parsePositiveDecimalApplicationId",
+      "INVALID_APPLICATION_ID",
+      "readAuthorizedApplicationInterviewInvite",
+      "allowPlatformAdmin: true",
+      "APPLICATION_NOT_FOUND",
+      "AUTHORIZATION_UNAVAILABLE",
+      "INTERVIEW_NOT_SCHEDULED",
+      "generateInterviewICS(interviewDetails)",
+      "getICSFilename(interview.jobTitle, interview.candidateName)",
+    ]) requireAnchor(problems, handler, anchor, `/api/applications/:id/interview/ics lost required handler anchor: ${anchor}`);
+    if (handler.includes("storage.getApplication(")
+      || handler.includes("storage.getJob(")
+      || /\bdb\.(?:query|select|execute)\b/.test(handler)) {
+      problems.push("/api/applications/:id/interview/ics reaches an id-only or raw target read.");
+    }
+    if (count(handler, "generateInterviewICS(") !== 1) {
+      problems.push("the ICS route must invoke its generator exactly once.");
+    }
+    const authorizationAt = handler.indexOf("readAuthorizedApplicationInterviewInvite");
+    const generatorAt = handler.indexOf("generateInterviewICS(interviewDetails)");
+    if (authorizationAt < 0 || generatorAt < 0 || authorizationAt > generatorAt) {
+      problems.push("ICS generation occurs before statement-bound authorization.");
+    }
+  }
+
+  requireAnchor(
+    problems,
+    testConfig,
+    "'server/tests/interviewIcsAuthorization.routes.test.ts'",
+    "the focused ICS authorization route test is not collected by Vitest.",
+  );
 }
 
 export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative = DEFAULT_MANIFEST) {
