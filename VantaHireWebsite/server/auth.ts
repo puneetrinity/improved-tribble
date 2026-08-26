@@ -194,37 +194,6 @@ export function requireVerifiedCandidate(
   next();
 }
 
-// Organization context middleware - attaches org info to request
-// Use after requireAuth for routes that need org context
-export function withOrgContext() {
-  return async (req: any, res: any, next: any) => {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    // Skip org check for non-recruiter roles
-    if (req.user.role !== 'recruiter') {
-      return next();
-    }
-
-    try {
-      // Lazy import to avoid circular dependency
-      const { getUserOrganization } = await import('./lib/organizationService');
-      const orgResult = await getUserOrganization(req.user.id);
-
-      if (orgResult) {
-        req.organization = orgResult.organization;
-        req.membership = orgResult.membership;
-      }
-
-      next();
-    } catch (error) {
-      console.error('Error loading org context:', error);
-      next();
-    }
-  };
-}
-
 // Middleware to require an active seat (blocks unseated members)
 export function requireSeat(options?: { allowNoOrg?: boolean }) {
   return async (req: any, res: any, next: any) => {

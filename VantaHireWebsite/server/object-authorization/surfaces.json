@@ -1,0 +1,42 @@
+{
+  "format_version": 1,
+  "source_commit": "3570fee4f0e31e381f6e248c0501958ab955eada",
+  "route_registration_census": 316,
+  "contract": "Application history authorization and protected rows share one PostgreSQL statement snapshot; absence and denial are indistinguishable.",
+  "routes": [
+    {
+      "method": "get",
+      "path": "/api/applications/:id/history",
+      "reader": "readAuthorizedApplicationStageHistory",
+      "projection": ["fromStage", "toStage", "changedAt", "notes"]
+    },
+    {
+      "method": "get",
+      "path": "/api/applications/:id/email-history",
+      "reader": "readAuthorizedApplicationEmailHistory",
+      "projection": ["id", "templateName", "templateType", "recipientEmail", "sentAt", "status", "sentBy"]
+    }
+  ],
+  "governed_files": [
+    { "file": "../.github/workflows/ci.yml", "sha256": "bb7049744d295ce49405ab5250ee701d8d799795a5bd650ccdb55a67c075e57f" },
+    { "file": "package.json", "sha256": "7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe" },
+    { "file": "vitest.server.config.ts", "sha256": "69c4074381af79a5f2349524ea00ef0740eedf3070f649d778d77c9d46f1c67f" },
+    { "file": "server/applications.routes.ts", "sha256": "5764cb7065624f5f0c8bb2921864aae9e3998cafa231a95524cc750c72b84bbe" },
+    { "file": "server/auth.ts", "sha256": "a2f1ffc7ff99c9e6c56fafc834065a5463bfe747bf7cbdcc506f3f3356a06365" },
+    { "file": "server/candidate-privacy/surfaces.json", "sha256": "dd207e11c02aa4a9f9b8bee48fae338a10fa944243ffddd6ed6674b06657b839" },
+    { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "f387e4290d1cb6603705dae84b79a603e329b9a55a8d027bbdf969dd03dfb5e0" },
+    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "9fb2977fec29adfaf1763466c85ee763a7178c0a0e112374bd93110118fcaa9f" },
+    { "file": "server/lib/applicationReadAuthorization.ts", "sha256": "491c70d996abba31ab5a1f8b19696b2b8e01a12002b0ed6e675ec4523ffc6bb1" },
+    { "file": "server/storage.ts", "sha256": "1c140fd05c645ae9f4faba9dd1b6e5a14370576d080207c21fcc42814f0265ee" },
+    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "65f9755f80ac1cb453a2eb8d3adb94318e5237ac3cb5d3aa044d11ea1a028b94" },
+    { "file": "scripts/check-object-authorization.mjs", "sha256": "554a9e09f3d0f2c8a27a73cefa11396b2787b1bd34591d98ebd28937f55724f1" }
+  ],
+  "frozen_files": [
+    { "file": "package-lock.json", "sha256": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539" },
+    { "file": "shared/schema.ts", "sha256": "872208d4b7aafdb77fb0d15bd4fac775056f48d65be76c3ea8dca14a8d6d1684" },
+    { "file": "server/schema-control/manifest.ts", "sha256": "16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2" },
+    { "file": "server/schema-migrations/0000_baseline.sql", "sha256": "3fd883d6fb45d0c52acc69bff16949185948bb51e5d732f57247f542814aa129" },
+    { "file": "server/schema-migrations/0001_candidate_privacy_flow.sql", "sha256": "a050e6b3e72a61b1d73c9124ddcd10eb6309f804891412dec9e15288df8c77c8" },
+    { "file": "server/schema-migrations/checksums.lock", "sha256": "6498876e722e89dd5cc9a9346e29723f2ac4b21c63c840a1f6aa11ceb6c5b9bf" }
+  ]
+}

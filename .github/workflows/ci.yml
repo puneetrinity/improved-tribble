@@ -50,6 +50,7 @@ jobs:
       - run: npm ci
       - run: npm run check:schema-control
       - run: npm run check:candidate-privacy-surfaces
+      - run: npm run check:object-authorization
       - run: npm run check:server
       - run: npm run check:client
       - run: npm run test:server
@@ -67,3 +68,10 @@ jobs:
           FLOW_SCHEMA_TEST_DATABASE_URL: postgresql://flow_schema_control_test_runner:runner-test-only@127.0.0.1:5432/flow_schema_control_test_ci
           FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL: postgresql://flow_schema_control_test_runtime:runtime-test-only@127.0.0.1:5432/flow_schema_control_test_ci
         run: npm run test:candidate-privacy:pg
+      - name: Run disposable object-authorization matrix
+        env:
+          NODE_ENV: test
+          FLOW_AUTHZ_TEST_DISPOSABLE: '1'
+          FLOW_SCHEMA_TEST_DATABASE_URL: postgresql://flow_schema_control_test_runner:runner-test-only@127.0.0.1:5432/flow_schema_control_test_ci
+          FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL: postgresql://flow_schema_control_test_runtime:runtime-test-only@127.0.0.1:5432/flow_schema_control_test_ci
+        run: npm run test:object-authorization:pg

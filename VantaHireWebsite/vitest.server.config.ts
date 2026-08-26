@@ -13,6 +13,7 @@ export default defineConfig({
       'server/tests/resumeExtractor.isolation.test.ts',
       'server/tests/outreachHygieneConcurrency.pg.test.ts',
       'server/tests/candidatePrivacy.pg.test.ts',
+      'server/tests/applicationReadAuthorization.pg.test.ts',
     ],
   },
   resolve: {

@@ -49,7 +49,6 @@ import {
   type InsertPipelineStage,
   type EmailTemplate,
   type InsertEmailTemplate,
-  type EmailAuditLog,
   type AutomationSetting,
   consultants,
   type Consultant,
@@ -112,7 +111,7 @@ const privacyAllowedFor = (
        : sql`('block_all','review')`}
 )`;
 
-const applicationPrivacyAllowed = (globalUse = false) => privacyAllowedFor(
+export const applicationPrivacyAllowed = (globalUse = false) => privacyAllowedFor(
   'application',
   'application_id',
   applications.id,
@@ -327,7 +326,6 @@ export interface IStorage {
   getPipelineStages(organizationId?: number | null, userId?: number): Promise<PipelineStage[]>;
   createPipelineStage(stage: InsertPipelineStage & { createdBy?: number; organizationId?: number }): Promise<PipelineStage>;
   updateApplicationStage(appId: number, newStageId: number, changedBy: number, notes?: string): Promise<void>;
-  getApplicationStageHistory(appId: number): Promise<any[]>;
   scheduleInterview(appId: number, fields: { date?: Date; time?: string; location?: string; notes?: string }): Promise<Application | undefined>;
   addRecruiterNote(appId: number, note: string): Promise<Application | undefined>;
   setApplicationRating(appId: number, rating: number): Promise<Application | undefined>;
@@ -1610,36 +1608,6 @@ export class DatabaseStorage implements IStorage {
     return counts;
   }
 
-  // Get email history for an application
-  async getApplicationEmailHistory(applicationId: number): Promise<(EmailAuditLog & { sentByUser: { id: number; username: string; firstName: string | null; lastName: string | null } | null; template: { id: number; name: string } | null })[]> {
-    const results = await db
-      .select({
-        log: emailAuditLog,
-        sentByUser: {
-          id: users.id,
-          username: users.username,
-          firstName: users.firstName,
-          lastName: users.lastName,
-        },
-        template: {
-          id: emailTemplates.id,
-          name: emailTemplates.name,
-        },
-      })
-      .from(emailAuditLog)
-      .leftJoin(users, eq(emailAuditLog.sentBy, users.id))
-      .leftJoin(emailTemplates, eq(emailAuditLog.templateId, emailTemplates.id))
-      .where(eq(emailAuditLog.applicationId, applicationId))
-      .orderBy(desc(emailAuditLog.sentAt));
-
-    type EmailLogRow = typeof results[number];
-    return results.map((row: EmailLogRow) => ({
-      ...row.log,
-      sentByUser: row.sentByUser?.id ? row.sentByUser : null,
-      template: row.template?.id ? row.template : null,
-    }));
-  }
-
   // Phase 4: User profile management methods
   async getUserProfile(userId: number): Promise<UserProfile | undefined> {
     const [profile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
@@ -2891,19 +2859,6 @@ export class DatabaseStorage implements IStorage {
         notes,
       });
     });
-  }
-
-  async getApplicationStageHistory(appId: number): Promise<any[]> {
-    const rows = await db
-      .select({ history: applicationStageHistory })
-      .from(applicationStageHistory)
-      .innerJoin(applications, eq(applicationStageHistory.applicationId, applications.id))
-      .where(and(
-        eq(applicationStageHistory.applicationId, appId),
-        applicationPrivacyAllowed(false),
-      ))
-      .orderBy(desc(applicationStageHistory.changedAt));
-    return rows.map((row: { history: typeof applicationStageHistory.$inferSelect }) => row.history);
   }
 
   async scheduleInterview(appId: number, fields: { date?: Date; time?: string; location?: string; notes?: string }): Promise<Application | undefined> {

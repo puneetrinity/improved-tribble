@@ -69,9 +69,19 @@ import {
   requireCandidatePrivacyAllowed,
   requireNewCandidateIdentityAllowed,
 } from './candidate-privacy/decision';
+import {
+  readAuthorizedApplicationEmailHistory,
+  readAuthorizedApplicationStageHistory,
+} from './lib/applicationReadAuthorization';
 
 // Base URL for email links
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
+
+function parsePositiveDecimalApplicationId(value: unknown): number | null {
+  if (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
 
 async function requireApplicationIngestAllowed(input: {
   userId?: number;
@@ -1608,17 +1618,25 @@ export function registerApplicationsRoutes(
   app.get("/api/applications/:id/history", requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(idParam);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const result = await readAuthorizedApplicationStageHistory(
+        req.user!.id,
+        appId,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
         return;
       }
-      const hist = await storage.getApplicationStageHistory(appId);
-      res.json(hist);
+      res.json(result.rows);
       return;
     } catch (e) { next(e); }
   });
@@ -1761,24 +1779,25 @@ export function registerApplicationsRoutes(
   app.get("/api/applications/:id/email-history", requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
+      const applicationId = parsePositiveDecimalApplicationId(idParam);
+      if (applicationId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
-      const applicationId = Number(idParam);
-      if (!Number.isFinite(applicationId) || applicationId <= 0 || !Number.isInteger(applicationId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const result = await readAuthorizedApplicationEmailHistory(
+        req.user!.id,
+        applicationId,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
         return;
       }
-
-      const application = await storage.getApplication(applicationId);
-      if (!application) {
-        res.status(404).json({ error: 'Application not found' });
-        return;
-      }
-
-      const emailHistory = await storage.getApplicationEmailHistory(applicationId);
-      res.json(emailHistory);
+      res.json(result.rows);
       return;
     } catch (error) {
       next(error);
