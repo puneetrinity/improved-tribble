@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "acb81355229c1145eed1d9a6b584e2f11a05702628d7ec96212f8b2340ee8c39",
+  "source_census_sha256": "0eb037761a21b3ffa69eddc87e8c94054738bf7fae879257196a59eb94348fe8",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
@@ -267,13 +267,13 @@
     {
       "id": "application-history-object-authorization",
       "file": "server/lib/applicationReadAuthorization.ts",
-      "symbol": "readAuthorizedApplicationStageHistory",
+      "symbol": "readAuthorizedApplicationInterviewInvite",
       "models": ["applications", "jobs", "organization_members", "job_recruiters", "application_stage_history", "email_audit_log"],
       "direction": "read",
       "privacy_action": ["withdraw_global_matching", "request_erasure"],
       "organization_scope": "exact_job_assignment_or_platform_admin",
-      "enforcement": "One statement snapshot composes current role, membership, seat, exact job authority, structural organization and the existing own-organization privacy fence before minimum history projections.",
-      "anchors": ["WITH authorized_application AS", "applicationPrivacyAllowed(false)", "readAuthorizedApplicationEmailHistory"]
+      "enforcement": "One statement snapshot composes current role, membership, seat, exact job authority, structural organization and the existing own-organization privacy fence before minimum history or interview-calendar projections.",
+      "anchors": ["WITH authorized_application AS", "applicationPrivacyAllowed(false)", "readAuthorizedApplicationEmailHistory", "readAuthorizedApplicationInterviewInvite"]
     },
     {
       "id": "application-intake-and-workflow",

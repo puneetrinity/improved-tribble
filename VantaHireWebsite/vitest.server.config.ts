@@ -14,6 +14,7 @@ export default defineConfig({
       'server/tests/outreachHygieneConcurrency.pg.test.ts',
       'server/tests/candidatePrivacy.pg.test.ts',
       'server/tests/applicationReadAuthorization.pg.test.ts',
+      'server/tests/interviewIcsAuthorization.routes.test.ts',
     ],
   },
   resolve: {

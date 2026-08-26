@@ -71,6 +71,7 @@ import {
 } from './candidate-privacy/decision';
 import {
   readAuthorizedApplicationEmailHistory,
+  readAuthorizedApplicationInterviewInvite,
   readAuthorizedApplicationStageHistory,
 } from './lib/applicationReadAuthorization';
 
@@ -1646,47 +1647,42 @@ export function registerApplicationsRoutes(
   // Download interview calendar invite (ICS file)
   app.get("/api/applications/:id/interview/ics", requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application id', code: 'INVALID_APPLICATION_ID' });
         return;
       }
 
-      const application = await storage.getApplication(appId);
-      if (!application) {
-        res.status(404).json({ error: 'Application not found' });
+      const result = await readAuthorizedApplicationInterviewInvite(
+        req.user!.id,
+        appId,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
         return;
       }
 
-      const job = await storage.getJob(application.jobId);
-      if (!job) {
-        res.status(404).json({ error: 'Job not found' });
-        return;
-      }
-
-      if (!application.interviewDate || !application.interviewTime) {
-        res.status(400).json({
-          error: 'Interview not scheduled',
-          message: 'Interview date and time must be set before generating calendar invite'
-        });
+      const { interview } = result;
+      if (!interview.interviewDate || !interview.interviewTime) {
+        res.status(400).json({ error: 'Interview not scheduled', code: 'INTERVIEW_NOT_SCHEDULED' });
         return;
       }
 
       const recruiter = req.user;
-      const interviewDateString = new Date(application.interviewDate).toISOString().slice(0, 10);
+      const interviewDateString = interview.interviewDate.slice(0, 10);
 
-      const interviewDetails: any = {
-        candidateName: application.name,
-        candidateEmail: application.email,
-        jobTitle: job.title,
+      const interviewDetails: Parameters<typeof generateInterviewICS>[0] = {
+        candidateName: interview.candidateName,
+        candidateEmail: interview.candidateEmail,
+        jobTitle: interview.jobTitle,
         interviewDate: interviewDateString,
-        interviewTime: application.interviewTime,
-        interviewLocation: application.interviewLocation || 'TBD',
+        interviewTime: interview.interviewTime,
+        interviewLocation: interview.interviewLocation || 'TBD',
       };
 
       if (recruiter?.firstName) {
@@ -1695,20 +1691,19 @@ export function registerApplicationsRoutes(
       if (recruiter?.username) {
         interviewDetails.recruiterEmail = recruiter.username;
       }
-      if (application.interviewNotes) {
-        interviewDetails.notes = application.interviewNotes;
+      if (interview.interviewNotes) {
+        interviewDetails.notes = interview.interviewNotes;
       }
 
       const icsContent = generateInterviewICS(interviewDetails);
-      const filename = getICSFilename(job.title, application.name);
+      const filename = getICSFilename(interview.jobTitle, interview.candidateName);
 
       res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.send(icsContent);
       return;
-    } catch (error) {
-      console.error('[ICS Download] Error:', error);
-      next(error);
+    } catch {
+      next(new Error('INTERVIEW_ICS_GENERATION_FAILED'));
     }
   });
 

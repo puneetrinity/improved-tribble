@@ -1,12 +1,18 @@
-import { randomUUID } from "node:crypto";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
+
+import { runReleaseMigration, type MigrationClient } from "../schema-control/runner";
+import { provisionRuntimeRole } from "../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1"
   && Boolean(migrationUrl)
   && Boolean(runtimeUrl);
+const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "schema-migrations");
+const targetId = "flow-object-authorization-test-target";
 
 type AuthorizationModule = typeof import("../lib/applicationReadAuthorization");
 
@@ -14,13 +20,27 @@ let authorization: AuthorizationModule;
 let owner: Client | undefined;
 let runtimePool: { end(): Promise<void> } | undefined;
 let safeTargetProven = false;
-const schemaName = `flow_authz_test_${randomUUID().replaceAll("-", "")}`;
 
-function quotedIdentifier(value: string): string {
-  if (!/^[a-z][a-z0-9_]{1,127}$/.test(value)) {
-    throw new Error("Disposable authorization identifier refused.");
-  }
-  return `"${value}"`;
+async function clientFor(connectionString: string): Promise<Client> {
+  const client = new Client({ connectionString, connectionTimeoutMillis: 2_000 });
+  await client.connect();
+  return client;
+}
+
+async function connectMigration(): Promise<MigrationClient> {
+  const client = await clientFor(migrationUrl);
+  return {
+    query: (text, params) => client.query(text, params as any),
+    end: () => client.end(),
+  };
+}
+
+async function connectRuntime(): Promise<MigrationClient> {
+  const client = await clientFor(runtimeUrl);
+  return {
+    query: (text, params) => client.query(text, params as any),
+    end: () => client.end(),
+  };
 }
 
 function assertSafeUrl(value: string, label: string): URL {
@@ -35,10 +55,15 @@ function assertSafeUrl(value: string, label: string): URL {
   return parsed;
 }
 
-function runtimeUrlForSchema(): string {
-  const parsed = new URL(runtimeUrl);
-  parsed.searchParams.set("options", `-c search_path=${schemaName}`);
-  return parsed.toString();
+async function resetDatabase(): Promise<void> {
+  const client = await clientFor(migrationUrl);
+  try {
+    await client.query("DROP SCHEMA IF EXISTS schema_control CASCADE");
+    await client.query("DROP SCHEMA IF EXISTS public CASCADE");
+    await client.query("CREATE SCHEMA public AUTHORIZATION CURRENT_USER");
+  } finally {
+    await client.end();
+  }
 }
 
 async function databaseState(): Promise<string> {
@@ -70,93 +95,10 @@ async function readWithoutMutation<T>(read: () => Promise<T>): Promise<T> {
 
 async function installFixture(): Promise<void> {
   if (!owner) throw new Error("Disposable authorization owner is unavailable.");
-  const runtimeRole = new URL(runtimeUrl).username;
-  const schema = quotedIdentifier(schemaName);
-  const role = quotedIdentifier(runtimeRole);
-  await owner.query(`CREATE SCHEMA ${schema} AUTHORIZATION CURRENT_USER`);
-  await owner.query(`SET search_path TO ${schema}`);
   await owner.query(`
-    CREATE TABLE organizations (
-      id integer PRIMARY KEY,
-      name text NOT NULL
-    );
-    CREATE TABLE users (
-      id integer PRIMARY KEY,
-      username text NOT NULL,
-      password text NOT NULL,
-      role text NOT NULL,
-      email_verified boolean NOT NULL DEFAULT false,
-      first_name text,
-      last_name text
-    );
-    CREATE TABLE organization_members (
-      id integer PRIMARY KEY,
-      organization_id integer NOT NULL REFERENCES organizations(id),
-      user_id integer NOT NULL REFERENCES users(id),
-      role text NOT NULL DEFAULT 'member',
-      seat_assigned boolean NOT NULL DEFAULT true,
-      UNIQUE (organization_id, user_id)
-    );
-    CREATE TABLE jobs (
-      id integer PRIMARY KEY,
-      organization_id integer REFERENCES organizations(id),
-      posted_by integer NOT NULL REFERENCES users(id)
-    );
-    CREATE TABLE job_recruiters (
-      id integer PRIMARY KEY,
-      organization_id integer REFERENCES organizations(id),
-      job_id integer NOT NULL REFERENCES jobs(id),
-      recruiter_id integer NOT NULL REFERENCES users(id),
-      UNIQUE (job_id, recruiter_id)
-    );
-    CREATE TABLE applications (
-      id integer PRIMARY KEY,
-      job_id integer NOT NULL REFERENCES jobs(id),
-      organization_id integer REFERENCES organizations(id)
-    );
-    CREATE TABLE application_stage_history (
-      id integer PRIMARY KEY,
-      application_id integer NOT NULL REFERENCES applications(id),
-      from_stage integer,
-      to_stage integer NOT NULL,
-      changed_by integer NOT NULL REFERENCES users(id),
-      notes text,
-      changed_at timestamp NOT NULL
-    );
-    CREATE TABLE email_templates (
-      id integer PRIMARY KEY,
-      name text NOT NULL
-    );
-    CREATE TABLE email_audit_log (
-      id integer PRIMARY KEY,
-      application_id integer REFERENCES applications(id),
-      template_id integer REFERENCES email_templates(id),
-      template_type text,
-      recipient_email text NOT NULL,
-      subject text NOT NULL,
-      sent_at timestamp NOT NULL,
-      sent_by integer REFERENCES users(id),
-      status text NOT NULL,
-      error_message text,
-      preview_url text
-    );
-    CREATE TABLE candidate_privacy_requests (
-      request_id uuid PRIMARY KEY,
-      action text NOT NULL,
-      state text NOT NULL
-    );
-    CREATE TABLE candidate_privacy_subject_links (
-      request_id uuid PRIMARY KEY REFERENCES candidate_privacy_requests(request_id),
-      subject_type text NOT NULL,
-      application_id integer REFERENCES applications(id)
-    );
-    CREATE TABLE candidate_privacy_remote_projection (
-      request_id uuid PRIMARY KEY REFERENCES candidate_privacy_requests(request_id),
-      decision text NOT NULL
-    );
-  `);
-  await owner.query(`
-    INSERT INTO organizations (id,name) VALUES (1,'Fixture org one'),(2,'Fixture org two');
+    INSERT INTO organizations (id,name,slug,settings,is_active,signal_tenant_id) VALUES
+      (1,'Fixture org one','fixture-org-one','{}'::jsonb,true,NULL),
+      (2,'Fixture org two','fixture-org-two','{}'::jsonb,true,NULL);
     INSERT INTO users (id,username,password,role,email_verified,first_name,last_name) VALUES
       (101,'primary@example.invalid','x','recruiter',true,'Primary','Recruiter'),
       (102,'co@example.invalid','x','recruiter',true,'Co','Recruiter'),
@@ -167,45 +109,89 @@ async function installFixture(): Promise<void> {
       (301,'candidate@example.invalid','x','candidate',true,'Test','Candidate'),
       (302,'hm@example.invalid','x','hiring_manager',true,'Test','Manager'),
       (401,'admin@example.invalid','x','super_admin',true,'Platform','Admin');
-    INSERT INTO organization_members (id,organization_id,user_id,role,seat_assigned) VALUES
-      (1,1,101,'owner',true),(2,1,102,'member',true),(3,1,103,'member',true),
-      (4,1,104,'member',false),(5,2,201,'owner',true);
-    INSERT INTO jobs (id,organization_id,posted_by) VALUES
-      (1001,1,101),(1002,2,201),(1003,NULL,101),(1004,2,101);
-    INSERT INTO job_recruiters (id,organization_id,job_id,recruiter_id) VALUES (1,1,1001,102);
-    INSERT INTO applications (id,job_id,organization_id) VALUES
-      (2001,1001,1),(2002,1002,2),(2003,1003,NULL),(2004,1004,1),
-      (2005,1001,1),(2006,1001,1),(2007,1001,1),(2008,1001,1);
+    INSERT INTO organization_members
+      (id,organization_id,user_id,role,seat_assigned,credits_allocated,credits_used,credits_rollover,invited_by)
+    VALUES
+      (1,1,101,'owner',true,0,0,0,NULL),
+      (2,1,102,'member',true,0,0,0,101),
+      (3,1,103,'member',true,0,0,0,101),
+      (4,1,104,'member',false,0,0,0,101),
+      (5,2,201,'owner',true,0,0,0,NULL);
+    INSERT INTO jobs
+      (id,organization_id,title,location,type,description,original_jd,posted_by,is_active,status,slug)
+    VALUES
+      (1001,1,'Fixture Role One','Remote','full-time','Fixture description','Fixture description',101,false,'pending','fixture-role-one'),
+      (1002,2,'Fixture Role Two','Remote','full-time','Fixture description','Fixture description',201,false,'pending','fixture-role-two'),
+      (1003,NULL,'Null-org Role','Remote','full-time','Fixture description','Fixture description',101,false,'pending','null-org-role'),
+      (1004,2,'Mismatched Role','Remote','full-time','Fixture description','Fixture description',101,false,'pending','mismatched-role');
+    INSERT INTO job_recruiters (id,organization_id,job_id,recruiter_id,added_by) VALUES
+      (1,1,1001,102,101);
+    INSERT INTO applications
+      (id,organization_id,job_id,user_id,name,email,phone,resume_url,resume_filename,
+       extracted_resume_text,cover_letter,status,current_stage,submitted_by_recruiter,
+       created_by_user_id,source,source_metadata,whatsapp_consent,
+       platform_discovery_consent,consent_captured_at,
+       interview_date,interview_time,interview_location,interview_notes)
+    VALUES
+      (2001,1,1001,NULL,'Fixture Candidate','fixture@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       '2099-01-15T00:00:00Z','10:30','Synthetic room','Synthetic authorization proof'),
+      (2002,2,1002,NULL,'Foreign Candidate','foreign-candidate@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,201,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       '2099-01-16T00:00:00Z','11:00',NULL,NULL),
+      (2003,NULL,1003,NULL,'Null Candidate','null@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       NULL,NULL,NULL,NULL),
+      (2004,1,1004,NULL,'Mismatch Candidate','mismatch@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       NULL,NULL,NULL,NULL),
+      (2005,1,1001,NULL,'Blocked Candidate','blocked@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       '2099-01-15T00:00:00Z','10:30',NULL,NULL),
+      (2006,1,1001,NULL,'Review Candidate','review@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       '2099-01-15T00:00:00Z','10:30',NULL,NULL),
+      (2007,1,1001,NULL,'Global Optout Candidate','global@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       '2099-01-15T00:00:00Z','10:30',NULL,NULL),
+      (2008,1,1001,NULL,'Empty Candidate','empty@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+       NULL,NULL,NULL,NULL);
     INSERT INTO application_stage_history (id,application_id,from_stage,to_stage,changed_by,notes,changed_at) VALUES
       (3001,2001,NULL,1,101,'Created','2026-08-26T09:00:00Z'),
       (3002,2001,1,2,101,'Reviewed','2026-08-26T10:00:00Z');
-    INSERT INTO email_templates (id,name) VALUES (6001,'Status update');
+    INSERT INTO email_templates (id,name,subject,body,template_type,created_by,is_default,organization_id) VALUES
+      (6001,'Status update','Fixture subject','Fixture body','status_update',101,false,1);
     INSERT INTO email_audit_log
       (id,application_id,template_id,template_type,recipient_email,subject,sent_at,sent_by,status,error_message,preview_url)
     VALUES
       (5001,2001,6001,'status_update','fixture@example.invalid','private subject','2026-08-26T11:00:00Z',101,'success',NULL,'https://invalid/private'),
       (5002,2001,NULL,NULL,'fixture@example.invalid','private subject','2026-08-26T10:30:00Z',NULL,'success',NULL,NULL);
-    INSERT INTO candidate_privacy_requests (request_id,action,state) VALUES
-      ('00000000-0000-0000-0000-000000000005','request_erasure','memory_active'),
-      ('00000000-0000-0000-0000-000000000006','request_erasure','needs_review'),
-      ('00000000-0000-0000-0000-000000000007','withdraw_global_matching','memory_active');
-    INSERT INTO candidate_privacy_subject_links (request_id,subject_type,application_id) VALUES
-      ('00000000-0000-0000-0000-000000000005','application',2005),
-      ('00000000-0000-0000-0000-000000000006','application',2006),
-      ('00000000-0000-0000-0000-000000000007','application',2007);
-    INSERT INTO candidate_privacy_remote_projection (request_id,decision) VALUES
-      ('00000000-0000-0000-0000-000000000005','block_all'),
-      ('00000000-0000-0000-0000-000000000006','review'),
-      ('00000000-0000-0000-0000-000000000007','block_global');
-    GRANT USAGE ON SCHEMA ${schema} TO ${role};
-    GRANT SELECT ON ALL TABLES IN SCHEMA ${schema} TO ${role};
+    INSERT INTO candidate_privacy_requests
+      (request_id,directive_id,action,authority_type,actor_user_id,reason_code,state,version,last_delivery_status)
+    VALUES
+      ('00000000-0000-0000-0000-000000000005','10000000-0000-0000-0000-000000000005','request_erasure','verified_candidate',301,'candidate_erasure_request','memory_active',1,'delivered'),
+      ('00000000-0000-0000-0000-000000000006','10000000-0000-0000-0000-000000000006','request_erasure','verified_candidate',301,'candidate_erasure_request','needs_review',1,'delivered'),
+      ('00000000-0000-0000-0000-000000000007','10000000-0000-0000-0000-000000000007','withdraw_global_matching','verified_candidate',301,'candidate_global_opt_out','memory_active',1,'delivered');
+    INSERT INTO candidate_privacy_subject_links
+      (link_id,request_id,subject_type,application_id,organization_id)
+    VALUES
+      ('20000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000005','application',2005,1),
+      ('20000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000006','application',2006,1),
+      ('20000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000007','application',2007,1);
+    INSERT INTO candidate_privacy_remote_projection
+      (directive_id,request_id,action,scope,state,decision,version,effective_at,generation)
+    VALUES
+      ('10000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000005','request_erasure','active_profile','active_quarantine','block_all',1,now(),1),
+      ('10000000-0000-0000-0000-000000000006','00000000-0000-0000-0000-000000000006','request_erasure','active_profile','needs_review','review',1,now(),1),
+      ('10000000-0000-0000-0000-000000000007','00000000-0000-0000-0000-000000000007','withdraw_global_matching','global_matching','active_quarantine','block_global',1,now(),1);
   `);
 }
 
-describe.skipIf(!enabled)("application read authorization disposable PostgreSQL", () => {
+describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQL", () => {
   beforeAll(async () => {
-    if (!['test', 'development'].includes(process.env.NODE_ENV ?? "")) {
-      throw new Error("Disposable authorization integration requires NODE_ENV=test|development.");
+    if (process.env.NODE_ENV !== "test") {
+      throw new Error("Disposable authorization integration requires NODE_ENV=test.");
     }
     const migrationTarget = assertSafeUrl(migrationUrl, "migration");
     const runtimeTarget = assertSafeUrl(runtimeUrl, "runtime");
@@ -213,12 +199,10 @@ describe.skipIf(!enabled)("application read authorization disposable PostgreSQL"
       throw new Error("Disposable authorization database identity mismatch.");
     }
 
-    owner = new Client({ connectionString: migrationUrl, connectionTimeoutMillis: 2_000 });
-    const runtime = new Client({ connectionString: runtimeUrl, connectionTimeoutMillis: 2_000 });
-    await owner.connect();
-    await runtime.connect();
+    const migration = await clientFor(migrationUrl);
+    const runtime = await clientFor(runtimeUrl);
     try {
-      const ownerIdentity = (await owner.query(
+      const ownerIdentity = (await migration.query(
         "SELECT current_database() AS database,current_user AS role,host(inet_server_addr()) AS server_addr",
       )).rows[0] ?? {};
       const runtimeIdentity = (await runtime.query(
@@ -239,22 +223,41 @@ describe.skipIf(!enabled)("application read authorization disposable PostgreSQL"
       safeTargetProven = true;
     } finally {
       await runtime.end();
+      await migration.end();
     }
 
+    await resetDatabase();
+    await runReleaseMigration({
+      migrationsDir,
+      creds: {
+        migrateUrl: migrationUrl,
+        expectedTargetId: targetId,
+        environment: "development",
+        allowFreshInitialization: true,
+      },
+      connect: connectMigration,
+    });
+    await provisionRuntimeRole({
+      migrateUrl: migrationUrl,
+      runtimeUrl,
+      runtimeRole: new URL(runtimeUrl).username,
+      expectedTargetId: targetId,
+      connectMigration,
+      connectRuntime,
+    });
+
+    owner = await clientFor(migrationUrl);
     await installFixture();
-    process.env.DATABASE_URL = runtimeUrlForSchema();
+    process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     authorization = await import("../lib/applicationReadAuthorization");
     runtimePool = (await import("../db")).pool;
-  }, 60_000);
+  }, 180_000);
 
   afterAll(async () => {
     await runtimePool?.end();
-    if (owner && safeTargetProven) {
-      await owner.query("SET search_path TO public");
-      await owner.query(`DROP SCHEMA IF EXISTS ${quotedIdentifier(schemaName)} CASCADE`);
-    }
     await owner?.end();
+    if (safeTargetProven) await resetDatabase();
   });
 
   const stage = (actorId: number, applicationId: number, allowPlatformAdmin = true) =>
@@ -270,6 +273,29 @@ describe.skipIf(!enabled)("application read authorization disposable PostgreSQL"
       applicationId,
       { allowPlatformAdmin },
     ));
+
+  const interview = (actorId: number, applicationId: number, allowPlatformAdmin = true) =>
+    readWithoutMutation(() => authorization.readAuthorizedApplicationInterviewInvite(
+      actorId,
+      applicationId,
+      { allowPlatformAdmin },
+    ));
+
+  it("installs the exact pinned two-migration schema before testing", async () => {
+    if (!owner) throw new Error("Disposable authorization owner is unavailable.");
+    const state = (await owner.query(`
+      SELECT (SELECT count(*)::int FROM schema_control.applied) AS applied,
+             (SELECT data_type FROM information_schema.columns
+               WHERE table_schema='public' AND table_name='applications' AND column_name='interview_date') AS interview_type,
+             (SELECT count(*)::int FROM information_schema.columns
+               WHERE table_schema='public' AND table_name='candidate_privacy_remote_projection') AS privacy_columns
+    `)).rows[0];
+    expect(state).toEqual({
+      applied: 2,
+      interview_type: "timestamp without time zone",
+      privacy_columns: 10,
+    });
+  });
 
   it("allows primary and exact co-recruiters with deterministic minimum stage rows", async () => {
     const primary = await stage(101, 2001);
@@ -354,5 +380,57 @@ describe.skipIf(!enabled)("application read authorization disposable PostgreSQL"
     await expect(email(101, 2007)).resolves.toEqual({ ok: true, rows: [] });
     await expect(email(401, 2001, true)).resolves.toMatchObject({ ok: true });
     await expect(email(401, 2001, false)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("returns the exact seven-field interview projection for primary and co-recruiters", async () => {
+    const expected = {
+      ok: true,
+      interview: {
+        candidateName: "Fixture Candidate",
+        candidateEmail: "fixture@example.invalid",
+        jobTitle: "Fixture Role One",
+        interviewDate: "2099-01-15T00:00:00.000Z",
+        interviewTime: "10:30",
+        interviewLocation: "Synthetic room",
+        interviewNotes: "Synthetic authorization proof",
+      },
+    };
+    const primary = await interview(101, 2001);
+    const co = await interview(102, 2001);
+    expect(primary).toEqual(expected);
+    expect(co).toEqual(expected);
+    expect(Object.keys(primary.ok ? primary.interview : {})).toEqual([
+      "candidateName",
+      "candidateEmail",
+      "jobTitle",
+      "interviewDate",
+      "interviewTime",
+      "interviewLocation",
+      "interviewNotes",
+    ]);
+  });
+
+  it("applies the complete object boundary to the interview projection", async () => {
+    await expect(interview(201, 2002)).resolves.toMatchObject({ ok: true });
+    await expect(interview(201, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(103, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(104, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(105, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(301, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(302, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(101, 999999)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("keeps platform administration explicit and structural for interview reads", async () => {
+    await expect(interview(401, 2001, true)).resolves.toMatchObject({ ok: true });
+    await expect(interview(401, 2001, false)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(401, 2003, true)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(401, 2004, true)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("denies block_all and review while preserving own-org block_global interview reads", async () => {
+    await expect(interview(101, 2005)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(101, 2006)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(interview(101, 2007)).resolves.toMatchObject({ ok: true });
   });
 });

@@ -1,8 +1,8 @@
 {
   "format_version": 1,
-  "source_commit": "3570fee4f0e31e381f6e248c0501958ab955eada",
+  "source_commit": "db91e84d4a1f82d6f0137319014211eab7ed21be",
   "route_registration_census": 316,
-  "contract": "Application history authorization and protected rows share one PostgreSQL statement snapshot; absence and denial are indistinguishable.",
+  "contract": "Application history and interview-calendar authorization share one PostgreSQL statement snapshot with their protected projections; absence and denial are indistinguishable.",
   "routes": [
     {
       "method": "get",
@@ -15,21 +15,28 @@
       "path": "/api/applications/:id/email-history",
       "reader": "readAuthorizedApplicationEmailHistory",
       "projection": ["id", "templateName", "templateType", "recipientEmail", "sentAt", "status", "sentBy"]
+    },
+    {
+      "method": "get",
+      "path": "/api/applications/:id/interview/ics",
+      "reader": "readAuthorizedApplicationInterviewInvite",
+      "projection": ["candidateName", "candidateEmail", "jobTitle", "interviewDate", "interviewTime", "interviewLocation", "interviewNotes"]
     }
   ],
   "governed_files": [
     { "file": "../.github/workflows/ci.yml", "sha256": "bb7049744d295ce49405ab5250ee701d8d799795a5bd650ccdb55a67c075e57f" },
     { "file": "package.json", "sha256": "7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe" },
-    { "file": "vitest.server.config.ts", "sha256": "69c4074381af79a5f2349524ea00ef0740eedf3070f649d778d77c9d46f1c67f" },
-    { "file": "server/applications.routes.ts", "sha256": "5764cb7065624f5f0c8bb2921864aae9e3998cafa231a95524cc750c72b84bbe" },
+    { "file": "vitest.server.config.ts", "sha256": "aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe" },
+    { "file": "server/applications.routes.ts", "sha256": "608bb7d43d95c532f7be6a7cfa5ef0f00ae90ea543a10b0d38bfce7dbf49488f" },
     { "file": "server/auth.ts", "sha256": "a2f1ffc7ff99c9e6c56fafc834065a5463bfe747bf7cbdcc506f3f3356a06365" },
-    { "file": "server/candidate-privacy/surfaces.json", "sha256": "dd207e11c02aa4a9f9b8bee48fae338a10fa944243ffddd6ed6674b06657b839" },
-    { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "f387e4290d1cb6603705dae84b79a603e329b9a55a8d027bbdf969dd03dfb5e0" },
-    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "9fb2977fec29adfaf1763466c85ee763a7178c0a0e112374bd93110118fcaa9f" },
-    { "file": "server/lib/applicationReadAuthorization.ts", "sha256": "491c70d996abba31ab5a1f8b19696b2b8e01a12002b0ed6e675ec4523ffc6bb1" },
+    { "file": "server/candidate-privacy/surfaces.json", "sha256": "c8bc1d8e550dbc152d39f984f4be97e4e7dbb5417bfdf6b1eff01b558a4d4406" },
+    { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "552b16428a31dc47017f9f5c2da52b06afe0b04e9c07c5d523619198228088bd" },
+    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "a6b84445646ec86e43f44fa85755eafc54edd96e1ba9b237b0d444a57e2a8309" },
+    { "file": "server/lib/applicationReadAuthorization.ts", "sha256": "ce7c0ddb32c09510b3ca3d98d152959bac0780496d344522622de5b14486ef6f" },
     { "file": "server/storage.ts", "sha256": "1c140fd05c645ae9f4faba9dd1b6e5a14370576d080207c21fcc42814f0265ee" },
-    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "65f9755f80ac1cb453a2eb8d3adb94318e5237ac3cb5d3aa044d11ea1a028b94" },
-    { "file": "scripts/check-object-authorization.mjs", "sha256": "554a9e09f3d0f2c8a27a73cefa11396b2787b1bd34591d98ebd28937f55724f1" }
+    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "6bf8628f40b813a8aef4d80ce0ac09d378070e94e3c33eff0617c03a473b8f3c" },
+    { "file": "server/tests/interviewIcsAuthorization.routes.test.ts", "sha256": "5f24cda1c7f4d499a317ca4e998d71bb99df40880d2295231b78505efbdf3e59" },
+    { "file": "scripts/check-object-authorization.mjs", "sha256": "a56287de45f1e238103740fab3c3476c7dd8af515dae180796f41e2db706561c" }
   ],
   "frozen_files": [
     { "file": "package-lock.json", "sha256": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539" },
@@ -37,6 +44,9 @@
     { "file": "server/schema-control/manifest.ts", "sha256": "16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2" },
     { "file": "server/schema-migrations/0000_baseline.sql", "sha256": "3fd883d6fb45d0c52acc69bff16949185948bb51e5d732f57247f542814aa129" },
     { "file": "server/schema-migrations/0001_candidate_privacy_flow.sql", "sha256": "a050e6b3e72a61b1d73c9124ddcd10eb6309f804891412dec9e15288df8c77c8" },
-    { "file": "server/schema-migrations/checksums.lock", "sha256": "6498876e722e89dd5cc9a9346e29723f2ac4b21c63c840a1f6aa11ceb6c5b9bf" }
+    { "file": "server/schema-migrations/checksums.lock", "sha256": "6498876e722e89dd5cc9a9346e29723f2ac4b21c63c840a1f6aa11ceb6c5b9bf" },
+    { "file": "server/lib/icsGenerator.ts", "sha256": "a78b08f0821d0f36bfbebe5c4932192b2769350c43e1e100ec78d8e92e240f03" },
+    { "file": "client/src/components/kanban/ApplicationDetailPanel.tsx", "sha256": "2844c96fb9e5bd435d8825d0591cc592fbcf3d52a60b7df01cf7de09f9bb00d2" },
+    { "file": "client/src/pages/application-management-page.tsx", "sha256": "bdf776892af5abc00806ee88007aad3e565d7b64636fa1001336e950b233849e" }
   ]
 }

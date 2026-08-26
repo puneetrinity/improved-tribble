@@ -9,6 +9,7 @@ vi.mock("../../db", () => ({
 
 import {
   readAuthorizedApplicationEmailHistory,
+  readAuthorizedApplicationInterviewInvite,
   readAuthorizedApplicationStageHistory,
 } from "../applicationReadAuthorization";
 
@@ -201,5 +202,123 @@ describe("application read authorization kernel", () => {
       ok: false,
       reason: "unavailable",
     });
+  });
+
+  it("returns the exact interview projection from one authorized statement", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      candidateName: "Fixture Candidate",
+      candidateEmail: "candidate@example.invalid",
+      jobTitle: "Fixture Role",
+      interviewDate: new Date("2099-01-15T00:00:00.000Z"),
+      interviewTime: "10:30",
+      interviewLocation: "Synthetic room",
+      interviewNotes: "Synthetic authorization proof",
+      applicationId: 9,
+      organizationId: 3,
+      phone: "forbidden",
+    }] });
+    const result = await readAuthorizedApplicationInterviewInvite(7, 9, allowAdmin);
+    expect(result).toEqual({
+      ok: true,
+      interview: {
+        candidateName: "Fixture Candidate",
+        candidateEmail: "candidate@example.invalid",
+        jobTitle: "Fixture Role",
+        interviewDate: "2099-01-15T00:00:00.000Z",
+        interviewTime: "10:30",
+        interviewLocation: "Synthetic room",
+        interviewNotes: "Synthetic authorization proof",
+      },
+    });
+    expect(Object.keys(result.ok ? result.interview : {})).toEqual([
+      "candidateName",
+      "candidateEmail",
+      "jobTitle",
+      "interviewDate",
+      "interviewTime",
+      "interviewLocation",
+      "interviewNotes",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("forbidden");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns nullable interview scheduling fields only after authorization", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      candidateName: "Fixture Candidate",
+      candidateEmail: "candidate@example.invalid",
+      jobTitle: "Fixture Role",
+      interviewDate: null,
+      interviewTime: null,
+      interviewLocation: null,
+      interviewNotes: null,
+    }] });
+    await expect(readAuthorizedApplicationInterviewInvite(7, 9, allowAdmin)).resolves.toEqual({
+      ok: true,
+      interview: {
+        candidateName: "Fixture Candidate",
+        candidateEmail: "candidate@example.invalid",
+        jobTitle: "Fixture Role",
+        interviewDate: null,
+        interviewTime: null,
+        interviewLocation: null,
+        interviewNotes: null,
+      },
+    });
+  });
+
+  it("does not expose absent versus denied interview reads", async () => {
+    execute.mockResolvedValueOnce({ rows: [] });
+    await expect(readAuthorizedApplicationInterviewInvite(7, 999, allowAdmin)).resolves.toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+  });
+
+  it("fails closed on malformed, duplicate, database, actor, or policy interview results", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      candidateName: "Fixture Candidate",
+      candidateEmail: "candidate@example.invalid",
+      jobTitle: "Fixture Role",
+      interviewDate: "not-a-date",
+      interviewTime: "10:30",
+      interviewLocation: null,
+      interviewNotes: null,
+    }] });
+    await expect(readAuthorizedApplicationInterviewInvite(7, 9, allowAdmin)).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+
+    const valid = {
+      candidateName: "Fixture Candidate",
+      candidateEmail: "candidate@example.invalid",
+      jobTitle: "Fixture Role",
+      interviewDate: null,
+      interviewTime: null,
+      interviewLocation: null,
+      interviewNotes: null,
+    };
+    execute.mockResolvedValueOnce({ rows: [valid, valid] });
+    await expect(readAuthorizedApplicationInterviewInvite(7, 9, allowAdmin)).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+
+    execute.mockRejectedValueOnce(new Error("postgres://raw-secret candidate@example.invalid"));
+    const failed = await readAuthorizedApplicationInterviewInvite(7, 9, allowAdmin);
+    expect(failed).toEqual({ ok: false, reason: "unavailable" });
+    expect(JSON.stringify(failed)).not.toContain("raw-secret");
+
+    await expect(readAuthorizedApplicationInterviewInvite(0, 9, allowAdmin)).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    await expect(readAuthorizedApplicationInterviewInvite(
+      7,
+      9,
+      {} as { allowPlatformAdmin: boolean },
+    )).resolves.toEqual({ ok: false, reason: "unavailable" });
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 });
