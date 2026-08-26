@@ -1,10 +1,11 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "839901bc0c599d35ad48164c0dbdab30254129402668f93c7097968fe38f342b",
+  "source_census_sha256": "acb81355229c1145eed1d9a6b584e2f11a05702628d7ec96212f8b2340ee8c39",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
+    "server/lib/applicationReadAuthorization.ts",
     "server/applications.routes.ts",
     "server/candidatePortal.routes.ts",
     "server/profile.routes.ts",
@@ -59,6 +60,7 @@
     { "file": "server/routes.ts", "classification": "fenced" },
     { "file": "server/rateLimit.ts", "classification": "fenced" },
     { "file": "server/storage.ts", "classification": "fenced" },
+    { "file": "server/lib/applicationReadAuthorization.ts", "classification": "fenced" },
     { "file": "server/applications.routes.ts", "classification": "fenced" },
     { "file": "server/candidatePortal.routes.ts", "classification": "fenced" },
     { "file": "server/profile.routes.ts", "classification": "fenced" },
@@ -261,6 +263,17 @@
       "organization_scope": "owning_org",
       "enforcement": "Correlated SQL predicates precede grouping/order/limit; mutations recheck anchors; talent pool is soft-removed and auditable.",
       "anchors": ["applicationPrivacyAllowed", "requireNewCandidateIdentityAllowed", "removeTalentPoolCandidate", "restoreTalentPoolCandidate"]
+    },
+    {
+      "id": "application-history-object-authorization",
+      "file": "server/lib/applicationReadAuthorization.ts",
+      "symbol": "readAuthorizedApplicationStageHistory",
+      "models": ["applications", "jobs", "organization_members", "job_recruiters", "application_stage_history", "email_audit_log"],
+      "direction": "read",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "exact_job_assignment_or_platform_admin",
+      "enforcement": "One statement snapshot composes current role, membership, seat, exact job authority, structural organization and the existing own-organization privacy fence before minimum history projections.",
+      "anchors": ["WITH authorized_application AS", "applicationPrivacyAllowed(false)", "readAuthorizedApplicationEmailHistory"]
     },
     {
       "id": "application-intake-and-workflow",

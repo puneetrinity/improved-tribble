@@ -1,0 +1,243 @@
+import {
+  applicationStageHistory,
+  applications,
+  emailAuditLog,
+  emailTemplates,
+  jobRecruiters,
+  jobs,
+  organizationMembers,
+  users,
+} from "@shared/schema";
+import { sql } from "drizzle-orm";
+import { db } from "../db";
+import { applicationPrivacyAllowed } from "../storage";
+
+export interface ApplicationStageHistoryProjection {
+  fromStage: number | null;
+  toStage: number;
+  changedAt: string;
+  notes: string | null;
+}
+
+export interface ApplicationEmailHistoryProjection {
+  id: number;
+  templateName: string;
+  templateType: string;
+  recipientEmail: string;
+  sentAt: string;
+  status: string;
+  sentBy: { firstName: string; lastName: string } | null;
+}
+
+export type AuthorizedApplicationRead<T> =
+  | { ok: true; rows: T[] }
+  | { ok: false; reason: "not_found" | "unavailable" };
+
+export interface ApplicationReadPolicy {
+  allowPlatformAdmin: boolean;
+}
+
+type QueryResult = { rows?: unknown[] };
+type UnknownRow = Record<string, unknown>;
+
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function rowsFrom(result: unknown): UnknownRow[] {
+  const rows = (result as QueryResult | null)?.rows;
+  if (!Array.isArray(rows)) throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+  if (!rows.every((row) => typeof row === "object" && row !== null && !Array.isArray(row))) {
+    throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+  }
+  return rows as UnknownRow[];
+}
+
+function positiveInteger(value: unknown): number {
+  if (!isPositiveSafeInteger(value)) throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+  return value;
+}
+
+function nullablePositiveInteger(value: unknown): number | null {
+  return value === null ? null : positiveInteger(value);
+}
+
+function text(value: unknown): string {
+  if (typeof value !== "string") throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+  return value;
+}
+
+function nullableText(value: unknown): string | null {
+  return value === null ? null : text(value);
+}
+
+function isoTimestamp(value: unknown): string {
+  const date = value instanceof Date
+    ? value
+    : typeof value === "string" || typeof value === "number"
+      ? new Date(value)
+      : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+  }
+  return date.toISOString();
+}
+
+function sender(value: unknown): { firstName: string; lastName: string } | null {
+  if (value === null) return null;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+  }
+  const row = value as Record<string, unknown>;
+  return {
+    firstName: text(row.firstName),
+    lastName: text(row.lastName),
+  };
+}
+
+function validInputs(actorId: unknown, applicationId: unknown, policy: ApplicationReadPolicy): boolean {
+  return isPositiveSafeInteger(actorId)
+    && isPositiveSafeInteger(applicationId)
+    && typeof policy?.allowPlatformAdmin === "boolean";
+}
+
+function authorizedApplicationCte(
+  actorId: number,
+  applicationId: number,
+  allowPlatformAdmin: boolean,
+) {
+  return sql`
+    SELECT ${applications.id} AS application_id
+      FROM ${applications}
+      INNER JOIN ${jobs}
+        ON ${jobs.id} = ${applications.jobId}
+      INNER JOIN ${users} AS actor
+        ON actor.id = ${actorId}
+     WHERE ${applications.id} = ${applicationId}
+       AND ${applications.organizationId} IS NOT NULL
+       AND ${jobs.organizationId} IS NOT NULL
+       AND ${applications.organizationId} = ${jobs.organizationId}
+       AND ${applicationPrivacyAllowed(false)}
+       AND (
+         (${allowPlatformAdmin} AND actor.role = 'super_admin')
+         OR (
+           actor.role = 'recruiter'
+           AND EXISTS (
+             SELECT 1
+               FROM ${organizationMembers}
+              WHERE ${organizationMembers.userId} = ${actorId}
+                AND ${organizationMembers.organizationId} = ${applications.organizationId}
+                AND ${organizationMembers.seatAssigned} = TRUE
+           )
+           AND (
+             ${jobs.postedBy} = ${actorId}
+             OR EXISTS (
+               SELECT 1
+                 FROM ${jobRecruiters}
+                WHERE ${jobRecruiters.jobId} = ${jobs.id}
+                  AND ${jobRecruiters.recruiterId} = ${actorId}
+             )
+           )
+         )
+       )
+  `;
+}
+
+export async function readAuthorizedApplicationStageHistory(
+  actorId: number,
+  applicationId: number,
+  policy: ApplicationReadPolicy,
+): Promise<AuthorizedApplicationRead<ApplicationStageHistoryProjection>> {
+  if (!validInputs(actorId, applicationId, policy)) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  try {
+    const result = await db.execute(sql`
+      WITH authorized_application AS (
+        ${authorizedApplicationCte(actorId, applicationId, policy.allowPlatformAdmin)}
+      )
+      SELECT authorized_application.application_id AS "authorizedApplicationId",
+             ${applicationStageHistory.fromStage} AS "fromStage",
+             ${applicationStageHistory.toStage} AS "toStage",
+             ${applicationStageHistory.changedAt} AS "changedAt",
+             ${applicationStageHistory.notes} AS notes
+        FROM authorized_application
+        LEFT JOIN ${applicationStageHistory}
+          ON ${applicationStageHistory.applicationId} = authorized_application.application_id
+       ORDER BY ${applicationStageHistory.changedAt} DESC NULLS LAST,
+                ${applicationStageHistory.id} DESC NULLS LAST
+    `);
+    const rawRows = rowsFrom(result);
+    if (rawRows.length === 0) return { ok: false, reason: "not_found" };
+
+    const rows = rawRows
+      .filter((row) => row.toStage !== null)
+      .map((row): ApplicationStageHistoryProjection => ({
+        fromStage: nullablePositiveInteger(row.fromStage),
+        toStage: positiveInteger(row.toStage),
+        changedAt: isoTimestamp(row.changedAt),
+        notes: nullableText(row.notes),
+      }));
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}
+
+export async function readAuthorizedApplicationEmailHistory(
+  actorId: number,
+  applicationId: number,
+  policy: ApplicationReadPolicy,
+): Promise<AuthorizedApplicationRead<ApplicationEmailHistoryProjection>> {
+  if (!validInputs(actorId, applicationId, policy)) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  try {
+    const result = await db.execute(sql`
+      WITH authorized_application AS (
+        ${authorizedApplicationCte(actorId, applicationId, policy.allowPlatformAdmin)}
+      )
+      SELECT authorized_application.application_id AS "authorizedApplicationId",
+             ${emailAuditLog.id} AS id,
+             COALESCE(${emailTemplates.name}, 'Manual email') AS "templateName",
+             COALESCE(${emailAuditLog.templateType}, 'manual') AS "templateType",
+             ${emailAuditLog.recipientEmail} AS "recipientEmail",
+             ${emailAuditLog.sentAt} AS "sentAt",
+             ${emailAuditLog.status} AS status,
+             CASE WHEN sender.id IS NULL THEN NULL
+                  ELSE json_build_object(
+                    'firstName', COALESCE(sender.first_name, ''),
+                    'lastName', COALESCE(sender.last_name, '')
+                  )
+             END AS "sentBy"
+        FROM authorized_application
+        LEFT JOIN ${emailAuditLog}
+          ON ${emailAuditLog.applicationId} = authorized_application.application_id
+        LEFT JOIN ${emailTemplates}
+          ON ${emailTemplates.id} = ${emailAuditLog.templateId}
+        LEFT JOIN ${users} AS sender
+          ON sender.id = ${emailAuditLog.sentBy}
+       ORDER BY ${emailAuditLog.sentAt} DESC NULLS LAST,
+                ${emailAuditLog.id} DESC NULLS LAST
+    `);
+    const rawRows = rowsFrom(result);
+    if (rawRows.length === 0) return { ok: false, reason: "not_found" };
+
+    const rows = rawRows
+      .filter((row) => row.id !== null)
+      .map((row): ApplicationEmailHistoryProjection => ({
+        id: positiveInteger(row.id),
+        templateName: text(row.templateName),
+        templateType: text(row.templateType),
+        recipientEmail: text(row.recipientEmail),
+        sentAt: isoTimestamp(row.sentAt),
+        status: text(row.status),
+        sentBy: sender(row.sentBy),
+      }));
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}

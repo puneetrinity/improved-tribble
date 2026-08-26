@@ -1,0 +1,180 @@
+import { createHash } from "node:crypto";
+import {
+  cpSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
+import { tmpdir } from "node:os";
+import { afterEach, describe, expect, it } from "vitest";
+
+// @ts-expect-error Plain ESM guard intentionally runs before TypeScript compilation.
+import { checkObjectAuthorization } from "../../../scripts/check-object-authorization.mjs";
+
+const APP_ROOT = join(dirname(new URL(import.meta.url).pathname), "../../..");
+const MANIFEST = "server/object-authorization/surfaces.json";
+const scratch: string[] = [];
+
+function sha256(value: string | Buffer): string {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function updateHashes(root: string): void {
+  const path = join(root, MANIFEST);
+  const manifest = JSON.parse(readFileSync(path, "utf8")) as {
+    governed_files: Array<{ file: string; sha256: string }>;
+  };
+  for (const row of manifest.governed_files) {
+    row.sha256 = sha256(readFileSync(join(root, row.file)));
+  }
+  writeFileSync(path, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
+}
+
+function fixture(): string {
+  const parent = mkdtempSync(join(tmpdir(), "flow-object-authorization-test-"));
+  scratch.push(parent);
+  const root = join(parent, "VantaHireWebsite");
+  mkdirSync(root, { recursive: true });
+  cpSync(join(APP_ROOT, "server"), join(root, "server"), { recursive: true });
+  cpSync(join(APP_ROOT, "shared"), join(root, "shared"), { recursive: true });
+  cpSync(join(APP_ROOT, "scripts"), join(root, "scripts"), { recursive: true });
+  for (const file of ["package.json", "package-lock.json", "vitest.server.config.ts"] as const) {
+    cpSync(join(APP_ROOT, file), join(root, file));
+  }
+  mkdirSync(join(parent, ".github", "workflows"), { recursive: true });
+  cpSync(join(APP_ROOT, "..", ".github", "workflows", "ci.yml"), join(parent, ".github", "workflows", "ci.yml"));
+  updateHashes(root);
+  return root;
+}
+
+function mutate(root: string, file: string, update: (source: string) => string): string[] {
+  const path = join(root, file);
+  const original = readFileSync(path, "utf8");
+  writeFileSync(path, update(original), { mode: 0o600 });
+  updateHashes(root);
+  const problems = checkObjectAuthorization(root);
+  writeFileSync(path, original, { mode: 0o600 });
+  updateHashes(root);
+  expect(checkObjectAuthorization(root)).toEqual([]);
+  return problems;
+}
+
+afterEach(() => {
+  while (scratch.length) rmSync(scratch.pop()!, { recursive: true, force: true });
+});
+
+describe("object authorization surface guard", () => {
+  it("accepts the checked-in complete contract", () => {
+    expect(checkObjectAuthorization(fixture())).toEqual([]);
+  });
+
+  it("rejects loss of the current recruiter role", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("actor.role = 'recruiter'", "actor.role = 'candidate'"),
+    );
+    expect(problems).toContain("authorization read lost the current recruiter-role predicate.");
+  });
+
+  it("rejects nullable application organization", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${applications.organizationId} IS NOT NULL", "TRUE"),
+    );
+    expect(problems).toContain("application organization can be null.");
+  });
+
+  it("rejects loss of seat enforcement", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${organizationMembers.seatAssigned} = TRUE", "TRUE"),
+    );
+    expect(problems).toContain("authorization read lost current seat enforcement.");
+  });
+
+  it("rejects implicit platform administration", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${allowPlatformAdmin} AND actor.role", "TRUE AND actor.role"),
+    );
+    expect(problems).toContain("platform-admin access is no longer controlled by the explicit policy.");
+  });
+
+  it("rejects loss of exact job assignment", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${jobs.postedBy} = ${actorId}", "TRUE"),
+    );
+    expect(problems).toContain("authorization read lost primary-recruiter authority.");
+  });
+
+  it("rejects loss of the candidate-privacy predicate", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("applicationPrivacyAllowed(false)", "sql`TRUE`"),
+    );
+    expect(problems).toContain("authorization read lost the candidate-privacy predicate.");
+  });
+
+  it("rejects a history read moved outside the authorized CTE", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("FROM authorized_application", "FROM applications"),
+    );
+    expect(problems).toContain("both protected histories must read through the authorized CTE.");
+  });
+
+  it("rejects a raw email subject projection", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace(
+        "${emailAuditLog.id} AS id,",
+        "${emailAuditLog.id} AS id,\n             ${emailAuditLog.subject} AS subject,",
+      ),
+    );
+    expect(problems).toContain("email history selects a forbidden raw audit field.");
+  });
+
+  it("rejects an id-only storage read restored in the route", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedApplicationEmailHistory(",
+        "await storage.getApplication(applicationId);\n      const result = await readAuthorizedApplicationEmailHistory(",
+      ),
+    );
+    expect(problems).toContain("/api/applications/:id/email-history reaches an id-only application/history read.");
+  });
+
+  it("rejects restoration of fail-open organization context", () => {
+    const problems = mutate(fixture(), "server/auth.ts", (source) =>
+      `${source}\nexport function withOrgContext() { return (_req: unknown, _res: unknown, next: () => void) => next(); }\n`,
+    );
+    expect(problems).toContain("dead fail-open withOrgContext remains defined.");
+  });
+
+  it("rejects a duplicate protected route registration", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      `${source}\n// mutation canary\napp.get("/api/applications/:id/history", handler);\n`,
+    );
+    expect(problems).toContain(
+      "route registration must exist exactly once: GET /api/applications/:id/history",
+    );
+  });
+
+  it("rejects denial-code drift and returns green after byte restoration", () => {
+    const root = fixture();
+    const file = "server/applications.routes.ts";
+    const path = join(root, file);
+    const original = readFileSync(path, "utf8");
+    writeFileSync(path, original.replace("APPLICATION_NOT_FOUND", "FOREIGN_APPLICATION"), { mode: 0o600 });
+    updateHashes(root);
+    expect(checkObjectAuthorization(root).some((problem) => problem.includes("APPLICATION_NOT_FOUND"))).toBe(true);
+    writeFileSync(path, original, { mode: 0o600 });
+    updateHashes(root);
+    expect(checkObjectAuthorization(root)).toEqual([]);
+  });
+
+  it("rejects a route parser that accepts non-decimal application ids", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace("!/^[1-9][0-9]*$/.test(value)", "false"),
+    );
+    expect(problems).toContain(
+      "strict application-id parser lost required anchor: !/^[1-9][0-9]*$/.test(value)",
+    );
+  });
+});
