@@ -40,8 +40,9 @@ const sections: LegalSection[] = [
           to these Terms, you may not access or use our services.
         </p>
         <p>
-          We reserve the right to modify these Terms at any time. Continued use of our services after
-          changes constitutes acceptance of the modified Terms.
+          We may update these Terms and will post the revised date. Where required, we will provide
+          additional notice before a material change takes effect. Continued use after the effective
+          date means you accept the revised Terms.
         </p>
       </>
     ),
@@ -87,12 +88,18 @@ const sections: LegalSection[] = [
             <a href="/privacy-policy" className={linkCls}>Privacy Policy</a>. Removing someone from a recruiter’s
             talent pool removes only that organization-scoped membership; it is not a global erasure or global opt-out.
           </p>
+          <p>
+            Withdrawing an application, leaving an organization pool, withdrawing from future global matching,
+            and requesting erasure review are different actions. Global matching and erasure requests require
+            verified candidate authority or an authorized privacy process.
+          </p>
         </div>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Account Termination</h4>
           <p>
-            We reserve the right to suspend or terminate your account at any time for violation of
-            these Terms, fraudulent activity, or any other reason we deem appropriate.
+            We may suspend or terminate an account to address a material violation of these Terms,
+            fraud, a security or legal risk, or harm to users or the service. Where practicable and
+            lawful, we will provide notice or a way to contact us about the action.
           </p>
         </div>
       </>
@@ -114,7 +121,7 @@ const sections: LegalSection[] = [
           <li>Attempt to gain unauthorized access to our systems</li>
           <li>Scrape, harvest, or collect user data without permission</li>
           <li>Harass, abuse, or harm other users</li>
-          <li>Use automated systems (bots) to access our services</li>
+          <li>Use automated systems to access our services without authorization</li>
           <li>Reverse engineer or decompile our platform</li>
           <li>Resell or redistribute our services without authorization</li>
         </ul>
@@ -167,7 +174,10 @@ const sections: LegalSection[] = [
             <li>Job postings must be accurate and comply with employment laws</li>
             <li>You may not post discriminatory job listings</li>
             <li>You are responsible for reviewing applications and making hiring decisions</li>
-            <li>You must handle candidate data in compliance with privacy laws</li>
+            <li>You must have appropriate authority to submit, access, and use candidate data</li>
+            <li>You must handle candidate data in compliance with applicable privacy requirements</li>
+            <li>You must honor candidate restrictions and may not re-import or recreate a suppressed profile to bypass them</li>
+            <li>Your organization-scoped access does not authorize global deletion or access to another organization's recruitment history</li>
             <li>You may not use ealana for unlawful recruitment practices</li>
           </ul>
         </div>
@@ -177,7 +187,8 @@ const sections: LegalSection[] = [
             <li>Applications must contain truthful and accurate information</li>
             <li>You may not submit fraudulent credentials or resumes</li>
             <li>You understand that applying does not guarantee employment</li>
-            <li>You authorize recruiters to view and download your application materials</li>
+            <li>Submitting an application makes its materials available to the organization handling that application</li>
+            <li>An application does not by itself authorize unrelated organizations to view that organization's private workflow history</li>
           </ul>
         </div>
       </>
@@ -191,8 +202,7 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          ealana may offer paid features or subscription plans in the future. If you purchase
-          a subscription:
+          Where ealana offers paid features or subscription plans and you complete a purchase:
         </p>
         <ul className={listCls}>
           <li>Fees are non-refundable except as required by law</li>
@@ -228,8 +238,9 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Third-Party Services</h4>
           <p>
-            ealana may integrate with third-party services (Google Cloud, OpenAI, etc.).
-            We are not responsible for the availability or content of third-party services.
+            ealana uses third-party cloud, communications, payment, monitoring, and AI
+            infrastructure providers. Their availability and independently operated services may
+            be subject to their own terms and policies.
           </p>
         </div>
         <div className={highlightBoxPurple}>
@@ -255,7 +266,7 @@ const sections: LegalSection[] = [
           <li>Your violation of these Terms</li>
           <li>Your violation of any law or regulation</li>
           <li>Your infringement of third-party rights</li>
-          <li>Your use of ealana</li>
+          <li>Your unlawful use of ealana or material breach of these Terms</li>
         </ul>
       </>
     ),
@@ -268,12 +279,12 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          These Terms are governed by the laws of India. Any disputes arising from these Terms or
-          your use of ealana shall be resolved through binding arbitration in accordance with
-          Indian arbitration laws.
+          These Terms are governed by the laws of India. Disputes will be handled through the
+          courts, tribunals, grievance channels, or another process available under applicable law.
+          We may agree in writing to arbitration where it is lawful and appropriate.
         </p>
         <p>
-          You agree to waive any right to a jury trial or to participate in a class action lawsuit.
+          Nothing in these Terms limits a right, remedy, or forum that cannot lawfully be waived.
         </p>
       </>
     ),
@@ -338,7 +349,7 @@ export default function TermsOfServicePage() {
         sectionLabel="Terms of Service"
         heroTitle="Fair terms, clear expectations."
         heroDesc="Please read these terms carefully before using ealana. They outline your rights, responsibilities, and the rules that govern our platform."
-        lastUpdated="Last Updated: August 2026"
+        lastUpdated="Last Updated: August 26, 2026"
         sections={sections}
       />
     </>

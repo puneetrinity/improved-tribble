@@ -46,8 +46,10 @@ const sections: LegalSection[] = [
           and recruitment platform.
         </p>
         <p>
-          By using ealana, you agree to the collection and use of information in accordance
-          with this policy. If you do not agree with our policies and practices, please do not use our services.
+          This policy describes our data practices. Ordinary use is not treated as a substitute
+          for a separate choice or other authority where one is required. Our{" "}
+          <a href="/terms-of-service" className={linkCls}>Terms of Service</a> govern use of
+          the platform.
         </p>
       </>
     ),
@@ -61,14 +63,18 @@ const sections: LegalSection[] = [
       <>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Personal Information</h4>
-          <p>When you register or use our services, we may collect:</p>
+          <p>
+            We may receive personal information from you, a recruiter or employer, or an
+            authorized recruitment source. Depending on how you use the service, this may include:
+          </p>
           <ul className={listCls}>
             <li>Name, email address, and contact information</li>
             <li>Resume/CV and professional credentials</li>
             <li>Employment history and educational background</li>
             <li>Skills, certifications, and professional qualifications</li>
-            <li>LinkedIn profile and other professional social media links</li>
+            <li>Professional profile links and information made available for recruitment</li>
             <li>Application responses and form submissions</li>
+            <li>Recruitment workflow information, such as application status and communications</li>
           </ul>
         </div>
         <div className={subsectionCls}>
@@ -76,15 +82,17 @@ const sections: LegalSection[] = [
           <ul className={listCls}>
             <li>IP address, browser type, and device information</li>
             <li>Usage data and interaction patterns</li>
-            <li>Cookies and similar tracking technologies</li>
-            <li>Analytics data about how you use our platform</li>
+            <li>Session, security, and preference information stored in cookies or local storage</li>
+            <li>Analytics data when you allow optional analytics technologies</li>
           </ul>
         </div>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>AI-Generated Data</h4>
           <p>
-            Our platform uses AI to analyse resumes and match candidates with jobs. This analysis
-            generates fit scores and recommendations, which are stored with your application data.
+            Our platform may use AI to analyse resumes, assist with recruitment workflows, and
+            match candidates with jobs. This may generate fit scores, summaries, or recommendations
+            stored with recruitment data. These outputs assist people; they should not be the sole
+            basis for a hiring decision.
           </p>
         </div>
       </>
@@ -100,12 +108,12 @@ const sections: LegalSection[] = [
         <p>We use the collected information for:</p>
         <ul className={listCls}>
           <li>Processing and managing job applications</li>
-          <li>Matching candidates with suitable job opportunities</li>
+          <li>Matching candidates with suitable job opportunities where permitted</li>
           <li>Communicating with you about your applications and our services</li>
           <li>Providing AI-powered resume analysis and job fit scoring</li>
           <li>Improving our platform and user experience</li>
           <li>Sending notifications about application status updates</li>
-          <li>Conducting analytics and research to enhance our services</li>
+          <li>Measuring and improving the service, including consented analytics</li>
           <li>Complying with legal obligations and protecting our rights</li>
           <li>Preventing fraud and ensuring platform security</li>
         </ul>
@@ -122,20 +130,30 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>With Recruiters and Employers</h4>
           <p>
-            When you apply for a job, your application data, resume, and AI fit scores are shared
-            with the recruiter or employer posting that position. They can view, download, and
-            manage your application through our platform.
+            When you apply for a job, your application data, resume, and related recruitment
+            analysis are made available to the organization handling that application. Authorized
+            members of that organization may view, download, and manage the application through
+            organization-scoped workflows. Organizations are not authorized to use another
+            organization's private recruitment history.
           </p>
         </div>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Service Providers</h4>
-          <p>We may share your information with trusted third-party service providers who assist us in:</p>
+          <p>
+            We use service providers to operate the platform. They may process information on our
+            behalf for:
+          </p>
           <ul className={listCls}>
-            <li>Cloud storage and hosting (Google Cloud Storage)</li>
-            <li>Email delivery services</li>
-            <li>Analytics and performance monitoring</li>
-            <li>AI and machine learning services (OpenAI API)</li>
+            <li>Cloud hosting, file storage, databases, and queues</li>
+            <li>Email, messaging, and other communications</li>
+            <li>Payments, where paid checkout is available</li>
+            <li>Consent-based analytics and operational error monitoring</li>
+            <li>AI inference and related technical processing</li>
           </ul>
+          <p>
+            The information made available to a provider depends on the feature and service it
+            supports. Provider terms and privacy commitments apply where relevant.
+          </p>
         </div>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Legal Requirements</h4>
@@ -159,16 +177,17 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          We implement industry-standard security measures to protect your information, including:
+          We use technical and organizational safeguards designed to protect your information,
+          including:
         </p>
         <div className={securityGridCls}>
           {[
             { label: "HTTPS/TLS", desc: "Encrypted data transmission" },
-            { label: "Auth", desc: "Secure authentication & sessions" },
-            { label: "CSRF", desc: "Protection on all state changes" },
-            { label: "Audits", desc: "Regular security assessments" },
-            { label: "RBAC", desc: "Role-based access controls" },
-            { label: "GCP", desc: "Google Cloud Platform storage" },
+            { label: "Sessions", desc: "Protected authentication cookies" },
+            { label: "Requests", desc: "CSRF controls on covered session routes" },
+            { label: "Access", desc: "Scoped controls on covered routes" },
+            { label: "Data", desc: "Restricted database credentials" },
+            { label: "Recovery", desc: "Managed backups and release controls" },
           ].map((item) => (
             <div key={item.label} className={infoItemCls}>
               <span className={infoLabelCls}>{item.label}</span>
@@ -186,19 +205,21 @@ const sections: LegalSection[] = [
   {
     id: "your-rights",
     icon: <UserCheck size={16} />,
-    label: "Rights",
-    title: "Your Rights",
+    label: "Choices",
+    title: "Your Choices and Requests",
     content: (
       <>
-        <p>You have the right to:</p>
+        <p>
+          Depending on your relationship with ealana and applicable requirements, you may ask us to:
+        </p>
         <div className={rightsGridCls}>
           {[
-            { right: "Access", desc: "Request a copy of your personal data" },
-            { right: "Rectification", desc: "Correct inaccurate or incomplete information" },
+            { right: "Access inquiry", desc: "Ask what personal information we process about you" },
+            { right: "Correction", desc: "Ask us to correct inaccurate or incomplete information" },
             { right: "Erasure review", desc: "Ask us to restrict active use and review data for erasure" },
-            { right: "Portability", desc: "Receive your data in a structured, machine-readable format" },
-            { right: "Objection", desc: "Object to certain types of data processing" },
             { right: "Global matching opt-out", desc: "Stop new global matching and recommendations" },
+            { right: "Application withdrawal", desc: "Withdraw an application through its organization workflow" },
+            { right: "Privacy grievance", desc: "Contact us if a privacy control or response needs review" },
           ].map((item) => (
             <div key={item.right} className={rightItemCls}>
               <span className={rightNameCls}>{item.right}</span>
@@ -217,6 +238,12 @@ const sections: LegalSection[] = [
           Existing organization-private application, workflow and audit records may remain restricted to the
           organization that already received them.
         </p>
+        <p>
+          Withdrawing an application, leaving an organization's talent pool, stopping future global matching,
+          and requesting erasure review are different actions. Withdrawing an application does not itself erase
+          a profile. A recruiter can remove only its own organization's pool membership and cannot create a global
+          opt-out or erasure request on the candidate's behalf.
+        </p>
       </>
     ),
   },
@@ -228,10 +255,11 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          We retain personal information only as needed to provide the service, protect its integrity,
-          support existing organization workflows and meet applicable requirements. Our current controls
-          restrict active use and place an erasure request into protected review; automated hard-deletion
-          schedules are not yet part of this control.
+          We retain personal information to provide the service, protect its integrity, support existing
+          organization workflows, maintain security and audit records, and meet applicable requirements.
+          Final per-data-class retention periods are not yet automated. Our current controls restrict active
+          use and place an erasure request into protected review; automated hard-deletion schedules are not
+          yet part of this control.
         </p>
         <ul className={listCls}>
           <li><strong>Candidate controls</strong> - Global matching can be stopped and active profile use can be restricted for erasure review</li>
@@ -250,12 +278,14 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          We use cookies and similar tracking technologies to enhance your experience.
+          We use essential cookies and local storage to operate and secure the service. Optional
+          analytics technologies load only after you accept them.
           For detailed information, please see our{" "}
           <a href="/cookie-policy" className={linkCls}>Cookie Policy</a>.
         </p>
         <p>
-          You can manage your cookie preferences through our Cookie Consent banner or your browser settings.
+          You can change your analytics choice through Cookie Preferences and manage cookies or
+          local storage through your browser settings.
         </p>
       </>
     ),
@@ -269,7 +299,7 @@ const sections: LegalSection[] = [
       <p>
         ealana is not intended for individuals under the age of 18. We do not knowingly collect
         personal information from children. If we become aware that we have collected data from a
-        child, we will take steps to delete such information.
+        child, we will restrict active use and address it through our verified privacy process.
       </p>
     ),
   },
@@ -285,7 +315,8 @@ const sections: LegalSection[] = [
           changes by posting the new policy on this page and updating the "Last Updated" date.
         </p>
         <p>
-          Your continued use of ealana after changes are posted constitutes acceptance of the updated policy.
+          Where required, we will provide additional notice or obtain a new choice before a
+          materially different use of personal information.
         </p>
       </>
     ),
@@ -298,7 +329,8 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          If you have questions about this Privacy Policy or our data practices, please contact us:
+          If you have questions or want to make an access, correction, matching opt-out, erasure-review,
+          or privacy-grievance request, please contact us:
         </p>
         <div className={contactCardCls}>
           <div className={contactOrgCls}>
@@ -308,7 +340,7 @@ const sections: LegalSection[] = [
             <Mail size={13} />
             <span>info@ealana.com</span>
           </div>
-          <div className={contactSubjectCls}>Subject: Privacy Policy Inquiry</div>
+          <div className={contactSubjectCls}>Subject: Privacy Request — Access / Correction / Opt-out / Erasure</div>
         </div>
       </>
     ),
@@ -336,8 +368,8 @@ export default function PrivacyPolicyPage() {
       <LegalPageLayout
         sectionLabel="Privacy Policy"
         heroTitle="Your data, your trust."
-        heroDesc="We take your privacy seriously. Here's everything you need to know about how we collect, use, and protect your information."
-        lastUpdated="Last Updated: August 2026"
+        heroDesc="How ealana collects, uses, shares, protects, retains, and responds to requests about personal information."
+        lastUpdated="Last Updated: August 26, 2026"
         sections={sections}
       />
     </>

@@ -34,8 +34,8 @@ const sections: LegalSection[] = [
           They are widely used to make websites work more efficiently and provide a better user experience.
         </p>
         <p>
-          ealana uses cookies and similar tracking technologies to enhance your experience,
-          analyse usage, and provide personalised features.
+          ealana uses essential cookies and browser storage to operate and secure the service.
+          Optional analytics technologies load only after you accept analytics in the consent banner.
         </p>
       </>
     ),
@@ -50,67 +50,66 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>1. Essential Cookies (Always Active)</h4>
           <p>
-            These cookies are necessary for the website to function and cannot be disabled.
-            They enable core functionality such as:
+            These cookies are necessary for session-backed parts of the service and its security.
+            They support:
           </p>
           <ul className={listCls}>
             <li>User authentication and session management</li>
             <li>Security features and CSRF protection</li>
-            <li>Remember your login status</li>
-            <li>Shopping cart functionality (if applicable)</li>
+            <li>Keeping an authenticated session for up to 24 hours</li>
           </ul>
           <div className={cookieNamesCls}>
-            <span className={cookieTagCls}>session_id</span>
-            <span className={cookieTagCls}>csrf_token</span>
+            <span className={cookieTagCls}>connect.sid</span>
+            <span className={cookieTagCls}>__Host-psifi.x-csrf-token</span>
           </div>
         </div>
 
         <div className={subsectionCls}>
           <h4 className={h4Cls}>2. Analytics Cookies (Optional)</h4>
           <p>
-            These cookies help us understand how visitors use our platform by collecting
-            anonymous information about:
+            If you accept analytics, we may load Google Analytics and the Apollo website tracker.
+            These services help us understand:
           </p>
           <ul className={listCls}>
             <li>Pages visited and time spent on each page</li>
             <li>Click patterns and navigation paths</li>
             <li>Browser type, device, and screen resolution</li>
-            <li>Geographic location (country/city level)</li>
+            <li>Approximate location derived by the provider</li>
           </ul>
-          <p className={noteCls}>Service provider: Google Analytics</p>
+          <p className={noteCls}>Providers: Google Analytics and Apollo website analytics</p>
           <div className={cookieNamesCls}>
             <span className={cookieTagCls}>_ga</span>
-            <span className={cookieTagCls}>_gid</span>
-            <span className={cookieTagCls}>_gat</span>
+            <span className={cookieTagCls}>_ga_*</span>
+            <span className={cookieTagCls}>provider-managed identifiers</span>
           </div>
         </div>
 
         <div className={subsectionCls}>
-          <h4 className={h4Cls}>3. Functional Cookies (Optional)</h4>
+          <h4 className={h4Cls}>3. Preferences and Local Storage</h4>
           <p>
-            These cookies enable enhanced functionality and personalisation:
+            We use browser storage for interface preferences and for recording your analytics choice:
           </p>
           <ul className={listCls}>
-            <li>Remember your preferences (language, theme)</li>
-            <li>Store your cookie consent choices</li>
-            <li>Personalise content based on your role (candidate/recruiter)</li>
-            <li>Remember form inputs to prevent data loss</li>
+            <li>Remember whether the application sidebar is open</li>
+            <li>Store accepted or declined analytics consent in local storage</li>
+            <li>Remember product tours and other interface state</li>
           </ul>
           <div className={cookieNamesCls}>
-            <span className={cookieTagCls}>cookie_consent</span>
-            <span className={cookieTagCls}>user_preferences</span>
+            <span className={cookieTagCls}>sidebar_state</span>
+            <span className={cookieTagCls}>consent.analytics (local storage)</span>
           </div>
         </div>
 
         <div className={subsectionCls}>
-          <h4 className={h4Cls}>4. Performance Cookies (Optional)</h4>
+          <h4 className={h4Cls}>4. Operational Monitoring</h4>
           <p>
-            These cookies help us monitor and improve platform performance:
+            We may collect limited technical error and performance information needed to operate,
+            secure, and troubleshoot the service. This is operational telemetry, not a promise that
+            a separate "performance cookie" is placed on your device. It may include:
           </p>
           <ul className={listCls}>
             <li>Load times and page rendering speed</li>
             <li>Error tracking and debugging</li>
-            <li>A/B testing for feature improvements</li>
             <li>Server response times</li>
           </ul>
         </div>
@@ -125,13 +124,16 @@ const sections: LegalSection[] = [
     content: (
       <>
         <p>
-          We use third-party services that may set their own cookies on your device:
+          Optional analytics providers may set or read their own cookies or similar identifiers
+          after you accept analytics. A provider-hosted payment page may also use cookies under
+          that provider's policy when you choose to visit it.
         </p>
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Google Analytics</h4>
           <p>
-            We use Google Analytics to analyse website traffic and user behaviour. Google Analytics
-            sets cookies to track sessions and collect anonymous usage data.
+            When analytics is accepted and configured, Google Analytics measures website traffic
+            and usage. It may set cookies such as <code>_ga</code> and property-specific
+            <code>_ga_*</code> cookies.
           </p>
           <p>
             Learn more:{" "}
@@ -146,17 +148,18 @@ const sections: LegalSection[] = [
           </p>
         </div>
         <div className={subsectionCls}>
-          <h4 className={h4Cls}>Google Cloud Platform</h4>
+          <h4 className={h4Cls}>Apollo Website Tracker</h4>
           <p>
-            We use Google Cloud for hosting and file storage. Google may set cookies for
-            authentication and performance monitoring.
+            When analytics is accepted and configured, the Apollo website tracker may measure
+            visits and interactions using provider-managed browser identifiers.
           </p>
         </div>
         <div className={subsectionCls}>
-          <h4 className={h4Cls}>OpenAI API</h4>
+          <h4 className={h4Cls}>Hosted Payment Pages</h4>
           <p>
-            Our AI-powered features use OpenAI's API. While OpenAI does not set cookies directly
-            on our site, your data is processed by their servers in accordance with their privacy policy.
+            If paid checkout is available and you open a provider-hosted payment page, that separate
+            page may use cookies under the payment provider's own policy. Those cookies are not set
+            by ealana's application pages.
           </p>
         </div>
       </>
@@ -173,8 +176,8 @@ const sections: LegalSection[] = [
           <div className={infoItemCls}>
             <span className={infoLabelCls}>Session Cookies</span>
             <span className={infoDescCls}>
-              Temporary cookies that are deleted when you close your browser. Used for authentication
-              and session management.
+              Some cookies last only for the browser session. The ealana authentication cookie has
+              a configured lifetime of up to 24 hours.
             </span>
           </div>
           <div className={infoItemCls}>
@@ -185,9 +188,10 @@ const sections: LegalSection[] = [
           </div>
         </div>
         <ul className={listCls}>
-          <li><strong>Analytics cookies</strong> - Up to 2 years</li>
-          <li><strong>Preference cookies</strong> - Up to 1 year</li>
-          <li><strong>Consent cookies</strong> - Up to 1 year</li>
+          <li><strong>Authentication cookie</strong> - Up to 24 hours</li>
+          <li><strong>Sidebar preference cookie</strong> - Up to 7 days</li>
+          <li><strong>Analytics consent</strong> - Stored in local storage until you reset it or clear site data</li>
+          <li><strong>Analytics identifiers</strong> - Provider-managed and removable through your browser controls</li>
         </ul>
       </>
     ),
@@ -202,9 +206,10 @@ const sections: LegalSection[] = [
         <div className={subsectionCls}>
           <h4 className={h4Cls}>Cookie Consent Banner</h4>
           <p>
-            When you first visit ealana, you will see a cookie consent banner. You can choose
-            to accept or decline optional cookies. Essential cookies cannot be disabled as they
-            are necessary for the site to function.
+            When no analytics choice is stored, ealana shows a consent banner. You can accept or
+            decline optional analytics. Declining does not load the Google Analytics or Apollo
+            website tracker from this consent flow. Essential session and security cookies are not
+            controlled by the analytics choice because authenticated service features need them.
           </p>
           <button
             className="inline-flex items-center gap-2 mt-[14px] bg-e-blue text-white border-none rounded-xl font-ui font-medium text-[0.85rem] py-[10px] px-5 cursor-pointer no-underline transition-all duration-200 hover:brightness-110"
@@ -229,7 +234,7 @@ const sections: LegalSection[] = [
             <li>Set exceptions for specific websites</li>
           </ul>
           <p className={noteCls}>
-            Note: Blocking essential cookies may prevent you from using ealana.
+            Note: Blocking essential cookies may prevent sign-in or other session-backed features.
           </p>
         </div>
 
@@ -277,9 +282,9 @@ const sections: LegalSection[] = [
         </p>
         <ul className={listCls}>
           <li>Log you out of your account</li>
-          <li>Reset your preferences and settings</li>
+          <li>Reset interface preferences and settings</li>
           <li>Affect site functionality and performance</li>
-          <li>Require you to accept the cookie banner again</li>
+          <li>Require a new analytics choice if you also clear local storage</li>
         </ul>
       </>
     ),
@@ -291,9 +296,9 @@ const sections: LegalSection[] = [
     title: "Do Not Track (DNT)",
     content: (
       <p>
-        Some browsers include a "Do Not Track" (DNT) feature. Currently, there is no industry
-        standard for responding to DNT signals. ealana does not currently respond to DNT
-        signals, but you can manage your cookie preferences through our consent banner.
+        ealana does not currently use a browser "Do Not Track" signal as the analytics choice for
+        this consent flow. You can decline analytics through our consent banner and use browser
+        controls to clear cookies and local storage.
       </p>
     ),
   },
@@ -356,8 +361,8 @@ export default function CookiePolicyPage() {
       <LegalPageLayout
         sectionLabel="Cookie Policy"
         heroTitle="How we use cookies."
-        heroDesc="We use cookies to improve your experience and analyse how our platform is used. Here's everything you need to know."
-        lastUpdated="Last Updated: January 2025"
+        heroDesc="The cookies, local storage, and consent-based analytics used by ealana, and how to control them."
+        lastUpdated="Last Updated: August 26, 2026"
         sections={sections}
       />
     </>
