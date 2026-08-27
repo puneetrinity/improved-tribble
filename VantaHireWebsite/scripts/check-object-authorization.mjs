@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_MANIFEST = "server/object-authorization/surfaces.json";
-const SOURCE_COMMIT = "db91e84d4a1f82d6f0137319014211eab7ed21be";
+const SOURCE_COMMIT = "5449d7b13f80b6fbca56daebb7dc9ccdd965e335";
 const ROUTE_METHOD = /\bapp\.(?:get|post|put|patch|delete)\s*\(/g;
 const SKIP_ROUTE_PARTS = new Set(["__tests__", "tests", "scripts", "dist", "node_modules"]);
 
@@ -45,10 +45,14 @@ function routeCall(source, method, path) {
   const matches = [...source.matchAll(pattern)];
   if (matches.length !== 1) return { count: matches.length, source: "" };
   const start = matches[0].index;
-  const end = source.indexOf("\n  });", start);
+  const endings = ["\n  });", "\n  );"]
+    .map((closing) => ({ closing, index: source.indexOf(closing, start) }))
+    .filter(({ index }) => index >= 0)
+    .sort((left, right) => left.index - right.index);
+  const end = endings[0];
   return {
     count: 1,
-    source: end < 0 ? "" : source.slice(start, end + "\n  });".length),
+    source: end ? source.slice(start, end.index + end.closing.length) : "",
   };
 }
 
@@ -77,6 +81,7 @@ function validateKernel(root, problems) {
   const storage = read(root, "server/storage.ts");
   const auth = read(root, "server/auth.ts");
   const routes = read(root, "server/applications.routes.ts");
+  const whatsappRoutes = read(root, "server/whatsapp.routes.ts");
   const testConfig = read(root, "vitest.server.config.ts");
 
   for (const anchor of [
@@ -85,6 +90,13 @@ function validateKernel(root, problems) {
     "!/^[1-9][0-9]*$/.test(value)",
     "Number.isSafeInteger(parsed)",
   ]) requireAnchor(problems, routes, anchor, `strict application-id parser lost required anchor: ${anchor}`);
+
+  for (const anchor of [
+    "export function parsePositiveDecimalApplicationId",
+    'typeof value !== "string"',
+    "!/^[1-9][0-9]*$/.test(value)",
+    "Number.isSafeInteger(parsed)",
+  ]) requireAnchor(problems, kernel, anchor, `shared strict application-id parser lost required anchor: ${anchor}`);
 
   const sharedAnchors = [
     ["WITH authorized_application AS", "authorization read lost its protected CTE."],
@@ -103,11 +115,12 @@ function validateKernel(root, problems) {
     ["FROM authorized_application", "history is no longer selected through the authorized CTE."],
   ];
   for (const [anchor, label] of sharedAnchors) requireAnchor(problems, kernel, anchor, label);
-  if (count(kernel, "FROM authorized_application") !== 3) {
-    problems.push("all three protected application readers must read through the authorized CTE.");
+  if (count(kernel, "FROM authorized_application") !== 4) {
+    problems.push("all four protected application readers must read through the authorized CTE.");
   }
   if (count(kernel, "LEFT JOIN ${applicationStageHistory}") !== 1
-    || count(kernel, "LEFT JOIN ${emailAuditLog}") !== 1) {
+    || count(kernel, "LEFT JOIN ${emailAuditLog}") !== 1
+    || count(kernel, "LEFT JOIN ${whatsappAuditLog}") !== 1) {
     problems.push("authorized-empty sentinel joins are incomplete.");
   }
   if (/\bLIMIT\b/.test(kernel)) problems.push("authorization read introduced a pre-fence limit.");
@@ -116,6 +129,7 @@ function validateKernel(root, problems) {
     "readAuthorizedApplicationStageHistory",
     "readAuthorizedApplicationEmailHistory",
     "readAuthorizedApplicationInterviewInvite",
+    "readAuthorizedApplicationWhatsAppHistory",
   ]) {
     const source = exportedFunctionSource(kernel, symbol);
     if (!source) problems.push(`authorization reader is missing: ${symbol}`);
@@ -173,6 +187,47 @@ function validateKernel(root, problems) {
   }
   if (/\b(?:phone|resume|organization|applicationId|jobId|userId|score|consent|source)\b/i.test(interviewSelect)) {
     problems.push("interview reader selects a forbidden target field.");
+  }
+
+  const whatsappReader = exportedFunctionSource(kernel, "readAuthorizedApplicationWhatsAppHistory");
+  for (const anchor of [
+    "LEFT JOIN ${whatsappAuditLog}",
+    "${whatsappAuditLog.applicationId} = authorized_application.application_id",
+    "LEFT JOIN ${whatsappTemplates}",
+    "LEFT JOIN ${users} AS sender",
+    "${whatsappAuditLog.sentAt} DESC NULLS LAST",
+    "${whatsappAuditLog.id} DESC NULLS LAST",
+    "templateName: text(row.templateName)",
+    "templateType: text(row.templateType)",
+    "status: text(row.status)",
+    "sentAt: isoTimestamp(row.sentAt)",
+    "deliveredAt: nullableIsoTimestamp(row.deliveredAt)",
+    "readAt: nullableIsoTimestamp(row.readAt)",
+    "sentBy: sender(row.sentBy)",
+  ]) requireAnchor(problems, whatsappReader, anchor, `WhatsApp projection anchor is missing: ${anchor}`);
+  const whatsappSelect = whatsappReader.match(
+    /SELECT authorized_application\.application_id AS "authorizedApplicationId",[\s\S]*?FROM authorized_application/,
+  )?.[0] ?? "";
+  const whatsappAliases = [...whatsappSelect.matchAll(/AS\s+"([A-Za-z]+)"/g)]
+    .map((match) => match[1])
+    .filter((alias) => alias !== "authorizedApplicationId");
+  if (JSON.stringify(whatsappAliases) !== JSON.stringify([
+    "templateName",
+    "templateType",
+    "sentAt",
+    "deliveredAt",
+    "readAt",
+    "sentBy",
+  ])) {
+    problems.push("WhatsApp reader no longer returns the exact seven-field projection.");
+  }
+  if (/\$\{whatsappAuditLog\.(?:recipientPhone|messageId|errorCode|errorMessage|templateVariables)\}/.test(whatsappSelect)
+    || /\$\{whatsappTemplates\.(?:metaTemplateName|metaTemplateId|bodyTemplate|status|rejectionReason|category|language)\}/.test(whatsappSelect)
+    || /AS\s+"?(?:id|applicationId|templateId|recipientPhone|messageId|errorCode|errorMessage|templateVariables)"?/i.test(whatsappSelect)) {
+    problems.push("WhatsApp history selects a forbidden raw audit or template field.");
+  }
+  if (count(whatsappReader, "db.execute(") !== 1) {
+    problems.push("WhatsApp history must execute exactly one database statement.");
   }
 
   const emailSelect = kernel.match(/SELECT authorized_application\.application_id AS "authorizedApplicationId",[\s\S]*?FROM authorized_application/g)?.[1] ?? "";
@@ -252,12 +307,54 @@ function validateKernel(root, problems) {
     }
   }
 
+  const whatsappRoute = routeCall(whatsappRoutes, "get", "/api/applications/:id/whatsapp-history");
+  if (whatsappRoute.count !== 1 || !whatsappRoute.source) {
+    problems.push("route registration must exist exactly once: GET /api/applications/:id/whatsapp-history");
+  } else {
+    const handler = whatsappRoute.source;
+    for (const anchor of [
+      "requireRole(['recruiter', 'super_admin'])",
+      "requireSeat()",
+      "parsePositiveDecimalApplicationId",
+      "INVALID_APPLICATION_ID",
+      "readAuthorizedApplicationWhatsAppHistory",
+      "allowPlatformAdmin: true",
+      "APPLICATION_NOT_FOUND",
+      "AUTHORIZATION_UNAVAILABLE",
+      "res.json(result.rows)",
+    ]) requireAnchor(problems, handler, anchor, `/api/applications/:id/whatsapp-history lost required handler anchor: ${anchor}`);
+    if (handler.includes("storage.getApplication(")
+      || handler.includes("db.query.whatsappAuditLog")
+      || handler.includes("whatsappAuditLog.findMany")) {
+      problems.push("/api/applications/:id/whatsapp-history reaches an id-only or raw history read.");
+    }
+    const authorizationAt = handler.indexOf("readAuthorizedApplicationWhatsAppHistory");
+    const responseAt = handler.indexOf("res.json(result.rows)");
+    if (authorizationAt < 0 || responseAt < 0 || authorizationAt > responseAt) {
+      problems.push("WhatsApp history responds before statement-bound authorization.");
+    }
+  }
+
+  for (const row of manifestFrozenRouteBlocks(root)) {
+    const registration = routeCall(whatsappRoutes, row.method, row.path);
+    if (registration.count !== 1 || !registration.source) {
+      problems.push(`frozen WhatsApp route block is missing: ${row.method.toUpperCase()} ${row.path}`);
+    } else if (sha256(registration.source) !== row.sha256) {
+      problems.push(`frozen WhatsApp route block drifted: ${row.method.toUpperCase()} ${row.path}`);
+    }
+  }
+
   requireAnchor(
     problems,
     testConfig,
     "'server/tests/interviewIcsAuthorization.routes.test.ts'",
     "the focused ICS authorization route test is not collected by Vitest.",
   );
+}
+
+function manifestFrozenRouteBlocks(root) {
+  const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
+  return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
 }
 
 export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative = DEFAULT_MANIFEST) {
@@ -275,6 +372,9 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   }
   if (manifest.route_registration_census !== 316) {
     problems.push("object authorization route census contract is invalid.");
+  }
+  if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
+    problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
   }
 
   for (const row of [...(manifest.governed_files ?? []), ...(manifest.frozen_files ?? [])]) {

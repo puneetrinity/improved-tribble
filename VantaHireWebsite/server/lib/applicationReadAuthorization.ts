@@ -7,6 +7,8 @@ import {
   jobs,
   organizationMembers,
   users,
+  whatsappAuditLog,
+  whatsappTemplates,
 } from "@shared/schema";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
@@ -39,6 +41,16 @@ export interface InterviewInviteProjection {
   interviewNotes: string | null;
 }
 
+export interface ApplicationWhatsAppHistoryProjection {
+  templateName: string;
+  templateType: string;
+  status: string;
+  sentAt: string;
+  deliveredAt: string | null;
+  readAt: string | null;
+  sentBy: { firstName: string; lastName: string } | null;
+}
+
 export type AuthorizedApplicationRead<T> =
   | { ok: true; rows: T[] }
   | { ok: false; reason: "not_found" | "unavailable" };
@@ -56,6 +68,12 @@ type UnknownRow = Record<string, unknown>;
 
 function isPositiveSafeInteger(value: unknown): value is number {
   return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+export function parsePositiveDecimalApplicationId(value: unknown): number | null {
+  if (typeof value !== "string" || !/^[1-9][0-9]*$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
 function rowsFrom(result: unknown): UnknownRow[] {
@@ -311,6 +329,71 @@ export async function readAuthorizedApplicationEmailHistory(
         recipientEmail: text(row.recipientEmail),
         sentAt: isoTimestamp(row.sentAt),
         status: text(row.status),
+        sentBy: sender(row.sentBy),
+      }));
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}
+
+export async function readAuthorizedApplicationWhatsAppHistory(
+  actorId: number,
+  applicationId: number,
+  policy: ApplicationReadPolicy,
+): Promise<AuthorizedApplicationRead<ApplicationWhatsAppHistoryProjection>> {
+  if (!validInputs(actorId, applicationId, policy)) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  try {
+    const result = await db.execute(sql`
+      WITH authorized_application AS (
+        ${authorizedApplicationCte(actorId, applicationId, policy.allowPlatformAdmin)}
+      )
+      SELECT authorized_application.application_id AS "authorizedApplicationId",
+             COALESCE(
+               ${whatsappTemplates.name},
+               ${whatsappAuditLog.templateType},
+               'WhatsApp update'
+             ) AS "templateName",
+             COALESCE(
+               ${whatsappAuditLog.templateType},
+               ${whatsappTemplates.templateType},
+               'unknown'
+             ) AS "templateType",
+             ${whatsappAuditLog.status} AS status,
+             ${whatsappAuditLog.sentAt} AS "sentAt",
+             ${whatsappAuditLog.deliveredAt} AS "deliveredAt",
+             ${whatsappAuditLog.readAt} AS "readAt",
+             CASE WHEN sender.id IS NULL THEN NULL
+                  ELSE json_build_object(
+                    'firstName', COALESCE(sender.first_name, ''),
+                    'lastName', COALESCE(sender.last_name, '')
+                  )
+             END AS "sentBy"
+        FROM authorized_application
+        LEFT JOIN ${whatsappAuditLog}
+          ON ${whatsappAuditLog.applicationId} = authorized_application.application_id
+        LEFT JOIN ${whatsappTemplates}
+          ON ${whatsappTemplates.id} = ${whatsappAuditLog.templateId}
+        LEFT JOIN ${users} AS sender
+          ON sender.id = ${whatsappAuditLog.sentBy}
+       ORDER BY ${whatsappAuditLog.sentAt} DESC NULLS LAST,
+                ${whatsappAuditLog.id} DESC NULLS LAST
+    `);
+    const rawRows = rowsFrom(result);
+    if (rawRows.length === 0) return { ok: false, reason: "not_found" };
+
+    const rows = rawRows
+      .filter((row) => row.status !== null)
+      .map((row): ApplicationWhatsAppHistoryProjection => ({
+        templateName: text(row.templateName),
+        templateType: text(row.templateType),
+        status: text(row.status),
+        sentAt: isoTimestamp(row.sentAt),
+        deliveredAt: nullableIsoTimestamp(row.deliveredAt),
+        readAt: nullableIsoTimestamp(row.readAt),
         sentBy: sender(row.sentBy),
       }));
     return { ok: true, rows };

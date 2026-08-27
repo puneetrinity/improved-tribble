@@ -1,8 +1,8 @@
 {
   "format_version": 1,
-  "source_commit": "db91e84d4a1f82d6f0137319014211eab7ed21be",
+  "source_commit": "5449d7b13f80b6fbca56daebb7dc9ccdd965e335",
   "route_registration_census": 316,
-  "contract": "Application history and interview-calendar authorization share one PostgreSQL statement snapshot with their protected projections; absence and denial are indistinguishable.",
+  "contract": "Application history, interview-calendar and WhatsApp-history authorization share one PostgreSQL statement snapshot with their protected projections; absence and denial are indistinguishable.",
   "routes": [
     {
       "method": "get",
@@ -21,6 +21,12 @@
       "path": "/api/applications/:id/interview/ics",
       "reader": "readAuthorizedApplicationInterviewInvite",
       "projection": ["candidateName", "candidateEmail", "jobTitle", "interviewDate", "interviewTime", "interviewLocation", "interviewNotes"]
+    },
+    {
+      "method": "get",
+      "path": "/api/applications/:id/whatsapp-history",
+      "reader": "readAuthorizedApplicationWhatsAppHistory",
+      "projection": ["templateName", "templateType", "status", "sentAt", "deliveredAt", "readAt", "sentBy"]
     }
   ],
   "governed_files": [
@@ -29,14 +35,23 @@
     { "file": "vitest.server.config.ts", "sha256": "aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe" },
     { "file": "server/applications.routes.ts", "sha256": "608bb7d43d95c532f7be6a7cfa5ef0f00ae90ea543a10b0d38bfce7dbf49488f" },
     { "file": "server/auth.ts", "sha256": "a2f1ffc7ff99c9e6c56fafc834065a5463bfe747bf7cbdcc506f3f3356a06365" },
-    { "file": "server/candidate-privacy/surfaces.json", "sha256": "c8bc1d8e550dbc152d39f984f4be97e4e7dbb5417bfdf6b1eff01b558a4d4406" },
-    { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "552b16428a31dc47017f9f5c2da52b06afe0b04e9c07c5d523619198228088bd" },
-    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "a6b84445646ec86e43f44fa85755eafc54edd96e1ba9b237b0d444a57e2a8309" },
-    { "file": "server/lib/applicationReadAuthorization.ts", "sha256": "ce7c0ddb32c09510b3ca3d98d152959bac0780496d344522622de5b14486ef6f" },
+    { "file": "server/candidate-privacy/surfaces.json", "sha256": "9dcaf74d84cbbf635eba6c744b0666cdbdb43bee206af3bfe910f2d2c178538b" },
+    { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "5e1f527d15747fefccb0497bb4f8474fddc6e848878f8047952d4f650e9c46ee" },
+    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "5ae982929f94ce87211ce1981708ab1c22661cf426fc4a573b42f8677bc8b894" },
+    { "file": "server/lib/__tests__/whatsappHistoryAuthorization.routes.test.ts", "sha256": "a6a1e7c36c57bcb88e6d900670e64f71809b48034006cfa2d739bd1b3545baa7" },
+    { "file": "server/lib/applicationReadAuthorization.ts", "sha256": "ee5cd298ca183159c311b7fc9595f5c58a0e2069c90abd9f910ffb5ea32b6832" },
     { "file": "server/storage.ts", "sha256": "1c140fd05c645ae9f4faba9dd1b6e5a14370576d080207c21fcc42814f0265ee" },
-    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "6bf8628f40b813a8aef4d80ce0ac09d378070e94e3c33eff0617c03a473b8f3c" },
+    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "ce0cede6452482d2642f551aeca28aab23ac50c35654b4d225038f5843ddedbb" },
     { "file": "server/tests/interviewIcsAuthorization.routes.test.ts", "sha256": "5f24cda1c7f4d499a317ca4e998d71bb99df40880d2295231b78505efbdf3e59" },
-    { "file": "scripts/check-object-authorization.mjs", "sha256": "a56287de45f1e238103740fab3c3476c7dd8af515dae180796f41e2db706561c" }
+    { "file": "server/whatsapp.routes.ts", "sha256": "6fe33d722f4be777ed138d9ba3a80689cf4d01f31eeb9b14a1ff26ddfac844ca" },
+    { "file": "scripts/check-object-authorization.mjs", "sha256": "3a17495a5bf47c0a84e739bcf9aa431003c4b01887e55e5151aa862e0fee4196" }
+  ],
+  "frozen_route_blocks": [
+    { "method": "get", "path": "/api/webhooks/whatsapp", "sha256": "7f536ad1b199d3a8b6cfc23abe20ddfd2cc4a8c4da6a6858eb091de4659edca8" },
+    { "method": "post", "path": "/api/webhooks/whatsapp", "sha256": "03f20507fc5dc844eb1623a93ce44252462de728a3eee39e11c7ab1918b56b7b" },
+    { "method": "get", "path": "/api/whatsapp/templates", "sha256": "8dc442300f589aba740493e143739ebbc977f80308099b3ed8c42638ab9d8057" },
+    { "method": "post", "path": "/api/applications/:id/send-whatsapp", "sha256": "b9424fbd742367071f034ec6492f51af5cf6dc6e1dec6279c529bdf054123c6a" },
+    { "method": "get", "path": "/api/whatsapp/status", "sha256": "00a91814c0d7055de5912b83120264f75af42dd7da3d53394a14c76412e9bdcb" }
   ],
   "frozen_files": [
     { "file": "package-lock.json", "sha256": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539" },

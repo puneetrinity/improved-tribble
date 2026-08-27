@@ -8,9 +8,11 @@ vi.mock("../../db", () => ({
 }));
 
 import {
+  parsePositiveDecimalApplicationId,
   readAuthorizedApplicationEmailHistory,
   readAuthorizedApplicationInterviewInvite,
   readAuthorizedApplicationStageHistory,
+  readAuthorizedApplicationWhatsAppHistory,
 } from "../applicationReadAuthorization";
 
 const allowAdmin = { allowPlatformAdmin: true } as const;
@@ -320,5 +322,134 @@ describe("application read authorization kernel", () => {
       {} as { allowPlatformAdmin: boolean },
     )).resolves.toEqual({ ok: false, reason: "unavailable" });
     expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it.each([
+    ["1", 1],
+    ["9007199254740991", Number.MAX_SAFE_INTEGER],
+    [undefined, null],
+    ["", null],
+    ["0", null],
+    ["-1", null],
+    ["+1", null],
+    ["01", null],
+    [" 1", null],
+    ["1 ", null],
+    ["1.0", null],
+    ["1e1", null],
+    ["0x10", null],
+    ["1x", null],
+    [String(Number.MAX_SAFE_INTEGER + 1), null],
+    [1 as unknown, null],
+  ])("strictly parses application id %s", (value, expected) => {
+    expect(parsePositiveDecimalApplicationId(value)).toBe(expected);
+  });
+
+  it("returns the exact WhatsApp status projection and excludes raw audit/template fields", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      authorizedApplicationId: 9,
+      templateName: "Interview update",
+      templateType: "interview_invite",
+      status: "read",
+      sentAt: new Date("2026-08-26T12:00:00.000Z"),
+      deliveredAt: "2026-08-26T12:01:00.000Z",
+      readAt: "2026-08-26T12:02:00.000Z",
+      sentBy: { firstName: "Test", lastName: "Recruiter" },
+      id: 12,
+      applicationId: 9,
+      templateId: 4,
+      recipientPhone: "+15550000001",
+      messageId: "provider-secret",
+      errorCode: "forbidden",
+      errorMessage: "forbidden",
+      templateVariables: { candidate: "forbidden" },
+      bodyTemplate: "forbidden",
+      metaTemplateId: "forbidden",
+    }] });
+
+    const result = await readAuthorizedApplicationWhatsAppHistory(7, 9, allowAdmin);
+    expect(result).toEqual({
+      ok: true,
+      rows: [{
+        templateName: "Interview update",
+        templateType: "interview_invite",
+        status: "read",
+        sentAt: "2026-08-26T12:00:00.000Z",
+        deliveredAt: "2026-08-26T12:01:00.000Z",
+        readAt: "2026-08-26T12:02:00.000Z",
+        sentBy: { firstName: "Test", lastName: "Recruiter" },
+      }],
+    });
+    expect(Object.keys(result.ok ? result.rows[0]! : {})).toEqual([
+      "templateName",
+      "templateType",
+      "status",
+      "sentAt",
+      "deliveredAt",
+      "readAt",
+      "sentBy",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("+15550000001");
+    expect(JSON.stringify(result)).not.toContain("provider-secret");
+    expect(JSON.stringify(result)).not.toContain("forbidden");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns authorized empty WhatsApp history from the sentinel row", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      authorizedApplicationId: 9,
+      templateName: "WhatsApp update",
+      templateType: "unknown",
+      status: null,
+      sentAt: null,
+      deliveredAt: null,
+      readAt: null,
+      sentBy: null,
+    }] });
+    await expect(readAuthorizedApplicationWhatsAppHistory(7, 9, allowAdmin)).resolves.toEqual({
+      ok: true,
+      rows: [],
+    });
+  });
+
+  it("does not expose absent versus denied WhatsApp reads", async () => {
+    execute.mockResolvedValueOnce({ rows: [] });
+    await expect(readAuthorizedApplicationWhatsAppHistory(7, 999, allowAdmin)).resolves.toEqual({
+      ok: false,
+      reason: "not_found",
+    });
+  });
+
+  it("fails closed on malformed, database, actor, or policy WhatsApp results", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      authorizedApplicationId: 9,
+      templateName: "WhatsApp update",
+      templateType: "status_update",
+      status: "sent",
+      sentAt: "2026-08-26T12:00:00.000Z",
+      deliveredAt: "not-a-date",
+      readAt: null,
+      sentBy: null,
+    }] });
+    await expect(readAuthorizedApplicationWhatsAppHistory(7, 9, allowAdmin)).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+
+    execute.mockRejectedValueOnce(new Error("postgres://raw-secret phone=+15550000001"));
+    const failed = await readAuthorizedApplicationWhatsAppHistory(7, 9, allowAdmin);
+    expect(failed).toEqual({ ok: false, reason: "unavailable" });
+    expect(JSON.stringify(failed)).not.toContain("raw-secret");
+
+    await expect(readAuthorizedApplicationWhatsAppHistory(0, 9, allowAdmin)).resolves.toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+    await expect(readAuthorizedApplicationWhatsAppHistory(
+      7,
+      9,
+      {} as { allowPlatformAdmin: boolean },
+    )).resolves.toEqual({ ok: false, reason: "unavailable" });
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 });

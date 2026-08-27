@@ -77,6 +77,8 @@ async function databaseState(): Promise<string> {
       'applications', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM applications t),
       'stage_history', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM application_stage_history t),
       'email_history', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM email_audit_log t),
+      'whatsapp_templates', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM whatsapp_templates t),
+      'whatsapp_history', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM whatsapp_audit_log t),
       'privacy_requests', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY request_id), '[]'::jsonb) FROM candidate_privacy_requests t),
       'privacy_links', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY request_id), '[]'::jsonb) FROM candidate_privacy_subject_links t),
       'privacy_projection', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY request_id), '[]'::jsonb) FROM candidate_privacy_remote_projection t)
@@ -167,6 +169,20 @@ async function installFixture(): Promise<void> {
     VALUES
       (5001,2001,6001,'status_update','fixture@example.invalid','private subject','2026-08-26T11:00:00Z',101,'success',NULL,'https://invalid/private'),
       (5002,2001,NULL,NULL,'fixture@example.invalid','private subject','2026-08-26T10:30:00Z',NULL,'success',NULL,NULL);
+    INSERT INTO whatsapp_templates
+      (id,name,meta_template_name,meta_template_id,language,template_type,category,body_template,status,rejection_reason,created_at)
+    VALUES
+      (7001,'Interview update','fixture_interview_update','meta-private','en','interview_invite','UTILITY','Private body {{1}}','approved',NULL,'2026-08-26T08:00:00Z');
+    INSERT INTO whatsapp_audit_log
+      (id,application_id,template_id,template_type,recipient_phone,message_id,status,error_code,error_message,
+       template_variables,sent_at,delivered_at,read_at,sent_by)
+    VALUES
+      (8001,2001,7001,'interview_invite','+15550000001','provider-private-1','read','private-code','private error',
+       '{"candidate":"private variable"}'::jsonb,'2026-08-26T12:00:00Z','2026-08-26T12:01:00Z','2026-08-26T12:02:00Z',101),
+      (8002,2001,NULL,NULL,'+15550000002','provider-private-2','failed','private-code','private error',
+       '{"candidate":"private variable"}'::jsonb,'2026-08-26T11:30:00Z',NULL,NULL,NULL),
+      (8003,2002,NULL,'authorization_fixture_2d','+15550000003',NULL,'authorization_fixture',NULL,NULL,
+       NULL,'2026-08-26T11:00:00Z',NULL,NULL,201);
     INSERT INTO candidate_privacy_requests
       (request_id,directive_id,action,authority_type,actor_user_id,reason_code,state,version,last_delivery_status)
     VALUES
@@ -276,6 +292,13 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
 
   const interview = (actorId: number, applicationId: number, allowPlatformAdmin = true) =>
     readWithoutMutation(() => authorization.readAuthorizedApplicationInterviewInvite(
+      actorId,
+      applicationId,
+      { allowPlatformAdmin },
+    ));
+
+  const whatsapp = (actorId: number, applicationId: number, allowPlatformAdmin = true) =>
+    readWithoutMutation(() => authorization.readAuthorizedApplicationWhatsAppHistory(
       actorId,
       applicationId,
       { allowPlatformAdmin },
@@ -432,5 +455,76 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
     await expect(interview(101, 2005)).resolves.toEqual({ ok: false, reason: "not_found" });
     await expect(interview(101, 2006)).resolves.toEqual({ ok: false, reason: "not_found" });
     await expect(interview(101, 2007)).resolves.toMatchObject({ ok: true });
+  });
+
+  it("returns the exact ordered WhatsApp status projection without raw audit or template fields", async () => {
+    const result = await whatsapp(101, 2001);
+    expect(result).toEqual({ ok: true, rows: [
+      {
+        templateName: "Interview update",
+        templateType: "interview_invite",
+        status: "read",
+        sentAt: "2026-08-26T12:00:00.000Z",
+        deliveredAt: "2026-08-26T12:01:00.000Z",
+        readAt: "2026-08-26T12:02:00.000Z",
+        sentBy: { firstName: "Primary", lastName: "Recruiter" },
+      },
+      {
+        templateName: "WhatsApp update",
+        templateType: "unknown",
+        status: "failed",
+        sentAt: "2026-08-26T11:30:00.000Z",
+        deliveredAt: null,
+        readAt: null,
+        sentBy: null,
+      },
+    ] });
+    expect(Object.keys(result.ok ? result.rows[0]! : {})).toEqual([
+      "templateName",
+      "templateType",
+      "status",
+      "sentAt",
+      "deliveredAt",
+      "readAt",
+      "sentBy",
+    ]);
+    const encoded = JSON.stringify(result);
+    for (const forbidden of [
+      "+15550000001",
+      "provider-private",
+      "private-code",
+      "private error",
+      "private variable",
+      "Private body",
+      "meta-private",
+      "applicationId",
+      "templateId",
+      "messageId",
+    ]) expect(encoded).not.toContain(forbidden);
+  });
+
+  it("applies the complete actor and object boundary to WhatsApp history", async () => {
+    await expect(whatsapp(201, 2002)).resolves.toMatchObject({ ok: true });
+    await expect(whatsapp(201, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    for (const actorId of [103, 104, 105, 301, 302]) {
+      await expect(whatsapp(actorId, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    }
+    await expect(whatsapp(101, 999999)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(whatsapp(101, 2003)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(whatsapp(101, 2004)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("keeps platform administration explicit for WhatsApp history", async () => {
+    await expect(whatsapp(401, 2001, true)).resolves.toMatchObject({ ok: true });
+    await expect(whatsapp(401, 2001, false)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(whatsapp(401, 2003, true)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(whatsapp(401, 2004, true)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("preserves privacy semantics and the authorized-empty WhatsApp sentinel", async () => {
+    await expect(whatsapp(101, 2005)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(whatsapp(101, 2006)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(whatsapp(101, 2007)).resolves.toEqual({ ok: true, rows: [] });
+    await expect(whatsapp(101, 2008)).resolves.toEqual({ ok: true, rows: [] });
   });
 });
