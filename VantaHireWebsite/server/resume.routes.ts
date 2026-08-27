@@ -1,16 +1,46 @@
 import type { Express, Request, Response, NextFunction } from 'express';
-import { z } from 'zod';
-import { db } from './db';
-import { candidateResumes, applications } from '@shared/schema';
-import { requireRole, requireAuth } from './auth';
-import { downloadFromGCS } from './gcs-storage';
-import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
+import { randomUUID } from 'node:crypto';
+import { requireRole, requireAuth, requireSeat } from './auth';
 import {
-  CandidatePrivacyRestrictedError,
-  requireCandidatePrivacyAllowed,
-} from './candidate-privacy/decision';
+  parsePositiveDecimalApplicationId,
+  readAuthorizedApplicationResumeText,
+} from './lib/applicationReadAuthorization';
+import { storage, type ResumeAccessActorRole, type ResumeAccessTerminalStatus } from './storage';
 
-const resumeTextParams = z.object({ id: z.coerce.number().int().positive() });
+async function terminalizeTextAttempt(input: {
+  attemptId: string;
+  status: ResumeAccessTerminalStatus;
+  responseStatus: number;
+  failureCode?: string | null;
+}): Promise<boolean> {
+  try {
+    return await storage.terminalizeResumeAccessAttempt({
+      ...input,
+      failureCode: input.failureCode ?? null,
+      updateLegacyDownloadedAt: false,
+    });
+  } catch {
+    return false;
+  }
+}
+
+function bindTextResponseTerminal(res: Response, attemptId: string): void {
+  let terminalScheduled = false;
+  const settle = (status: ResumeAccessTerminalStatus, responseStatus: number, failureCode?: string) => {
+    if (terminalScheduled) return;
+    terminalScheduled = true;
+    void terminalizeTextAttempt({
+      attemptId,
+      status,
+      responseStatus,
+      ...(failureCode === undefined ? {} : { failureCode }),
+    });
+  };
+  res.once('finish', () => settle('completed', 200));
+  res.once('close', () => {
+    if (!res.writableFinished) settle('failed', 499, 'RESPONSE_CLOSED');
+  });
+}
 
 export function registerResumeRoutes(app: Express): void {
   // GET /api/applications/:id/resume-text
@@ -19,69 +49,65 @@ export function registerResumeRoutes(app: Express): void {
     '/api/applications/:id/resume-text',
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
-    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-      try {
-        const parse = resumeTextParams.safeParse(req.params);
-        if (!parse.success) {
-          res.status(400).json({ error: 'Invalid application id' });
-          return;
-        }
-        const applicationId = parse.data.id;
-
-        await requireCandidatePrivacyAllowed(
-          { type: 'application', id: applicationId },
-          { globalUse: false },
-        );
-
-        const application = await db.query.applications.findFirst({
-          where: (apps: typeof applications, { eq }: any) => eq(apps.id, applicationId),
-        });
-        if (!application) {
-          res.status(404).json({ error: 'Application not found' });
-          return;
-        }
-
-        let resumeText = '';
-
-        if (application.extractedResumeText) {
-          resumeText = application.extractedResumeText;
-        } else if (application.resumeId) {
-          const resumeData = await db.query.candidateResumes.findFirst({
-            where: (resumes: typeof candidateResumes, { eq }: any) => eq(resumes.id, application.resumeId),
-          });
-          resumeText = resumeData?.extractedText || '';
-        }
-
-        // Fallback: download from GCS and extract on the fly if text missing
-        if (!resumeText && application.resumeUrl && application.resumeUrl.startsWith('gs://')) {
-          try {
-            await requireCandidatePrivacyAllowed(
-              { type: 'application', id: applicationId },
-              { globalUse: false },
-            );
-            const buffer = await downloadFromGCS(application.resumeUrl);
-            const extraction = await extractResumeText(buffer);
-            if (extraction.success && validateResumeText(extraction.text)) {
-              resumeText = extraction.text;
-            }
-          } catch (err) {
-            console.error('[Resume Text] Extract fallback failed:', err);
-          }
-        }
-
-        if (!resumeText) {
-          res.status(404).json({ error: 'Resume text not available' });
-          return;
-        }
-
-        res.json({ text: resumeText });
-      } catch (error) {
-        if (error instanceof CandidatePrivacyRestrictedError) {
-          res.status(404).json({ code: 'candidate_privacy_restricted' });
-          return;
-        }
-        next(error);
+    requireSeat(),
+    async (req: Request, res: Response, _next: NextFunction): Promise<void> => {
+      const applicationId = parsePositiveDecimalApplicationId(req.params.id);
+      if (applicationId === null) {
+        res.status(400).json({ code: 'INVALID_APPLICATION_ID' });
+        return;
       }
+
+      const authorized = await readAuthorizedApplicationResumeText(
+        req.user!.id,
+        applicationId,
+        { allowPlatformAdmin: true },
+      );
+      if (!authorized.ok) {
+        if (authorized.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
+        return;
+      }
+
+      const actorRole = req.user!.role as ResumeAccessActorRole;
+      const attemptId = randomUUID();
+      let auditReady = false;
+      try {
+        auditReady = await storage.createResumeAccessAttempt({
+          attemptId,
+          applicationId: authorized.resume.applicationId,
+          organizationId: authorized.resume.organizationId,
+          actorUserId: req.user!.id,
+          actorRole,
+          deliveryMode: authorized.resume.text ? 'stored_text' : 'missing',
+        });
+      } catch {
+        auditReady = false;
+      }
+      if (!auditReady) {
+        res.status(503).json({ code: 'AUDIT_UNAVAILABLE' });
+        return;
+      }
+
+      if (!authorized.resume.text) {
+        const terminal = await terminalizeTextAttempt({
+          attemptId,
+          status: 'failed',
+          responseStatus: 404,
+          failureCode: 'RESUME_TEXT_MISSING',
+        });
+        if (!terminal) {
+          res.status(503).json({ code: 'AUDIT_UNAVAILABLE' });
+          return;
+        }
+        res.status(404).json({ code: 'RESUME_TEXT_NOT_AVAILABLE' });
+        return;
+      }
+
+      bindTextResponseTerminal(res, attemptId);
+      res.status(200).json({ text: authorized.resume.text });
     }
   );
 }

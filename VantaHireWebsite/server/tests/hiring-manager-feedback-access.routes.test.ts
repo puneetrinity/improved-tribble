@@ -8,7 +8,20 @@ const storageMock = {
   getUser: vi.fn(),
   isRecruiterOnJob: vi.fn(),
   markApplicationDownloaded: vi.fn(),
+  createResumeAccessAttempt: vi.fn(),
+  terminalizeResumeAccessAttempt: vi.fn(),
 };
+
+const applicationReadAuthorizationMock = vi.hoisted(() => ({
+  readResumeFile: vi.fn(),
+}));
+
+const gcsStorageMock = vi.hoisted(() => ({
+  uploadToGCS: vi.fn(),
+  getSignedDownloadUrl: vi.fn(),
+  downloadFromGCS: vi.fn(),
+  downloadBoundApplicationResumeFromGCS: vi.fn(),
+}));
 
 const selectQueue: any[][] = [];
 
@@ -71,6 +84,13 @@ vi.mock('../db', () => ({
   db: dbMock,
 }));
 
+vi.mock('../lib/applicationReadAuthorization', () => ({
+  readAuthorizedApplicationResumeFile: applicationReadAuthorizationMock.readResumeFile,
+  readAuthorizedApplicationStageHistory: vi.fn(),
+  readAuthorizedApplicationEmailHistory: vi.fn(),
+  readAuthorizedApplicationInterviewInvite: vi.fn(),
+}));
+
 vi.mock('../lib/organizationService', () => ({
   getUserOrganization: vi.fn(),
 }));
@@ -80,11 +100,7 @@ vi.mock('../lib/featureGating', () => ({
   requireFeatureAccess: () => (_req: any, _res: any, next: any) => next(),
 }));
 
-vi.mock('../gcs-storage', () => ({
-  uploadToGCS: vi.fn(),
-  getSignedDownloadUrl: vi.fn(),
-  downloadFromGCS: vi.fn(),
-}));
+vi.mock('../gcs-storage', () => gcsStorageMock);
 
 vi.mock('../notificationService', () => ({
   sendStatusUpdateNotification: vi.fn(),
@@ -335,14 +351,10 @@ describe('hiring manager feedback access', () => {
     expect(dbMock.insert).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when a hiring manager requests a resume for another manager’s job application', async () => {
-    storageMock.getApplication.mockResolvedValue({
-      id: 459,
-      jobId: 88,
-    });
-    storageMock.getJob.mockResolvedValue({
-      id: 88,
-      hiringManagerId: 9999,
+  it('returns the same 404 when a hiring manager requests a resume for another manager’s job application', async () => {
+    applicationReadAuthorizationMock.readResumeFile.mockResolvedValue({
+      ok: false,
+      reason: 'not_found',
     });
 
     const app = await buildApp();
@@ -351,9 +363,16 @@ describe('hiring manager feedback access', () => {
       params: { id: '459' },
     });
 
-    expect(result.status).toBe(403);
-    expect(result.body).toEqual({ error: 'Access denied' });
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+    expect(storageMock.getApplication).not.toHaveBeenCalled();
+    expect(storageMock.getJob).not.toHaveBeenCalled();
     expect(storageMock.markApplicationDownloaded).not.toHaveBeenCalled();
+    expect(storageMock.createResumeAccessAttempt).not.toHaveBeenCalled();
+    expect(storageMock.terminalizeResumeAccessAttempt).not.toHaveBeenCalled();
+    expect(gcsStorageMock.getSignedDownloadUrl).not.toHaveBeenCalled();
+    expect(gcsStorageMock.downloadFromGCS).not.toHaveBeenCalled();
+    expect(gcsStorageMock.downloadBoundApplicationResumeFromGCS).not.toHaveBeenCalled();
   });
 
   it('allows recruiters to request hiring manager review for accessible applications on a single job', async () => {

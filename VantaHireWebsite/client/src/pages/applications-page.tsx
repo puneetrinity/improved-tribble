@@ -110,16 +110,6 @@ export default function ApplicationsPage() {
     },
   });
 
-  // Download resume mutation
-  const downloadResumeMutation = useMutation({
-    mutationFn: async (applicationId: number) => {
-      await apiRequest("PATCH", `/api/applications/${applicationId}/download`);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/my-applications-received"] });
-    },
-  });
-
   // Update application stage mutation
   const updateStageMutation = useMutation({
     mutationFn: async ({ applicationId, stageId, notes }: { applicationId: number; stageId: number; notes?: string }) => {
@@ -430,11 +420,6 @@ export default function ApplicationsPage() {
         onClose={() => {
           setResumePreviewApp(null);
           setResumeText(null);
-        }}
-        onDownload={() => {
-          if (resumePreviewApp) {
-            downloadResumeMutation.mutate(resumePreviewApp.id);
-          }
         }}
         onMoveToScreening={async (notes) => {
           if (resumePreviewApp) {

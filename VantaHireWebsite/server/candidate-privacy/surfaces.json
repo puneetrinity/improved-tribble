@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "b4001d413e4d9508031cc5d584bc17463b5d90bbd1bcfd3f94770a02a8cd54ef",
+  "source_census_sha256": "1326cdeb01140da2d59a139a8f9f8188508621634d016f0c0d8423bc0131a1a5",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
@@ -316,8 +316,8 @@
       "direction": "read",
       "privacy_action": ["request_erasure"],
       "organization_scope": "candidate_self_or_owning_org",
-      "enforcement": "Resume/application anchor is rechecked before text, preview or download response.",
-      "anchors": ["requireCandidatePrivacyAllowed", "candidate_privacy_restricted"]
+      "enforcement": "Resume text is selected inside the statement-bound application authorization CTE; restricted/foreign objects fail closed before content or audit response.",
+      "anchors": ["readAuthorizedApplicationResumeText", "RESUME_TEXT_NOT_AVAILABLE"]
     },
     {
       "id": "bulk-resume-ingest",
@@ -756,8 +756,8 @@
       "direction": "read_render",
       "privacy_action": ["request_erasure"],
       "organization_scope": "owning_org",
-      "enforcement": "UI consumes only the server-fenced semantic search and resume proxy endpoints.",
-      "anchors": ["/api/candidates/semantic-search", "/api/candidates/external-resume"]
+      "enforcement": "UI consumes server-fenced semantic search and opens only local application-bound resumes; external results expose no locator or open action.",
+      "anchors": ["/api/candidates/semantic-search", "/api/applications/"]
     },
     {
       "id": "sourcing-ui-family",

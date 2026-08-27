@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const DEFAULT_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_MANIFEST = "server/object-authorization/surfaces.json";
-const SOURCE_COMMIT = "5449d7b13f80b6fbca56daebb7dc9ccdd965e335";
+const SOURCE_COMMIT = "ae84dcf9af22ac15cca0fe1eaf546ee338fff779";
 const ROUTE_METHOD = /\bapp\.(?:get|post|put|patch|delete)\s*\(/g;
 const SKIP_ROUTE_PARTS = new Set(["__tests__", "tests", "scripts", "dist", "node_modules"]);
 
@@ -32,11 +32,11 @@ function walk(path, output = []) {
 }
 
 function exportedFunctionSource(source, symbol) {
-  const startPattern = new RegExp(`export\\s+async\\s+function\\s+${symbol}\\b`);
+  const startPattern = new RegExp(`export\\s+(?:async\\s+)?function\\s+${symbol}\\b`);
   const match = startPattern.exec(source);
   if (!match) return "";
   const tail = source.slice(match.index + match[0].length);
-  const next = /\nexport\s+async\s+function\s+\w+\b/.exec(tail);
+  const next = /\nexport\s+(?:async\s+)?function\s+\w+\b/.exec(tail);
   return next ? source.slice(match.index, match.index + match[0].length + next.index) : source.slice(match.index);
 }
 
@@ -82,6 +82,18 @@ function validateKernel(root, problems) {
   const auth = read(root, "server/auth.ts");
   const routes = read(root, "server/applications.routes.ts");
   const whatsappRoutes = read(root, "server/whatsapp.routes.ts");
+  const resumeRoutes = read(root, "server/resume.routes.ts");
+  const semanticRoutes = read(root, "server/candidates.semantic.routes.ts");
+  const gcsStorage = read(root, "server/gcs-storage.ts");
+  const candidatesClient = read(root, "client/src/pages/candidates-page.tsx");
+  const applicationsClient = read(root, "client/src/pages/applications-page.tsx");
+  const managementClient = read(root, "client/src/pages/application-management-page.tsx");
+  const internalCopy = read(root, "client/src/lib/internal-copy.ts");
+  const migration = read(root, "server/schema-migrations/0002_resume_access_attempts.sql");
+  const migrationLock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+  const schema = read(root, "shared/schema.ts");
+  const schemaControlTest = read(root, "server/schema-control/__tests__/schemaControl.pg.test.ts");
+  const schemaGuardTest = read(root, "server/schema-control/__tests__/schemaGuard.test.ts");
   const testConfig = read(root, "vitest.server.config.ts");
 
   for (const anchor of [
@@ -98,8 +110,13 @@ function validateKernel(root, problems) {
     "Number.isSafeInteger(parsed)",
   ]) requireAnchor(problems, kernel, anchor, `shared strict application-id parser lost required anchor: ${anchor}`);
 
+  const primaryCteStart = kernel.indexOf("function authorizedApplicationCte(");
+  const resumeCteStart = kernel.indexOf("function authorizedResumeApplicationCte(");
+  const primaryCte = primaryCteStart >= 0 && resumeCteStart > primaryCteStart
+    ? kernel.slice(primaryCteStart, resumeCteStart)
+    : "";
+  requireAnchor(problems, kernel, "WITH authorized_application AS", "authorization read lost its protected CTE.");
   const sharedAnchors = [
-    ["WITH authorized_application AS", "authorization read lost its protected CTE."],
     ["applicationPrivacyAllowed(false)", "authorization read lost the candidate-privacy predicate."],
     ["actor.role = 'recruiter'", "authorization read lost the current recruiter-role predicate."],
     ["actor.role = 'super_admin'", "authorization read lost the explicit platform-admin predicate."],
@@ -112,11 +129,11 @@ function validateKernel(root, problems) {
     ["${jobs.postedBy} = ${actorId}", "authorization read lost primary-recruiter authority."],
     ["FROM ${jobRecruiters}", "authorization read lost exact co-recruiter authority."],
     ["${jobRecruiters.jobId} = ${jobs.id}", "co-recruiter authority is not bound to the exact job."],
-    ["FROM authorized_application", "history is no longer selected through the authorized CTE."],
   ];
-  for (const [anchor, label] of sharedAnchors) requireAnchor(problems, kernel, anchor, label);
-  if (count(kernel, "FROM authorized_application") !== 4) {
-    problems.push("all four protected application readers must read through the authorized CTE.");
+  for (const [anchor, label] of sharedAnchors) requireAnchor(problems, primaryCte, anchor, label);
+  requireAnchor(problems, kernel, "FROM authorized_application", "history is no longer selected through the authorized CTE.");
+  if (count(kernel, "FROM authorized_application") !== 6) {
+    problems.push("all six protected application readers must read through the authorized CTE.");
   }
   if (count(kernel, "LEFT JOIN ${applicationStageHistory}") !== 1
     || count(kernel, "LEFT JOIN ${emailAuditLog}") !== 1
@@ -130,6 +147,8 @@ function validateKernel(root, problems) {
     "readAuthorizedApplicationEmailHistory",
     "readAuthorizedApplicationInterviewInvite",
     "readAuthorizedApplicationWhatsAppHistory",
+    "readAuthorizedApplicationResumeFile",
+    "readAuthorizedApplicationResumeText",
   ]) {
     const source = exportedFunctionSource(kernel, symbol);
     if (!source) problems.push(`authorization reader is missing: ${symbol}`);
@@ -228,6 +247,46 @@ function validateKernel(root, problems) {
   }
   if (count(whatsappReader, "db.execute(") !== 1) {
     problems.push("WhatsApp history must execute exactly one database statement.");
+  }
+
+  const resumeFileReader = exportedFunctionSource(kernel, "readAuthorizedApplicationResumeFile");
+  for (const anchor of [
+    "function authorizedResumeApplicationCte",
+    "actor.role = 'candidate'",
+    "${applications.userId} = ${actorId}",
+    "actor.role = 'hiring_manager'",
+    "${jobs.hiringManagerId} = ${actorId}",
+    "${allowPlatformAdmin} AND actor.role = 'super_admin'",
+    "${applications.resumeUrl} AS resume_url",
+    "${applications.resumeFilename} AS resume_filename",
+    'authorized_application.application_id AS "applicationId"',
+    'authorized_application.organization_id AS "organizationId"',
+    'authorized_application.resume_url AS "resumeUrl"',
+    'authorized_application.resume_filename AS "resumeFilename"',
+  ]) requireAnchor(problems, kernel, anchor, `resume-file authorization anchor is missing: ${anchor}`);
+  if (count(resumeFileReader, "db.execute(") !== 1) {
+    problems.push("resume-file authorization must execute exactly one database statement.");
+  }
+  const resumeFileSelect = resumeFileReader.match(
+    /SELECT authorized_application\.application_id AS "applicationId"[\s\S]*?FROM authorized_application/,
+  )?.[0] ?? "";
+  if (/\b(?:JOIN|FROM)\s+\$\{(?:applications|jobs|users)\}/.test(resumeFileSelect)) {
+    problems.push("resume-file target fields are re-read outside the authorized CTE.");
+  }
+
+  const resumeTextReader = exportedFunctionSource(kernel, "readAuthorizedApplicationResumeText");
+  for (const anchor of [
+    "${applications.resumeId} AS resume_id",
+    "${applications.extractedResumeText} AS application_resume_text",
+    "COALESCE(",
+    "NULLIF(authorized_application.application_resume_text, '')",
+    "NULLIF(${candidateResumes.extractedText}, '')",
+    "LEFT JOIN ${candidateResumes}",
+    "${candidateResumes.id} = authorized_application.resume_id",
+    "text: nullableText(row.text)",
+  ]) requireAnchor(problems, resumeTextReader, anchor, `resume-text authorization anchor is missing: ${anchor}`);
+  if (count(resumeTextReader, "db.execute(") !== 1) {
+    problems.push("resume-text authorization must execute exactly one database statement.");
   }
 
   const emailSelect = kernel.match(/SELECT authorized_application\.application_id AS "authorizedApplicationId",[\s\S]*?FROM authorized_application/g)?.[1] ?? "";
@@ -344,6 +403,131 @@ function validateKernel(root, problems) {
     }
   }
 
+  const resumeFileRoute = routeCall(routes, "get", "/api/applications/:id/resume");
+  if (resumeFileRoute.count !== 1 || !resumeFileRoute.source) {
+    problems.push("route registration must exist exactly once: GET /api/applications/:id/resume");
+  } else {
+    const handler = resumeFileRoute.source;
+    for (const anchor of [
+      "requireAuth", "requireSeat()", "parsePositiveDecimalApplicationId", "INVALID_APPLICATION_ID",
+      "readAuthorizedApplicationResumeFile", "allowPlatformAdmin: true", "APPLICATION_NOT_FOUND",
+      "AUTHORIZATION_UNAVAILABLE", "createResumeAttempt", "downloadBoundApplicationResumeFromGCS",
+      "bindResumeResponseTerminal", "RESUME_NOT_AVAILABLE", "RESUME_UNAVAILABLE",
+    ]) requireAnchor(problems, handler, anchor, `/api/applications/:id/resume lost required handler anchor: ${anchor}`);
+    if (/storage\.(?:getApplication|isRecruiterOnJob)|getUserOrganization|ensureHiringManagerOwnsApplication/.test(handler)) {
+      problems.push("/api/applications/:id/resume restores a check-then-read authorization path.");
+    }
+    if (count(handler, "APPLICATION_NOT_FOUND") !== 2) {
+      problems.push("/api/applications/:id/resume must use APPLICATION_NOT_FOUND for both denied actor and denied object.");
+    }
+    const authorizedAt = handler.indexOf("readAuthorizedApplicationResumeFile");
+    const auditAt = handler.indexOf("createResumeAttempt");
+    const providerAt = handler.indexOf("downloadBoundApplicationResumeFromGCS");
+    if (authorizedAt < 0 || auditAt < authorizedAt || providerAt < auditAt) {
+      problems.push("resume-file authorization/audit/provider order is unsafe.");
+    }
+    if (/console\.(?:log|warn|error)/.test(handler)) {
+      problems.push("resume-file route logs target or provider data.");
+    }
+  }
+
+  const resumeTextRoute = routeCall(resumeRoutes, "get", "/api/applications/:id/resume-text");
+  if (resumeTextRoute.count !== 1 || !resumeTextRoute.source) {
+    problems.push("route registration must exist exactly once: GET /api/applications/:id/resume-text");
+  } else {
+    const handler = resumeTextRoute.source;
+    for (const anchor of [
+      "requireAuth", "requireRole(['recruiter', 'super_admin'])", "requireSeat()",
+      "parsePositiveDecimalApplicationId", "readAuthorizedApplicationResumeText",
+      "APPLICATION_NOT_FOUND", "AUTHORIZATION_UNAVAILABLE", "RESUME_TEXT_NOT_AVAILABLE",
+      "createResumeAccessAttempt", "bindTextResponseTerminal",
+    ]) requireAnchor(problems, handler, anchor, `/api/applications/:id/resume-text lost required handler anchor: ${anchor}`);
+    if (/downloadFromGCS|extractResumeText|storage\.getApplication|db\.(?:query|select|execute)/.test(handler)) {
+      problems.push("resume-text route restores a global or provider-backed read.");
+    }
+  }
+
+  const retiredPatch = routeCall(routes, "patch", "/api/applications/:id/download");
+  if (retiredPatch.count !== 1 || !retiredPatch.source) {
+    problems.push("retired resume download-tracking PATCH registration is missing.");
+  } else {
+    for (const anchor of ["csrfProtection", "requireRole(['recruiter', 'super_admin'])", "requireSeat()", "RESUME_DOWNLOAD_TRACKING_RETIRED"])
+      requireAnchor(problems, retiredPatch.source, anchor, `retired PATCH lost required anchor: ${anchor}`);
+    if (/storage\.|db\.|parsePositiveDecimalApplicationId/.test(retiredPatch.source)) {
+      problems.push("retired resume download-tracking PATCH performs an object read or write.");
+    }
+  }
+
+  const externalProxy = routeCall(semanticRoutes, "get", "/api/candidates/external-resume");
+  if (externalProxy.count !== 1 || !externalProxy.source || !externalProxy.source.includes("EXTERNAL_RESUME_PROXY_RETIRED")) {
+    problems.push("external resume proxy is not a fixed retired registration.");
+  } else if (/req\.query|downloadFromGCS|getSignedDownloadUrl/.test(externalProxy.source)) {
+    problems.push("external resume proxy still consumes a caller locator or provider.");
+  }
+  if (/\blocator\s*:|getSignedDownloadUrl|generateSignedUrl/.test(semanticRoutes)) {
+    problems.push("semantic resume results still emit locators or signed URLs.");
+  }
+  for (const anchor of ["previewUrl: null", "signedUrl: null", "canOpenResume: false"])
+    requireAnchor(problems, semanticRoutes, anchor, `semantic external resume contract lost anchor: ${anchor}`);
+
+  const boundParser = exportedFunctionSource(gcsStorage, "parseBoundApplicationResumeGcsPath");
+  const boundDownload = exportedFunctionSource(gcsStorage, "downloadBoundApplicationResumeFromGCS");
+  for (const anchor of [
+    "GCS_BUCKET_NAME", "GCS_RESUME_CONFIGURATION_UNAVAILABLE", "GCS_RESUME_LOCATOR_REFUSED",
+    "^gs:\\/\\/([^/]+)\\/(resumes\\/(.+))$", "match[1] !== configuredBucket",
+  ]) requireAnchor(problems, boundParser, anchor, `bound GCS parser lost anchor: ${anchor}`);
+  for (const anchor of [
+    "parseBoundApplicationResumeGcsPath(gcsPath)", "storage.bucket(bound.bucket)",
+    "file(bound.object)", "GCS_RESUME_PROVIDER_UNAVAILABLE",
+  ]) requireAnchor(problems, boundDownload, anchor, `bound GCS downloader lost anchor: ${anchor}`);
+  if (/storage\.bucket\(match|storage\.bucket\(parsed/.test(boundDownload)) {
+    problems.push("bound GCS downloader trusts a parsed caller bucket.");
+  }
+
+  if (storage.includes("markApplicationDownloaded")) {
+    problems.push("the dishonest resume download writer remains reachable.");
+  }
+  for (const anchor of [
+    "createResumeAccessAttempt", "terminalizeResumeAccessAttempt", "eq(resumeAccessAttempts.status, 'attempted')",
+    "input.status !== 'completed'", "attempt.deliveryMode !== 'gcs_stream'",
+    "['recruiter', 'hiring_manager'].includes(attempt.actorRole)", "applicationPrivacyAllowed(false)",
+  ]) requireAnchor(problems, storage, anchor, `resume audit repository lost anchor: ${anchor}`);
+
+  for (const anchor of [
+    "CREATE TABLE public.resume_access_attempts", "attempt_id uuid NOT NULL UNIQUE", "ON DELETE SET NULL",
+    "resume_access_attempts_actor_role_check", "resume_access_attempts_delivery_mode_check",
+    "resume_access_attempts_status_check", "resume_access_attempts_terminal_check",
+    "application_id, attempted_at DESC", "actor_user_id, attempted_at DESC",
+  ]) requireAnchor(problems, migration, anchor, `resume audit migration lost anchor: ${anchor}`);
+  for (const anchor of [
+    'pgTable("resume_access_attempts"', 'uuid("attempt_id").notNull().unique()',
+    'index("resume_access_attempts_application_idx")', 'index("resume_access_attempts_actor_idx")',
+    '"resume_access_attempts_terminal_check"',
+  ]) requireAnchor(problems, schema, anchor, `resume audit Drizzle schema lost anchor: ${anchor}`);
+  if (!/^[a-f0-9]{64}$/.test(migrationLock?.migrations?.["0002"] ?? "")) {
+    problems.push("resume audit migration is missing from checksums.lock.");
+  } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
+    problems.push("resume audit migration checksum does not match migration 0002.");
+  }
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0003_${name}.sql`', 'applied: ["0000", "0001", "0002"]'])
+    requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
+  requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
+
+  if (/\/api\/candidates\/external-resume|\blocator\b/.test(candidatesClient)) {
+    problems.push("candidate client still constructs an external locator/proxy request.");
+  }
+  if (!/\/api\/applications\/\$\{[^}]+\.applicationId\}\/resume/.test(candidatesClient)) {
+    problems.push("candidate client lost the authorized local application resume route.");
+  }
+  for (const [file, source] of [["applications-page", applicationsClient], ["application-management-page", managementClient]]) {
+    if (/\/api\/applications\/\$\{[^}]+\}\/download/.test(source)) {
+      problems.push(`${file} restores the retired download-tracking PATCH.`);
+    }
+  }
+  if (/downloadTracked|Download tracked|Download recorded/.test(internalCopy)) {
+    problems.push("client copy still claims human download tracking.");
+  }
+
   requireAnchor(
     problems,
     testConfig,
@@ -375,6 +559,12 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
     problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
+  }
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 6) {
+    problems.push("exactly six statement-bound application read routes must be governed.");
+  }
+  if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 2) {
+    problems.push("exactly two resume registrations must be retired.");
   }
 
   for (const row of [...(manifest.governed_files ?? []), ...(manifest.frozen_files ?? [])]) {

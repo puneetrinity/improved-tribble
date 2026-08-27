@@ -35,6 +35,7 @@ const fixtureFiles = [
   "VantaHireWebsite/server/schema-control/caller-manifest.json",
   "VantaHireWebsite/server/schema-migrations/0000_baseline.sql",
   "VantaHireWebsite/server/schema-migrations/0001_candidate_privacy_flow.sql",
+  "VantaHireWebsite/server/schema-migrations/0002_resume_access_attempts.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
   "VantaHireWebsite/scripts/check-schema-control.mjs",
@@ -101,6 +102,23 @@ const mutations: Array<{
     name: "app db:push alias",
     expected: /legacy Flow schema authority "db:push"/,
     apply(root) { mutateJson(root, "VantaHireWebsite/package.json", (pkg) => { pkg.scripts["db:push"] = "tsx server/scripts/runMigrations.ts"; }); },
+  },
+  {
+    name: "resume-access migration edited after checksum",
+    expected: /applied migration 0002 .* was edited/,
+    apply(root) {
+      const relative = "VantaHireWebsite/server/schema-migrations/0002_resume_access_attempts.sql";
+      write(root, relative, `${readFileSync(join(root, relative), "utf8")}\n-- forbidden drift\n`);
+    },
+  },
+  {
+    name: "resume-access migration omitted from checksum lock",
+    expected: /checksums\.lock versions do not exactly match migration files/,
+    apply(root) {
+      mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
+        delete lock.migrations["0002"];
+      });
+    },
   },
   {
     name: "app db:migrate alias",

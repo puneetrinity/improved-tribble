@@ -15,8 +15,10 @@ const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "schem
 const targetId = "flow-object-authorization-test-target";
 
 type AuthorizationModule = typeof import("../lib/applicationReadAuthorization");
+type StorageModule = typeof import("../storage");
 
 let authorization: AuthorizationModule;
+let storageModule: StorageModule;
 let owner: Client | undefined;
 let runtimePool: { end(): Promise<void> } | undefined;
 let safeTargetProven = false;
@@ -75,10 +77,12 @@ async function databaseState(): Promise<string> {
       'jobs', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM jobs t),
       'job_recruiters', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM job_recruiters t),
       'applications', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM applications t),
+      'candidate_resumes', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM candidate_resumes t),
       'stage_history', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM application_stage_history t),
       'email_history', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM email_audit_log t),
       'whatsapp_templates', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM whatsapp_templates t),
       'whatsapp_history', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM whatsapp_audit_log t),
+      'resume_access_attempts', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM resume_access_attempts t),
       'privacy_requests', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY request_id), '[]'::jsonb) FROM candidate_privacy_requests t),
       'privacy_links', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY request_id), '[]'::jsonb) FROM candidate_privacy_subject_links t),
       'privacy_projection', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY request_id), '[]'::jsonb) FROM candidate_privacy_remote_projection t)
@@ -120,44 +124,46 @@ async function installFixture(): Promise<void> {
       (4,1,104,'member',false,0,0,0,101),
       (5,2,201,'owner',true,0,0,0,NULL);
     INSERT INTO jobs
-      (id,organization_id,title,location,type,description,original_jd,posted_by,is_active,status,slug)
+      (id,organization_id,title,location,type,description,original_jd,posted_by,hiring_manager_id,is_active,status,slug)
     VALUES
-      (1001,1,'Fixture Role One','Remote','full-time','Fixture description','Fixture description',101,false,'pending','fixture-role-one'),
-      (1002,2,'Fixture Role Two','Remote','full-time','Fixture description','Fixture description',201,false,'pending','fixture-role-two'),
-      (1003,NULL,'Null-org Role','Remote','full-time','Fixture description','Fixture description',101,false,'pending','null-org-role'),
-      (1004,2,'Mismatched Role','Remote','full-time','Fixture description','Fixture description',101,false,'pending','mismatched-role');
+      (1001,1,'Fixture Role One','Remote','full-time','Fixture description','Fixture description',101,302,false,'pending','fixture-role-one'),
+      (1002,2,'Fixture Role Two','Remote','full-time','Fixture description','Fixture description',201,NULL,false,'pending','fixture-role-two'),
+      (1003,NULL,'Null-org Role','Remote','full-time','Fixture description','Fixture description',101,NULL,false,'pending','null-org-role'),
+      (1004,2,'Mismatched Role','Remote','full-time','Fixture description','Fixture description',101,NULL,false,'pending','mismatched-role');
     INSERT INTO job_recruiters (id,organization_id,job_id,recruiter_id,added_by) VALUES
       (1,1,1001,102,101);
+    INSERT INTO candidate_resumes (id,user_id,label,gcs_path,extracted_text,is_default)
+    VALUES (9001,301,'Fallback resume','gs://configured/resumes/fallback.pdf','candidate-resume fallback',true);
     INSERT INTO applications
-      (id,organization_id,job_id,user_id,name,email,phone,resume_url,resume_filename,
+      (id,organization_id,job_id,user_id,resume_id,name,email,phone,resume_url,resume_filename,
        extracted_resume_text,cover_letter,status,current_stage,submitted_by_recruiter,
        created_by_user_id,source,source_metadata,whatsapp_consent,
        platform_discovery_consent,consent_captured_at,
        interview_date,interview_time,interview_location,interview_notes)
     VALUES
-      (2001,1,1001,NULL,'Fixture Candidate','fixture@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+      (2001,1,1001,301,NULL,'Fixture Candidate','fixture@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
        'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
        '2099-01-15T00:00:00Z','10:30','Synthetic room','Synthetic authorization proof'),
-      (2002,2,1002,NULL,'Foreign Candidate','foreign-candidate@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
-       'fixture resume',NULL,'submitted',NULL,true,201,'authorization_fixture','{}'::jsonb,false,false,NULL,
+      (2002,2,1002,NULL,NULL,'Foreign Candidate','foreign-candidate@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       NULL,NULL,'submitted',NULL,true,201,'authorization_fixture','{}'::jsonb,false,false,NULL,
        '2099-01-16T00:00:00Z','11:00',NULL,NULL),
-      (2003,NULL,1003,NULL,'Null Candidate','null@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+      (2003,NULL,1003,NULL,NULL,'Null Candidate','null@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
        'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
        NULL,NULL,NULL,NULL),
-      (2004,1,1004,NULL,'Mismatch Candidate','mismatch@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+      (2004,1,1004,NULL,NULL,'Mismatch Candidate','mismatch@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
        'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
        NULL,NULL,NULL,NULL),
-      (2005,1,1001,NULL,'Blocked Candidate','blocked@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+      (2005,1,1001,301,NULL,'Blocked Candidate','blocked@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
        'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
        '2099-01-15T00:00:00Z','10:30',NULL,NULL),
-      (2006,1,1001,NULL,'Review Candidate','review@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+      (2006,1,1001,NULL,NULL,'Review Candidate','review@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
        'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
        '2099-01-15T00:00:00Z','10:30',NULL,NULL),
-      (2007,1,1001,NULL,'Global Optout Candidate','global@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+      (2007,1,1001,NULL,NULL,'Global Optout Candidate','global@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
        'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
        '2099-01-15T00:00:00Z','10:30',NULL,NULL),
-      (2008,1,1001,NULL,'Empty Candidate','empty@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
-       'fixture resume',NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
+      (2008,1,1001,NULL,9001,'Empty Candidate','empty@example.invalid','0000000000','https://invalid/resume','fixture.pdf',
+       NULL,NULL,'submitted',NULL,true,101,'authorization_fixture','{}'::jsonb,false,false,NULL,
        NULL,NULL,NULL,NULL);
     INSERT INTO application_stage_history (id,application_id,from_stage,to_stage,changed_by,notes,changed_at) VALUES
       (3001,2001,NULL,1,101,'Created','2026-08-26T09:00:00Z'),
@@ -267,6 +273,7 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
     process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     authorization = await import("../lib/applicationReadAuthorization");
+    storageModule = await import("../storage");
     runtimePool = (await import("../db")).pool;
   }, 180_000);
 
@@ -304,19 +311,35 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
       { allowPlatformAdmin },
     ));
 
-  it("installs the exact pinned two-migration schema before testing", async () => {
+  const resumeFile = (actorId: number, applicationId: number, allowPlatformAdmin = true) =>
+    readWithoutMutation(() => authorization.readAuthorizedApplicationResumeFile(
+      actorId,
+      applicationId,
+      { allowPlatformAdmin },
+    ));
+
+  const resumeText = (actorId: number, applicationId: number, allowPlatformAdmin = true) =>
+    readWithoutMutation(() => authorization.readAuthorizedApplicationResumeText(
+      actorId,
+      applicationId,
+      { allowPlatformAdmin },
+    ));
+
+  it("installs the exact pinned three-migration schema before testing", async () => {
     if (!owner) throw new Error("Disposable authorization owner is unavailable.");
     const state = (await owner.query(`
       SELECT (SELECT count(*)::int FROM schema_control.applied) AS applied,
              (SELECT data_type FROM information_schema.columns
                WHERE table_schema='public' AND table_name='applications' AND column_name='interview_date') AS interview_type,
              (SELECT count(*)::int FROM information_schema.columns
-               WHERE table_schema='public' AND table_name='candidate_privacy_remote_projection') AS privacy_columns
+               WHERE table_schema='public' AND table_name='candidate_privacy_remote_projection') AS privacy_columns,
+             to_regclass('public.resume_access_attempts')::text AS resume_audit
     `)).rows[0];
     expect(state).toEqual({
-      applied: 2,
+      applied: 3,
       interview_type: "timestamp without time zone",
       privacy_columns: 10,
+      resume_audit: "resume_access_attempts",
     });
   });
 
@@ -526,5 +549,183 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
     await expect(whatsapp(101, 2006)).resolves.toEqual({ ok: false, reason: "not_found" });
     await expect(whatsapp(101, 2007)).resolves.toEqual({ ok: true, rows: [] });
     await expect(whatsapp(101, 2008)).resolves.toEqual({ ok: true, rows: [] });
+  });
+
+  it("applies the full recruiter, hiring-manager, candidate-self, and admin resume-file matrix", async () => {
+    const own = await resumeFile(101, 2001);
+    const co = await resumeFile(102, 2001);
+    const manager = await resumeFile(302, 2001);
+    expect(own).toEqual(co);
+    expect(own).toEqual(manager);
+    expect(own).toEqual({
+      ok: true,
+      resume: {
+        applicationId: 2001,
+        organizationId: 1,
+        resumeUrl: "https://invalid/resume",
+        resumeFilename: "fixture.pdf",
+      },
+    });
+    expect(Object.keys(own.ok ? own.resume : {})).toEqual([
+      "applicationId", "organizationId", "resumeUrl", "resumeFilename",
+    ]);
+
+    for (const actorId of [103, 104, 105, 201]) {
+      await expect(resumeFile(actorId, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    }
+    await expect(resumeFile(302, 2002)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeFile(301, 2001)).resolves.toMatchObject({ ok: true });
+    await expect(resumeFile(301, 2002)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeFile(401, 2001, true)).resolves.toMatchObject({ ok: true });
+    await expect(resumeFile(401, 2001, false)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeFile(101, 999999)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("makes candidate-self independent of privacy while preserving non-candidate structural/privacy denial", async () => {
+    await expect(resumeFile(301, 2005)).resolves.toMatchObject({ ok: true });
+    await expect(resumeFile(101, 2005)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeFile(101, 2006)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeFile(101, 2007)).resolves.toMatchObject({ ok: true });
+    await expect(resumeFile(101, 2003)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeFile(101, 2004)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("returns only stored application text or same-statement candidate-resume fallback", async () => {
+    await expect(resumeText(101, 2001)).resolves.toEqual({
+      ok: true,
+      resume: { applicationId: 2001, organizationId: 1, text: "fixture resume" },
+    });
+    const fallback = await resumeText(101, 2008);
+    expect(fallback).toEqual({
+      ok: true,
+      resume: { applicationId: 2008, organizationId: 1, text: "candidate-resume fallback" },
+    });
+    expect(Object.keys(fallback.ok ? fallback.resume : {})).toEqual([
+      "applicationId", "organizationId", "text",
+    ]);
+    await expect(resumeText(201, 2002)).resolves.toEqual({
+      ok: true,
+      resume: { applicationId: 2002, organizationId: 2, text: null },
+    });
+  });
+
+  it("keeps resume-text on the recruiter/admin matrix and existing privacy fence", async () => {
+    await expect(resumeText(102, 2001)).resolves.toMatchObject({ ok: true });
+    for (const actorId of [103, 104, 105, 201, 301, 302]) {
+      await expect(resumeText(actorId, 2001)).resolves.toEqual({ ok: false, reason: "not_found" });
+    }
+    await expect(resumeText(401, 2001, true)).resolves.toMatchObject({ ok: true });
+    await expect(resumeText(401, 2001, false)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeText(101, 2005)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeText(101, 2006)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeText(101, 2007)).resolves.toMatchObject({ ok: true });
+    await expect(resumeText(101, 2003)).resolves.toEqual({ ok: false, reason: "not_found" });
+    await expect(resumeText(101, 2004)).resolves.toEqual({ ok: false, reason: "not_found" });
+  });
+
+  it("persists one attributable attempt and terminalizes it once with legacy timestamp only on completed stream", async () => {
+    if (!owner) throw new Error("Disposable authorization owner is unavailable.");
+    const attemptId = "30000000-0000-0000-0000-000000000001";
+    await expect(storageModule.storage.createResumeAccessAttempt({
+      attemptId,
+      applicationId: 2001,
+      organizationId: 1,
+      actorUserId: 101,
+      actorRole: "recruiter",
+      deliveryMode: "gcs_stream",
+    })).resolves.toBe(true);
+    await expect(storageModule.storage.terminalizeResumeAccessAttempt({
+      attemptId,
+      status: "completed",
+      responseStatus: 200,
+      failureCode: null,
+      updateLegacyDownloadedAt: true,
+    })).resolves.toBe(true);
+    await expect(storageModule.storage.terminalizeResumeAccessAttempt({
+      attemptId,
+      status: "failed",
+      responseStatus: 500,
+      failureCode: "SECOND_TERMINAL",
+      updateLegacyDownloadedAt: false,
+    })).resolves.toBe(false);
+
+    const state = (await owner.query(`
+      SELECT a.status,a.failure_code,a.response_status,(a.terminal_at IS NOT NULL) AS terminal,
+             (app.downloaded_at IS NOT NULL) AS downloaded,
+             (app.updated_at=app.downloaded_at) AS legacy_atomic
+        FROM resume_access_attempts a
+        JOIN applications app ON app.id=a.application_id
+       WHERE a.attempt_id=$1
+    `, [attemptId])).rows[0];
+    expect(state).toEqual({
+      status: "completed",
+      failure_code: null,
+      response_status: 200,
+      terminal: true,
+      downloaded: true,
+      legacy_atomic: true,
+    });
+  });
+
+  it("does not update legacy timestamps for redirects, failures, candidate, or platform-admin access", async () => {
+    if (!owner) throw new Error("Disposable authorization owner is unavailable.");
+    const cases = [
+      ["30000000-0000-0000-0000-000000000002", 2002, 201, "recruiter", "http_redirect", "redirected", 302, null],
+      ["30000000-0000-0000-0000-000000000003", 2003, 101, "recruiter", "missing", "failed", 404, "RESUME_MISSING"],
+      ["30000000-0000-0000-0000-000000000004", 2005, 301, "candidate", "gcs_stream", "completed", 200, null],
+      ["30000000-0000-0000-0000-000000000005", 2006, 401, "super_admin", "gcs_stream", "completed", 200, null],
+    ] as const;
+    for (const [attemptId, applicationId, actorUserId, actorRole, deliveryMode, status, responseStatus, failureCode] of cases) {
+      await expect(storageModule.storage.createResumeAccessAttempt({
+        attemptId,
+        applicationId,
+        organizationId: applicationId === 2003 ? null : applicationId === 2002 ? 2 : 1,
+        actorUserId,
+        actorRole,
+        deliveryMode,
+      })).resolves.toBe(true);
+      await expect(storageModule.storage.terminalizeResumeAccessAttempt({
+        attemptId,
+        status,
+        responseStatus,
+        failureCode,
+        updateLegacyDownloadedAt: false,
+      })).resolves.toBe(true);
+    }
+    const unchanged = await owner.query(
+      "SELECT count(*)::int AS n FROM applications WHERE id IN (2002,2003,2005,2006) AND downloaded_at IS NULL",
+    );
+    expect(unchanged.rows[0]?.n).toBe(4);
+  });
+
+  it("enforces audit constraints and nulls the application reference on deletion", async () => {
+    if (!owner) throw new Error("Disposable authorization owner is unavailable.");
+    await expect(owner.query(`
+      INSERT INTO resume_access_attempts(attempt_id,actor_role,delivery_mode,status)
+      VALUES ('30000000-0000-0000-0000-000000000006','candidate','raw_object','attempted')
+    `)).rejects.toMatchObject({ code: "23514" });
+
+    await owner.query(`
+      INSERT INTO applications
+        (id,organization_id,job_id,name,email,phone,resume_url,status,source,source_metadata,
+         whatsapp_consent,platform_discovery_consent)
+      VALUES (2099,1,1001,'Delete fixture','delete@example.invalid','0000000000','fixture://delete','submitted',
+              'authorization_fixture','{}'::jsonb,false,false)
+    `);
+    const attemptId = "30000000-0000-0000-0000-000000000007";
+    await expect(storageModule.storage.createResumeAccessAttempt({
+      attemptId,
+      applicationId: 2099,
+      organizationId: 1,
+      actorUserId: 101,
+      actorRole: "recruiter",
+      deliveryMode: "missing",
+    })).resolves.toBe(true);
+    await owner.query("DELETE FROM applications WHERE id=2099");
+    const row = (await owner.query(
+      "SELECT application_id,organization_id,actor_user_id,status FROM resume_access_attempts WHERE attempt_id=$1",
+      [attemptId],
+    )).rows[0];
+    expect(row).toEqual({ application_id: null, organization_id: 1, actor_user_id: 101, status: "attempted" });
   });
 });

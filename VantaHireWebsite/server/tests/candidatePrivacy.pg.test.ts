@@ -241,7 +241,7 @@ describe.skipIf(!enabled)("candidate privacy disposable PostgreSQL", () => {
       expect(after.rows[0]).toEqual(before.rows[0]);
       expect((await migration.query(
         "SELECT COUNT(*)::integer AS applied FROM schema_control.applied",
-      )).rows[0]?.applied).toBe(2);
+      )).rows[0]?.applied).toBe(3);
     } finally {
       await migration.end();
       await runtime.end();

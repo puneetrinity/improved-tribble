@@ -16,7 +16,12 @@ import type { Multer } from 'multer';
 import { sql, eq, and, inArray, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
-import { storage } from './storage';
+import {
+  storage,
+  type ResumeAccessActorRole,
+  type ResumeAccessDeliveryMode,
+  type ResumeAccessTerminalStatus,
+} from './storage';
 import { requireAuth, requireRole, requireSeat, requireVerifiedCandidate } from './auth';
 import { getUserOrganization } from './lib/organizationService';
 import { calculateAiCost } from './lib/aiMatchingEngine';
@@ -41,7 +46,11 @@ import {
   type Job,
   type JobSourcedCandidate,
 } from '@shared/schema';
-import { uploadToGCS, getSignedDownloadUrl, downloadFromGCS } from './gcs-storage';
+import {
+  uploadToGCS,
+  downloadFromGCS,
+  downloadBoundApplicationResumeFromGCS,
+} from './gcs-storage';
 import {
   sendStatusUpdateNotification,
   sendInterviewInvitationNotification,
@@ -72,6 +81,7 @@ import {
 import {
   readAuthorizedApplicationEmailHistory,
   readAuthorizedApplicationInterviewInvite,
+  readAuthorizedApplicationResumeFile,
   readAuthorizedApplicationStageHistory,
 } from './lib/applicationReadAuthorization';
 
@@ -82,6 +92,84 @@ function parsePositiveDecimalApplicationId(value: unknown): number | null {
   if (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value)) return null;
   const parsed = Number(value);
   return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function resumeActorRole(value: unknown): ResumeAccessActorRole | null {
+  return typeof value === 'string'
+    && ['recruiter', 'hiring_manager', 'candidate', 'super_admin'].includes(value)
+    ? value as ResumeAccessActorRole
+    : null;
+}
+
+function safeResumeFilename(value: string | null): string {
+  const normalized = (value ?? 'resume.pdf')
+    .replace(/[\u0000-\u001f\u007f"\\/]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180);
+  return normalized || 'resume.pdf';
+}
+
+function resumeContentType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  if (ext === 'pdf') return 'application/pdf';
+  if (ext === 'docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (ext === 'doc') return 'application/msword';
+  return 'application/octet-stream';
+}
+
+async function createResumeAttempt(input: {
+  attemptId: string;
+  applicationId: number;
+  organizationId: number | null;
+  actorUserId: number;
+  actorRole: ResumeAccessActorRole;
+  deliveryMode: ResumeAccessDeliveryMode;
+}): Promise<boolean> {
+  try {
+    return await storage.createResumeAccessAttempt(input);
+  } catch {
+    return false;
+  }
+}
+
+async function terminalizeResumeAttempt(input: {
+  attemptId: string;
+  status: ResumeAccessTerminalStatus;
+  responseStatus: number;
+  failureCode?: string | null;
+  updateLegacyDownloadedAt: boolean;
+}): Promise<boolean> {
+  try {
+    return await storage.terminalizeResumeAccessAttempt(input);
+  } catch {
+    return false;
+  }
+}
+
+function bindResumeResponseTerminal(input: {
+  res: Response;
+  attemptId: string;
+  successStatus: 'completed' | 'redirected';
+  responseStatus: number;
+  updateLegacyDownloadedAt: boolean;
+}): void {
+  let terminalScheduled = false;
+  const settle = (status: ResumeAccessTerminalStatus, responseStatus: number, failureCode?: string) => {
+    if (terminalScheduled) return;
+    terminalScheduled = true;
+    void terminalizeResumeAttempt({
+      attemptId: input.attemptId,
+      status,
+      responseStatus,
+      failureCode: failureCode ?? null,
+      updateLegacyDownloadedAt: status === 'completed' && input.updateLegacyDownloadedAt,
+    });
+  };
+  input.res.once('finish', () => settle(input.successStatus, input.responseStatus));
+  input.res.once('close', () => {
+    if (!input.res.writableFinished) settle('failed', 499, 'RESPONSE_CLOSED');
+  });
 }
 
 async function requireApplicationIngestAllowed(input: {
@@ -1288,106 +1376,123 @@ export function registerApplicationsRoutes(
     }
   });
 
-  // Secure resume download via permission-gated redirect
-  app.get("/api/applications/:id/resume", requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const applicationId = Number(idParam);
-      if (!Number.isFinite(applicationId) || applicationId <= 0 || !Number.isInteger(applicationId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
-        return;
-      }
-
-      const appRecord = await storage.getApplication(applicationId);
-      if (!appRecord) {
-        res.status(404).json({ error: 'Application not found' });
-        return;
-      }
-
-      // Permission checks
-      const role = req.user!.role;
-      if (role === 'super_admin') {
-        // allowed
-      } else if (role === 'recruiter') {
-        // Get user's organization for access control
-        const orgResult = await getUserOrganization(req.user!.id);
-        const userOrgId = orgResult?.organization.id;
-        // Use isRecruiterOnJob to check access (includes co-recruiters)
-        const hasAccess = await storage.isRecruiterOnJob(appRecord.jobId, req.user!.id, userOrgId);
-        if (!hasAccess) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
-        await storage.markApplicationDownloaded(applicationId);
-      } else if (role === 'hiring_manager') {
-        const access = await ensureHiringManagerOwnsApplication(req.user!.id, applicationId);
-        if (!access.ok) {
-          res.status(access.status).json({ error: access.error });
-          return;
-        }
-        await storage.markApplicationDownloaded(applicationId);
-      } else if (role === 'candidate') {
-        if (!appRecord.userId || appRecord.userId !== req.user!.id) {
-          res.status(403).json({ error: 'Access denied' });
-          return;
-        }
-      } else {
-        res.status(403).json({ error: 'Access denied' });
-        return;
-      }
-
-      const url = appRecord.resumeUrl;
-      if (!url) {
-        res.status(404).json({ error: 'Resume not available' });
-        return;
-      }
-
-      // Stream PDF through server to allow iframe embedding (avoids GCS X-Frame-Options)
-      if (url.startsWith('gs://')) {
-        try {
-          const buffer = await downloadFromGCS(url);
-          const filename = appRecord.resumeFilename || 'resume.pdf';
-          const ext = filename.split('.').pop()?.toLowerCase() || 'pdf';
-          const contentType =
-            ext === 'pdf'
-              ? 'application/pdf'
-              : ext === 'docx'
-                ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-                : ext === 'doc'
-                  ? 'application/msword'
-                  : 'application/octet-stream';
-          const downloadParam = req.query.download;
-          const forceDownload = downloadParam === '1' || downloadParam === 'true';
-          const disposition = forceDownload || ext !== 'pdf' ? 'attachment' : 'inline';
-
-          // Allow embedding in iframes from same origin only (security fix)
-          res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-          res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
-          res.setHeader('Content-Type', contentType);
-          res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
-          res.setHeader('Content-Length', buffer.length);
-          res.send(buffer);
-          return;
-        } catch (gcsError) {
-          console.error('[Resume] GCS download failed:', gcsError);
-          res.status(500).json({ error: 'Failed to retrieve resume' });
-          return;
-        }
-      } else if (/^https?:\/\//i.test(url)) {
-        // External URL - redirect (can't proxy arbitrary URLs)
-        res.redirect(302, url);
-        return;
-      } else {
-        res.status(404).json({ error: 'Resume not available' });
-        return;
-      }
-    } catch (error) {
-      next(error);
+  // Application-bound resume delivery with statement-bound actor/object authorization.
+  app.get("/api/applications/:id/resume", requireAuth, requireSeat(), async (req: Request, res: Response): Promise<void> => {
+    const applicationId = parsePositiveDecimalApplicationId(req.params.id);
+    if (applicationId === null) {
+      res.status(400).json({ code: 'INVALID_APPLICATION_ID' });
+      return;
     }
+
+    const actorRole = resumeActorRole(req.user?.role);
+    if (!actorRole) {
+      res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+      return;
+    }
+
+    const authorized = await readAuthorizedApplicationResumeFile(
+      req.user!.id,
+      applicationId,
+      { allowPlatformAdmin: true },
+    );
+    if (!authorized.ok) {
+      if (authorized.reason === 'not_found') {
+        res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+      } else {
+        res.status(503).json({ code: 'AUTHORIZATION_UNAVAILABLE' });
+      }
+      return;
+    }
+
+    const url = authorized.resume.resumeUrl?.trim() ?? '';
+    const deliveryMode: ResumeAccessDeliveryMode = !url
+      ? 'missing'
+      : url.startsWith('gs://')
+        ? 'gcs_stream'
+        : /^https?:\/\//i.test(url)
+          ? 'http_redirect'
+          : 'unsupported';
+    const attemptId = randomUUID();
+    const auditReady = await createResumeAttempt({
+      attemptId,
+      applicationId: authorized.resume.applicationId,
+      organizationId: authorized.resume.organizationId,
+      actorUserId: req.user!.id,
+      actorRole,
+      deliveryMode,
+    });
+    if (!auditReady) {
+      res.status(503).json({ code: 'AUDIT_UNAVAILABLE' });
+      return;
+    }
+
+    if (deliveryMode === 'missing' || deliveryMode === 'unsupported') {
+      const terminal = await terminalizeResumeAttempt({
+        attemptId,
+        status: 'failed',
+        responseStatus: 404,
+        failureCode: deliveryMode === 'missing' ? 'RESUME_MISSING' : 'RESUME_SCHEME_UNSUPPORTED',
+        updateLegacyDownloadedAt: false,
+      });
+      if (!terminal) {
+        res.status(503).json({ code: 'AUDIT_UNAVAILABLE' });
+        return;
+      }
+      res.status(404).json({ code: 'RESUME_NOT_AVAILABLE' });
+      return;
+    }
+
+    if (deliveryMode === 'http_redirect') {
+      bindResumeResponseTerminal({
+        res,
+        attemptId,
+        successStatus: 'redirected',
+        responseStatus: 302,
+        updateLegacyDownloadedAt: false,
+      });
+      res.redirect(302, url);
+      return;
+    }
+
+    let buffer: Buffer;
+    try {
+      buffer = await downloadBoundApplicationResumeFromGCS(url);
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      const locatorRefused = code === 'GCS_RESUME_LOCATOR_REFUSED';
+      const responseStatus = locatorRefused ? 404 : 503;
+      const terminal = await terminalizeResumeAttempt({
+        attemptId,
+        status: 'failed',
+        responseStatus,
+        failureCode: locatorRefused ? 'RESUME_SCOPE_REFUSED' : 'RESUME_PROVIDER_UNAVAILABLE',
+        updateLegacyDownloadedAt: false,
+      });
+      if (!terminal) {
+        res.status(503).json({ code: 'AUDIT_UNAVAILABLE' });
+        return;
+      }
+      res.status(responseStatus).json({ code: locatorRefused ? 'RESUME_NOT_AVAILABLE' : 'RESUME_UNAVAILABLE' });
+      return;
+    }
+
+    const filename = safeResumeFilename(authorized.resume.resumeFilename);
+    const contentType = resumeContentType(filename);
+    const forceDownload = req.query.download === '1' || req.query.download === 'true';
+    const disposition = forceDownload || contentType !== 'application/pdf' ? 'attachment' : 'inline';
+    bindResumeResponseTerminal({
+      res,
+      attemptId,
+      successStatus: 'completed',
+      responseStatus: 200,
+      updateLegacyDownloadedAt: actorRole === 'recruiter' || actorRole === 'hiring_manager',
+    });
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self'");
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${filename}"`);
+    res.setHeader('Content-Length', buffer.length);
+    res.status(200).send(buffer);
   });
 
   // ============= PIPELINE MANAGEMENT ROUTES =============
@@ -2871,52 +2976,8 @@ export function registerApplicationsRoutes(
     }
   });
 
-  // Mark application as downloaded (when resume is downloaded)
-  app.patch("/api/applications/:id/download", csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const applicationId = Number(idParam);
-
-      if (!Number.isFinite(applicationId) || applicationId <= 0 || !Number.isInteger(applicationId)) {
-        res.status(400).json({ error: "Invalid application ID" });
-        return;
-      }
-
-      if (req.user!.role !== 'super_admin') {
-        // Get user's organization for access control
-        const orgResult = await getUserOrganization(req.user!.id);
-        const userOrgId = orgResult?.organization.id;
-
-        const application = await storage.getApplication(applicationId);
-        if (!application) {
-          res.status(404).json({ error: "Application not found" });
-          return;
-        }
-
-        // Use isRecruiterOnJob to check access (includes co-recruiters)
-        const hasAccess = await storage.isRecruiterOnJob(application.jobId, req.user!.id, userOrgId);
-        if (!hasAccess) {
-          res.status(403).json({ error: "Access denied" });
-          return;
-        }
-      }
-
-      const application = await storage.markApplicationDownloaded(applicationId);
-
-      if (!application) {
-        res.status(404).json({ error: "Application not found" });
-        return;
-      }
-
-      res.json(application);
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.patch("/api/applications/:id/download", csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), (_req: Request, res: Response): void => {
+    res.status(410).json({ code: 'RESUME_DOWNLOAD_TRACKING_RETIRED' });
   });
 
   // ============= CANDIDATE DASHBOARD ROUTES =============

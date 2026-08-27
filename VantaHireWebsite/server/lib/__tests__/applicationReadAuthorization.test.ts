@@ -11,6 +11,8 @@ import {
   parsePositiveDecimalApplicationId,
   readAuthorizedApplicationEmailHistory,
   readAuthorizedApplicationInterviewInvite,
+  readAuthorizedApplicationResumeFile,
+  readAuthorizedApplicationResumeText,
   readAuthorizedApplicationStageHistory,
   readAuthorizedApplicationWhatsAppHistory,
 } from "../applicationReadAuthorization";
@@ -322,6 +324,88 @@ describe("application read authorization kernel", () => {
       {} as { allowPlatformAdmin: boolean },
     )).resolves.toEqual({ ok: false, reason: "unavailable" });
     expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns only the statement-bound resume-file projection", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      applicationId: 9,
+      organizationId: 3,
+      resumeUrl: "gs://configured/resumes/fixture.pdf",
+      resumeFilename: "fixture.pdf",
+      candidateEmail: "forbidden@example.invalid",
+    }] });
+    const result = await readAuthorizedApplicationResumeFile(7, 9, allowAdmin);
+    expect(result).toEqual({
+      ok: true,
+      resume: {
+        applicationId: 9,
+        organizationId: 3,
+        resumeUrl: "gs://configured/resumes/fixture.pdf",
+        resumeFilename: "fixture.pdf",
+      },
+    });
+    expect(Object.keys(result.ok ? result.resume : {})).toEqual([
+      "applicationId", "organizationId", "resumeUrl", "resumeFilename",
+    ]);
+    expect(JSON.stringify(result)).not.toContain("forbidden");
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("allows a candidate-self file projection with a null organization", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      applicationId: 9,
+      organizationId: null,
+      resumeUrl: null,
+      resumeFilename: null,
+    }] });
+    await expect(readAuthorizedApplicationResumeFile(7, 9, allowAdmin)).resolves.toEqual({
+      ok: true,
+      resume: { applicationId: 9, organizationId: null, resumeUrl: null, resumeFilename: null },
+    });
+  });
+
+  it("returns stored resume text and preserves an authorized missing-text result", async () => {
+    execute
+      .mockResolvedValueOnce({ rows: [{ applicationId: 9, organizationId: 3, text: "Stored text" }] })
+      .mockResolvedValueOnce({ rows: [{ applicationId: 9, organizationId: 3, text: null }] });
+    const available = await readAuthorizedApplicationResumeText(7, 9, allowAdmin);
+    expect(available).toEqual({
+      ok: true,
+      resume: { applicationId: 9, organizationId: 3, text: "Stored text" },
+    });
+    expect(Object.keys(available.ok ? available.resume : {})).toEqual([
+      "applicationId", "organizationId", "text",
+    ]);
+    await expect(readAuthorizedApplicationResumeText(7, 9, allowAdmin)).resolves.toEqual({
+      ok: true,
+      resume: { applicationId: 9, organizationId: 3, text: null },
+    });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["file", readAuthorizedApplicationResumeFile],
+    ["text", readAuthorizedApplicationResumeText],
+  ] as const)("fails closed for absent, duplicate, malformed, database, and input %s reads", async (_kind, reader) => {
+    execute.mockResolvedValueOnce({ rows: [] });
+    await expect(reader(7, 9, allowAdmin)).resolves.toEqual({ ok: false, reason: "not_found" });
+
+    const valid = _kind === "file"
+      ? { applicationId: 9, organizationId: 3, resumeUrl: null, resumeFilename: null }
+      : { applicationId: 9, organizationId: 3, text: null };
+    execute.mockResolvedValueOnce({ rows: [valid, valid] });
+    await expect(reader(7, 9, allowAdmin)).resolves.toEqual({ ok: false, reason: "unavailable" });
+
+    execute.mockResolvedValueOnce({ rows: [{ ...valid, applicationId: "9" }] });
+    await expect(reader(7, 9, allowAdmin)).resolves.toEqual({ ok: false, reason: "unavailable" });
+
+    execute.mockRejectedValueOnce(new Error("postgres://raw-secret resume-object"));
+    const failed = await reader(7, 9, allowAdmin);
+    expect(failed).toEqual({ ok: false, reason: "unavailable" });
+    expect(JSON.stringify(failed)).not.toContain("raw-secret");
+
+    await expect(reader(0, 9, allowAdmin)).resolves.toEqual({ ok: false, reason: "unavailable" });
+    expect(execute).toHaveBeenCalledTimes(4);
   });
 
   it.each([
