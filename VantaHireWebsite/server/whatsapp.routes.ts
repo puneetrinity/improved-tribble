@@ -10,11 +10,11 @@
 
 import type { Express, Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
-import { eq, desc } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
 import { storage } from './storage';
-import { requireRole } from './auth';
+import { requireRole, requireSeat } from './auth';
 import { whatsappTemplates, whatsappAuditLog } from '@shared/schema';
 import { queueMauticOutreachSync } from './lib/mauticService';
 import {
@@ -22,6 +22,10 @@ import {
   getAllWhatsAppTemplates,
 } from './whatsappTemplateService';
 import { getWhatsAppService } from './whatsappService';
+import {
+  parsePositiveDecimalApplicationId,
+  readAuthorizedApplicationWhatsAppHistory,
+} from './lib/applicationReadAuthorization';
 import type { CsrfMiddleware } from './types/routes';
 
 // Validation schemas
@@ -205,37 +209,30 @@ export function registerWhatsAppRoutes(
   app.get(
     '/api/applications/:id/whatsapp-history',
     requireRole(['recruiter', 'super_admin']),
+    requireSeat(),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const idParam = req.params.id;
-        if (!idParam) {
-          res.status(400).json({ error: 'Missing ID parameter' });
+        const appId = parsePositiveDecimalApplicationId(req.params.id);
+        if (appId === null) {
+          res.status(400).json({ error: 'Invalid application id', code: 'INVALID_APPLICATION_ID' });
           return;
         }
 
-        const appId = Number(idParam);
-        if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-          res.status(400).json({ error: 'Invalid ID parameter' });
+        const result = await readAuthorizedApplicationWhatsAppHistory(
+          req.user!.id,
+          appId,
+          { allowPlatformAdmin: true },
+        );
+        if (!result.ok) {
+          if (result.reason === 'not_found') {
+            res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+          } else {
+            res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+          }
           return;
         }
 
-        // Verify application exists
-        const application = await storage.getApplication(appId);
-        if (!application) {
-          res.status(404).json({ error: 'Application not found' });
-          return;
-        }
-
-        // Get WhatsApp history
-        const history = await db.query.whatsappAuditLog.findMany({
-          where: eq(whatsappAuditLog.applicationId, appId),
-          with: {
-            template: true,
-          },
-          orderBy: [desc(whatsappAuditLog.sentAt)],
-        });
-
-        res.json(history);
+        res.json(result.rows);
       } catch (e) {
         next(e);
       }

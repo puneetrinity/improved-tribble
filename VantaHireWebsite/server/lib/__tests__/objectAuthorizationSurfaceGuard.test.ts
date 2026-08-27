@@ -95,6 +95,13 @@ describe("object authorization surface guard", () => {
     expect(problems).toContain("application organization can be null.");
   });
 
+  it("rejects nullable job organization", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${jobs.organizationId} IS NOT NULL", "TRUE"),
+    );
+    expect(problems).toContain("job organization can be null.");
+  });
+
   it("rejects loss of seat enforcement", () => {
     const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
       source.replace("${organizationMembers.seatAssigned} = TRUE", "TRUE"),
@@ -127,7 +134,7 @@ describe("object authorization surface guard", () => {
     const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
       source.replace("FROM authorized_application", "FROM applications"),
     );
-    expect(problems).toContain("all three protected application readers must read through the authorized CTE.");
+    expect(problems).toContain("all four protected application readers must read through the authorized CTE.");
   });
 
   it("rejects a raw email subject projection", () => {
@@ -259,5 +266,124 @@ describe("object authorization surface guard", () => {
       `${source}\n// forbidden generator drift\n`,
     );
     expect(problems).toContain("governed/frozen file drifted: server/lib/icsGenerator.ts");
+  });
+
+  it("rejects loss of the WhatsApp route seat gate", () => {
+    const problems = mutate(fixture(), "server/whatsapp.routes.ts", (source) =>
+      source.replace(
+        "    requireSeat(),\n    async (req: Request, res: Response, next: NextFunction): Promise<void> => {\n      try {\n        const appId = parsePositiveDecimalApplicationId(req.params.id);",
+        "    async (req: Request, res: Response, next: NextFunction): Promise<void> => {\n      try {\n        const appId = parsePositiveDecimalApplicationId(req.params.id);",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/whatsapp-history lost required handler anchor: requireSeat()",
+    );
+  });
+
+  it("rejects an id-only application read restored in the WhatsApp route", () => {
+    const problems = mutate(fixture(), "server/whatsapp.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedApplicationWhatsAppHistory(",
+        "await storage.getApplication(appId);\n        const result = await readAuthorizedApplicationWhatsAppHistory(",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/whatsapp-history reaches an id-only or raw history read.",
+    );
+  });
+
+  it("rejects a raw WhatsApp audit query restored in the handler", () => {
+    const problems = mutate(fixture(), "server/whatsapp.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedApplicationWhatsAppHistory(",
+        "await db.query.whatsappAuditLog.findMany();\n        const result = await readAuthorizedApplicationWhatsAppHistory(",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/whatsapp-history reaches an id-only or raw history read.",
+    );
+  });
+
+  it("rejects a permissive shared application-id parser", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("!/^[1-9][0-9]*$/.test(value)", "false"),
+    );
+    expect(problems).toContain(
+      "shared strict application-id parser lost required anchor: !/^[1-9][0-9]*$/.test(value)",
+    );
+  });
+
+  it("rejects a WhatsApp response moved before authorization", () => {
+    const problems = mutate(fixture(), "server/whatsapp.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedApplicationWhatsAppHistory(",
+        "res.json(result.rows);\n        const result = await readAuthorizedApplicationWhatsAppHistory(",
+      ),
+    );
+    expect(problems).toContain("WhatsApp history responds before statement-bound authorization.");
+  });
+
+  it("rejects loss of application-job organization equality", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${applications.organizationId} = ${jobs.organizationId}", "TRUE"),
+    );
+    expect(problems).toContain("application and job organization can diverge.");
+  });
+
+  it("rejects loss of current organization membership", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("FROM ${organizationMembers}", "FROM ${users}"),
+    );
+    expect(problems).toContain("authorization read lost current organization membership.");
+  });
+
+  it("rejects loss of exact co-recruiter job binding", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${jobRecruiters.jobId} = ${jobs.id}", "TRUE"),
+    );
+    expect(problems).toContain("co-recruiter authority is not bound to the exact job.");
+  });
+
+  it("rejects loss of the WhatsApp authorized-empty audit join", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("LEFT JOIN ${whatsappAuditLog}", "INNER JOIN ${whatsappAuditLog}"),
+    );
+    expect(problems).toContain("authorized-empty sentinel joins are incomplete.");
+    expect(problems).toContain("WhatsApp projection anchor is missing: LEFT JOIN ${whatsappAuditLog}");
+  });
+
+  it("rejects a forbidden raw WhatsApp recipient projection", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace(
+        "${whatsappAuditLog.status} AS status,",
+        '${whatsappAuditLog.status} AS status,\n             ${whatsappAuditLog.recipientPhone} AS "recipientPhone",',
+      ),
+    );
+    expect(problems).toContain("WhatsApp history selects a forbidden raw audit or template field.");
+  });
+
+  it("rejects loss of deterministic WhatsApp ordering", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${whatsappAuditLog.id} DESC NULLS LAST", "${whatsappAuditLog.id} ASC NULLS LAST"),
+    );
+    expect(problems).toContain(
+      "WhatsApp projection anchor is missing: ${whatsappAuditLog.id} DESC NULLS LAST",
+    );
+  });
+
+  it("rejects WhatsApp denial-code drift", () => {
+    const problems = mutate(fixture(), "server/whatsapp.routes.ts", (source) =>
+      source.replace("APPLICATION_NOT_FOUND", "FOREIGN_APPLICATION"),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/whatsapp-history lost required handler anchor: APPLICATION_NOT_FOUND",
+    );
+  });
+
+  it("rejects drift in any frozen non-history WhatsApp route block", () => {
+    const problems = mutate(fixture(), "server/whatsapp.routes.ts", (source) =>
+      source.replace("getAllWhatsAppTemplates();", "getAllWhatsAppTemplates(/* forbidden drift */);"),
+    );
+    expect(problems).toContain("frozen WhatsApp route block drifted: GET /api/whatsapp/templates");
   });
 });
