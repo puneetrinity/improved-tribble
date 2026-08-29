@@ -46,15 +46,15 @@
     { "method": "get", "path": "/api/candidates/external-resume", "code": "EXTERNAL_RESUME_PROXY_RETIRED" }
   ],
   "governed_files": [
-    { "file": "../.github/workflows/ci.yml", "sha256": "bb7049744d295ce49405ab5250ee701d8d799795a5bd650ccdb55a67c075e57f" },
+    { "file": "../.github/workflows/ci.yml", "sha256": "ae8172202f6f6fa60e7976ec0866be8378c8ae47eea23819b88092bfffcf1ac1" },
     { "file": "package.json", "sha256": "7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe" },
     { "file": "vitest.server.config.ts", "sha256": "aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe" },
-    { "file": "server/applications.routes.ts", "sha256": "8975f858a432e85d8caf0592c77289b165bc1e77473d0f46535aace5a5f03476" },
+    { "file": "server/applications.routes.ts", "sha256": "d49af5b3f9f76d0b5521b381a6a8febe5921ce722c2d633975914cd6b0fdf41f" },
     { "file": "server/resume.routes.ts", "sha256": "8a85106836a3bb681e66e1a25bf0dcedeb8181e00b4bbb669c1b8e85c446d26e" },
     { "file": "server/candidates.semantic.routes.ts", "sha256": "9116127419c1f515d11d504786408ef1f2622e9365a74ec55f0fb93b70059a4a" },
     { "file": "server/gcs-storage.ts", "sha256": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802" },
     { "file": "server/auth.ts", "sha256": "634a9771eb8ad36a49ecd81f11a7d0d71b41bdfdec6893ddb301ec629ae42bd8" },
-    { "file": "server/candidate-privacy/surfaces.json", "sha256": "4ad48a872c81f782bbc4116ffbd8be9137983d56a5a4c12b558ab28200091b98" },
+    { "file": "server/candidate-privacy/surfaces.json", "sha256": "22d252e7f2425afc3f916be22774b856b9de16554ba30cced0ca32fa41ba880b" },
     { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "6fe7a1bed64866da80b94ad2a52f69c8dd82a16b94d06d081f7a59d92c609762" },
     { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "2569f0f88677170d67df61afafdb4a8ca70c0d97880c61d56ace79537a3a9d63" },
     { "file": "server/lib/__tests__/resumeAccessAuthorization.routes.test.ts", "sha256": "a607c1f9b019e5b23327aa8f14fc5305bb4201e6bff68ceb428cd65a6634320c" },

@@ -18,6 +18,7 @@ import { candidateResumes, applications, jobs, users, BatchFitResult } from '../
 import { eq, and, inArray, sql, desc, count } from 'drizzle-orm';
 import { upload, uploadToGCS, downloadFromGCS } from './gcs-storage';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
+import { extractResumeForOrdinaryIngest } from './lib/resumeIngestExtraction';
 import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { computeFitScore, isFitStale, getStalenessReason } from './lib/aiMatchingEngine';
 import {
@@ -393,21 +394,28 @@ export function registerAIRoutes(app: Express): void {
        return;
         }
 
-        // Extract text from resume
-        const extractionResult = await extractResumeText(file.buffer);
+        // Extract text before upload. OCR is reached only after a fresh privacy recheck.
+        const extractionResult = await extractResumeForOrdinaryIngest(file.buffer, {
+          beforeOcr: () => requireCandidatePrivacyAllowed(
+            { type: 'candidate_user', id: userId },
+            { globalUse: true, newGlobalOperation: true },
+          ),
+        });
 
-        if (!extractionResult.success) {
-          // Use 415 Unsupported Media Type for file type errors, 400 for other issues
-          const isUnsupportedType = extractionResult.error?.includes('Unsupported file type');
-          res.status(isUnsupportedType ? 415 : 400).json({
-            error: 'Resume extraction failed',
-            message: extractionResult.error,
-          });
-       return;
+        if (!extractionResult.success
+            && extractionResult.reasonCode === 'NATIVE_UNSUPPORTED_FOR_OCR') {
+          res.status(415).json({ error: 'Resume extraction failed' });
+          return;
         }
-
-        // Validate extracted text
-        if (!validateResumeText(extractionResult.text)) {
+        if (!extractionResult.success
+            && extractionResult.reasonCode !== 'NO_EXTRACTABLE_TEXT') {
+          res.status(503).json({
+            error: 'Resume extraction unavailable',
+            code: 'RESUME_EXTRACTION_UNAVAILABLE',
+          });
+          return;
+        }
+        if (!extractionResult.success) {
           res.status(400).json({
             error: 'Invalid resume',
             message: 'Resume must contain at least 50 characters of text.',
