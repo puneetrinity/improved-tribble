@@ -755,6 +755,7 @@ export function setupAuth(app: Express) {
       res.json({
         message: "Email verified successfully. You can now log in.",
         verified: true,
+        role: user.role,
       });
     } catch (error) {
       next(error);

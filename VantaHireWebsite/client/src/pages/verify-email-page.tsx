@@ -13,6 +13,7 @@ export default function VerifyEmailPage() {
   const searchString = useSearch();
   const [state, setState] = useState<VerificationState>("ready");
   const [message, setMessage] = useState("");
+  const [role, setRole] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
   const token = params?.token;
@@ -22,9 +23,15 @@ export default function VerifyEmailPage() {
     return searchParams.get("invite");
   }, [searchString]);
 
+  // Route the post-verification "Login" button to the correct portal: a
+  // recruiter co-recruiter invite stays on recruiter auth; a verified candidate
+  // goes to candidate auth; everything else (recruiter self-signup / unknown
+  // role) keeps the recruiter default.
   const redirectUrl = inviteToken
     ? `/recruiter-auth?invite=${inviteToken}`
-    : "/recruiter-auth";
+    : role === "candidate"
+      ? "/candidate-auth"
+      : "/recruiter-auth";
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 200);
@@ -50,6 +57,7 @@ export default function VerifyEmailPage() {
       if (response.ok && data.verified) {
         setState("success");
         setMessage(data.message || "Your email has been verified successfully!");
+        setRole(typeof data.role === "string" ? data.role : null);
       } else if (data.code === "VERIFICATION_TOKEN_EXPIRED") {
         setState("expired");
         setMessage(data.error || "Your verification link has expired.");
