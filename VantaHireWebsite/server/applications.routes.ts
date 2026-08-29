@@ -1208,7 +1208,7 @@ export function registerApplicationsRoutes(
   );
 
   // Get applications for a specific job (recruiters only) - with org verification
-  app.get("/api/jobs/:id/applications", requireRole(['recruiter', 'super_admin']), requireSeat({ allowNoOrg: true }), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  app.get("/api/jobs/:id/applications", requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const idParam = req.params.id;
       if (!idParam) {

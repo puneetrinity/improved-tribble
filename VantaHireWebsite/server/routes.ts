@@ -3,10 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { eq, and, or, gt, isNull, sql } from "drizzle-orm";
-import { insertContactSchema, jobs, users, organizationMembers, hiringManagerInvitations } from "@shared/schema";
+import { insertContactSchema, jobs } from "@shared/schema";
 import { z } from "zod";
 import { getEmailService } from "./simpleEmailService";
-import { setupAuth, requireRole } from "./auth";
+import { setupAuth, requireRole, requireSeat } from "./auth";
 import { upload } from "./gcs-storage";
 import { isAIEnabled } from "./aiJobAnalyzer";
 import { generateJobsSitemapXML } from "./seoUtils";
@@ -42,6 +42,10 @@ import { registerCandidatePortalRoutes } from "./candidatePortal.routes";
 import { registerOutreachComplianceRoutes } from "./outreachCompliance.routes";
 import { registerCandidatePrivacyRoutes } from "./candidate-privacy/routes";
 import { isExpectedDisconnectError } from "./monitoring";
+import {
+  parseHiringManagerRoleFilter,
+  readAuthorizedHiringManagerDirectory,
+} from "./lib/membershipScopedReadAuthorization";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup security middleware with environment-aware CSP
@@ -326,80 +330,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   /**
    * GET /api/users
-   * Get list of users filtered by role
+   * Get the purpose-bound hiring-manager picker directory.
    * Query params:
-   *   - role: string (optional, filter by specific role: 'hiring_manager', 'recruiter', etc.)
+   *   - role: exact scalar string `hiring_manager`
    */
-  app.get("/api/users", requireRole(['recruiter', 'super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { role } = req.query;
-
-      // Fetch users from storage
-      const allUsers = await storage.getUsers();
-
-      // Filter by role if specified
-      let filteredUsers = allUsers;
-      if (role && typeof role === 'string') {
-        filteredUsers = allUsers.filter((u: typeof allUsers[0]) => u.role === role);
-      }
-
-      // Scope hiring managers to the requester's organization (recruiters only)
-      if (req.user?.role === 'recruiter' && role === 'hiring_manager') {
-        const membership = await db.query.organizationMembers.findFirst({
-          where: eq(organizationMembers.userId, req.user.id),
-          columns: { organizationId: true },
-        });
-
-        if (!membership) {
-          res.json([]);
-          return;
-        }
-
-        const orgId = membership.organizationId;
-
-        const hmFromJobs = await db.select({ id: jobs.hiringManagerId })
-          .from(jobs)
-          .where(and(
-            eq(jobs.organizationId, orgId),
-            sql`${jobs.hiringManagerId} IS NOT NULL`
-          ));
-
-        const hmFromInvites = await db.select({ id: users.id })
-          .from(hiringManagerInvitations)
-          .innerJoin(users, sql`LOWER(${users.username}) = LOWER(${hiringManagerInvitations.email})`)
-          .innerJoin(organizationMembers, eq(organizationMembers.userId, hiringManagerInvitations.invitedBy))
-          .where(and(
-            eq(organizationMembers.organizationId, orgId),
-            eq(hiringManagerInvitations.status, 'accepted'),
-            eq(users.role, 'hiring_manager')
-          ));
-
-        const allowedIds = new Set<number>();
-        for (const row of hmFromJobs) {
-          if (row.id != null) allowedIds.add(row.id);
-        }
-        for (const row of hmFromInvites) {
-          allowedIds.add(row.id);
-        }
-
-        filteredUsers = filteredUsers.filter((u: typeof allUsers[0]) => allowedIds.has(u.id));
-      }
-
-      // Return sanitized user data (exclude password)
-      const sanitizedUsers = filteredUsers.map((user: typeof allUsers[0]) => ({
-        id: user.id,
-        username: user.username,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      }));
-
-      res.json(sanitizedUsers);
+  app.get("/api/users", requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response): Promise<void> => {
+    const role = parseHiringManagerRoleFilter(req.query.role);
+    if (role === null) {
+      res.status(400).json({ error: 'A hiring-manager role filter is required', code: 'ROLE_FILTER_REQUIRED' });
       return;
-    } catch (error) {
-      console.error('[Users] Error fetching users:', error);
-      next(error);
     }
+
+    const result = await readAuthorizedHiringManagerDirectory(req.user!.id, { allowPlatformAdmin: true });
+    if (!result.ok) {
+      res.status(503).json({ error: 'User directory unavailable', code: 'USER_DIRECTORY_UNAVAILABLE' });
+      return;
+    }
+
+    res.json(result.rows);
   });
 
   // ============= CONSULTANT SHOWCASE ROUTES =============

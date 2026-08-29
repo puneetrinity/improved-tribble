@@ -78,9 +78,12 @@ function requireAnchor(problems, source, anchor, label) {
 
 function validateKernel(root, problems) {
   const kernel = read(root, "server/lib/applicationReadAuthorization.ts");
+  const membershipKernel = read(root, "server/lib/membershipScopedReadAuthorization.ts");
   const storage = read(root, "server/storage.ts");
   const auth = read(root, "server/auth.ts");
   const routes = read(root, "server/applications.routes.ts");
+  const mainRoutes = read(root, "server/routes.ts");
+  const subscriptionRoutes = read(root, "server/subscription.routes.ts");
   const whatsappRoutes = read(root, "server/whatsapp.routes.ts");
   const resumeRoutes = read(root, "server/resume.routes.ts");
   const semanticRoutes = read(root, "server/candidates.semantic.routes.ts");
@@ -95,6 +98,96 @@ function validateKernel(root, problems) {
   const schemaControlTest = read(root, "server/schema-control/__tests__/schemaControl.pg.test.ts");
   const schemaGuardTest = read(root, "server/schema-control/__tests__/schemaGuard.test.ts");
   const testConfig = read(root, "vitest.server.config.ts");
+
+  const directoryReader = exportedFunctionSource(membershipKernel, "readAuthorizedHiringManagerDirectory");
+  for (const anchor of [
+    "export function parseHiringManagerRoleFilter",
+    'value === "hiring_manager"',
+    "WITH actor_context AS MATERIALIZED",
+    "seated_membership.user_id = actor.id",
+    "seated_membership.seat_assigned = TRUE",
+    "actor_context.actor_role = 'recruiter'",
+    "actor_context.organization_id IS NOT NULL",
+    "hiring_manager.role = 'hiring_manager'",
+    "${jobs.organizationId} = actor_context.organization_id",
+    "${jobs.hiringManagerId} = hiring_manager.id",
+    "INNER JOIN ${organizationMembers} AS inviter_membership",
+    "inviter_membership.organization_id = actor_context.organization_id",
+    "LOWER(${hiringManagerInvitations.email}) = LOWER(hiring_manager.username)",
+    "${hiringManagerInvitations.status} = 'accepted'",
+    "${policy.allowPlatformAdmin} AND actor_context.actor_role = 'super_admin'",
+    "SELECT DISTINCT hiring_manager.id AS id",
+    'first_name AS "firstName"',
+    'last_name AS "lastName"',
+    "ORDER BY normalized_username, id",
+  ]) requireAnchor(problems, membershipKernel, anchor, `membership-scoped directory anchor is missing: ${anchor}`);
+  if (!directoryReader || count(directoryReader, "db.execute(") !== 1) {
+    problems.push("hiring-manager directory must execute exactly one database statement.");
+  }
+  if (/\b(?:password|emailVerification|passwordReset|aiContent|billing|credit|profile|token)\b/i.test(
+    directoryReader,
+  )) {
+    problems.push("hiring-manager directory selects a forbidden identity field.");
+  }
+  for (const anchor of [
+    "id: positiveInteger(row.id)", "username: text(row.username)", "firstName: nullableText(row.firstName)",
+    "lastName: nullableText(row.lastName)", 'role: "hiring_manager"',
+  ]) requireAnchor(problems, directoryReader, anchor, `hiring-manager projection anchor is missing: ${anchor}`);
+
+  const jobApplicationsRoute = routeCall(routes, "get", "/api/jobs/:id/applications");
+  if (jobApplicationsRoute.count !== 1 || !jobApplicationsRoute.source) {
+    problems.push("route registration must exist exactly once: GET /api/jobs/:id/applications");
+  } else {
+    for (const anchor of ["requireRole(['recruiter', 'super_admin'])", "requireSeat()", "getUserOrganization",
+      "isRecruiterOnJob", "getApplicationsByJob"]) {
+      requireAnchor(problems, jobApplicationsRoute.source, anchor,
+        `/api/jobs/:id/applications lost required handler anchor: ${anchor}`);
+    }
+    if (jobApplicationsRoute.source.includes("allowNoOrg")) {
+      problems.push("/api/jobs/:id/applications restores the no-organization seat exception.");
+    }
+  }
+
+  const seatUsageRoute = routeCall(subscriptionRoutes, "get", "/api/subscription/seats/usage");
+  if (seatUsageRoute.count !== 1 || !seatUsageRoute.source) {
+    problems.push("route registration must exist exactly once: GET /api/subscription/seats/usage");
+  } else {
+    for (const anchor of ["requireRole(['recruiter'])", "requireSeat()", "getUserOrganization",
+      "getSeatUsage", "getMembersForSeatSelection"]) {
+      requireAnchor(problems, seatUsageRoute.source, anchor,
+        `/api/subscription/seats/usage lost required handler anchor: ${anchor}`);
+    }
+    if (seatUsageRoute.source.includes("requireAuth,")) {
+      problems.push("/api/subscription/seats/usage restores requireAuth-only admission.");
+    }
+  }
+
+  const userDirectoryRoute = routeCall(mainRoutes, "get", "/api/users");
+  if (userDirectoryRoute.count !== 1 || !userDirectoryRoute.source) {
+    problems.push("route registration must exist exactly once: GET /api/users");
+  } else {
+    for (const anchor of [
+      "requireRole(['recruiter', 'super_admin'])", "requireSeat()", "parseHiringManagerRoleFilter",
+      "ROLE_FILTER_REQUIRED", "readAuthorizedHiringManagerDirectory", "allowPlatformAdmin: true",
+      "USER_DIRECTORY_UNAVAILABLE", "res.json(result.rows)",
+    ]) requireAnchor(problems, userDirectoryRoute.source, anchor, `/api/users lost required handler anchor: ${anchor}`);
+    if (/storage\.getUsers|db\.(?:query|select|execute)|\.filter\s*\(/.test(userDirectoryRoute.source)) {
+      problems.push("/api/users restores a global or post-read identity filter.");
+    }
+    const parserAt = userDirectoryRoute.source.indexOf("parseHiringManagerRoleFilter");
+    const readerAt = userDirectoryRoute.source.indexOf("readAuthorizedHiringManagerDirectory");
+    const responseAt = userDirectoryRoute.source.indexOf("res.json(result.rows)");
+    const preReader = parserAt >= 0 && readerAt > parserAt
+      ? userDirectoryRoute.source.slice(parserAt, readerAt)
+      : "";
+    if (parserAt < 0 || readerAt < parserAt || responseAt < readerAt
+        || /res\.(?:json|send)\s*\(/.test(preReader)) {
+      problems.push("/api/users parser/authorization/response order is unsafe.");
+    }
+    if (/console\.(?:log|warn|error)/.test(userDirectoryRoute.source)) {
+      problems.push("/api/users logs raw directory or database data.");
+    }
+  }
 
   for (const anchor of [
     "function parsePositiveDecimalApplicationId",
@@ -560,11 +653,33 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
     problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 6) {
-    problems.push("exactly six statement-bound application read routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 9) {
+    problems.push("exactly nine object/membership-scoped read routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 2) {
     problems.push("exactly two resume registrations must be retired.");
+  }
+
+  for (const [path, reader] of [
+    ["/api/jobs/:id/applications", "requireSeat+isRecruiterOnJob"],
+    ["/api/subscription/seats/usage", "requireSeat+getSeatUsage"],
+    ["/api/users", "readAuthorizedHiringManagerDirectory"],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === "get" && row.path === path && row.reader === reader);
+    if (matches.length !== 1) problems.push(`membership-scoped manifest route is missing or duplicated: GET ${path}`);
+  }
+
+  const governedPaths = new Set((manifest.governed_files ?? []).map((row) => row.file));
+  for (const file of [
+    "server/applications.routes.ts", "server/subscription.routes.ts", "server/routes.ts",
+    "server/lib/membershipScopedReadAuthorization.ts",
+    "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
+    "server/lib/__tests__/membershipScopedReadAuthorization.routes.test.ts",
+    "server/tests/applicationReadAuthorization.pg.test.ts",
+    "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
+    "scripts/check-object-authorization.mjs", "server/candidate-privacy/surfaces.json",
+  ]) {
+    if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
 
   for (const row of [...(manifest.governed_files ?? []), ...(manifest.frozen_files ?? [])]) {

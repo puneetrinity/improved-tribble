@@ -11,6 +11,9 @@ import { checkObjectAuthorization } from './check-object-authorization.mjs';
 const APP_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const REPO_ROOT = resolve(APP_ROOT, '..');
 const SOURCE_SHA = '9301960a495d156689e07b43034a5512c05a3cc3';
+const SOURCE_TREE = 'b1674cdd942bdf13f6c486b1a42714a879016fd3';
+const OCR_MERGE_SHA = 'cb3f95d2229d3d7edc02e2d4d9f05ddf643a3359';
+const OCR_MERGE_TREE = '2657e7c19c2de792f14fff87142e8b7bf9c2c1eb';
 const FROZEN_ON_DEMAND_BLOCKS = {
   application: '9c4f0e84b340e8573409978a1bfde1ff69a4b96422a7eab26aaf777678f8b193',
   aiSingle: 'f94a0a41154e8d6b87260452b0a92b7aeddb2e34fe132f73559372947106c02e',
@@ -39,8 +42,6 @@ const FROZEN = {
   'server/resume.routes.ts': '8a85106836a3bb681e66e1a25bf0dcedeb8181e00b4bbb669c1b8e85c446d26e',
   'server/bulkResumeImport.routes.ts': '7b0a7c07c42360c8d86ad950607335b7a2714318b7f685d7b502411d52abfa6e',
   'server/lib/resumeImportProcessor.ts': '1314be8df83e520c46c1eab5831d468f42659f3a4783a124e38c224381ad92e2',
-  'scripts/check-candidate-privacy-surfaces.mjs': 'f19ccb484a63b20ba8867001733cffb43ea0520106ea18429cf938607749d784',
-  'scripts/check-object-authorization.mjs': '9b47acacd8a31fa890a13c2f5baeee9d556d6183c75520f3f22f90edda4db663',
   'server/gcs-storage.ts': '5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802',
   'shared/schema.ts': '33aff02818a423ae392b03c135414904cbe93e92b63e5b98f1869705a38cc066',
   'package.json': '7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe',
@@ -104,6 +105,29 @@ export function collectAuthoredFiles(committedDiff, worktreeStatus) {
     .filter((file) => file !== 'VantaHireWebsite/node_modules')
     .map((file) => file.replace(/^VantaHireWebsite\//u, ''))
     .sort();
+}
+
+export function validatePinnedOcrHistory({
+  sourceIsAncestorOfMerge,
+  mergeIsAncestorOfHead,
+  sourceTree,
+  mergeTree,
+  committedDiff,
+}) {
+  const problems = [];
+  if (!sourceIsAncestorOfMerge) problems.push('OCR source-to-merge ancestry pin drifted.');
+  if (!mergeIsAncestorOfHead) problems.push('OCR merge is not an ancestor of HEAD.');
+  if (sourceTree !== SOURCE_TREE) problems.push('OCR source tree pin drifted.');
+  if (mergeTree !== OCR_MERGE_TREE) problems.push('OCR merge tree pin drifted.');
+  const normalized = collectAuthoredFiles(committedDiff, '');
+  if (JSON.stringify(normalized) !== JSON.stringify([...AUTHORED_FILES].sort())) {
+    problems.push(`eleven-file OCR boundary drifted: ${normalized.join(',')}`);
+  }
+  return problems;
+}
+
+export function composeSharedGuardProblems(candidatePrivacyProblems, objectAuthorizationProblems) {
+  return [...candidatePrivacyProblems, ...objectAuthorizationProblems];
 }
 
 export function validateResumeIngestOcrSources(files) {
@@ -258,19 +282,44 @@ function walk(path, output = []) {
 
 export function checkResumeIngestOcr(root = APP_ROOT) {
   const problems = [];
+  let sourceIsAncestorOfMerge;
+  let mergeIsAncestorOfHead;
+  let sourceTree;
+  let mergeTree;
+  let committedDiff;
   try {
-    gitOutput(['merge-base', '--is-ancestor', SOURCE_SHA, 'HEAD']);
+    gitOutput(['merge-base', '--is-ancestor', SOURCE_SHA, OCR_MERGE_SHA]);
+    sourceIsAncestorOfMerge = true;
   } catch (error) {
-    if (error?.status === 1) problems.push('source head/tree pin drifted.');
-    else problems.push('source head/tree pin could not be verified.');
+    if (error?.status === 1) sourceIsAncestorOfMerge = false;
+    else problems.push('OCR source-to-merge ancestry could not be verified.');
   }
   try {
-    const pinnedTree = gitOutput(['rev-parse', `${SOURCE_SHA}^{tree}`]).trim();
-    if (pinnedTree !== 'b1674cdd942bdf13f6c486b1a42714a879016fd3') {
-      problems.push('source head/tree pin drifted.');
-    }
+    gitOutput(['merge-base', '--is-ancestor', OCR_MERGE_SHA, 'HEAD']);
+    mergeIsAncestorOfHead = true;
+  } catch (error) {
+    if (error?.status === 1) mergeIsAncestorOfHead = false;
+    else problems.push('OCR merge ancestry could not be verified.');
+  }
+  try {
+    sourceTree = gitOutput(['rev-parse', `${SOURCE_SHA}^{tree}`]).trim();
+    mergeTree = gitOutput(['rev-parse', `${OCR_MERGE_SHA}^{tree}`]).trim();
+    committedDiff = gitOutput(['diff', '--name-only', SOURCE_SHA, OCR_MERGE_SHA, '--']);
   } catch {
-    problems.push('source head/tree pin could not be verified.');
+    problems.push('OCR source/merge pins could not be verified.');
+  }
+  if (sourceIsAncestorOfMerge !== undefined
+      && mergeIsAncestorOfHead !== undefined
+      && sourceTree !== undefined
+      && mergeTree !== undefined
+      && committedDiff !== undefined) {
+    problems.push(...validatePinnedOcrHistory({
+      sourceIsAncestorOfMerge,
+      mergeIsAncestorOfHead,
+      sourceTree,
+      mergeTree,
+      committedDiff,
+    }));
   }
   for (const [file, expected] of Object.entries(FROZEN)) {
     const absolute = resolve(root, file);
@@ -303,18 +352,10 @@ export function checkResumeIngestOcr(root = APP_ROOT) {
     'server/lib/resumeIngestExtraction.ts',
   ])) problems.push('ordinary-ingest helper caller census drifted.');
 
-  problems.push(...checkCandidatePrivacySurfaces(root));
-  problems.push(...checkObjectAuthorization(root));
-  try {
-    const committed = gitOutput(['diff', '--name-only', SOURCE_SHA, 'HEAD', '--']);
-    const status = gitOutput(['status', '--porcelain=v1', '-uall']);
-    const normalized = collectAuthoredFiles(committed, status);
-    if (JSON.stringify(normalized) !== JSON.stringify([...AUTHORED_FILES].sort())) {
-      problems.push(`eleven-file boundary drifted: ${normalized.join(',')}`);
-    }
-  } catch {
-    problems.push('eleven-file boundary could not be verified.');
-  }
+  problems.push(...composeSharedGuardProblems(
+    checkCandidatePrivacySurfaces(root),
+    checkObjectAuthorization(root),
+  ));
   return [...new Set(problems)].sort();
 }
 

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Express, Request, Response, NextFunction } from "express";
-import { requireAuth } from "./auth";
+import { requireAuth, requireRole, requireSeat } from "./auth";
 import { getUserOrganization } from "./lib/organizationService";
 import { canManageBilling } from "./lib/membershipService";
 import {
@@ -601,7 +601,7 @@ export function registerSubscriptionRoutes(
   // ===== Seats =====
 
   // Get seat usage
-  app.get("/api/subscription/seats/usage", requireAuth, async (req, res) => {
+  app.get("/api/subscription/seats/usage", requireRole(['recruiter']), requireSeat(), async (req, res) => {
     try {
       const user = req.user!;
       const orgResult = await getUserOrganization(user.id);
