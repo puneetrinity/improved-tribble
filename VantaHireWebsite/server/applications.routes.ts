@@ -63,6 +63,7 @@ import { generateInterviewICS, getICSFilename } from './lib/icsGenerator';
 import { verifyOutreachApplicationToken } from './lib/outreachComplianceCore';
 import { lockCandidateOutreach } from './lib/outreachConcurrency';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
+import { extractResumeForOrdinaryIngest } from './lib/resumeIngestExtraction';
 import { isAIEnabled, generateCandidateSummary } from './aiJobAnalyzer';
 import { checkCircuitBreaker } from './lib/aiMatchingEngine';
 import { applicationRateLimit, recruiterAddRateLimit, aiAnalysisRateLimit, type RateLimitInfo } from './rateLimit';
@@ -609,19 +610,24 @@ export function registerApplicationsRoutes(
           }
           // GCS not configured or unavailable — continue without resume URL
         }
-        try {
-          const extraction = await extractResumeText(req.file.buffer);
-          if (extraction.success && validateResumeText(extraction.text)) {
-            extractedResumeText = extraction.text;
-          }
-        } catch (resumeExtractError) {
-          console.error('Resume extraction failed during application (non-blocking):', resumeExtractError);
-        }
+        const extraction = await extractResumeForOrdinaryIngest(req.file.buffer, {
+          beforeOcr: () => requireApplicationIngestAllowed({
+            ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
+            email: applicationData.email,
+            phone: applicationData.phone,
+          }),
+        });
+        extractedResumeText = extraction.success ? extraction.text : null;
       }
 
       // If candidate is authenticated, persist resume + extracted text for AI
       if (verifiedCandidate && req.file?.buffer) {
         try {
+          await requireApplicationIngestAllowed({
+            userId: verifiedCandidate.id,
+            email: applicationData.email,
+            phone: applicationData.phone,
+          });
           await requireCandidatePrivacyAllowed(
             { type: 'candidate_user', id: verifiedCandidate.id },
             { globalUse: true, newGlobalOperation: true },
@@ -670,6 +676,11 @@ export function registerApplicationsRoutes(
 
       // Application persistence and drip cancellation are one commit. A real
       // applicant can never be stored while their remaining outreach stays live.
+      await requireApplicationIngestAllowed({
+        ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
+        email: applicationData.email,
+        phone: applicationData.phone,
+      });
       const application = await db.transaction(async (tx: any) => {
         const created = await storage.createApplication({
           ...applicationData,
@@ -896,15 +907,13 @@ export function registerApplicationsRoutes(
         }
 
         // Extract resume text for AI summary (recruiter-add has no candidateResumes record)
-        let extractedResumeText: string | null = null;
-        try {
-          const extraction = await extractResumeText(req.file.buffer);
-          if (extraction.success && validateResumeText(extraction.text)) {
-            extractedResumeText = extraction.text;
-          }
-        } catch (resumeExtractError) {
-          console.error('Resume extraction failed during recruiter-add (non-blocking):', resumeExtractError);
-        }
+        const extraction = await extractResumeForOrdinaryIngest(req.file.buffer, {
+          beforeOcr: () => requireApplicationIngestAllowed({
+            email: applicationData.email,
+            phone: applicationData.phone,
+          }),
+        });
+        const extractedResumeText: string | null = extraction.success ? extraction.text : null;
 
         // Determine default pipeline stage for recruiter-added candidates (if stages are configured)
         let defaultStageId: number | null = null;
@@ -939,6 +948,10 @@ export function registerApplicationsRoutes(
         }
 
         // Create application with recruiter metadata
+        await requireApplicationIngestAllowed({
+          email: applicationData.email,
+          phone: applicationData.phone,
+        });
         const application = await storage.createApplication({
           name: applicationData.name,
           email: applicationData.email,
