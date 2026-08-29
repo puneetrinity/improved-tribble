@@ -32,6 +32,7 @@ import {
   applicationGraphSyncJobs,
   resumeImportBatches,
   resumeImportItems,
+  resumeAccessAttempts,
   type User,
   type InsertUser,
   type ContactSubmission,
@@ -82,6 +83,27 @@ import { pickInitialPipelineStage } from "./lib/pipelineStageSelection";
 import { computeResumeImportBatchStatus } from "./lib/resumeImportFieldExtraction";
 
 export type JobHealthStatus = 'green' | 'amber' | 'red';
+
+export type ResumeAccessActorRole = 'recruiter' | 'hiring_manager' | 'candidate' | 'super_admin';
+export type ResumeAccessDeliveryMode = 'gcs_stream' | 'http_redirect' | 'stored_text' | 'missing' | 'unsupported';
+export type ResumeAccessTerminalStatus = 'completed' | 'failed' | 'redirected';
+
+export interface CreateResumeAccessAttemptInput {
+  attemptId: string;
+  applicationId: number;
+  organizationId: number | null;
+  actorUserId: number;
+  actorRole: ResumeAccessActorRole;
+  deliveryMode: ResumeAccessDeliveryMode;
+}
+
+export interface TerminalizeResumeAccessAttemptInput {
+  attemptId: string;
+  status: ResumeAccessTerminalStatus;
+  responseStatus: number;
+  failureCode?: string | null;
+  updateLegacyDownloadedAt: boolean;
+}
 
 // Correlated privacy fence. It is composed into WHERE before grouping/order/
 // limit. Existing organization workflow can retain global-opt-out rows;
@@ -257,7 +279,8 @@ export interface IStorage {
   updateApplicationStatus(id: number, status: string, notes?: string): Promise<Application | undefined>;
   updateApplicationsStatus(ids: number[], status: string, notes?: string): Promise<number>;
   markApplicationViewed(id: number): Promise<Application | undefined>;
-  markApplicationDownloaded(id: number): Promise<Application | undefined>;
+  createResumeAccessAttempt(input: CreateResumeAccessAttemptInput): Promise<boolean>;
+  terminalizeResumeAccessAttempt(input: TerminalizeResumeAccessAttemptInput): Promise<boolean>;
   
   // User profile operations
   getUserProfile(userId: number): Promise<UserProfile | undefined>;
@@ -1356,16 +1379,70 @@ export class DatabaseStorage implements IStorage {
     return application || undefined;
   }
 
-  async markApplicationDownloaded(id: number): Promise<Application | undefined> {
-    const [application] = await db
-      .update(applications)
-      .set({
-        downloadedAt: new Date(),
-        updatedAt: new Date()
+  async createResumeAccessAttempt(input: CreateResumeAccessAttemptInput): Promise<boolean> {
+    const inserted = await db
+      .insert(resumeAccessAttempts)
+      .values({
+        attemptId: input.attemptId,
+        applicationId: input.applicationId,
+        organizationId: input.organizationId,
+        actorUserId: input.actorUserId,
+        actorRole: input.actorRole,
+        deliveryMode: input.deliveryMode,
+        status: 'attempted',
       })
-      .where(and(eq(applications.id, id), applicationPrivacyAllowed(false)))
-      .returning();
-    return application || undefined;
+      .returning({ attemptId: resumeAccessAttempts.attemptId });
+    return inserted.length === 1 && inserted[0]?.attemptId === input.attemptId;
+  }
+
+  async terminalizeResumeAccessAttempt(input: TerminalizeResumeAccessAttemptInput): Promise<boolean> {
+    return db.transaction(async (tx: any) => {
+      const terminalAt = new Date();
+      const rows = await tx
+        .update(resumeAccessAttempts)
+        .set({
+          status: input.status,
+          responseStatus: input.responseStatus,
+          failureCode: input.status === 'failed' ? (input.failureCode ?? 'DELIVERY_FAILED') : null,
+          terminalAt,
+        })
+        .where(and(
+          eq(resumeAccessAttempts.attemptId, input.attemptId),
+          eq(resumeAccessAttempts.status, 'attempted'),
+        ))
+        .returning({
+          applicationId: resumeAccessAttempts.applicationId,
+          actorRole: resumeAccessAttempts.actorRole,
+          deliveryMode: resumeAccessAttempts.deliveryMode,
+        });
+
+      if (rows.length !== 1) return false;
+      const attempt = rows[0]!;
+
+      if (input.updateLegacyDownloadedAt) {
+        if (
+          input.status !== 'completed'
+          || attempt.deliveryMode !== 'gcs_stream'
+          || !['recruiter', 'hiring_manager'].includes(attempt.actorRole)
+          || attempt.applicationId === null
+        ) {
+          throw new Error('RESUME_ACCESS_LEGACY_UPDATE_REFUSED');
+        }
+        const updated = await tx
+          .update(applications)
+          .set({ downloadedAt: terminalAt, updatedAt: terminalAt })
+          .where(and(
+            eq(applications.id, attempt.applicationId),
+            applicationPrivacyAllowed(false),
+          ))
+          .returning({ id: applications.id });
+        if (updated.length !== 1) {
+          throw new Error('RESUME_ACCESS_LEGACY_UPDATE_REFUSED');
+        }
+      }
+
+      return true;
+    });
   }
 
   async reviewJob(id: number, status: string, reviewComments?: string, reviewedBy?: number): Promise<Job | undefined> {

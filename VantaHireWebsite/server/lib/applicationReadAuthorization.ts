@@ -1,6 +1,7 @@
 import {
   applicationStageHistory,
   applications,
+  candidateResumes,
   emailAuditLog,
   emailTemplates,
   jobRecruiters,
@@ -51,12 +52,33 @@ export interface ApplicationWhatsAppHistoryProjection {
   sentBy: { firstName: string; lastName: string } | null;
 }
 
+export interface ApplicationResumeFileProjection {
+  applicationId: number;
+  organizationId: number | null;
+  resumeUrl: string | null;
+  resumeFilename: string | null;
+}
+
+export interface ApplicationResumeTextProjection {
+  applicationId: number;
+  organizationId: number;
+  text: string | null;
+}
+
 export type AuthorizedApplicationRead<T> =
   | { ok: true; rows: T[] }
   | { ok: false; reason: "not_found" | "unavailable" };
 
 export type AuthorizedApplicationInterviewInviteRead =
   | { ok: true; interview: InterviewInviteProjection }
+  | { ok: false; reason: "not_found" | "unavailable" };
+
+export type AuthorizedApplicationResumeFileRead =
+  | { ok: true; resume: ApplicationResumeFileProjection }
+  | { ok: false; reason: "not_found" | "unavailable" };
+
+export type AuthorizedApplicationResumeTextRead =
+  | { ok: true; resume: ApplicationResumeTextProjection }
   | { ok: false; reason: "not_found" | "unavailable" };
 
 export interface ApplicationReadPolicy {
@@ -179,6 +201,159 @@ function authorizedApplicationCte(
          )
        )
   `;
+}
+
+function authorizedResumeApplicationCte(
+  actorId: number,
+  applicationId: number,
+  allowPlatformAdmin: boolean,
+  projection: SQL,
+) {
+  return sql`
+    SELECT ${applications.id} AS application_id,
+           ${applications.organizationId} AS organization_id
+           ${projection}
+      FROM ${applications}
+      INNER JOIN ${jobs}
+        ON ${jobs.id} = ${applications.jobId}
+      INNER JOIN ${users} AS actor
+        ON actor.id = ${actorId}
+     WHERE ${applications.id} = ${applicationId}
+       AND (
+         (
+           actor.role = 'candidate'
+           AND ${applications.userId} = ${actorId}
+         )
+         OR (
+           ${applications.organizationId} IS NOT NULL
+           AND ${jobs.organizationId} IS NOT NULL
+           AND ${applications.organizationId} = ${jobs.organizationId}
+           AND ${applicationPrivacyAllowed(false)}
+           AND (
+             (${allowPlatformAdmin} AND actor.role = 'super_admin')
+             OR (
+               actor.role = 'hiring_manager'
+               AND ${jobs.hiringManagerId} = ${actorId}
+             )
+             OR (
+               actor.role = 'recruiter'
+               AND EXISTS (
+                 SELECT 1
+                   FROM ${organizationMembers}
+                  WHERE ${organizationMembers.userId} = ${actorId}
+                    AND ${organizationMembers.organizationId} = ${applications.organizationId}
+                    AND ${organizationMembers.seatAssigned} = TRUE
+               )
+               AND (
+                 ${jobs.postedBy} = ${actorId}
+                 OR EXISTS (
+                   SELECT 1
+                     FROM ${jobRecruiters}
+                    WHERE ${jobRecruiters.jobId} = ${jobs.id}
+                      AND ${jobRecruiters.recruiterId} = ${actorId}
+                 )
+               )
+             )
+           )
+         )
+       )
+  `;
+}
+
+export async function readAuthorizedApplicationResumeFile(
+  actorId: number,
+  applicationId: number,
+  policy: ApplicationReadPolicy,
+): Promise<AuthorizedApplicationResumeFileRead> {
+  if (!validInputs(actorId, applicationId, policy)) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  try {
+    const result = await db.execute(sql`
+      WITH authorized_application AS (
+        ${authorizedResumeApplicationCte(
+          actorId,
+          applicationId,
+          policy.allowPlatformAdmin,
+          sql`,
+            ${applications.resumeUrl} AS resume_url,
+            ${applications.resumeFilename} AS resume_filename
+          `,
+        )}
+      )
+      SELECT authorized_application.application_id AS "applicationId",
+             authorized_application.organization_id AS "organizationId",
+             authorized_application.resume_url AS "resumeUrl",
+             authorized_application.resume_filename AS "resumeFilename"
+        FROM authorized_application
+    `);
+    const rawRows = rowsFrom(result);
+    if (rawRows.length === 0) return { ok: false, reason: "not_found" };
+    if (rawRows.length !== 1) throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+    const row = rawRows[0]!;
+    return {
+      ok: true,
+      resume: {
+        applicationId: positiveInteger(row.applicationId),
+        organizationId: nullablePositiveInteger(row.organizationId),
+        resumeUrl: nullableText(row.resumeUrl),
+        resumeFilename: nullableText(row.resumeFilename),
+      },
+    };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}
+
+export async function readAuthorizedApplicationResumeText(
+  actorId: number,
+  applicationId: number,
+  policy: ApplicationReadPolicy,
+): Promise<AuthorizedApplicationResumeTextRead> {
+  if (!validInputs(actorId, applicationId, policy)) {
+    return { ok: false, reason: "unavailable" };
+  }
+
+  try {
+    const result = await db.execute(sql`
+      WITH authorized_application AS (
+        ${authorizedApplicationCte(
+          actorId,
+          applicationId,
+          policy.allowPlatformAdmin,
+          sql`,
+            ${applications.organizationId} AS organization_id,
+            ${applications.resumeId} AS resume_id,
+            ${applications.extractedResumeText} AS application_resume_text
+          `,
+        )}
+      )
+      SELECT authorized_application.application_id AS "applicationId",
+             authorized_application.organization_id AS "organizationId",
+             COALESCE(
+               NULLIF(authorized_application.application_resume_text, ''),
+               NULLIF(${candidateResumes.extractedText}, '')
+             ) AS text
+        FROM authorized_application
+        LEFT JOIN ${candidateResumes}
+          ON ${candidateResumes.id} = authorized_application.resume_id
+    `);
+    const rawRows = rowsFrom(result);
+    if (rawRows.length === 0) return { ok: false, reason: "not_found" };
+    if (rawRows.length !== 1) throw new Error("APPLICATION_AUTHORIZATION_RESULT_INVALID");
+    const row = rawRows[0]!;
+    return {
+      ok: true,
+      resume: {
+        applicationId: positiveInteger(row.applicationId),
+        organizationId: positiveInteger(row.organizationId),
+        text: nullableText(row.text),
+      },
+    };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
 }
 
 export async function readAuthorizedApplicationInterviewInvite(

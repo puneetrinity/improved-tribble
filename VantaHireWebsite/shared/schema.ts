@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -760,6 +760,52 @@ export const organizationMembers = pgTable("organization_members", {
   userUniqueIdx: uniqueIndex("org_members_user_unique_idx").on(table.userId), // Enforce single-org-per-user
   roleIdx: index("org_members_role_idx").on(table.role),
   seatAssignedIdx: index("org_members_seat_assigned_idx").on(table.seatAssigned),
+}));
+
+export const resumeAccessAttempts = pgTable("resume_access_attempts", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  attemptId: uuid("attempt_id").notNull().unique(),
+  applicationId: integer("application_id").references(() => applications.id, { onDelete: "set null" }),
+  organizationId: integer("organization_id").references(() => organizations.id, { onDelete: "set null" }),
+  actorUserId: integer("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  actorRole: text("actor_role").notNull(),
+  deliveryMode: text("delivery_mode").notNull(),
+  status: text("status").notNull().default("attempted"),
+  failureCode: text("failure_code"),
+  responseStatus: integer("response_status"),
+  attemptedAt: timestamp("attempted_at", { withTimezone: true }).defaultNow().notNull(),
+  terminalAt: timestamp("terminal_at", { withTimezone: true }),
+}, (table) => ({
+  applicationAttemptedAtIdx: index("resume_access_attempts_application_idx")
+    .on(table.applicationId, table.attemptedAt.desc()),
+  actorAttemptedAtIdx: index("resume_access_attempts_actor_idx")
+    .on(table.actorUserId, table.attemptedAt.desc()),
+  actorRoleCheck: check(
+    "resume_access_attempts_actor_role_check",
+    sql`${table.actorRole} IN ('recruiter','hiring_manager','candidate','super_admin')`,
+  ),
+  deliveryModeCheck: check(
+    "resume_access_attempts_delivery_mode_check",
+    sql`${table.deliveryMode} IN ('gcs_stream','http_redirect','stored_text','missing','unsupported')`,
+  ),
+  statusCheck: check(
+    "resume_access_attempts_status_check",
+    sql`${table.status} IN ('attempted','completed','failed','redirected')`,
+  ),
+  failureCodeCheck: check(
+    "resume_access_attempts_failure_code_check",
+    sql`${table.failureCode} IS NULL OR ${table.failureCode} ~ '^[A-Z0-9_]{1,80}$'`,
+  ),
+  responseStatusCheck: check(
+    "resume_access_attempts_response_status_check",
+    sql`${table.responseStatus} IS NULL OR ${table.responseStatus} BETWEEN 100 AND 599`,
+  ),
+  terminalCheck: check(
+    "resume_access_attempts_terminal_check",
+    sql`(${table.status} = 'attempted' AND ${table.terminalAt} IS NULL AND ${table.failureCode} IS NULL)
+      OR (${table.status} IN ('completed','redirected') AND ${table.terminalAt} IS NOT NULL AND ${table.failureCode} IS NULL)
+      OR (${table.status} = 'failed' AND ${table.terminalAt} IS NOT NULL AND ${table.failureCode} IS NOT NULL)`,
+  ),
 }));
 
 export const mauticContactLinks = pgTable("mautic_contact_links", {
@@ -2506,6 +2552,7 @@ export type InsertSavedJob = typeof savedJobs.$inferInsert;
 export type InsertApplication = z.infer<typeof insertApplicationSchema>;
 export type RecruiterAddApplication = z.infer<typeof recruiterAddApplicationSchema>;
 export type Application = typeof applications.$inferSelect;
+export type ResumeAccessAttempt = typeof resumeAccessAttempts.$inferSelect;
 
 export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
 export type UserProfile = typeof userProfiles.$inferSelect;

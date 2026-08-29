@@ -572,8 +572,6 @@ export const applicationManagementCopy = {
     updateFailedTitle: 'Update failed',
     bulkUpdateSuccessTitle: 'Bulk update successful',
     bulkUpdateFailedTitle: 'Bulk update failed',
-    downloadTrackedTitle: 'Download tracked',
-    downloadTrackedDescription: 'Resume download has been recorded.',
     stageUpdatedTitle: 'Stage updated',
     stageUpdatedDescription: 'Application moved to new stage successfully.',
     interviewScheduledTitle: 'Interview scheduled',

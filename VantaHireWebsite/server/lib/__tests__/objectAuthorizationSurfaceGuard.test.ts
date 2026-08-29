@@ -43,10 +43,19 @@ function fixture(): string {
   cpSync(join(APP_ROOT, "scripts"), join(root, "scripts"), { recursive: true });
   mkdirSync(join(root, "client", "src", "components", "kanban"), { recursive: true });
   mkdirSync(join(root, "client", "src", "pages"), { recursive: true });
+  mkdirSync(join(root, "client", "src", "lib"), { recursive: true });
   cpSync(
     join(APP_ROOT, "client", "src", "components", "kanban", "ApplicationDetailPanel.tsx"),
     join(root, "client", "src", "components", "kanban", "ApplicationDetailPanel.tsx"),
   );
+  cpSync(
+    join(APP_ROOT, "client", "src", "components", "ResumePreviewModal.tsx"),
+    join(root, "client", "src", "components", "ResumePreviewModal.tsx"),
+  );
+  for (const file of ["applications-page.tsx", "candidates-page.tsx"] as const) {
+    cpSync(join(APP_ROOT, "client", "src", "pages", file), join(root, "client", "src", "pages", file));
+  }
+  cpSync(join(APP_ROOT, "client", "src", "lib", "internal-copy.ts"), join(root, "client", "src", "lib", "internal-copy.ts"));
   cpSync(
     join(APP_ROOT, "client", "src", "pages", "application-management-page.tsx"),
     join(root, "client", "src", "pages", "application-management-page.tsx"),
@@ -134,7 +143,7 @@ describe("object authorization surface guard", () => {
     const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
       source.replace("FROM authorized_application", "FROM applications"),
     );
-    expect(problems).toContain("all four protected application readers must read through the authorized CTE.");
+    expect(problems).toContain("all six protected application readers must read through the authorized CTE.");
   });
 
   it("rejects a raw email subject projection", () => {
@@ -385,5 +394,181 @@ describe("object authorization surface guard", () => {
       source.replace("getAllWhatsAppTemplates();", "getAllWhatsAppTemplates(/* forbidden drift */);"),
     );
     expect(problems).toContain("frozen WhatsApp route block drifted: GET /api/whatsapp/templates");
+  });
+
+  it("rejects loss of the resume-file seat gate", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        'app.get("/api/applications/:id/resume", requireAuth, requireSeat(),',
+        'app.get("/api/applications/:id/resume", requireAuth,',
+      ),
+    );
+    expect(problems).toContain("/api/applications/:id/resume lost required handler anchor: requireSeat()");
+  });
+
+  it("rejects a check-then-read application lookup restored in resume GET", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const authorized = await readAuthorizedApplicationResumeFile(",
+        "await storage.getApplication(applicationId);\n    const authorized = await readAuthorizedApplicationResumeFile(",
+      ),
+    );
+    expect(problems).toContain("/api/applications/:id/resume restores a check-then-read authorization path.");
+  });
+
+  it("rejects broadening candidate-self beyond exact application ownership", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${applications.userId} = ${actorId}", "TRUE"),
+    );
+    expect(problems).toContain("resume-file authorization anchor is missing: ${applications.userId} = ${actorId}");
+  });
+
+  it("rejects loss of exact hiring-manager job authority", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace("${jobs.hiringManagerId} = ${actorId}", "TRUE"),
+    );
+    expect(problems).toContain("resume-file authorization anchor is missing: ${jobs.hiringManagerId} = ${actorId}");
+  });
+
+  it("rejects a resume URL re-read outside the authorized CTE", () => {
+    const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
+      source.replace(
+        'authorized_application.resume_url AS "resumeUrl"',
+        '${applications.resumeUrl} AS "resumeUrl"',
+      ),
+    );
+    expect(problems).toContain('resume-file authorization anchor is missing: authorized_application.resume_url AS "resumeUrl"');
+  });
+
+  it("rejects resume-text GCS extraction", () => {
+    const problems = mutate(fixture(), "server/resume.routes.ts", (source) =>
+      source.replace(
+        "const authorized = await readAuthorizedApplicationResumeText(",
+        "await downloadFromGCS(req.query.locator);\n      const authorized = await readAuthorizedApplicationResumeText(",
+      ),
+    );
+    expect(problems).toContain("resume-text route restores a global or provider-backed read.");
+  });
+
+  it("rejects loss of resume-text seat admission", () => {
+    const problems = mutate(fixture(), "server/resume.routes.ts", (source) =>
+      source.replace("    requireSeat(),\n", ""),
+    );
+    expect(problems).toContain("/api/applications/:id/resume-text lost required handler anchor: requireSeat()");
+  });
+
+  it("rejects caller locator parsing restored in the external proxy", () => {
+    const problems = mutate(fixture(), "server/candidates.semantic.routes.ts", (source) =>
+      source.replace(
+        "(_req: Request, res: Response): void => {",
+        "(req: Request, res: Response): void => {\n      void req.query.locator;",
+      ),
+    );
+    expect(problems).toContain("external resume proxy still consumes a caller locator or provider.");
+  });
+
+  it("rejects a raw locator restored to semantic results", () => {
+    const problems = mutate(fixture(), "server/candidates.semantic.routes.ts", (source) =>
+      source.replace("previewUrl: null,", "locator: application.resumeUrl,\n            previewUrl: null,"),
+    );
+    expect(problems).toContain("semantic resume results still emit locators or signed URLs.");
+  });
+
+  it("rejects broadening the GCS prefix", () => {
+    const problems = mutate(fixture(), "server/gcs-storage.ts", (source) =>
+      source.replace("(resumes\\/(.+))", "(.+)")
+    );
+    expect(problems.some((problem) => problem.includes("bound GCS parser lost anchor"))).toBe(true);
+  });
+
+  it("rejects provider access before the durable attempt", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const auditReady = await createResumeAttempt({",
+        "await downloadBoundApplicationResumeFromGCS(url);\n    const auditReady = await createResumeAttempt({",
+      ),
+    );
+    expect(problems).toContain("resume-file authorization/audit/provider order is unsafe.");
+  });
+
+  it("rejects terminalization without attempted-status CAS", () => {
+    const problems = mutate(fixture(), "server/storage.ts", (source) =>
+      source.replace("eq(resumeAccessAttempts.status, 'attempted')", "sql`TRUE`"),
+    );
+    expect(problems).toContain("resume audit repository lost anchor: eq(resumeAccessAttempts.status, 'attempted')");
+  });
+
+  it("rejects legacy timestamp updates outside completed GCS streams", () => {
+    const problems = mutate(fixture(), "server/storage.ts", (source) =>
+      source.replace("input.status !== 'completed'", "false"),
+    );
+    expect(problems).toContain("resume audit repository lost anchor: input.status !== 'completed'");
+  });
+
+  it("rejects loss of audit terminal-coherence constraints", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0002_resume_access_attempts.sql", (source) =>
+      source.replace("resume_access_attempts_terminal_check", "resume_access_attempts_terminal_removed"),
+    );
+    expect(problems).toContain("resume audit migration lost anchor: resume_access_attempts_terminal_check");
+  });
+
+  it("rejects migration/checksum drift", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0002_resume_access_attempts.sql", (source) =>
+      `${source}\n-- forbidden drift\n`,
+    );
+    expect(problems).toContain("resume audit migration checksum does not match migration 0002.");
+  });
+
+  it("rejects restoring the client download-tracking PATCH", () => {
+    const problems = mutate(fixture(), "client/src/pages/applications-page.tsx", (source) =>
+      `${source}\nconst forbidden = \`/api/applications/\${1}/download\`;\n`,
+    );
+    expect(problems).toContain("applications-page restores the retired download-tracking PATCH.");
+  });
+
+  it("rejects restoring the external client proxy", () => {
+    const problems = mutate(fixture(), "client/src/pages/candidates-page.tsx", (source) =>
+      `${source}\nconst forbidden = '/api/candidates/external-resume?locator=x';\n`,
+    );
+    expect(problems).toContain("candidate client still constructs an external locator/proxy request.");
+  });
+
+  it("rejects denial-code drift on resume GET", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });",
+        "res.status(403).json({ code: 'FOREIGN_APPLICATION' });",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/resume must use APPLICATION_NOT_FOUND for both denied actor and denied object.",
+    );
+  });
+
+  it("rejects raw route logging", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const url = authorized.resume.resumeUrl?.trim() ?? '';",
+        "console.error(authorized.resume.resumeUrl);\n    const url = authorized.resume.resumeUrl?.trim() ?? '';",
+      ),
+    );
+    expect(problems).toContain("resume-file route logs target or provider data.");
+  });
+
+  it("rejects reactivating the retired PATCH", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "res.status(410).json({ code: 'RESUME_DOWNLOAD_TRACKING_RETIRED' });",
+        "void storage.getApplication(req.params.id); res.status(200).json({});",
+      ),
+    );
+    expect(problems).toContain("retired resume download-tracking PATCH performs an object read or write.");
+  });
+
+  it("rejects drift in the frozen resume preview component", () => {
+    const problems = mutate(fixture(), "client/src/components/ResumePreviewModal.tsx", (source) =>
+      `${source}\n// forbidden drift\n`,
+    );
+    expect(problems).toContain("governed/frozen file drifted: client/src/components/ResumePreviewModal.tsx");
   });
 });

@@ -14,7 +14,6 @@ import { getTenantStrategy, resolveActiveKGTenantId } from './lib/activekgTenant
 import { MIN_RESUME_TEXT_LENGTH } from './lib/applicationGraphSyncProcessor';
 import { getSearchDefaults } from './lib/activekgSearchConfig';
 import { search as activekgSearch, type ActiveKGSearchResult, type ActiveKGSearchResponse } from './lib/services/activekg-client';
-import { getSignedDownloadUrl, getSignedViewUrl, downloadFromGCS } from './gcs-storage';
 import type { CsrfMiddleware } from './types/routes';
 import { db } from './db';
 import { applicationStageHistory, applications, organizations, type Application } from '@shared/schema';
@@ -138,14 +137,6 @@ function asNonEmptyString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
 }
 
-function getResumeContentType(filename?: string | null): string {
-  const lower = (filename ?? '').toLowerCase();
-  if (lower.endsWith('.pdf')) return 'application/pdf';
-  if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  if (lower.endsWith('.doc')) return 'application/msword';
-  return 'application/octet-stream';
-}
-
 function extractEmailFromText(text: string): string | null {
   const match = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
   return match ? match[0].toLowerCase() : null;
@@ -203,32 +194,6 @@ function extractNameFromText(text: string): string | null {
   return candidate;
 }
 
-function extractGsPathFromGcsId(raw: string): string | null {
-  // ActiveKG GCS connector IDs commonly look like:
-  // gcs:<tenant>:<bucket>/<object> or gcs:<bucket>/<object>
-  if (!raw.startsWith('gcs:')) return null;
-  const parts = raw.split(':');
-  if (parts.length >= 3) {
-    const bucketAndObject = parts.slice(2).join(':');
-    const slashIdx = bucketAndObject.indexOf('/');
-    if (slashIdx > 0) {
-      const bucket = bucketAndObject.slice(0, slashIdx);
-      const object = bucketAndObject.slice(slashIdx + 1);
-      if (bucket && object) return `gs://${bucket}/${object}`;
-    }
-  }
-  if (parts.length === 2) {
-    const bucketAndObject = parts[1]!;
-    const slashIdx = bucketAndObject.indexOf('/');
-    if (slashIdx > 0) {
-      const bucket = bucketAndObject.slice(0, slashIdx);
-      const object = bucketAndObject.slice(slashIdx + 1);
-      if (bucket && object) return `gs://${bucket}/${object}`;
-    }
-  }
-  return null;
-}
-
 // ── Route registration ─────────────────────────────────────────────
 
 export function registerCandidateSemanticRoutes(
@@ -239,31 +204,8 @@ export function registerCandidateSemanticRoutes(
     '/api/candidates/external-resume',
     requireRole(['recruiter', 'super_admin']),
     requireSeat({ allowNoOrg: true }),
-    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-      try {
-        const locatorRaw = typeof req.query.locator === 'string' ? req.query.locator : '';
-        const filenameRaw = typeof req.query.filename === 'string' ? req.query.filename : 'resume.pdf';
-        const download = req.query.download === '1';
-
-        if (!locatorRaw || !locatorRaw.startsWith('gs://')) {
-          res.status(400).json({ error: 'Invalid external resume locator' });
-          return;
-        }
-
-        const buffer = await downloadFromGCS(locatorRaw);
-        const safeFilename = filenameRaw.replace(/[^a-zA-Z0-9._-]/g, '_') || 'resume.pdf';
-
-        res.setHeader('Content-Type', getResumeContentType(safeFilename));
-        res.setHeader(
-          'Content-Disposition',
-          `${download ? 'attachment' : 'inline'}; filename="${safeFilename}"`,
-        );
-        res.status(200).send(buffer);
-        return;
-      } catch (error) {
-        console.error('[EXTERNAL_RESUME] Error:', error);
-        next(error);
-      }
+    (_req: Request, res: Response): void => {
+      res.status(410).json({ code: 'EXTERNAL_RESUME_PROXY_RETIRED' });
     },
   );
 
@@ -482,31 +424,15 @@ export function registerCandidateSemanticRoutes(
           }
         }
 
-        // ── Build response, generate signed resume URLs ────────
+        // ── Build response; application routes remain the only resume object selector ────────
         const results: Array<Record<string, unknown>> = [];
         let usedVectorDisplayForRrf = false;
         for (const g of grouped) {
           const app = appMap.get(g.applicationId);
           if (!app) continue; // filtered out by org isolation
 
-          let signedResumeUrl: string | null = null;
-          if (app.resumeUrl?.startsWith('gs://')) {
-            try {
-              signedResumeUrl = await getSignedDownloadUrl(
-                app.resumeUrl,
-                app.resumeFilename,
-                defaults.signedUrlMinutes,
-              );
-            } catch {
-              // non-blocking — leave null
-            }
-          }
-
           const stage = app.currentStage ? stageMap.get(app.currentStage) : undefined;
           const job = jobMap.get(app.jobId);
-          const expiresAt = signedResumeUrl
-            ? new Date(Date.now() + defaults.signedUrlMinutes * 60_000).toISOString()
-            : null;
           const useVectorDisplay = scoreType === 'rrf_fused' && g.bestVectorScore != null;
           if (useVectorDisplay) usedVectorDisplayForRrf = true;
           const displayScoreRaw = useVectorDisplay ? g.bestVectorScore! : g.bestScore;
@@ -528,9 +454,8 @@ export function registerCandidateSemanticRoutes(
               resume: {
                 resumeFilename: app.resumeFilename ?? null,
                 previewUrl: null,
-                signedUrl: signedResumeUrl,
-                locator: app.resumeUrl ?? null,
-                expiresAt,
+                signedUrl: null,
+                expiresAt: null,
               },
             source: 'vantahire',
             isExternal: false,
@@ -614,59 +539,11 @@ export function registerCandidateSemanticRoutes(
               asNonEmptyString(props.mobile) ??
               asNonEmptyString(metadata.phone);
 
-            const externalResumeUrl =
-              asNonEmptyString(props.resume_url) ??
-              asNonEmptyString(props.url) ??
-              asNonEmptyString(metadata.url);
-            const gcsBucket =
-              asNonEmptyString(props.bucket) ??
-              asNonEmptyString(metadata.bucket);
-            const gcsObject =
-              asNonEmptyString(props.object) ??
-              asNonEmptyString(metadata.object);
-            const derivedGsUrl = gcsBucket && gcsObject ? `gs://${gcsBucket}/${gcsObject}` : null;
             const externalResumeFilename =
               asNonEmptyString(props.resume_filename) ??
               asNonEmptyString(metadata.resume_filename) ??
               asNonEmptyString(props.title) ??
               asNonEmptyString(metadata.title);
-            const gcsFromParent =
-              extractGsPathFromGcsId(asNonEmptyString(props.parent_id) ?? '') ??
-              extractGsPathFromGcsId(asNonEmptyString(metadata.parent_id) ?? '');
-            const gcsFromExternalId =
-              extractGsPathFromGcsId(asNonEmptyString(props.external_id) ?? '') ??
-              extractGsPathFromGcsId(asNonEmptyString(metadata.external_id) ?? '');
-            const gcsFromSourceFile =
-              asNonEmptyString(props.source_file)?.startsWith('gs://')
-                ? asNonEmptyString(props.source_file)
-                : asNonEmptyString(metadata.source_file)?.startsWith('gs://')
-                  ? asNonEmptyString(metadata.source_file)
-                  : null;
-
-            let safeExternalResumeUrl: string | null = null;
-            let safeExternalPreviewUrl: string | null = null;
-            const candidateResumeLocator =
-              externalResumeUrl ?? derivedGsUrl ?? gcsFromParent ?? gcsFromExternalId ?? gcsFromSourceFile;
-            if (candidateResumeLocator) {
-              if (/^https?:\/\//i.test(candidateResumeLocator)) {
-                safeExternalResumeUrl = candidateResumeLocator;
-                safeExternalPreviewUrl = candidateResumeLocator;
-              } else if (candidateResumeLocator.startsWith('gs://')) {
-                try {
-                  safeExternalPreviewUrl = await getSignedViewUrl(
-                    candidateResumeLocator,
-                    defaults.signedUrlMinutes,
-                  );
-                  safeExternalResumeUrl = await getSignedDownloadUrl(
-                    candidateResumeLocator,
-                    externalResumeFilename,
-                    defaults.signedUrlMinutes,
-                  );
-                } catch {
-                  // Non-blocking: keep null if signing fails
-                }
-              }
-            }
             const useVectorDisplay = scoreType === 'rrf_fused' && item.bestVectorScore != null;
             if (useVectorDisplay) usedVectorDisplayForRrf = true;
             const displayScoreRaw = useVectorDisplay ? item.bestVectorScore! : item.bestScore;
@@ -687,15 +564,14 @@ export function registerCandidateSemanticRoutes(
               highlights: item.highlights,
               resume: {
                 resumeFilename: externalResumeFilename,
-                previewUrl: safeExternalPreviewUrl,
-                signedUrl: safeExternalResumeUrl,
-                locator: candidateResumeLocator,
+                previewUrl: null,
+                signedUrl: null,
                 expiresAt: null,
               },
               source: asNonEmptyString(metadata.source) ?? asNonEmptyString(props.source) ?? 'external',
               isExternal: true,
               canMoveToJob: false,
-              canOpenResume: Boolean(safeExternalPreviewUrl ?? safeExternalResumeUrl),
+              canOpenResume: false,
             });
           }
         }

@@ -477,20 +477,6 @@ export default function ApplicationManagementPage() {
     },
   });
 
-  const markDownloadedMutation = useMutation({
-    mutationFn: async (applicationId: number) => {
-      const res = await apiRequest("PATCH", `/api/applications/${applicationId}/download`);
-      return await res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId, "applications"] });
-      toast({
-        title: applicationManagementCopy.toasts.downloadTrackedTitle,
-        description: applicationManagementCopy.toasts.downloadTrackedDescription,
-      });
-    },
-  });
-
   // ATS: Update application stage mutation
   const updateStageMutation = useMutation({
     mutationFn: async ({ applicationId, stageId, notes }: { applicationId: number; stageId: number; notes?: string }) => {
@@ -813,8 +799,6 @@ export default function ApplicationManagementPage() {
   const handleResumeDownload = (application: Application) => {
     // Use secure, permission-gated endpoint
     window.open(`/api/applications/${application.id}/resume?download=1`, '_blank');
-    // Track download for analytics/status (server also marks for recruiter/admin)
-    markDownloadedMutation.mutate(application.id);
   };
 
   const handleApplicationView = (applicationId: number) => {

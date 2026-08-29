@@ -49,7 +49,6 @@ interface SemanticResult {
     resumeFilename: string | null;
     previewUrl?: string | null;
     signedUrl: string | null;
-    locator?: string | null;
     expiresAt: string | null;
   };
   source?: string | null;
@@ -134,25 +133,11 @@ export default function CandidatesPage() {
   const semanticScoreType = semanticSearchQuery.data?.scoreType ?? "unknown";
   const semanticDisplayScoreType = semanticSearchQuery.data?.displayScoreType ?? semanticScoreType;
   const semanticScoreIsPercent = semanticDisplayScoreType === "cosine" || semanticDisplayScoreType === "weighted_fusion";
-  const externalPreviewProxyUrl = resumePreviewCandidate?.isExternal && resumePreviewCandidate?.resume.locator
-    ? `/api/candidates/external-resume?locator=${encodeURIComponent(resumePreviewCandidate.resume.locator)}&filename=${encodeURIComponent(resumePreviewCandidate.resume.resumeFilename ?? "resume.pdf")}`
+  const resumePreviewUrl = resumePreviewCandidate && !resumePreviewCandidate.isExternal
+    ? `/api/applications/${resumePreviewCandidate.applicationId}/resume`
     : null;
-  const externalDownloadProxyUrl = resumePreviewCandidate?.isExternal && resumePreviewCandidate?.resume.locator
-    ? `${externalPreviewProxyUrl}&download=1`
-    : null;
-  const resumePreviewUrl = resumePreviewCandidate
-    ? (
-      resumePreviewCandidate.isExternal
-        ? (externalPreviewProxyUrl ?? resumePreviewCandidate.resume.previewUrl ?? resumePreviewCandidate.resume.signedUrl)
-        : `/api/applications/${resumePreviewCandidate.applicationId}/resume`
-    )
-    : null;
-  const resumeDownloadUrl = resumePreviewCandidate
-    ? (
-      resumePreviewCandidate.isExternal
-        ? (externalDownloadProxyUrl ?? resumePreviewCandidate.resume.signedUrl)
-        : `/api/applications/${resumePreviewCandidate.applicationId}/resume?download=1`
-    )
+  const resumeDownloadUrl = resumePreviewCandidate && !resumePreviewCandidate.isExternal
+    ? `/api/applications/${resumePreviewCandidate.applicationId}/resume?download=1`
     : null;
   const resumeNameForType = (
     resumePreviewCandidate?.resume.resumeFilename ||

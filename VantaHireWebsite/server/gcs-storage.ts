@@ -274,6 +274,39 @@ export async function downloadFromGCS(gcsPath: string): Promise<Buffer> {
   return buffer;
 }
 
+export interface BoundApplicationResumeObject {
+  bucket: string;
+  object: string;
+}
+
+export function parseBoundApplicationResumeGcsPath(gcsPath: string): BoundApplicationResumeObject {
+  const configuredBucket = bucketName ?? process.env.GCS_BUCKET_NAME ?? null;
+  if (!configuredBucket) {
+    throw new Error('GCS_RESUME_CONFIGURATION_UNAVAILABLE');
+  }
+  if (typeof gcsPath !== 'string' || /[\u0000-\u001f\u007f]/.test(gcsPath)) {
+    throw new Error('GCS_RESUME_LOCATOR_REFUSED');
+  }
+  const match = /^gs:\/\/([^/]+)\/(resumes\/(.+))$/.exec(gcsPath);
+  if (!match || match[1] !== configuredBucket || !match[2] || !match[3]) {
+    throw new Error('GCS_RESUME_LOCATOR_REFUSED');
+  }
+  return { bucket: configuredBucket, object: match[2] };
+}
+
+export async function downloadBoundApplicationResumeFromGCS(gcsPath: string): Promise<Buffer> {
+  if (!storage) {
+    throw new Error('GCS_RESUME_CONFIGURATION_UNAVAILABLE');
+  }
+  const bound = parseBoundApplicationResumeGcsPath(gcsPath);
+  try {
+    const [buffer] = await storage.bucket(bound.bucket).file(bound.object).download();
+    return buffer;
+  } catch {
+    throw new Error('GCS_RESUME_PROVIDER_UNAVAILABLE');
+  }
+}
+
 /**
  * Check if file exists in GCS
  * @param gcsPath - Full GCS path (gs://bucket/path)
