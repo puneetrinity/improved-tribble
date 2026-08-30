@@ -76,6 +76,174 @@ function requireAnchor(problems, source, anchor, label) {
   if (!source.includes(anchor)) problems.push(label);
 }
 
+function validateApplicationAiOutboundAuthority(root, problems) {
+  const authority = read(root, "server/lib/applicationAiOutboundAuthorization.ts");
+  const applicationRoutes = read(root, "server/applications.routes.ts");
+  const communicationRoutes = read(root, "server/communications.routes.ts");
+  const emailService = read(root, "server/emailTemplateService.ts");
+
+  for (const anchor of [
+    "${applications.organizationId} IS NOT NULL",
+    "${jobs.organizationId} IS NOT NULL",
+    "${applications.organizationId} = ${jobs.organizationId}",
+    "applicationPrivacyAllowed(false)",
+    "actor.role = 'recruiter'",
+    "${organizationMembers.seatAssigned} = TRUE",
+    "${jobs.postedBy} = ${actorId}",
+    "FROM ${jobRecruiters}",
+    "policy.allowPlatformAdmin",
+  ]) requireAnchor(problems, authority, anchor, `AI/outbound authorization anchor is missing: ${anchor}`);
+  for (const [anchor, expected] of [
+    ["${applications.organizationId} IS NOT NULL", 5],
+    ["${jobs.organizationId} IS NOT NULL", 5],
+    ["${applications.organizationId} = ${jobs.organizationId}", 5],
+    ["applicationPrivacyAllowed(false)", 5],
+    ["actor.role = 'recruiter'", 2],
+    ["${organizationMembers.seatAssigned} = TRUE", 2],
+    ["${jobs.postedBy} = ${actorId}", 3],
+    ["FROM ${jobRecruiters}", 3],
+    ["policy.allowPlatformAdmin", 5],
+  ]) {
+    if (count(authority, anchor) !== expected) {
+      problems.push(`AI/outbound authorization anchor count drifted: ${anchor}`);
+    }
+  }
+
+  for (const symbol of [
+    "readAuthorizedApplicationAiSummaryContext",
+    "publishAuthorizedApplicationAiSummary",
+    "readAuthorizedSimilarCandidates",
+    "readAuthorizedManualEmailContext",
+    "readAuthorizedEmailDraftContext",
+    "recordAuthorizedEmailDraftUsage",
+  ]) {
+    const source = exportedFunctionSource(authority, symbol);
+    if (!source) problems.push(`AI/outbound authorization operation is missing: ${symbol}`);
+    else if (count(source, "db.execute(") !== 1) problems.push(`${symbol} must execute exactly one database statement.`);
+  }
+
+  for (const anchor of [
+    "COALESCE(",
+    "NULLIF(${applications.extractedResumeText}, '')",
+    "NULLIF(${candidateResumes.extractedText}, '')",
+    "NULLIF(${applications.coverLetter}, '')",
+    "WITH authorized_application AS MATERIALIZED",
+    "updated_application AS (",
+    "INSERT INTO ${userAiUsage}",
+    "'summary'",
+    "INNER JOIN inserted_usage ON TRUE",
+  ]) requireAnchor(problems, authority, anchor, `AI-summary authority anchor is missing: ${anchor}`);
+
+  for (const anchor of [
+    "WITH authorized_target AS MATERIALIZED",
+    "${jobs.organizationId} = authorized_target.organization_id",
+    "${applications.organizationId} = ${jobs.organizationId}",
+    "authorized_target.actor_role = 'super_admin'",
+    "ORDER BY ${applications.aiFitScore} DESC, ${applications.id} ASC",
+    "LIMIT ${limit}",
+    'authorized_target.job_id AS "authorizedJobId"',
+  ]) requireAnchor(problems, authority, anchor, `similar-candidate authority anchor is missing: ${anchor}`);
+
+  for (const anchor of [
+    "${emailTemplates.organizationId} = ${applications.organizationId}",
+    "${emailTemplates.organizationId} IS NULL",
+    "${emailTemplates.isDefault} = TRUE OR ${emailTemplates.createdBy} = ${actorId}",
+    "readAuthorizedManualEmailContext",
+    "readAuthorizedEmailDraftContext",
+    "recordAuthorizedEmailDraftUsage",
+    "'email_draft'",
+  ]) requireAnchor(problems, authority, anchor, `email-context authority anchor is missing: ${anchor}`);
+
+  if (/\b(?:resumeUrl|resumeFilename|phone|password|sourceMetadata)\b/.test(
+    exportedFunctionSource(authority, "readAuthorizedApplicationAiSummaryContext"),
+  )) problems.push("AI-summary context selects a forbidden candidate/source field.");
+
+  const routeContracts = [
+    [applicationRoutes, "post", "/api/applications/:id/ai-summary", "readAuthorizedApplicationAiSummaryContext"],
+    [applicationRoutes, "get", "/api/jobs/:id/ai-similar-candidates", "readAuthorizedSimilarCandidates"],
+    [communicationRoutes, "post", "/api/applications/:id/send-email", "readAuthorizedManualEmailContext"],
+    [communicationRoutes, "post", "/api/email/draft", "readAuthorizedEmailDraftContext"],
+  ];
+  for (const [routes, method, path, operation] of routeContracts) {
+    const registration = routeCall(routes, method, path);
+    if (registration.count !== 1 || !registration.source) {
+      problems.push(`AI/outbound route registration must exist exactly once: ${method.toUpperCase()} ${path}`);
+      continue;
+    }
+    for (const anchor of ["requireSeat()", operation, "AUTHORIZATION_UNAVAILABLE"]) {
+      requireAnchor(problems, registration.source, anchor, `${path} lost AI/outbound route anchor: ${anchor}`);
+    }
+    if (/storage\.(?:getApplication|getJob|getSimilarCandidatesForJob|getEmailTemplates)|downloadFromGCS|extractResumeText|\bdb\.(?:query|execute|select|insert|update|delete)\b/.test(registration.source)) {
+      problems.push(`${path} restores a global/id-only candidate read or route-owned write.`);
+    }
+    if (/\b(?:hasEnoughCredits|getAiCreditExhaustionPayload|useCredits)\b/.test(registration.source)) {
+      problems.push(`${path} restores a customer AI-credit check/debit.`);
+    }
+    if (/console\.(?:log|warn|error)/.test(registration.source)) {
+      problems.push(`${path} logs raw candidate, template, provider or database data.`);
+    }
+  }
+
+  const summaryRoute = routeCall(applicationRoutes, "post", "/api/applications/:id/ai-summary").source;
+  for (const anchor of [
+    "parsePositiveDecimalApplicationId", "INVALID_APPLICATION_ID", "APPLICATION_NOT_FOUND",
+    "NO_CANDIDATE_CONTENT", "requireCandidatePrivacyAllowed", "generateCandidateSummary",
+    "publishAuthorizedApplicationAiSummary",
+  ]) requireAnchor(problems, summaryRoute, anchor, `AI-summary route anchor is missing: ${anchor}`);
+  const summaryReadAt = summaryRoute.indexOf("readAuthorizedApplicationAiSummaryContext");
+  const summaryPrivacyAt = summaryRoute.indexOf("requireCandidatePrivacyAllowed");
+  const summaryProviderAt = summaryRoute.indexOf("generateCandidateSummary");
+  const summaryPublishAt = summaryRoute.indexOf("publishAuthorizedApplicationAiSummary");
+  if (!(summaryReadAt >= 0 && summaryPrivacyAt > summaryReadAt && summaryProviderAt > summaryPrivacyAt && summaryPublishAt > summaryProviderAt)) {
+    problems.push("AI-summary authorization/privacy/provider/publication order is unsafe.");
+  }
+
+  const similarRoute = routeCall(applicationRoutes, "get", "/api/jobs/:id/ai-similar-candidates").source;
+  for (const anchor of [
+    "parsePositiveDecimalJobId", "parseSimilarCandidateQuery", "INVALID_JOB_ID",
+    "INVALID_SIMILAR_CANDIDATE_QUERY", "JOB_NOT_FOUND", "res.json(result.rows)",
+  ]) requireAnchor(problems, similarRoute, anchor, `similar-candidate route anchor is missing: ${anchor}`);
+
+  const manualRoute = routeCall(communicationRoutes, "post", "/api/applications/:id/send-email").source;
+  for (const anchor of [
+    "parsePositiveDecimalApplicationId", "INVALID_APPLICATION_ID", "APPLICATION_NOT_FOUND",
+    "sendAuthorizedTemplatedEmail(context.value", "queueMauticOutreachSync",
+  ]) requireAnchor(problems, manualRoute, anchor, `manual-email route anchor is missing: ${anchor}`);
+  if (manualRoute.indexOf("sendAuthorizedTemplatedEmail") < manualRoute.indexOf("readAuthorizedManualEmailContext")) {
+    problems.push("manual email can reach the provider before statement-bound authorization.");
+  }
+
+  const draftRoute = routeCall(communicationRoutes, "post", "/api/email/draft").source;
+  for (const anchor of [
+    "requireCandidatePrivacyAllowed", "generateEmailDraft", "recordAuthorizedEmailDraftUsage",
+    "APPLICATION_NOT_FOUND", "AUTHORIZATION_UNAVAILABLE",
+  ]) requireAnchor(problems, draftRoute, anchor, `email-draft route anchor is missing: ${anchor}`);
+  const draftReadAt = draftRoute.indexOf("readAuthorizedEmailDraftContext");
+  const draftPrivacyAt = draftRoute.indexOf("requireCandidatePrivacyAllowed");
+  const draftProviderAt = draftRoute.indexOf("generateEmailDraft");
+  const draftUsageAt = draftRoute.indexOf("recordAuthorizedEmailDraftUsage");
+  if (!(draftReadAt >= 0 && draftPrivacyAt > draftReadAt && draftProviderAt > draftPrivacyAt && draftUsageAt > draftProviderAt)) {
+    problems.push("email-draft authorization/privacy/provider/usage order is unsafe.");
+  }
+
+  const sender = exportedFunctionSource(emailService, "sendAuthorizedTemplatedEmail");
+  for (const anchor of [
+    "isAuthorizedTemplatedEmailContext", "requireCandidatePrivacyAllowed", "getEmailService",
+    "const result = await svc.sendEmail", "context.candidateEmail", "db.insert(emailAuditLog)", "Email provider unavailable",
+  ]) requireAnchor(problems, sender, anchor, `authorized email sender anchor is missing: ${anchor}`);
+  if (/db\.query\.(?:applications|jobs|emailTemplates)|storage\.(?:getApplication|getJob|getEmailTemplates)/.test(sender)) {
+    problems.push("authorized email sender restores an id-only application/job/template read.");
+  }
+  const senderPrivacyAt = sender.indexOf("requireCandidatePrivacyAllowed");
+  const senderProviderAt = sender.indexOf("const result = await svc.sendEmail");
+  if (senderPrivacyAt < 0 || senderProviderAt < senderPrivacyAt) {
+    problems.push("authorized email sender reaches the provider before its final privacy fence.");
+  }
+  if (/console\.(?:log|warn|error)|error\?\.message|error\.message/.test(sender)) {
+    problems.push("authorized email sender logs or persists a raw provider/candidate error.");
+  }
+}
+
 function validateWorkflowAuthority(root, problems) {
   const workflow = read(root, "server/lib/applicationWorkflowAuthorization.ts");
   const routes = read(root, "server/applications.routes.ts");
@@ -813,8 +981,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
     problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 16) {
-    problems.push("exactly sixteen object/membership/workflow-scoped routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 20) {
+    problems.push("exactly twenty object/membership/workflow/AI-outbound routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 2) {
     problems.push("exactly two resume registrations must be retired.");
@@ -842,6 +1010,16 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     if (matches.length !== 1) problems.push(`workflow manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
   }
 
+  for (const [method, path, reader] of [
+    ["post", "/api/applications/:id/ai-summary", "readAuthorizedApplicationAiSummaryContext+publishAuthorizedApplicationAiSummary"],
+    ["get", "/api/jobs/:id/ai-similar-candidates", "readAuthorizedSimilarCandidates"],
+    ["post", "/api/applications/:id/send-email", "readAuthorizedManualEmailContext+sendAuthorizedTemplatedEmail"],
+    ["post", "/api/email/draft", "readAuthorizedEmailDraftContext+recordAuthorizedEmailDraftUsage"],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
+    if (matches.length !== 1) problems.push(`AI/outbound manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
   const governedPaths = new Set((manifest.governed_files ?? []).map((row) => row.file));
   for (const file of [
     "server/applications.routes.ts", "server/subscription.routes.ts", "server/routes.ts",
@@ -853,6 +1031,12 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/applicationWorkflowAuthorization.test.ts",
     "server/lib/__tests__/applicationWorkflowAuthorization.routes.test.ts",
     "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
+    "server/communications.routes.ts", "server/emailTemplateService.ts",
+    "server/lib/applicationAiOutboundAuthorization.ts",
+    "server/lib/__tests__/applicationAiOutboundAuthorization.test.ts",
+    "server/lib/__tests__/applicationAiOutboundAuthorization.routes.test.ts",
+    "server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts",
+    "server/lib/__tests__/authorizedTemplatedEmail.test.ts",
     "server/schema-migrations/0003_application_workflow_assessments.sql",
     "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
     "scripts/check-object-authorization.mjs", "server/candidate-privacy/surfaces.json",
@@ -878,6 +1062,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   try {
     validateKernel(root, problems);
     validateWorkflowAuthority(root, problems);
+    validateApplicationAiOutboundAuthority(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

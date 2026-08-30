@@ -829,4 +829,161 @@ describe("object authorization surface guard", () => {
     const problems = mutate(fixture(), "server/lib/seatService.ts", (source) => `${source}\n// forbidden drift\n`);
     expect(problems).toContain("governed/frozen file drifted: server/lib/seatService.ts");
   });
+
+  it("rejects loss of the AI/outbound seated actor grant", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace("${organizationMembers.seatAssigned} = TRUE", "TRUE"),
+    );
+    expect(problems).toContain(
+      "AI/outbound authorization anchor count drifted: ${organizationMembers.seatAssigned} = TRUE",
+    );
+  });
+
+  it("rejects loss of AI/outbound application-job organization equality", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace("${applications.organizationId} = ${jobs.organizationId}", "TRUE"),
+    );
+    expect(problems).toContain(
+      "AI/outbound authorization anchor count drifted: ${applications.organizationId} = ${jobs.organizationId}",
+    );
+  });
+
+  it("rejects loss of the AI/outbound candidate-privacy predicate", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace("applicationPrivacyAllowed(false)", "sql`TRUE`"),
+    );
+    expect(problems).toContain(
+      "AI/outbound authorization anchor count drifted: applicationPrivacyAllowed(false)",
+    );
+  });
+
+  it("rejects splitting an AI/outbound operation across two statements", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace(
+        "export async function publishAuthorizedApplicationAiSummary",
+        "export async function publishAuthorizedApplicationAiSummary",
+      ).replace(
+        "  const result = await db.execute(sql`",
+        "  await db.execute(sql`SELECT 1`);\n  const result = await db.execute(sql`",
+      ),
+    );
+    expect(problems).toContain(
+      "readAuthorizedApplicationAiSummaryContext must execute exactly one database statement.",
+    );
+  });
+
+  it("rejects cross-organization similar candidates", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace("${jobs.organizationId} = authorized_target.organization_id", "TRUE"),
+    );
+    expect(problems).toContain(
+      "similar-candidate authority anchor is missing: ${jobs.organizationId} = authorized_target.organization_id",
+    );
+  });
+
+  it("rejects an unbounded similar-candidate query", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace("LIMIT ${limit}", "LIMIT 500"),
+    );
+    expect(problems).toContain("similar-candidate authority anchor is missing: LIMIT ${limit}");
+  });
+
+  it("rejects nondeterministic similar-candidate ordering", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace(
+        "ORDER BY ${applications.aiFitScore} DESC, ${applications.id} ASC",
+        "ORDER BY ${applications.aiFitScore} DESC",
+      ),
+    );
+    expect(problems).toContain(
+      "similar-candidate authority anchor is missing: ORDER BY ${applications.aiFitScore} DESC, ${applications.id} ASC",
+    );
+  });
+
+  it("rejects an id-only application read restored in the AI-summary route", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const context = await readAuthorizedApplicationAiSummaryContext(",
+        "await storage.getApplication(appId);\n      const context = await readAuthorizedApplicationAiSummaryContext(",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/ai-summary restores a global/id-only candidate read or route-owned write.",
+    );
+  });
+
+  it("rejects an on-demand GCS fallback restored in the AI-summary route", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const context = await readAuthorizedApplicationAiSummaryContext(",
+        "await downloadFromGCS('gs://forbidden/resume');\n      const context = await readAuthorizedApplicationAiSummaryContext(",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/ai-summary restores a global/id-only candidate read or route-owned write.",
+    );
+  });
+
+  it("rejects restoring customer credit debits in the email-draft route", () => {
+    const problems = mutate(fixture(), "server/communications.routes.ts", (source) =>
+      source.replace(
+        "const context = await readAuthorizedEmailDraftContext(",
+        "await useCredits(req.user!.id, 1);\n      const context = await readAuthorizedEmailDraftContext(",
+      ),
+    );
+    expect(problems).toContain("/api/email/draft restores a customer AI-credit check/debit.");
+  });
+
+  it("rejects AI provider work before the final privacy fence", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const context = await readAuthorizedApplicationAiSummaryContext(",
+        "await generateCandidateSummary('x', 'x', 'x', 'x', [], []);\n      const context = await readAuthorizedApplicationAiSummaryContext(",
+      ),
+    );
+    expect(problems).toContain("AI-summary authorization/privacy/provider/publication order is unsafe.");
+  });
+
+  it("rejects weakening visible-template organization binding", () => {
+    const problems = mutate(fixture(), "server/lib/applicationAiOutboundAuthorization.ts", (source) =>
+      source.replace("${emailTemplates.organizationId} = ${applications.organizationId}", "TRUE"),
+    );
+    expect(problems).toContain(
+      "email-context authority anchor is missing: ${emailTemplates.organizationId} = ${applications.organizationId}",
+    );
+  });
+
+  it("rejects an id-only application re-read in the authorized email sender", () => {
+    const problems = mutate(fixture(), "server/emailTemplateService.ts", (source) =>
+      source.replace(
+        "  const variables: TemplateVariables = {",
+        "  await db.query.applications.findFirst();\n  const variables: TemplateVariables = {",
+      ),
+    );
+    expect(problems).toContain(
+      "authorized email sender restores an id-only application/job/template read.",
+    );
+  });
+
+  it("rejects loss of the authorized email sender's final privacy fence", () => {
+    const problems = mutate(fixture(), "server/emailTemplateService.ts", (source) =>
+      source.replace(
+        "      await requireCandidatePrivacyAllowed(\n        { type: 'application', id: context.applicationId },",
+        "      await Promise.resolve(\n        { type: 'application', id: context.applicationId },",
+      ),
+    );
+    expect(problems).toContain("authorized email sender reaches the provider before its final privacy fence.");
+  });
+
+  it("rejects raw logging in an AI/outbound route", () => {
+    const problems = mutate(fixture(), "server/communications.routes.ts", (source) =>
+      source.replace(
+        "const context = await readAuthorizedManualEmailContext(",
+        "console.error(req.body);\n      const context = await readAuthorizedManualEmailContext(",
+      ),
+    );
+    expect(problems).toContain(
+      "/api/applications/:id/send-email logs raw candidate, template, provider or database data.",
+    );
+  });
 });
