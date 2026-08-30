@@ -15,9 +15,13 @@ const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "schem
 const targetId = "flow-object-authorization-test-target";
 
 type AuthorizationModule = typeof import("../lib/applicationReadAuthorization");
+type MembershipAuthorizationModule = typeof import("../lib/membershipScopedReadAuthorization");
+type AuthModule = typeof import("../auth");
 type StorageModule = typeof import("../storage");
 
 let authorization: AuthorizationModule;
+let membershipAuthorization: MembershipAuthorizationModule;
+let authModule: AuthModule;
 let storageModule: StorageModule;
 let owner: Client | undefined;
 let runtimePool: { end(): Promise<void> } | undefined;
@@ -76,6 +80,7 @@ async function databaseState(): Promise<string> {
       'memberships', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM organization_members t),
       'jobs', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM jobs t),
       'job_recruiters', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM job_recruiters t),
+      'hiring_manager_invitations', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM hiring_manager_invitations t),
       'applications', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM applications t),
       'candidate_resumes', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM candidate_resumes t),
       'stage_history', (SELECT COALESCE(jsonb_agg(to_jsonb(t) ORDER BY id), '[]'::jsonb) FROM application_stage_history t),
@@ -114,6 +119,11 @@ async function installFixture(): Promise<void> {
       (201,'foreign@example.invalid','x','recruiter',true,'Foreign','Recruiter'),
       (301,'candidate@example.invalid','x','candidate',true,'Test','Candidate'),
       (302,'hm@example.invalid','x','hiring_manager',true,'Test','Manager'),
+      (303,'zeta-foreign-hm@example.invalid','x','hiring_manager',true,'Foreign','Manager'),
+      (304,'alpha-invited-hm@example.invalid','x','hiring_manager',true,'Invited','Manager'),
+      (305,'beta-foreign-invite@example.invalid','x','hiring_manager',true,'Other','Manager'),
+      (306,'invited-recruiter@example.invalid','x','recruiter',true,'Wrong','Role'),
+      (307,'pending-hm@example.invalid','x','hiring_manager',true,'Pending','Manager'),
       (401,'admin@example.invalid','x','super_admin',true,'Platform','Admin');
     INSERT INTO organization_members
       (id,organization_id,user_id,role,seat_assigned,credits_allocated,credits_used,credits_rollover,invited_by)
@@ -127,11 +137,20 @@ async function installFixture(): Promise<void> {
       (id,organization_id,title,location,type,description,original_jd,posted_by,hiring_manager_id,is_active,status,slug)
     VALUES
       (1001,1,'Fixture Role One','Remote','full-time','Fixture description','Fixture description',101,302,false,'pending','fixture-role-one'),
-      (1002,2,'Fixture Role Two','Remote','full-time','Fixture description','Fixture description',201,NULL,false,'pending','fixture-role-two'),
+      (1002,2,'Fixture Role Two','Remote','full-time','Fixture description','Fixture description',201,303,false,'pending','fixture-role-two'),
       (1003,NULL,'Null-org Role','Remote','full-time','Fixture description','Fixture description',101,NULL,false,'pending','null-org-role'),
       (1004,2,'Mismatched Role','Remote','full-time','Fixture description','Fixture description',101,NULL,false,'pending','mismatched-role');
     INSERT INTO job_recruiters (id,organization_id,job_id,recruiter_id,added_by) VALUES
-      (1,1,1001,102,101);
+      (1,1,1001,102,101),
+      (2,1,1001,105,101);
+    INSERT INTO hiring_manager_invitations
+      (id,email,name,token,invited_by,inviter_name,expires_at,status,accepted_at)
+    VALUES
+      (1,'hm@example.invalid','Duplicate manager','fixture-hm-token-1',101,'Primary','2099-01-01','accepted','2026-08-26'),
+      (2,'alpha-invited-hm@example.invalid','Invited manager','fixture-hm-token-2',101,'Primary','2099-01-01','accepted','2026-08-26'),
+      (3,'beta-foreign-invite@example.invalid','Foreign invited manager','fixture-hm-token-3',201,'Foreign','2099-01-01','accepted','2026-08-26'),
+      (4,'invited-recruiter@example.invalid','Wrong role','fixture-hm-token-4',101,'Primary','2099-01-01','accepted','2026-08-26'),
+      (5,'pending-hm@example.invalid','Pending manager','fixture-hm-token-5',101,'Primary','2099-01-01','pending',NULL);
     INSERT INTO candidate_resumes (id,user_id,label,gcs_path,extracted_text,is_default)
     VALUES (9001,301,'Fallback resume','gs://configured/resumes/fallback.pdf','candidate-resume fallback',true);
     INSERT INTO applications
@@ -273,6 +292,8 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
     process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     authorization = await import("../lib/applicationReadAuthorization");
+    membershipAuthorization = await import("../lib/membershipScopedReadAuthorization");
+    authModule = await import("../auth");
     storageModule = await import("../storage");
     runtimePool = (await import("../db")).pool;
   }, 180_000);
@@ -325,6 +346,24 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
       { allowPlatformAdmin },
     ));
 
+  const directory = (actorId: number, allowPlatformAdmin = true) =>
+    readWithoutMutation(() => membershipAuthorization.readAuthorizedHiringManagerDirectory(
+      actorId,
+      { allowPlatformAdmin },
+    ));
+
+  async function seatAdmission(actorId: number, role = "recruiter") {
+    const middleware = authModule.requireSeat();
+    const result: { status?: number; body?: unknown; next: boolean } = { next: false };
+    const req = { user: { id: actorId, role } } as any;
+    const res = {
+      status(code: number) { result.status = code; return this; },
+      json(body: unknown) { result.body = body; return this; },
+    } as any;
+    await middleware(req, res, () => { result.next = true; });
+    return result;
+  }
+
   it("installs the exact pinned three-migration schema before testing", async () => {
     if (!owner) throw new Error("Disposable authorization owner is unavailable.");
     const state = (await owner.query(`
@@ -341,6 +380,90 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
       privacy_columns: 10,
       resume_audit: "resume_access_attempts",
     });
+  });
+
+  it("returns the deduplicated current-org hiring-manager directory in deterministic order", async () => {
+    const primary = await directory(101);
+    const co = await directory(102);
+    expect(primary).toEqual(co);
+    expect(primary).toEqual({ ok: true, rows: [
+      {
+        id: 304,
+        username: "alpha-invited-hm@example.invalid",
+        firstName: "Invited",
+        lastName: "Manager",
+        role: "hiring_manager",
+      },
+      {
+        id: 302,
+        username: "hm@example.invalid",
+        firstName: "Test",
+        lastName: "Manager",
+        role: "hiring_manager",
+      },
+    ] });
+    expect(Object.keys(primary.ok ? primary.rows[0]! : {})).toEqual([
+      "id", "username", "firstName", "lastName", "role",
+    ]);
+  });
+
+  it("keeps foreign, non-hiring-manager and pending invitation rows out of recruiter results", async () => {
+    const encoded = JSON.stringify(await directory(101));
+    for (const forbidden of [
+      "zeta-foreign-hm", "beta-foreign-invite", "invited-recruiter", "pending-hm",
+      "password", "emailVerificationToken", "aiContentFreeUsed",
+    ]) expect(encoded).not.toContain(forbidden);
+    await expect(directory(201)).resolves.toEqual({ ok: true, rows: [
+      {
+        id: 305,
+        username: "beta-foreign-invite@example.invalid",
+        firstName: "Other",
+        lastName: "Manager",
+        role: "hiring_manager",
+      },
+      {
+        id: 303,
+        username: "zeta-foreign-hm@example.invalid",
+        firstName: "Foreign",
+        lastName: "Manager",
+        role: "hiring_manager",
+      },
+    ] });
+  });
+
+  it("returns authorized empty for unseated, removed-membership and unsupported actors", async () => {
+    for (const actorId of [104, 105, 301, 302]) {
+      await expect(directory(actorId)).resolves.toEqual({ ok: true, rows: [] });
+    }
+  });
+
+  it("real current-seat admission denies unseated and no-org retained-assignment recruiters", async () => {
+    await expect(readWithoutMutation(() => seatAdmission(104))).resolves.toEqual({
+      status: 403,
+      body: {
+        error: "Seat required",
+        code: "NO_SEAT",
+        message: "Your seat has been removed. Contact your organization owner.",
+      },
+      next: false,
+    });
+    await expect(readWithoutMutation(() => seatAdmission(105))).resolves.toEqual({
+      status: 403,
+      body: {
+        error: "Organization required",
+        code: "NO_ORGANIZATION",
+        message: "You must create or join an organization to continue.",
+      },
+      next: false,
+    });
+    await expect(readWithoutMutation(() => seatAdmission(101))).resolves.toMatchObject({ next: true });
+  });
+
+  it("keeps platform administration explicit and minimum-projection-only", async () => {
+    const allowed = await directory(401, true);
+    expect(allowed.ok && allowed.rows.map((row) => row.id)).toEqual([304, 305, 302, 307, 303]);
+    expect(allowed.ok && allowed.rows.every((row) => Object.keys(row).length === 5)).toBe(true);
+    await expect(directory(401, false)).resolves.toEqual({ ok: true, rows: [] });
   });
 
   it("allows primary and exact co-recruiters with deterministic minimum stage rows", async () => {

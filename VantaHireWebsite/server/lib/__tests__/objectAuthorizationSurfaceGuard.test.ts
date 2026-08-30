@@ -60,6 +60,19 @@ function fixture(): string {
     join(APP_ROOT, "client", "src", "pages", "application-management-page.tsx"),
     join(root, "client", "src", "pages", "application-management-page.tsx"),
   );
+  cpSync(
+    join(APP_ROOT, "client", "src", "pages", "job-edit-page.tsx"),
+    join(root, "client", "src", "pages", "job-edit-page.tsx"),
+  );
+  cpSync(
+    join(APP_ROOT, "client", "src", "pages", "org-billing-page.tsx"),
+    join(root, "client", "src", "pages", "org-billing-page.tsx"),
+  );
+  mkdirSync(join(root, "client", "src", "components"), { recursive: true });
+  cpSync(
+    join(APP_ROOT, "client", "src", "components", "JobPostingStepper.tsx"),
+    join(root, "client", "src", "components", "JobPostingStepper.tsx"),
+  );
   for (const file of ["package.json", "package-lock.json", "vitest.server.config.ts"] as const) {
     cpSync(join(APP_ROOT, file), join(root, file));
   }
@@ -570,5 +583,126 @@ describe("object authorization surface guard", () => {
       `${source}\n// forbidden drift\n`,
     );
     expect(problems).toContain("governed/frozen file drifted: client/src/components/ResumePreviewModal.tsx");
+  });
+
+  it("rejects restoring the no-organization exception on job applications", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace("requireSeat(), async (req: Request", "requireSeat({ allowNoOrg: true }), async (req: Request"),
+    );
+    expect(problems).toContain("/api/jobs/:id/applications restores the no-organization seat exception.");
+  });
+
+  it("rejects removing the job-application seat gate", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        'app.get("/api/jobs/:id/applications", requireRole([\'recruiter\', \'super_admin\']), requireSeat(),',
+        'app.get("/api/jobs/:id/applications", requireRole([\'recruiter\', \'super_admin\']),',
+      ),
+    );
+    expect(problems).toContain("/api/jobs/:id/applications lost required handler anchor: requireSeat()");
+  });
+
+  it("rejects restoring requireAuth-only seat usage", () => {
+    const problems = mutate(fixture(), "server/subscription.routes.ts", (source) =>
+      source.replace("requireRole(['recruiter']), requireSeat(),", "requireAuth,"),
+    );
+    expect(problems).toContain("/api/subscription/seats/usage restores requireAuth-only admission.");
+  });
+
+  it("rejects broadening seat usage to a non-recruiter role", () => {
+    const problems = mutate(fixture(), "server/subscription.routes.ts", (source) =>
+      source.replace("requireRole(['recruiter']), requireSeat(),", "requireRole(['recruiter', 'candidate']), requireSeat(),"),
+    );
+    expect(problems).toContain("/api/subscription/seats/usage lost required handler anchor: requireRole(['recruiter'])");
+  });
+
+  it("rejects loss of the exact hiring-manager role filter", () => {
+    const problems = mutate(fixture(), "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace('value === "hiring_manager"', 'typeof value === "string"'),
+    );
+    expect(problems).toContain('membership-scoped directory anchor is missing: value === "hiring_manager"');
+  });
+
+  it("rejects restoring a global user read", () => {
+    const problems = mutate(fixture(), "server/routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedHiringManagerDirectory(",
+        "await storage.getUsers();\n    const result = await readAuthorizedHiringManagerDirectory(",
+      ),
+    );
+    expect(problems).toContain("/api/users restores a global or post-read identity filter.");
+  });
+
+  it("rejects post-read JavaScript identity filtering", () => {
+    const problems = mutate(fixture(), "server/routes.ts", (source) =>
+      source.replace("res.json(result.rows);", "res.json(result.rows.filter((row) => row.role === role));"),
+    );
+    expect(problems).toContain("/api/users restores a global or post-read identity filter.");
+  });
+
+  it("rejects loss of current seated membership in the directory", () => {
+    const problems = mutate(fixture(), "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace("seated_membership.seat_assigned = TRUE", "TRUE"),
+    );
+    expect(problems).toContain("membership-scoped directory anchor is missing: seated_membership.seat_assigned = TRUE");
+  });
+
+  it("rejects loss of directory job-organization equality", () => {
+    const problems = mutate(fixture(), "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace("${jobs.organizationId} = actor_context.organization_id", "TRUE"),
+    );
+    expect(problems).toContain(
+      "membership-scoped directory anchor is missing: ${jobs.organizationId} = actor_context.organization_id",
+    );
+  });
+
+  it("rejects widening the hiring-manager projection", () => {
+    const problems = mutate(fixture(), "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace("role AS role\n", "role AS role, password AS password\n"),
+    );
+    expect(problems).toContain("hiring-manager directory selects a forbidden identity field.");
+  });
+
+  it("rejects changing the fixed hiring-manager role", () => {
+    const problems = mutate(fixture(), "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace("hiring_manager.role = 'hiring_manager'", "hiring_manager.role = 'recruiter'"),
+    );
+    expect(problems).toContain("membership-scoped directory anchor is missing: hiring_manager.role = 'hiring_manager'");
+  });
+
+  it("rejects loss of distinct deterministic directory ordering", () => {
+    const root = fixture();
+    const first = mutate(root, "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace("SELECT DISTINCT hiring_manager.id AS id", "SELECT hiring_manager.id AS id"),
+    );
+    expect(first).toContain(
+      "membership-scoped directory anchor is missing: SELECT DISTINCT hiring_manager.id AS id",
+    );
+    const second = mutate(root, "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace("ORDER BY normalized_username, id", "ORDER BY id"),
+    );
+    expect(second).toContain("membership-scoped directory anchor is missing: ORDER BY normalized_username, id");
+  });
+
+  it("rejects a directory response before authorization", () => {
+    const problems = mutate(fixture(), "server/routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedHiringManagerDirectory(",
+        "res.json([]);\n    const result = await readAuthorizedHiringManagerDirectory(",
+      ),
+    );
+    expect(problems).toContain("/api/users parser/authorization/response order is unsafe.");
+  });
+
+  it("rejects raw user-directory logging", () => {
+    const problems = mutate(fixture(), "server/routes.ts", (source) =>
+      source.replace("res.json(result.rows);", "console.error(result.rows);\n    res.json(result.rows);"),
+    );
+    expect(problems).toContain("/api/users logs raw directory or database data.");
+  });
+
+  it("rejects drift in frozen seat mutation code", () => {
+    const problems = mutate(fixture(), "server/lib/seatService.ts", (source) => `${source}\n// forbidden drift\n`);
+    expect(problems).toContain("governed/frozen file drifted: server/lib/seatService.ts");
   });
 });

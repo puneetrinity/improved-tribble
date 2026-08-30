@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import {
   checkResumeIngestOcr,
   collectAuthoredFiles,
+  composeSharedGuardProblems,
+  validatePinnedOcrHistory,
   validateResumeIngestOcrSources,
 } from '../../../scripts/check-resume-ingest-ocr.mjs';
 
@@ -63,6 +65,16 @@ const authoredFiles = [
   'server/object-authorization/surfaces.json',
 ];
 
+const pinnedHistory = {
+  sourceIsAncestorOfMerge: true,
+  mergeIsAncestorOfHead: true,
+  sourceTree: 'b1674cdd942bdf13f6c486b1a42714a879016fd3',
+  mergeTree: '2657e7c19c2de792f14fff87142e8b7bf9c2c1eb',
+  committedDiff: authoredFiles.map((file) => (
+    file.startsWith('.github/') ? file : `VantaHireWebsite/${file}`
+  )).join('\n'),
+};
+
 describe('ordinary-ingest OCR source guard', () => {
   for (const [label, file, from, to] of mutations) {
     it(`rejects ${label} mutation`, () => {
@@ -103,7 +115,36 @@ describe('ordinary-ingest OCR source guard', () => {
     ]);
   });
 
-  it('accepts the full exact-boundary worktree', () => {
+  it('accepts the immutable shipped OCR range independently of later packages', () => {
+    expect(validatePinnedOcrHistory(pinnedHistory)).toEqual([]);
+  });
+
+  it.each([
+    ['source ancestry', { sourceIsAncestorOfMerge: false }, 'OCR source-to-merge ancestry pin drifted.'],
+    ['merge ancestry', { mergeIsAncestorOfHead: false }, 'OCR merge is not an ancestor of HEAD.'],
+    ['source tree', { sourceTree: '0'.repeat(40) }, 'OCR source tree pin drifted.'],
+    ['merge tree', { mergeTree: '0'.repeat(40) }, 'OCR merge tree pin drifted.'],
+  ])('fails closed on %s drift', (_label, mutation, expected) => {
+    expect(validatePinnedOcrHistory({ ...pinnedHistory, ...mutation })).toContain(expected);
+  });
+
+  it('rejects missing or extra files in the immutable OCR range', () => {
+    const missing = pinnedHistory.committedDiff.split('\n').slice(1).join('\n');
+    const extra = `${pinnedHistory.committedDiff}\nVantaHireWebsite/server/undeclared.ts`;
+    expect(validatePinnedOcrHistory({ ...pinnedHistory, committedDiff: missing }))
+      .toEqual([expect.stringContaining('eleven-file OCR boundary drifted:')]);
+    expect(validatePinnedOcrHistory({ ...pinnedHistory, committedDiff: extra }))
+      .toEqual([expect.stringContaining('eleven-file OCR boundary drifted:')]);
+  });
+
+  it('propagates current shared-governance failures without freezing their implementations', () => {
+    expect(composeSharedGuardProblems(
+      ['candidate-privacy-current-failure'],
+      ['object-authorization-current-failure'],
+    )).toEqual(['candidate-privacy-current-failure', 'object-authorization-current-failure']);
+  });
+
+  it('accepts a later separately-governed package without inflating the shipped OCR boundary', () => {
     expect(checkResumeIngestOcr(root)).toEqual([]);
   });
 });
