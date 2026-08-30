@@ -549,8 +549,8 @@ describe("object authorization surface guard", () => {
   it("rejects denial-code drift on resume GET", () => {
     const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
       source.replace(
-        "res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });",
-        "res.status(403).json({ code: 'FOREIGN_APPLICATION' });",
+        "if (!actorRole) {\n      res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });",
+        "if (!actorRole) {\n      res.status(403).json({ code: 'FOREIGN_APPLICATION' });",
       ),
     );
     expect(problems).toContain(
@@ -699,6 +699,130 @@ describe("object authorization surface guard", () => {
       source.replace("res.json(result.rows);", "console.error(result.rows);\n    res.json(result.rows);"),
     );
     expect(problems).toContain("/api/users logs raw directory or database data.");
+  });
+
+  it("rejects loss of workflow seated membership", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("${organizationMembers.seatAssigned} = TRUE", "TRUE"),
+    );
+    expect(problems).toContain(
+      "workflow authorization anchor is missing: ${organizationMembers.seatAssigned} = TRUE",
+    );
+  });
+
+  it("rejects loss of workflow application-job organization equality", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("${applications.organizationId} = ${jobs.organizationId}", "TRUE"),
+    );
+    expect(problems).toContain(
+      "workflow authorization anchor must occur in both authorization CTEs: ${applications.organizationId} = ${jobs.organizationId}",
+    );
+  });
+
+  it("rejects loss of the workflow privacy predicate", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("applicationPrivacyAllowed(false)", "sql`TRUE`"),
+    );
+    expect(problems).toContain(
+      "workflow authorization anchor must occur in both authorization CTEs: applicationPrivacyAllowed(false)",
+    );
+  });
+
+  it("rejects a foreign stage admitted to the stage command", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("${pipelineStages.organizationId} = locked_application.organization_id", "TRUE"),
+    );
+    expect(problems).toContain(
+      "stage workflow anchor is missing: ${pipelineStages.organizationId} = locked_application.organization_id",
+    );
+  });
+
+  it("rejects a foreign stage admitted to the bulk interview command", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("target_stage.organization_id = ${applications.organizationId}", "TRUE"),
+    );
+    expect(problems).toContain(
+      "bulk workflow anchor is missing: target_stage.organization_id = ${applications.organizationId}",
+    );
+  });
+
+  it("rejects partial bulk writes", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("authorization_count.requested_count = authorization_count.authorized_count", "TRUE"),
+    );
+    expect(problems).toContain(
+      "bulk workflow must fence both mutation and result assembly on complete authorization.",
+    );
+  });
+
+  it("rejects loss of the atomic legacy-note compatibility projection", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("compatibility_projection AS", "compatibility_removed AS"),
+    );
+    expect(problems).toContain("assessment workflow anchor is missing: compatibility_projection AS");
+  });
+
+  it("rejects writing the legacy shared application rating", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace(
+        "const result = await db.execute(sql`",
+        "const forbidden = sql`${applications.rating}`;\n    const result = await db.execute(sql`",
+      ),
+    );
+    expect(problems).toContain("workflow rating writes the legacy shared applications.rating field.");
+  });
+
+  it("rejects broadening hiring-manager feedback authority", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace(
+        "actor.role = 'hiring_manager' AND ${jobs.hiringManagerId} = ${actorId}",
+        "actor.role = 'hiring_manager'",
+      ),
+    );
+    expect(problems).toContain(
+      "team-feedback workflow anchor is missing: actor.role = 'hiring_manager' AND ${jobs.hiringManagerId} = ${actorId}",
+    );
+  });
+
+  it("rejects an id-only workflow route fallback", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const result = await addAuthorizedApplicationReviewerNote(",
+        "await storage.getApplication(appId);\n      const result = await addAuthorizedApplicationReviewerNote(",
+      ),
+    );
+    expect(problems).toContain("/api/applications/:id/notes restores an id-only or route-owned workflow read/write.");
+  });
+
+  it("rejects candidate contact before the stage command", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace(
+        "const result = await moveAuthorizedApplicationStage(",
+        "runPrivacyCheckedApplicationSideEffect(appId, 'forbidden', () => sendStatusUpdateNotification(appId, 'x'));\n      const result = await moveAuthorizedApplicationStage(",
+      ),
+    );
+    expect(problems).toContain("/api/applications/:id/stage can contact a candidate before its workflow command succeeds.");
+  });
+
+  it("rejects raw workflow route logging", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace("const result = await setAuthorizedApplicationReviewerRating(", "console.error(req.body);\n      const result = await setAuthorizedApplicationReviewerRating("),
+    );
+    expect(problems).toContain("/api/applications/:id/rating logs raw workflow or database data.");
+  });
+
+  it("rejects workflow migration checksum drift", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0003_application_workflow_assessments.sql", (source) =>
+      `${source}\n-- forbidden workflow drift\n`,
+    );
+    expect(problems).toContain("workflow migration checksum does not match migration 0003.");
+  });
+
+  it("rejects removal of a workflow migration constraint", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0003_application_workflow_assessments.sql", (source) =>
+      source.replace("application_reviewer_ratings_rating_check", "application_reviewer_ratings_rating_removed"),
+    );
+    expect(problems).toContain("workflow migration anchor is missing: application_reviewer_ratings_rating_check");
   });
 
   it("rejects drift in frozen seat mutation code", () => {

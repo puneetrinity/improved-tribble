@@ -1,4 +1,4 @@
-import { pgTable, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -282,11 +282,61 @@ export const applicationFeedback = pgTable("application_feedback", {
   overallScore: integer("overall_score").notNull(), // 1-5 rating
   recommendation: text("recommendation").notNull(), // 'advance', 'hold', 'reject'
   notes: text("notes"), // Detailed feedback notes
+  rubricVersion: text("rubric_version").notNull().default("legacy-unversioned-v1"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   applicationIdIdx: index("application_feedback_application_id_idx").on(table.applicationId),
   authorIdIdx: index("application_feedback_author_id_idx").on(table.authorId),
+}));
+
+// Wave 2G: append-only, attributable recruiter notes. The legacy
+// applications.recruiter_notes array remains a compatibility projection only.
+export const applicationReviewerNotes = pgTable("application_reviewer_notes", {
+  id: serial("id").primaryKey(),
+  applicationId: integer("application_id").notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  authorId: integer("author_id").notNull().references(() => users.id),
+  note: text("note").notNull(),
+  visibility: text("visibility").notNull().default("organization_private"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  applicationTimeIdx: index("application_reviewer_notes_application_time_idx")
+    .on(table.applicationId, table.createdAt, table.id),
+  organizationIdx: index("application_reviewer_notes_organization_idx").on(table.organizationId),
+  authorIdx: index("application_reviewer_notes_author_idx").on(table.authorId),
+  noteLengthCheck: check(
+    "application_reviewer_notes_note_length_check",
+    sql`char_length(btrim(${table.note})) BETWEEN 1 AND 2000`,
+  ),
+  visibilityCheck: check(
+    "application_reviewer_notes_visibility_check",
+    sql`${table.visibility} = 'organization_private'`,
+  ),
+}));
+
+// Wave 2G: one server-owned rating per application/reviewer/rubric contract.
+// applications.rating remains legacy shared state and is never written by 2G.
+export const applicationReviewerRatings = pgTable("application_reviewer_ratings", {
+  applicationId: integer("application_id").notNull().references(() => applications.id, { onDelete: 'cascade' }),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
+  reviewerId: integer("reviewer_id").notNull().references(() => users.id),
+  rating: integer("rating").notNull(),
+  rubricVersion: text("rubric_version").notNull().default("application-rating-v1"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.applicationId, table.reviewerId] }),
+  organizationIdx: index("application_reviewer_ratings_organization_idx").on(table.organizationId),
+  reviewerIdx: index("application_reviewer_ratings_reviewer_idx").on(table.reviewerId),
+  ratingCheck: check(
+    "application_reviewer_ratings_rating_check",
+    sql`${table.rating} BETWEEN 1 AND 5`,
+  ),
+  rubricVersionCheck: check(
+    "application_reviewer_ratings_rubric_version_check",
+    sql`${table.rubricVersion} ~ '^[a-z0-9][a-z0-9-]{0,79}$'`,
+  ),
 }));
 
 // ATS: Email templates
@@ -1735,6 +1785,8 @@ export const applicationsRelations = relations(applications, ({ one, many }) => 
   }),
   stageHistory: many(applicationStageHistory),
   feedback: many(applicationFeedback),
+  reviewerNotes: many(applicationReviewerNotes),
+  reviewerRatings: many(applicationReviewerRatings),
   clientFeedback: many(clientFeedback),
   shortlistItems: many(clientShortlistItems),
 }));
@@ -1773,6 +1825,36 @@ export const applicationFeedbackRelations = relations(applicationFeedback, ({ on
   }),
   author: one(users, {
     fields: [applicationFeedback.authorId],
+    references: [users.id],
+  }),
+}));
+
+export const applicationReviewerNotesRelations = relations(applicationReviewerNotes, ({ one }) => ({
+  application: one(applications, {
+    fields: [applicationReviewerNotes.applicationId],
+    references: [applications.id],
+  }),
+  organization: one(organizations, {
+    fields: [applicationReviewerNotes.organizationId],
+    references: [organizations.id],
+  }),
+  author: one(users, {
+    fields: [applicationReviewerNotes.authorId],
+    references: [users.id],
+  }),
+}));
+
+export const applicationReviewerRatingsRelations = relations(applicationReviewerRatings, ({ one }) => ({
+  application: one(applications, {
+    fields: [applicationReviewerRatings.applicationId],
+    references: [applications.id],
+  }),
+  organization: one(organizations, {
+    fields: [applicationReviewerRatings.organizationId],
+    references: [organizations.id],
+  }),
+  reviewer: one(users, {
+    fields: [applicationReviewerRatings.reviewerId],
     references: [users.id],
   }),
 }));
@@ -2575,6 +2657,8 @@ export type ApplicationStageHistory = typeof applicationStageHistory.$inferSelec
 
 export type ApplicationFeedback = typeof applicationFeedback.$inferSelect;
 export type InsertApplicationFeedback = z.infer<typeof insertApplicationFeedbackSchema>;
+export type ApplicationReviewerNote = typeof applicationReviewerNotes.$inferSelect;
+export type ApplicationReviewerRating = typeof applicationReviewerRatings.$inferSelect;
 
 export type EmailAuditLog = typeof emailAuditLog.$inferSelect;
 

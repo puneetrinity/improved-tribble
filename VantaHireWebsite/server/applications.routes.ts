@@ -32,7 +32,6 @@ import {
   insertApplicationSchema,
   recruiterAddApplicationSchema,
   insertPipelineStageSchema,
-  insertApplicationFeedbackSchema,
   applications,
   candidateOutreachSchedules,
   jobSourcedCandidates,
@@ -85,6 +84,15 @@ import {
   readAuthorizedApplicationResumeFile,
   readAuthorizedApplicationStageHistory,
 } from './lib/applicationReadAuthorization';
+import {
+  addAuthorizedApplicationFeedback,
+  addAuthorizedApplicationReviewerNote,
+  moveAuthorizedApplicationStage,
+  readAuthorizedApplicationFeedback,
+  scheduleAuthorizedApplicationInterview,
+  scheduleAuthorizedBulkApplicationInterviews,
+  setAuthorizedApplicationReviewerRating,
+} from './lib/applicationWorkflowAuthorization';
 
 // Base URL for email links
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
@@ -249,15 +257,29 @@ function toCandidateApplicationView(application: Application & { job: Job }) {
 
 // Validation schemas
 const updateStageSchema = z.object({
-  stageId: z.number().int().positive(),
-  notes: z.string().optional(),
+  stageId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  notes: z.string().trim().max(2000).optional(),
 });
 
 const scheduleInterviewSchema = z.object({
   date: z.string().optional(),
-  time: z.string().optional(),
-  location: z.string().optional(),
-  notes: z.string().optional(),
+  time: z.string().max(200).optional(),
+  location: z.string().max(500).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+const reviewerNoteSchema = z.object({
+  note: z.string().trim().min(1).max(2000),
+});
+
+const reviewerRatingSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+});
+
+const applicationFeedbackBodySchema = z.object({
+  overallScore: z.number().int().min(1).max(5),
+  recommendation: z.enum(['advance', 'hold', 'reject']),
+  notes: z.string().trim().max(2000).optional(),
 });
 
 const requestHiringManagerReviewSchema = z.object({
@@ -400,20 +422,6 @@ export function registerApplicationsRoutes(
   csrfProtection: CsrfMiddleware,
   upload: Multer
 ): void {
-  const ensureHiringManagerOwnsApplication = async (userId: number, applicationId: number) => {
-    const application = await storage.getApplication(applicationId);
-    if (!application) {
-      return { ok: false as const, status: 404, error: 'Application not found' };
-    }
-
-    const job = await storage.getJob(application.jobId);
-    if (!job || job.hiringManagerId !== userId) {
-      return { ok: false as const, status: 403, error: 'Access denied' };
-    }
-
-    return { ok: true as const };
-  };
-
   // ============= APPLICATION SUBMISSION ROUTES =============
 
   // Submit job application with resume upload
@@ -1064,13 +1072,13 @@ export function registerApplicationsRoutes(
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
         const bodySchema = z.object({
-          applicationIds: z.array(z.number().int().positive()).min(1),
+          applicationIds: z.array(z.number().int().positive().max(Number.MAX_SAFE_INTEGER)).min(1),
           start: z.string(),
           intervalHours: z.number().min(0).max(24).default(0),
-          location: z.string().min(1),
-          timeRangeLabel: z.string().optional(),
-          notes: z.string().optional(),
-          stageId: z.number().int().positive().optional(),
+          location: z.string().trim().min(1).max(500),
+          timeRangeLabel: z.string().max(200).optional(),
+          notes: z.string().max(2000).optional(),
+          stageId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
         });
 
         const parsed = bodySchema.safeParse(req.body);
@@ -1082,16 +1090,7 @@ export function registerApplicationsRoutes(
           return;
         }
 
-        const data = parsed.data as z.infer<typeof bodySchema>;
-        const {
-          applicationIds,
-          start,
-          intervalHours,
-          location,
-          timeRangeLabel,
-          notes,
-          stageId,
-        } = data;
+        const { applicationIds, start, intervalHours, location, timeRangeLabel, notes, stageId } = parsed.data;
 
         // Normalize base start date
         let baseDate: Date | undefined;
@@ -1109,96 +1108,53 @@ export function registerApplicationsRoutes(
           return;
         }
 
-        const results: { id: number; success: boolean; error?: string }[] = [];
+        const normalizedIds = Array.from(new Set(applicationIds));
+        const items = normalizedIds.map((applicationId, index) => ({
+          applicationId,
+          interviewDate: new Date(baseDate.getTime() + intervalHours * 60 * 60 * 1000 * index),
+          interviewTime: timeRangeLabel?.trim() || null,
+          interviewLocation: location,
+          interviewNotes: notes?.trim() || null,
+        }));
 
-        const orgResult = await getUserOrganization(req.user!.id);
-        const organizationId = req.user!.role === 'super_admin' && !orgResult ? undefined : orgResult?.organization.id;
-
-        // Preload pipeline stages and map stageId -> order
-        let stageOrderMap = new Map<number, number>();
-        let targetStageOrder: number | null = null;
-        const targetStageId = stageId ?? null;
-        if (targetStageId !== null) {
-          const stages = await storage.getPipelineStages(organizationId, req.user!.id);
-          stageOrderMap = new Map(stages.map((s) => [s.id, s.order ?? 0]));
-          targetStageOrder = stageOrderMap.get(targetStageId) ?? null;
-        }
-
-        for (let index = 0; index < applicationIds.length; index++) {
-          const appId = Number(applicationIds[index]);
-          try {
-            const offsetMs = intervalHours * 60 * 60 * 1000 * index;
-            const slotDate = new Date(baseDate.getTime() + offsetMs);
-
-            // Persist interview details
-            const interviewFields: { date?: Date; time?: string; location?: string; notes?: string } = {
-              date: slotDate,
-              location,
-            };
-            if (typeof timeRangeLabel === "string" && timeRangeLabel.length > 0) {
-              interviewFields.time = timeRangeLabel;
-            }
-            if (typeof notes === "string" && notes.length > 0) {
-              interviewFields.notes = notes;
-            }
-
-            // Get current stage order for comparison (if stage update is needed)
-            let stageUpdateParams: { targetStageId: number; changedBy: number; notes?: string; currentStageOrder: number | null; targetStageOrder: number } | undefined;
-            if (targetStageId !== null && targetStageOrder !== null) {
-              const appRecord = await storage.getApplication(appId);
-              const currentStageId = appRecord?.currentStage ?? null;
-              const currentOrder = currentStageId !== null ? stageOrderMap.get(currentStageId) ?? null : null;
-
-              stageUpdateParams = {
-                targetStageId,
-                changedBy: req.user!.id,
-                currentStageOrder: currentOrder,
-                targetStageOrder,
-              };
-              // Only add notes if defined (exactOptionalPropertyTypes compatibility)
-              if (notes !== undefined) {
-                stageUpdateParams.notes = notes;
-              }
-            }
-
-            // Use atomic method for interview + stage update (prevents partial state)
-            await storage.scheduleInterviewWithStage(appId, interviewFields, stageUpdateParams);
-
-            // Fire-and-forget interview invite via email and WhatsApp (if automation enabled)
-            const autoNotifications = process.env.EMAIL_AUTOMATION_ENABLED === "true" || process.env.EMAIL_AUTOMATION_ENABLED === "1" || process.env.NOTIFICATION_AUTOMATION_ENABLED === "true";
-            if (autoNotifications) {
-              const dateStr = slotDate.toISOString();
-              const timeLabel = timeRangeLabel ?? "";
-              runPrivacyCheckedApplicationSideEffect(
-                appId,
-                'bulk_interview_notification',
-                () => sendInterviewInvitationNotification(appId, {
-                  date: dateStr,
-                  time: timeLabel,
-                  location,
-                }),
-              );
-            }
-
-            results.push({ id: appId, success: true });
-          } catch (err: any) {
-            console.error("Bulk interview scheduling error:", err);
-            results.push({
-              id: appId,
-              success: false,
-              error: err?.message ?? "Unknown error",
-            });
+        const result = await scheduleAuthorizedBulkApplicationInterviews(
+          req.user!.id,
+          items,
+          stageId ?? null,
+          notes?.trim() || null,
+          { allowPlatformAdmin: true },
+        );
+        if (!result.ok) {
+          if (result.reason === 'not_found') {
+            res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+          } else {
+            res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
           }
+          return;
         }
 
-        const scheduledCount = results.filter((r) => r.success).length;
-        const failed = results.filter((r) => !r.success);
+        const autoNotifications = process.env.EMAIL_AUTOMATION_ENABLED === "true"
+          || process.env.EMAIL_AUTOMATION_ENABLED === "1"
+          || process.env.NOTIFICATION_AUTOMATION_ENABLED === "true";
+        if (autoNotifications) {
+          result.value.forEach((scheduled) => {
+            runPrivacyCheckedApplicationSideEffect(
+              scheduled.applicationId,
+              'bulk_interview_notification',
+              () => sendInterviewInvitationNotification(scheduled.applicationId, {
+                date: scheduled.interviewDate ?? '',
+                time: scheduled.interviewTime ?? '',
+                location: scheduled.interviewLocation ?? '',
+              }),
+            );
+          });
+        }
 
         res.json({
-          total: applicationIds.length,
-          scheduledCount,
-          failedCount: failed.length,
-          failed,
+          total: normalizedIds.length,
+          scheduledCount: result.value.length,
+          failedCount: 0,
+          failed: [],
         });
         return;
       } catch (error) {
@@ -1678,14 +1634,9 @@ export function registerApplicationsRoutes(
   // Move application to a new stage
   app.patch("/api/applications/:id/stage", csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
 
@@ -1698,23 +1649,26 @@ export function registerApplicationsRoutes(
         return;
       }
 
-      const { stageId, notes } = validation.data;
-
-      const orgResult = await getUserOrganization(req.user!.id);
-      const organizationId = req.user!.role === 'super_admin' && !orgResult ? undefined : orgResult?.organization.id;
-      const stages = await storage.getPipelineStages(organizationId, req.user!.id);
-      const targetStage = stages.find(s => s.id === stageId);
-      if (!targetStage) {
-        res.status(400).json({ error: `Invalid stage ID: ${stageId}` });
+      const result = await moveAuthorizedApplicationStage(
+        req.user!.id,
+        appId,
+        validation.data.stageId,
+        validation.data.notes ?? null,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
         return;
       }
 
-      await storage.updateApplicationStage(appId, stageId, req.user!.id, notes);
-
       // Fire-and-forget: automated status notification via email and WhatsApp (if enabled)
       const autoNotifications = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1' || process.env.NOTIFICATION_AUTOMATION_ENABLED === 'true';
-      if (autoNotifications && targetStage.name) {
-        const stageName = targetStage.name.toLowerCase();
+      if (autoNotifications) {
+        const stageName = result.value.stageName.toLowerCase();
         if (stageName.includes('offer') || stageName.includes('hired')) {
           runPrivacyCheckedApplicationSideEffect(appId, 'offer_notification', () => sendOfferNotification(appId));
         } else if (stageName.includes('reject')) {
@@ -1723,7 +1677,7 @@ export function registerApplicationsRoutes(
           runPrivacyCheckedApplicationSideEffect(
             appId,
             'status_notification',
-            () => sendStatusUpdateNotification(appId, targetStage.name),
+            () => sendStatusUpdateNotification(appId, result.value.stageName),
           );
         }
       }
@@ -1828,14 +1782,9 @@ export function registerApplicationsRoutes(
   // Schedule interview
   app.patch("/api/applications/:id/interview", csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
 
@@ -1865,12 +1814,29 @@ export function registerApplicationsRoutes(
           if (!isNaN(parsed.getTime())) ts = parsed;
         }
       }
-      const updated = await storage.scheduleInterview(appId, {
-        ...(ts !== undefined && { date: ts }),
-        ...(time !== undefined && { time }),
-        ...(location !== undefined && { location }),
-        ...(notes !== undefined && { notes })
-      });
+      if (date && (!ts || Number.isNaN(ts.getTime()))) {
+        res.status(400).json({ error: 'Validation error', details: [{ message: 'Invalid interview date' }] });
+        return;
+      }
+      const result = await scheduleAuthorizedApplicationInterview(
+        req.user!.id,
+        appId,
+        {
+          date: ts ?? null,
+          time: time ?? null,
+          location: location ?? null,
+          notes: notes ?? null,
+        },
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
+        return;
+      }
 
       const autoNotifications = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1' || process.env.NOTIFICATION_AUTOMATION_ENABLED === 'true';
       if (autoNotifications && date && time && location) {
@@ -1881,7 +1847,7 @@ export function registerApplicationsRoutes(
         );
       }
 
-      res.json(updated);
+      res.json(result.value);
       return;
     } catch (e) { next(e); }
   });
@@ -1920,23 +1886,31 @@ export function registerApplicationsRoutes(
   // Add recruiter note
   app.post("/api/applications/:id/notes", csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const validation = reviewerNoteSchema.safeParse(req.body);
+      if (!validation.success) {
+        res.status(400).json({ error: 'Validation error', details: validation.error.errors });
         return;
       }
-      const { note } = req.body;
-      if (!note) {
-        res.status(400).json({ error: 'note required' });
+      const result = await addAuthorizedApplicationReviewerNote(
+        req.user!.id,
+        appId,
+        validation.data.note,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
         return;
       }
-      const updated = await storage.addRecruiterNote(appId, note);
-      res.json(updated);
+      res.status(201).json(result.value);
       return;
     } catch (e) { next(e); }
   });
@@ -1944,23 +1918,31 @@ export function registerApplicationsRoutes(
   // Set rating
   app.patch("/api/applications/:id/rating", csrfProtection, requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const validation = reviewerRatingSchema.safeParse(req.body);
+      if (!validation.success) {
+        res.status(400).json({ error: 'Validation error', details: validation.error.errors });
         return;
       }
-      const { rating } = req.body;
-      if (typeof rating !== 'number' || rating < 1 || rating > 5) {
-        res.status(400).json({ error: 'rating 1-5' });
+      const result = await setAuthorizedApplicationReviewerRating(
+        req.user!.id,
+        appId,
+        validation.data.rating,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
         return;
       }
-      const updated = await storage.setApplicationRating(appId, rating);
-      res.json(updated);
+      res.json(result.value);
       return;
     } catch (e) { next(e); }
   });
@@ -2593,90 +2575,38 @@ export function registerApplicationsRoutes(
   // Get feedback for an application
   app.get("/api/applications/:id/feedback", requireRole(['recruiter', 'super_admin', 'hiring_manager']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
-        return;
-      }
-
-      if (req.user!.role === 'hiring_manager') {
-        const access = await ensureHiringManagerOwnsApplication(req.user!.id, appId);
-        if (!access.ok) {
-          res.status(access.status).json({ error: access.error });
-          return;
-        }
-      }
-
-      const feedback = await db
-        .select({
-          id: applicationFeedback.id,
-          applicationId: applicationFeedback.applicationId,
-          authorId: applicationFeedback.authorId,
-          overallScore: applicationFeedback.overallScore,
-          recommendation: applicationFeedback.recommendation,
-          notes: applicationFeedback.notes,
-          createdAt: applicationFeedback.createdAt,
-          updatedAt: applicationFeedback.updatedAt,
-        })
-        .from(applicationFeedback)
-        .where(eq(applicationFeedback.applicationId, appId))
-        .orderBy(sql`${applicationFeedback.createdAt} DESC`);
-
-      const feedbackWithAuthors = await Promise.all(
-        feedback.map(async (fb: typeof feedback[0]) => {
-          const author = await storage.getUser(fb.authorId);
-          return {
-            ...fb,
-            author: author ? {
-              id: author.id,
-              firstName: author.firstName,
-              lastName: author.lastName,
-              role: author.role,
-            } : null,
-          };
-        })
+      const result = await readAuthorizedApplicationFeedback(
+        req.user!.id,
+        appId,
+        { allowPlatformAdmin: true },
       );
-
-      res.json(feedbackWithAuthors);
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
+        return;
+      }
+      res.json(result.rows);
       return;
-    } catch (error) {
-      console.error('[Feedback Get] Error:', error);
-      next(error);
-    }
+    } catch (error) { next(error); }
   });
 
   // Add feedback to an application
   app.post("/api/applications/:id/feedback", csrfProtection, requireRole(['recruiter', 'super_admin', 'hiring_manager']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
-        return;
-      }
-
-      if (req.user!.role === 'hiring_manager') {
-        const access = await ensureHiringManagerOwnsApplication(req.user!.id, appId);
-        if (!access.ok) {
-          res.status(access.status).json({ error: access.error });
-          return;
-        }
-      }
-
-      const validation = insertApplicationFeedbackSchema.safeParse({
-        ...req.body,
-        applicationId: appId,
-      });
-
+      const validation = applicationFeedbackBodySchema.safeParse(req.body);
       if (!validation.success) {
         res.status(400).json({
           error: 'Validation error',
@@ -2684,37 +2614,31 @@ export function registerApplicationsRoutes(
         });
         return;
       }
-
-      const [newFeedback] = await db
-        .insert(applicationFeedback)
-        .values({
-          applicationId: appId,
-          authorId: req.user!.id,
+      const result = await addAuthorizedApplicationFeedback(
+        req.user!.id,
+        appId,
+        {
           overallScore: validation.data.overallScore,
           recommendation: validation.data.recommendation,
           notes: validation.data.notes || null,
-        })
-        .returning();
-
-      const author = await storage.getUser(req.user!.id);
+        },
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
+        return;
+      }
 
       res.status(201).json({
         message: 'Feedback added successfully',
-        feedback: {
-          ...newFeedback,
-          author: author ? {
-            id: author.id,
-            firstName: author.firstName,
-            lastName: author.lastName,
-            role: author.role,
-          } : null,
-        },
+        feedback: result.value,
       });
       return;
-    } catch (error) {
-      console.error('[Feedback Add] Error:', error);
-      next(error);
-    }
+    } catch (error) { next(error); }
   });
 
   // ============= APPLICATION STATUS MANAGEMENT =============

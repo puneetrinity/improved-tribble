@@ -43,7 +43,6 @@ const FROZEN = {
   'server/bulkResumeImport.routes.ts': '7b0a7c07c42360c8d86ad950607335b7a2714318b7f685d7b502411d52abfa6e',
   'server/lib/resumeImportProcessor.ts': '1314be8df83e520c46c1eab5831d468f42659f3a4783a124e38c224381ad92e2',
   'server/gcs-storage.ts': '5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802',
-  'shared/schema.ts': '33aff02818a423ae392b03c135414904cbe93e92b63e5b98f1869705a38cc066',
   'package.json': '7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe',
   'package-lock.json': 'b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539',
   'vitest.server.config.ts': 'aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe',
@@ -51,7 +50,6 @@ const FROZEN = {
   'server/schema-migrations/0000_baseline.sql': '3fd883d6fb45d0c52acc69bff16949185948bb51e5d732f57247f542814aa129',
   'server/schema-migrations/0001_candidate_privacy_flow.sql': 'a050e6b3e72a61b1d73c9124ddcd10eb6309f804891412dec9e15288df8c77c8',
   'server/schema-migrations/0002_resume_access_attempts.sql': 'a8a838cff654c8da79820d45aac8fbfc0fec8a8411553dde9f3a1f05ba6d713c',
-  'server/schema-migrations/checksums.lock': '5aeb99953c4daf959daa21eccde3785354a18708c74742278ef7e6408c058d04',
 };
 
 function sha256(value) {

@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "d25f85914c9ad7903011df5b2e0e407ced259343d719730228ea28e7870ac8d4",
+  "source_census_sha256": "b902944c4452d2e3f6d6dc3ba07b0f41d0d1fd7bc080b8901ba69d438a4f1ed4",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",

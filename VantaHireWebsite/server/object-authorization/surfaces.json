@@ -2,7 +2,7 @@
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
   "route_registration_census": 316,
-  "contract": "Application object reads plus current membership/seat-scoped job, roster and hiring-manager directory reads are fail-closed; the identity directory uses a statement-bound minimum projection; resume locator proxies and client-side download tracking are retired.",
+  "contract": "Application object reads and workflow mutations plus current membership/seat-scoped job, roster and hiring-manager directory reads are fail-closed; workflow authorization and mutation share one statement; the identity directory uses a statement-bound minimum projection; resume locator proxies and client-side download tracking are retired.",
   "routes": [
     {
       "method": "get",
@@ -57,6 +57,48 @@
       "path": "/api/users",
       "reader": "readAuthorizedHiringManagerDirectory",
       "projection": ["id", "username", "firstName", "lastName", "role"]
+    },
+    {
+      "method": "patch",
+      "path": "/api/applications/:id/stage",
+      "reader": "moveAuthorizedApplicationStage",
+      "projection": ["applicationId", "stageId", "stageName", "changedAt"]
+    },
+    {
+      "method": "patch",
+      "path": "/api/applications/:id/interview",
+      "reader": "scheduleAuthorizedApplicationInterview",
+      "projection": ["applicationId", "interviewDate", "interviewTime", "interviewLocation", "interviewNotes", "updatedAt"]
+    },
+    {
+      "method": "patch",
+      "path": "/api/applications/bulk/interview",
+      "reader": "scheduleAuthorizedBulkApplicationInterviews",
+      "projection": ["applicationId", "interviewDate", "interviewTime", "interviewLocation", "interviewNotes", "updatedAt"]
+    },
+    {
+      "method": "post",
+      "path": "/api/applications/:id/notes",
+      "reader": "addAuthorizedApplicationReviewerNote",
+      "projection": ["applicationId", "note"]
+    },
+    {
+      "method": "patch",
+      "path": "/api/applications/:id/rating",
+      "reader": "setAuthorizedApplicationReviewerRating",
+      "projection": ["applicationId", "reviewerId", "rating", "rubricVersion", "updatedAt"]
+    },
+    {
+      "method": "get",
+      "path": "/api/applications/:id/feedback",
+      "reader": "readAuthorizedApplicationFeedback",
+      "projection": ["id", "applicationId", "authorId", "overallScore", "recommendation", "notes", "rubricVersion", "createdAt", "updatedAt", "author"]
+    },
+    {
+      "method": "post",
+      "path": "/api/applications/:id/feedback",
+      "reader": "addAuthorizedApplicationFeedback",
+      "projection": ["id", "applicationId", "authorId", "overallScore", "recommendation", "notes", "rubricVersion", "createdAt", "updatedAt", "author"]
     }
   ],
   "retired_routes": [
@@ -67,36 +109,42 @@
     { "file": "../.github/workflows/ci.yml", "sha256": "ae8172202f6f6fa60e7976ec0866be8378c8ae47eea23819b88092bfffcf1ac1" },
     { "file": "package.json", "sha256": "7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe" },
     { "file": "vitest.server.config.ts", "sha256": "aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe" },
-    { "file": "server/applications.routes.ts", "sha256": "fad2471b896b3df4d6d02272c9b7f1184681f4d000296129882a9c7754c44676" },
+    { "file": "server/applications.routes.ts", "sha256": "e7974b1ad9826497da0f8a7375ba1189d30be02778ad867260f2991f702e5578" },
     { "file": "server/subscription.routes.ts", "sha256": "a7fd2ebd84af32c2191ce22a7adadb7400e7791b828df4ceecab409ce5d48156" },
     { "file": "server/routes.ts", "sha256": "a3e94cd66be7130821526ba29041206658dda02e743f663abee9bf4817967c3a" },
     { "file": "server/resume.routes.ts", "sha256": "8a85106836a3bb681e66e1a25bf0dcedeb8181e00b4bbb669c1b8e85c446d26e" },
     { "file": "server/candidates.semantic.routes.ts", "sha256": "9116127419c1f515d11d504786408ef1f2622e9365a74ec55f0fb93b70059a4a" },
     { "file": "server/gcs-storage.ts", "sha256": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802" },
     { "file": "server/auth.ts", "sha256": "634a9771eb8ad36a49ecd81f11a7d0d71b41bdfdec6893ddb301ec629ae42bd8" },
-    { "file": "server/candidate-privacy/surfaces.json", "sha256": "2c712385377ba67c9e4364248617af60aa797429289aeb1b75691bfe9e0bcd4e" },
+    { "file": "server/candidate-privacy/surfaces.json", "sha256": "e4a29d2c5b9ef69ded7b37859ac8661fc0323c6c1a6d07090545dbe73aeb509e" },
     { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "6fe7a1bed64866da80b94ad2a52f69c8dd82a16b94d06d081f7a59d92c609762" },
-    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "cf36dd6643bc254b5f42bcbf64b20114893296e0ee2688c159b32e4b5997a7ba" },
+    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "6e08a181442202f45d910ce8b4a164d9ab483e860264a2a1cf6b8e6e8128207b" },
     { "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts", "sha256": "afbd24fd5559e4864bcbf06afef737dbf151dcb419e7d69972180e8f611055ac" },
     { "file": "server/lib/__tests__/membershipScopedReadAuthorization.routes.test.ts", "sha256": "8bb40a2aa05775ff95da9e105baf07506acdd4f3b0d92f22bd6bcd7943ced659" },
     { "file": "server/lib/__tests__/resumeAccessAuthorization.routes.test.ts", "sha256": "a607c1f9b019e5b23327aa8f14fc5305bb4201e6bff68ceb428cd65a6634320c" },
     { "file": "server/lib/__tests__/whatsappHistoryAuthorization.routes.test.ts", "sha256": "a6a1e7c36c57bcb88e6d900670e64f71809b48034006cfa2d739bd1b3545baa7" },
     { "file": "server/lib/applicationReadAuthorization.ts", "sha256": "474ea56028bde0005c404ec9b3c16a2373681e7564ec4f941454719475ea0544" },
     { "file": "server/lib/membershipScopedReadAuthorization.ts", "sha256": "3b77886dc1aacaaced273f44fb434749e0f11c145b406928da9343dd5181c216" },
+    { "file": "server/lib/applicationWorkflowAuthorization.ts", "sha256": "b048bd6f2fa81ae7467390a83b2f3208ca4f4274d64b062d83f4d3162cb17e48" },
+    { "file": "server/lib/__tests__/applicationWorkflowAuthorization.test.ts", "sha256": "6b32e97e63d694dea1eddb2f576ea3f3c42c0ffde4e1284f6cf495e022379c90" },
+    { "file": "server/lib/__tests__/applicationWorkflowAuthorization.routes.test.ts", "sha256": "cd3a4a814ccd9d7086a830253f63b9265d71bc98d153929e1c637f4491880243" },
+    { "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts", "sha256": "d5c5b33f20671ecfbeae547045e4fb2caf04c163f3f19e7fca5ae8e1f160fb92" },
     { "file": "server/storage.ts", "sha256": "ae1937ba018677bf813e7f01cd8db946f9cd46d5ab5a07f7dde0a0c49724f7cd" },
-    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "0b6310983ef38543608f137ebe6623db605ecbef362aa9e5e8d61e2931b11a51" },
+    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "baaab1e8026c8fb64024e87411f77fb14db519a100a4a3654801d06bb2c7ac90" },
     { "file": "server/tests/interviewIcsAuthorization.routes.test.ts", "sha256": "5f24cda1c7f4d499a317ca4e998d71bb99df40880d2295231b78505efbdf3e59" },
+    { "file": "server/tests/hiring-manager-feedback-access.routes.test.ts", "sha256": "2f6432802bafbdb4a7f80617412237277130bdc76df3e75d398daa7e598f4bad" },
     { "file": "server/whatsapp.routes.ts", "sha256": "6fe33d722f4be777ed138d9ba3a80689cf4d01f31eeb9b14a1ff26ddfac844ca" },
-    { "file": "scripts/check-object-authorization.mjs", "sha256": "01db0a99e4e38db1fa422f7197b5bebeea48f0d021ceff9e2454f698d5f98ce1" },
+    { "file": "scripts/check-object-authorization.mjs", "sha256": "72474f6670b3a51ea9387cde275e8901c392661035bb044d7c6349313d2d3651" },
     { "file": "client/src/pages/candidates-page.tsx", "sha256": "94a944e1543310d76db639b421490eb51f7e4388304527f6d92a807743f611ea" },
     { "file": "client/src/pages/application-management-page.tsx", "sha256": "02a7fe832254dabade7e9a4baa7064df37cde818ea5a951e602acdf5b50a682c" },
     { "file": "client/src/pages/applications-page.tsx", "sha256": "d4a9481cf12817c9999f311443af55e7dcfd50c1eb8fd1e499b34620ccde559e" },
     { "file": "client/src/lib/internal-copy.ts", "sha256": "984f37009b12717db2d333bb306b22ba7d0807fa60a0fb05b65e07c409b7a51a" },
-    { "file": "shared/schema.ts", "sha256": "33aff02818a423ae392b03c135414904cbe93e92b63e5b98f1869705a38cc066" },
+    { "file": "shared/schema.ts", "sha256": "a52c7b8f7a568ed0fe3b72eb7dd1a910ca0b8ee5ebed3715b345a208e440ae4d" },
     { "file": "server/schema-migrations/0002_resume_access_attempts.sql", "sha256": "a8a838cff654c8da79820d45aac8fbfc0fec8a8411553dde9f3a1f05ba6d713c" },
-    { "file": "server/schema-migrations/checksums.lock", "sha256": "5aeb99953c4daf959daa21eccde3785354a18708c74742278ef7e6408c058d04" },
-    { "file": "server/schema-control/__tests__/schemaControl.pg.test.ts", "sha256": "8379c51c8251c3d4f2527ec509128e5c736eaf8f6c10ac47556f04ca91e244db" },
-    { "file": "server/schema-control/__tests__/schemaGuard.test.ts", "sha256": "c0790e29df4e32e0a453e03ed4add2798b5596b62596ab0bb8f971865efa1410" }
+    { "file": "server/schema-migrations/0003_application_workflow_assessments.sql", "sha256": "d32de49a1449bb6bc5c6608cbd0055c04695544b693ef1620864c555e0b3ef9c" },
+    { "file": "server/schema-migrations/checksums.lock", "sha256": "0a29a9f4799db63220c8471569cc6814bb7e46bd7225dbe5846c9c8dafdbfa37" },
+    { "file": "server/schema-control/__tests__/schemaControl.pg.test.ts", "sha256": "c3def2a3f545f26ba7a000cc92eda9062511e92195c5c8facb5c491a879b7718" },
+    { "file": "server/schema-control/__tests__/schemaGuard.test.ts", "sha256": "78bfc3dcda3dc19df146c16ea40804a051ab60d494383d2cf9a441a288e8139e" }
   ],
   "frozen_route_blocks": [
     { "method": "get", "path": "/api/webhooks/whatsapp", "sha256": "7f536ad1b199d3a8b6cfc23abe20ddfd2cc4a8c4da6a6858eb091de4659edca8" },

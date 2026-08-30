@@ -16,6 +16,11 @@ const applicationReadAuthorizationMock = vi.hoisted(() => ({
   readResumeFile: vi.fn(),
 }));
 
+const applicationWorkflowAuthorizationMock = vi.hoisted(() => ({
+  readFeedback: vi.fn(),
+  addFeedback: vi.fn(),
+}));
+
 const gcsStorageMock = vi.hoisted(() => ({
   uploadToGCS: vi.fn(),
   getSignedDownloadUrl: vi.fn(),
@@ -89,6 +94,16 @@ vi.mock('../lib/applicationReadAuthorization', () => ({
   readAuthorizedApplicationStageHistory: vi.fn(),
   readAuthorizedApplicationEmailHistory: vi.fn(),
   readAuthorizedApplicationInterviewInvite: vi.fn(),
+}));
+
+vi.mock('../lib/applicationWorkflowAuthorization', () => ({
+  moveAuthorizedApplicationStage: vi.fn(),
+  scheduleAuthorizedApplicationInterview: vi.fn(),
+  scheduleAuthorizedBulkApplicationInterviews: vi.fn(),
+  addAuthorizedApplicationReviewerNote: vi.fn(),
+  setAuthorizedApplicationReviewerRating: vi.fn(),
+  readAuthorizedApplicationFeedback: applicationWorkflowAuthorizationMock.readFeedback,
+  addAuthorizedApplicationFeedback: applicationWorkflowAuthorizationMock.addFeedback,
 }));
 
 vi.mock('../lib/organizationService', () => ({
@@ -289,15 +304,8 @@ describe('hiring manager feedback access', () => {
     selectQueue.length = 0;
   });
 
-  it('returns 403 when a hiring manager requests feedback for another manager’s job application', async () => {
-    storageMock.getApplication.mockResolvedValue({
-      id: 459,
-      jobId: 88,
-    });
-    storageMock.getJob.mockResolvedValue({
-      id: 88,
-      hiringManagerId: 9999,
-    });
+  it('returns the same 404 when a hiring manager requests feedback for another manager’s job application', async () => {
+    applicationWorkflowAuthorizationMock.readFeedback.mockResolvedValue({ ok: false, reason: 'not_found' });
 
     const app = await buildApp();
 
@@ -305,13 +313,15 @@ describe('hiring manager feedback access', () => {
       params: { id: '459' },
     });
 
-    expect(result.status).toBe(403);
-    expect(result.body).toEqual({ error: 'Access denied' });
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+    expect(storageMock.getApplication).not.toHaveBeenCalled();
+    expect(storageMock.getJob).not.toHaveBeenCalled();
     expect(dbMock.select).not.toHaveBeenCalled();
   });
 
   it('returns 404 when a hiring manager requests feedback for a missing application', async () => {
-    storageMock.getApplication.mockResolvedValue(undefined);
+    applicationWorkflowAuthorizationMock.readFeedback.mockResolvedValue({ ok: false, reason: 'not_found' });
 
     const app = await buildApp();
 
@@ -320,20 +330,14 @@ describe('hiring manager feedback access', () => {
     });
 
     expect(result.status).toBe(404);
-    expect(result.body).toEqual({ error: 'Application not found' });
+    expect(result.body).toEqual({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+    expect(storageMock.getApplication).not.toHaveBeenCalled();
     expect(storageMock.getJob).not.toHaveBeenCalled();
     expect(dbMock.select).not.toHaveBeenCalled();
   });
 
-  it('returns 403 when a hiring manager submits feedback for another manager’s job application', async () => {
-    storageMock.getApplication.mockResolvedValue({
-      id: 459,
-      jobId: 88,
-    });
-    storageMock.getJob.mockResolvedValue({
-      id: 88,
-      hiringManagerId: 9999,
-    });
+  it('returns the same 404 when a hiring manager submits feedback for another manager’s job application', async () => {
+    applicationWorkflowAuthorizationMock.addFeedback.mockResolvedValue({ ok: false, reason: 'not_found' });
 
     const app = await buildApp();
 
@@ -346,8 +350,10 @@ describe('hiring manager feedback access', () => {
       },
     });
 
-    expect(result.status).toBe(403);
-    expect(result.body).toEqual({ error: 'Access denied' });
+    expect(result.status).toBe(404);
+    expect(result.body).toEqual({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+    expect(storageMock.getApplication).not.toHaveBeenCalled();
+    expect(storageMock.getJob).not.toHaveBeenCalled();
     expect(dbMock.insert).not.toHaveBeenCalled();
   });
 

@@ -88,6 +88,14 @@ describe('ordinary-ingest OCR source guard', () => {
     expect(validateResumeIngestOcrSources(files)).toEqual([]);
   });
 
+  it('delegates later shared-schema and checksum bytes to the current shared guards', () => {
+    expect(validateResumeIngestOcrSources({
+      ...files,
+      'shared/schema.ts': 'later-package-shared-schema',
+      'server/schema-migrations/checksums.lock': 'later-package-forward-checksum-ledger',
+    })).toEqual([]);
+  });
+
   it('derives the exact boundary from a committed tree', () => {
     const committed = authoredFiles.map((file) => (
       file.startsWith('.github/') ? file : `VantaHireWebsite/${file}`

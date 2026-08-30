@@ -76,6 +76,166 @@ function requireAnchor(problems, source, anchor, label) {
   if (!source.includes(anchor)) problems.push(label);
 }
 
+function validateWorkflowAuthority(root, problems) {
+  const workflow = read(root, "server/lib/applicationWorkflowAuthorization.ts");
+  const routes = read(root, "server/applications.routes.ts");
+  const migration = read(root, "server/schema-migrations/0003_application_workflow_assessments.sql");
+  const migrationLock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+  const catalog = read(root, "server/schema-migrations/catalog.lock.json");
+  const schema = read(root, "shared/schema.ts");
+
+  for (const anchor of [
+    "${applications.organizationId} IS NOT NULL",
+    "${jobs.organizationId} IS NOT NULL",
+    "${applications.organizationId} = ${jobs.organizationId}",
+    "applicationPrivacyAllowed(false)",
+    "actor.role = 'recruiter'",
+    "${organizationMembers.seatAssigned} = TRUE",
+    "${jobs.postedBy} = ${actorId}",
+    "FROM ${jobRecruiters}",
+    "${jobRecruiters.jobId} = ${jobs.id}",
+    "policy.allowPlatformAdmin",
+  ]) requireAnchor(problems, workflow, anchor, `workflow authorization anchor is missing: ${anchor}`);
+  for (const anchor of [
+    "${applications.organizationId} IS NOT NULL",
+    "${jobs.organizationId} IS NOT NULL",
+    "${applications.organizationId} = ${jobs.organizationId}",
+    "applicationPrivacyAllowed(false)",
+    "policy.allowPlatformAdmin",
+  ]) {
+    if (count(workflow, anchor) !== 2) {
+      problems.push(`workflow authorization anchor must occur in both authorization CTEs: ${anchor}`);
+    }
+  }
+
+  for (const symbol of [
+    "moveAuthorizedApplicationStage",
+    "scheduleAuthorizedApplicationInterview",
+    "scheduleAuthorizedBulkApplicationInterviews",
+    "addAuthorizedApplicationReviewerNote",
+    "setAuthorizedApplicationReviewerRating",
+    "readAuthorizedApplicationFeedback",
+    "addAuthorizedApplicationFeedback",
+  ]) {
+    const source = exportedFunctionSource(workflow, symbol);
+    if (!source) problems.push(`workflow authorization operation is missing: ${symbol}`);
+    else if (count(source, "db.execute(") !== 1) problems.push(`${symbol} must execute exactly one database statement.`);
+  }
+
+  for (const anchor of [
+    "WITH locked_application AS MATERIALIZED",
+    "authorized_stage AS MATERIALIZED",
+    "UPDATE ${applications}",
+    "INSERT INTO ${applicationStageHistory}",
+    "changed_by,",
+    "${actorId}",
+    "${pipelineStages.organizationId} = locked_application.organization_id",
+    "${pipelineStages.organizationId} IS NULL AND ${pipelineStages.isDefault} = TRUE",
+  ]) requireAnchor(problems, workflow, anchor, `stage workflow anchor is missing: ${anchor}`);
+
+  for (const anchor of [
+    "authorization_count AS MATERIALIZED",
+    "authorization_count.requested_count = authorization_count.authorized_count",
+    "FOR UPDATE OF ${applications}",
+    "target_stage.organization_id = ${applications.organizationId}",
+    "target_stage.organization_id IS NULL AND target_stage.is_default = TRUE",
+    "LEFT JOIN updated_application",
+    "ORDER BY requested.ordinal",
+  ]) requireAnchor(problems, workflow, anchor, `bulk workflow anchor is missing: ${anchor}`);
+  if (count(workflow, "authorization_count.requested_count = authorization_count.authorized_count") !== 2) {
+    problems.push("bulk workflow must fence both mutation and result assembly on complete authorization.");
+  }
+
+  for (const anchor of [
+    "compatibility_projection AS",
+    "COALESCE(${applications.recruiterNotes}, ARRAY[]::text[])",
+    "INSERT INTO ${applicationReviewerNotes}",
+    "'organization_private'",
+    "ON CONFLICT (application_id, reviewer_id)",
+    "application-rating-v1",
+  ]) requireAnchor(problems, workflow, anchor, `assessment workflow anchor is missing: ${anchor}`);
+  if (workflow.includes("${applications.rating}")) {
+    problems.push("workflow rating writes the legacy shared applications.rating field.");
+  }
+
+  for (const anchor of [
+    "actor.role = 'hiring_manager' AND ${jobs.hiringManagerId} = ${actorId}",
+    "LEFT JOIN ${applicationFeedback}",
+    "authorizedApplicationId",
+    "jsonb_build_object(",
+    "team-feedback-v1",
+    "${applicationFeedback.rubricVersion}",
+  ]) requireAnchor(problems, workflow, anchor, `team-feedback workflow anchor is missing: ${anchor}`);
+  if (/\b(?:password|emailVerificationToken|passwordResetToken)\b/.test(
+    exportedFunctionSource(workflow, "readAuthorizedApplicationFeedback"),
+  )) problems.push("team-feedback projection includes a forbidden identity field.");
+
+  const routeContracts = [
+    ["patch", "/api/applications/:id/stage", "moveAuthorizedApplicationStage"],
+    ["patch", "/api/applications/:id/interview", "scheduleAuthorizedApplicationInterview"],
+    ["patch", "/api/applications/bulk/interview", "scheduleAuthorizedBulkApplicationInterviews"],
+    ["post", "/api/applications/:id/notes", "addAuthorizedApplicationReviewerNote"],
+    ["patch", "/api/applications/:id/rating", "setAuthorizedApplicationReviewerRating"],
+    ["get", "/api/applications/:id/feedback", "readAuthorizedApplicationFeedback"],
+    ["post", "/api/applications/:id/feedback", "addAuthorizedApplicationFeedback"],
+  ];
+  for (const [method, path, operation] of routeContracts) {
+    const registration = routeCall(routes, method, path);
+    if (registration.count !== 1 || !registration.source) {
+      problems.push(`workflow route registration must exist exactly once: ${method.toUpperCase()} ${path}`);
+      continue;
+    }
+    for (const anchor of ["requireSeat()", operation, "APPLICATION_NOT_FOUND", "AUTHORIZATION_UNAVAILABLE"]) {
+      requireAnchor(problems, registration.source, anchor, `${path} lost workflow route anchor: ${anchor}`);
+    }
+    if (path.includes(":id")) {
+      for (const anchor of ["parsePositiveDecimalApplicationId", "INVALID_APPLICATION_ID"])
+        requireAnchor(problems, registration.source, anchor, `${path} lost workflow route anchor: ${anchor}`);
+    }
+    if (/storage\.(?:getApplication|getJob|updateApplicationStage|scheduleInterview|scheduleInterviewWithStage|addRecruiterNote|setApplicationRating)|\bdb\.(?:execute|select|insert|update|delete)\b/.test(registration.source)) {
+      problems.push(`${path} restores an id-only or route-owned workflow read/write.`);
+    }
+    if (/console\.(?:log|warn|error)/.test(registration.source)) {
+      problems.push(`${path} logs raw workflow or database data.`);
+    }
+    const commandAt = registration.source.indexOf(operation);
+    const finalResponseAt = Math.max(registration.source.lastIndexOf("res.json("), registration.source.lastIndexOf(".json("));
+    if (commandAt < 0 || finalResponseAt < commandAt) problems.push(`${path} has no response after its statement-bound workflow command.`);
+    const providerAt = registration.source.search(/runPrivacyCheckedApplicationSideEffect|send(?:StatusUpdate|InterviewInvitation|Offer|Rejection)Notification/);
+    if (providerAt >= 0 && providerAt < commandAt) problems.push(`${path} can contact a candidate before its workflow command succeeds.`);
+  }
+  for (const anchor of [
+    "requireRole(['recruiter', 'super_admin'])",
+    "requireRole(['recruiter', 'super_admin', 'hiring_manager'])",
+  ]) requireAnchor(problems, routes, anchor, `workflow route role gate is missing: ${anchor}`);
+
+  for (const anchor of [
+    "CREATE TABLE public.application_reviewer_notes",
+    "application_reviewer_notes_note_length_check",
+    "application_reviewer_notes_visibility_check",
+    "CREATE TABLE public.application_reviewer_ratings",
+    "PRIMARY KEY (application_id, reviewer_id)",
+    "application_reviewer_ratings_rating_check",
+    "application_reviewer_ratings_rubric_version_check",
+    "ADD COLUMN rubric_version text NOT NULL DEFAULT 'legacy-unversioned-v1'",
+    "application_feedback_rubric_version_check",
+  ]) requireAnchor(problems, migration, anchor, `workflow migration anchor is missing: ${anchor}`);
+  if (!/^[a-f0-9]{64}$/.test(migrationLock?.migrations?.["0003"] ?? "")) {
+    problems.push("workflow migration is missing from checksums.lock.");
+  } else if (sha256(migration) !== migrationLock.migrations["0003"]) {
+    problems.push("workflow migration checksum does not match migration 0003.");
+  }
+  if (migrationLock.catalog_lock_sha256 !== sha256(catalog)) {
+    problems.push("immutable adoption catalog checksum drifted.");
+  }
+  for (const anchor of [
+    'pgTable("application_reviewer_notes"',
+    'pgTable("application_reviewer_ratings"',
+    'primaryKey({ columns: [table.applicationId, table.reviewerId] })',
+    'rubricVersion: text("rubric_version").notNull().default("legacy-unversioned-v1")',
+  ]) requireAnchor(problems, schema, anchor, `workflow Drizzle schema anchor is missing: ${anchor}`);
+}
+
 function validateKernel(root, problems) {
   const kernel = read(root, "server/lib/applicationReadAuthorization.ts");
   const membershipKernel = read(root, "server/lib/membershipScopedReadAuthorization.ts");
@@ -602,7 +762,7 @@ function validateKernel(root, problems) {
   } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
     problems.push("resume audit migration checksum does not match migration 0002.");
   }
-  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0003_${name}.sql`', 'applied: ["0000", "0001", "0002"]'])
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0004_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003"]'])
     requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
   requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
 
@@ -653,8 +813,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
     problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 9) {
-    problems.push("exactly nine object/membership-scoped read routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 16) {
+    problems.push("exactly sixteen object/membership/workflow-scoped routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 2) {
     problems.push("exactly two resume registrations must be retired.");
@@ -669,6 +829,19 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     if (matches.length !== 1) problems.push(`membership-scoped manifest route is missing or duplicated: GET ${path}`);
   }
 
+  for (const [method, path, reader] of [
+    ["patch", "/api/applications/:id/stage", "moveAuthorizedApplicationStage"],
+    ["patch", "/api/applications/:id/interview", "scheduleAuthorizedApplicationInterview"],
+    ["patch", "/api/applications/bulk/interview", "scheduleAuthorizedBulkApplicationInterviews"],
+    ["post", "/api/applications/:id/notes", "addAuthorizedApplicationReviewerNote"],
+    ["patch", "/api/applications/:id/rating", "setAuthorizedApplicationReviewerRating"],
+    ["get", "/api/applications/:id/feedback", "readAuthorizedApplicationFeedback"],
+    ["post", "/api/applications/:id/feedback", "addAuthorizedApplicationFeedback"],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
+    if (matches.length !== 1) problems.push(`workflow manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
   const governedPaths = new Set((manifest.governed_files ?? []).map((row) => row.file));
   for (const file of [
     "server/applications.routes.ts", "server/subscription.routes.ts", "server/routes.ts",
@@ -676,6 +849,11 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
     "server/lib/__tests__/membershipScopedReadAuthorization.routes.test.ts",
     "server/tests/applicationReadAuthorization.pg.test.ts",
+    "server/lib/applicationWorkflowAuthorization.ts",
+    "server/lib/__tests__/applicationWorkflowAuthorization.test.ts",
+    "server/lib/__tests__/applicationWorkflowAuthorization.routes.test.ts",
+    "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
+    "server/schema-migrations/0003_application_workflow_assessments.sql",
     "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
     "scripts/check-object-authorization.mjs", "server/candidate-privacy/surfaces.json",
   ]) {
@@ -699,6 +877,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
 
   try {
     validateKernel(root, problems);
+    validateWorkflowAuthority(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }
