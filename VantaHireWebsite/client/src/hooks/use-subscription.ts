@@ -47,15 +47,11 @@ export interface SeatUsage {
 
 export interface Invoice {
   id: number;
-  invoiceNumber?: string;
-  amount: number;
-  taxAmount: number;
+  invoiceNumber: string;
   totalAmount: number;
-  status: string;
   type: string;
-  createdAt: string;
-  completedAt?: string | null;
-  invoiceUrl?: string | null;
+  completedAt: string;
+  downloadPath: string;
 }
 
 export interface CreditPackConfig {
@@ -111,7 +107,7 @@ export interface OrderStatus {
   cashfreeStatus?: string | null;
   paymentMethod?: string | null;
   type?: 'subscription' | 'seat_addition' | 'credit_pack' | 'refund';
-  invoiceUrl?: string | null;
+  downloadPath?: string | null;
   failureReason?: string | null;
   totalAmount?: number;
 }
@@ -205,10 +201,11 @@ export function useSeatUsage() {
   });
 }
 
-export function useInvoices() {
+export function useInvoices(enabled: boolean) {
   return useQuery<Invoice[]>({
     queryKey: ['subscription', 'invoices'],
     queryFn: fetchInvoices,
+    enabled,
     staleTime: 1000 * 60, // 1 minute
   });
 }

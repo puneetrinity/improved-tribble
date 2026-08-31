@@ -1173,6 +1173,202 @@ function validateReviewerShareAuthority(root, problems) {
   }
 }
 
+function validateScopedFinancialAdminPublicAuthority(root, problems) {
+  const authority = read(root, "server/lib/scopedFinancialAdminPublicAuthorization.ts");
+  const subscription = read(root, "server/subscription.routes.ts");
+  const admin = read(root, "server/admin.routes.ts");
+  const routes = read(root, "server/routes.ts");
+
+  const operations = [
+    "assignAuthorizedSeat",
+    "unassignAuthorizedSeat",
+    "listAuthorizedInvoices",
+    "readAuthorizedInvoiceById",
+    "readAuthorizedInvoiceByFileName",
+    "readAuthorizedOrganizationAiActivity",
+    "updateAuthorizedUserRole",
+  ];
+  for (const symbol of operations) {
+    const source = exportedFunctionSource(authority, symbol);
+    if (!source) problems.push(`2J scoped authority operation is missing: ${symbol}`);
+    else if (count(source, "db.execute(") !== 1) problems.push(`${symbol} must execute exactly one database statement.`);
+  }
+  if (count(authority, "db.execute(") !== operations.length) {
+    problems.push("2J scoped authority must contain exactly seven protected statements.");
+  }
+
+  for (const [anchor, expected] of [
+    ["actor.role = 'recruiter'", 6],
+    ["membership.role = 'owner'", 6],
+    ["membership.seat_assigned = TRUE", 6],
+    ["actor.role = 'super_admin'", 1],
+  ]) {
+    if (count(authority, anchor) !== expected) problems.push(`2J scoped authority anchor count drifted: ${anchor}`);
+  }
+  for (const anchor of [
+    "actor_context.organization_id = target.organization_id",
+    "COALESCE(subscription.seats, 1)",
+    "target_context.assigned_seats < target_context.seat_limit",
+    "target_context.member_role <> 'owner'",
+    "invoice.status = 'completed'",
+    "invoice.invoice_number || '.pdf' = ${fileName}",
+    "LIMIT ${limit}",
+    "usage.organization_id",
+    "NOW() - INTERVAL '30 days'",
+    "ORDER BY grouped.kind",
+    "SET role = ${nextRole}",
+    "target.email_verified AS email_verified",
+  ]) requireAnchor(problems, authority, anchor, `2J scoped authority anchor is missing: ${anchor}`);
+  for (const forbidden of [
+    "assignSeat(", "unassignSeat(", "getInvoices(", "getTransactionByCashfreeOrder(",
+    "getCreditUsageHistory", "getOrgCreditSummary", "getOrgCreditDetails", "getOrgCreditLedger",
+    "console.", "logger.", "req.body", "targetOrganizationId",
+  ]) if (authority.includes(forbidden)) problems.push(`2J scoped authority restores forbidden dependency/input/logging: ${forbidden}`);
+
+  const listSource = exportedFunctionSource(authority, "listAuthorizedInvoices");
+  for (const forbidden of [
+    "invoice.cashfree_order_id", "invoice.cashfree_payment_id", "invoice.metadata", "invoice.failure_reason",
+  ]) if (listSource.includes(forbidden)) problems.push(`invoice list restores forbidden financial field: ${forbidden}`);
+  const usageSource = exportedFunctionSource(authority, "readAuthorizedOrganizationAiActivity");
+  for (const forbidden of [
+    "usage.user_id", "usage.cost_usd", "usage.metadata", "usage.id", "application_id", "candidate",
+  ]) if (usageSource.includes(forbidden)) problems.push(`organization AI activity restores forbidden detail: ${forbidden}`);
+  const roleSource = exportedFunctionSource(authority, "updateAuthorizedUserRole");
+  for (const forbidden of [
+    "target.password", "verification_token", "password_reset", "onboarding", "provider", ".returning()",
+  ]) if (roleSource.includes(forbidden)) problems.push(`role update restores forbidden account field/write: ${forbidden}`);
+
+  const routeContracts = [
+    [subscription, "post", "/api/subscription/seats/assign", "assignAuthorizedSeat", ["INVALID_MEMBER_ID", "BILLING_ACCESS_DENIED", "MEMBER_NOT_FOUND", "NO_SEATS_AVAILABLE", "SEAT_COMMAND_UNAVAILABLE"]],
+    [subscription, "post", "/api/subscription/seats/unassign", "unassignAuthorizedSeat", ["INVALID_MEMBER_ID", "BILLING_ACCESS_DENIED", "MEMBER_NOT_FOUND", "OWNER_SEAT_REQUIRED", "SEAT_COMMAND_UNAVAILABLE"]],
+    [subscription, "get", "/api/subscription/invoices", "listAuthorizedInvoices", ["BILLING_ACCESS_DENIED", "INVOICE_AUTHORIZATION_UNAVAILABLE"]],
+    [subscription, "get", "/api/subscription/invoices/:transactionId/pdf", "readAuthorizedInvoiceById", ["INVALID_TRANSACTION_ID", "BILLING_ACCESS_DENIED", "INVOICE_NOT_FOUND", "INVOICE_AUTHORIZATION_UNAVAILABLE"]],
+    [subscription, "get", "/api/invoices/:fileName", "readAuthorizedInvoiceByFileName", ["INVALID_INVOICE_FILE_NAME", "BILLING_ACCESS_DENIED", "INVOICE_NOT_FOUND", "INVOICE_AUTHORIZATION_UNAVAILABLE"]],
+    [subscription, "get", "/api/ai/credits/usage", "readAuthorizedOrganizationAiActivity", ["BILLING_ACCESS_DENIED", "USAGE_UNAVAILABLE"]],
+    [admin, "patch", "/api/admin/users/:id/role", "updateAuthorizedUserRole", ["INVALID_ROLE_UPDATE", "USER_NOT_FOUND", "ROLE_UPDATE_UNAVAILABLE"]],
+  ];
+  for (const [source, method, path, operation, codes] of routeContracts) {
+    const block = routeCall(source, method, path);
+    if (block.count !== 1 || !block.source) {
+      problems.push(`2J protected route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+      continue;
+    }
+    requireAnchor(problems, block.source, operation, `${method.toUpperCase()} ${path} lost statement-bound operation ${operation}.`);
+    for (const code of codes) requireAnchor(problems, block.source, code, `${method.toUpperCase()} ${path} lost fixed response code ${code}.`);
+    if (/console\.(?:log|warn|error)\s*\(\s*(?:error|req\.|result|memberId|transactionId|fileName)/.test(block.source)) {
+      problems.push(`${method.toUpperCase()} ${path} logs protected identity, financial, path or raw-error data.`);
+    }
+  }
+
+  const assign = routeCall(subscription, "post", "/api/subscription/seats/assign").source;
+  const unassign = routeCall(subscription, "post", "/api/subscription/seats/unassign").source;
+  for (const [block, operation, sideEffect] of [
+    [assign, "assignAuthorizedSeat", "initializeMemberCredits"],
+    [unassign, "unassignAuthorizedSeat", "getEmailService"],
+  ]) {
+    if (block.indexOf(operation) < 0 || block.indexOf("if (result.value.changed)") < block.indexOf(operation)
+        || block.indexOf(sideEffect) < block.indexOf("if (result.value.changed)")) {
+      problems.push(`${operation} side effects are not ordered after an authorized changed result.`);
+    }
+    for (const forbidden of ["assignSeat(", "unassignSeat(", "getUserOrganization(", "canManageBilling(", "req.body.organizationId"]) {
+      if (block.includes(forbidden)) problems.push(`${operation} restores caller-org or global seat authority: ${forbidden}`);
+    }
+  }
+
+  const pdf = routeCall(subscription, "get", "/api/subscription/invoices/:transactionId/pdf").source;
+  const localFile = routeCall(subscription, "get", "/api/invoices/:fileName").source;
+  for (const [block, operation] of [[pdf, "readAuthorizedInvoiceById"], [localFile, "readAuthorizedInvoiceByFileName"]]) {
+    const authorization = block.indexOf(operation);
+    for (const work of ["generateAndStoreInvoicePdf", "getLocalInvoicePath", "sendFile", "res.redirect"]) {
+      const index = block.indexOf(work);
+      if (index >= 0 && index < authorization) problems.push(`${operation} reaches invoice provider/file work before exact authorization.`);
+    }
+    for (const forbidden of ["getInvoices(", "getTransactionByCashfreeOrder(", "req.params.organizationId"]) {
+      if (block.includes(forbidden)) problems.push(`${operation} restores global/list/caller invoice authorization: ${forbidden}`);
+    }
+  }
+  requireAnchor(problems, pdf, "redirectUrl.protocol !== 'https:'", "invoice redirect lost HTTPS-only enforcement.");
+  requireAnchor(problems, pdf, "redirectUrl.username || redirectUrl.password", "invoice redirect permits credentialed locators.");
+
+  const invoiceList = routeCall(subscription, "get", "/api/subscription/invoices").source;
+  if (invoiceList.includes("invoiceUrl") || invoiceList.includes("getInvoices(")) {
+    problems.push("invoice list route restores stored locators or newest-list authorization.");
+  }
+  const usage = routeCall(subscription, "get", "/api/ai/credits/usage").source;
+  for (const forbidden of ["getCreditUsageHistory", "getOrgCreditSummary", "getOrgCreditDetails", "getOrgCreditLedger", "req.query"]) {
+    if (usage.includes(forbidden)) problems.push(`AI activity route restores private/unbounded usage access: ${forbidden}`);
+  }
+  const orderStatus = routeCall(subscription, "get", "/api/subscription/order/:orderId/status").source;
+  requireAnchor(problems, orderStatus, "downloadPath:", "order status lost its authenticated invoice path.");
+  if (orderStatus.includes("invoiceUrl:")) problems.push("order status serializes a stored invoice locator.");
+
+  const roleRoute = routeCall(admin, "patch", "/api/admin/users/:id/role").source;
+  for (const anchor of ["csrfProtection", "requireRole(['super_admin'])", "parseScopedFinancialId", "parseAuthorizedUserRole", "res.json(result.value)"]) {
+    requireAnchor(problems, roleRoute, anchor, `role route lost minimum command anchor: ${anchor}`);
+  }
+  for (const forbidden of ["storage.updateUserRole", "res.json({ ...", "res.json(user)"]) {
+    if (roleRoute.includes(forbidden)) problems.push(`role route restores global/full-row response: ${forbidden}`);
+  }
+
+  const tombstones = [
+    [admin, "get", "/api/admin/applications/all", "ADMIN_APPLICATION_COLLECTION_RETIRED", "requireRole(['super_admin'])"],
+    [admin, "get", "/api/admin/consultants", "CONSULTANT_PRODUCT_RETIRED", "requireRole(['super_admin'])"],
+    [admin, "post", "/api/admin/consultants", "CONSULTANT_PRODUCT_RETIRED", "csrfProtection"],
+    [admin, "patch", "/api/admin/consultants/:id", "CONSULTANT_PRODUCT_RETIRED", "csrfProtection"],
+    [admin, "delete", "/api/admin/consultants/:id", "CONSULTANT_PRODUCT_RETIRED", "csrfProtection"],
+    [routes, "get", "/api/consultants", "CONSULTANT_PRODUCT_RETIRED", "res.status(410)"],
+    [routes, "get", "/api/consultants/:id", "CONSULTANT_PRODUCT_RETIRED", "res.status(410)"],
+  ];
+  for (const [source, method, path, code, middleware] of tombstones) {
+    const block = routeCall(source, method, path);
+    if (block.count !== 1 || !block.source) {
+      problems.push(`2J retired route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+      continue;
+    }
+    for (const anchor of ["res.status(410)", code, middleware]) {
+      requireAnchor(problems, block.source, anchor, `${method.toUpperCase()} ${path} lost fixed tombstone anchor: ${anchor}`);
+    }
+    for (const forbidden of ["storage.", "db.", "fetch(", "sendFile", "req.params", "req.body"]) {
+      if (block.source.includes(forbidden)) problems.push(`${method.toUpperCase()} ${path} tombstone restores work: ${forbidden}`);
+    }
+  }
+
+  for (const absolute of walk(join(root, "server"))) {
+    if (!absolute.endsWith(".ts")) continue;
+    const file = relative(root, absolute).replaceAll("\\", "/");
+    if (file !== "server/storage.ts" && readFileSync(absolute, "utf8").includes("getAllApplicationsWithDetails")) {
+      problems.push(`retired admin application collection has a production caller: ${file}`);
+    }
+  }
+
+  for (const deleted of [
+    "client/src/pages/unified-admin-dashboard.tsx",
+    "client/src/pages/admin-consultants-page.tsx",
+  ]) if (existsSync(join(root, deleted))) problems.push(`retired client artifact still exists: ${deleted}`);
+
+  let client = "";
+  for (const absolute of walk(join(root, "client", "src"))) {
+    if (/\.(?:ts|tsx)$/.test(absolute)) client += `\n${readFileSync(absolute, "utf8")}`;
+  }
+  for (const forbidden of [
+    "/api/admin/applications/all", "/api/admin/consultants", "/api/consultants", 'path="/consultants"',
+    "admin-consultants-page", "unified-admin-dashboard", "invoice.invoiceUrl",
+  ]) if (client.includes(forbidden)) problems.push(`client restores retired/private surface: ${forbidden}`);
+
+  const dashboard = read(root, "client/src/pages/admin-super-dashboard.tsx");
+  for (const forbidden of [
+    "ApplicationWithDetails", "selectedApplication", "filteredApplications", 'value="applications"',
+    "applicationPrivacyAnchor", "updateApplicationMutation",
+  ]) if (dashboard.includes(forbidden)) problems.push(`admin dashboard restores application collection/detail state: ${forbidden}`);
+  const billing = read(root, "client/src/pages/org-billing-page.tsx");
+  for (const anchor of ["useInvoices(isOwner)", "useAiCreditUsage(isOwner)", "invoice.downloadPath"]) {
+    requireAnchor(problems, billing, anchor, `billing UI lost minimum owner-scoped contract: ${anchor}`);
+  }
+  for (const forbidden of ["invoice.invoiceUrl", "getCreditUsageHistory", "costUsd", "candidateEmail"]) {
+    if (billing.includes(forbidden)) problems.push(`billing UI restores private invoice/usage detail: ${forbidden}`);
+  }
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -1197,11 +1393,11 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
     problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 33) {
-    problems.push("exactly thirty-three object/membership/workflow/AI-outbound/reviewer-share routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 40) {
+    problems.push("exactly forty object/membership/workflow/AI-outbound/reviewer-share/financial-admin routes must be governed.");
   }
-  if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 2) {
-    problems.push("exactly two resume registrations must be retired.");
+  if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 9) {
+    problems.push("exactly nine resume/application/consultant registrations must be retired.");
   }
 
   for (const [path, reader] of [
@@ -1224,6 +1420,32 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   ]) {
     const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
     if (matches.length !== 1) problems.push(`workflow manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
+  for (const [method, path, reader] of [
+    ["post", "/api/subscription/seats/assign", "assignAuthorizedSeat"],
+    ["post", "/api/subscription/seats/unassign", "unassignAuthorizedSeat"],
+    ["get", "/api/subscription/invoices", "listAuthorizedInvoices"],
+    ["get", "/api/subscription/invoices/:transactionId/pdf", "readAuthorizedInvoiceById"],
+    ["get", "/api/invoices/:fileName", "readAuthorizedInvoiceByFileName"],
+    ["get", "/api/ai/credits/usage", "readAuthorizedOrganizationAiActivity"],
+    ["patch", "/api/admin/users/:id/role", "updateAuthorizedUserRole"],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
+    if (matches.length !== 1) problems.push(`financial/admin manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
+  for (const [method, path, code] of [
+    ["get", "/api/admin/applications/all", "ADMIN_APPLICATION_COLLECTION_RETIRED"],
+    ["get", "/api/consultants", "CONSULTANT_PRODUCT_RETIRED"],
+    ["get", "/api/consultants/:id", "CONSULTANT_PRODUCT_RETIRED"],
+    ["get", "/api/admin/consultants", "CONSULTANT_PRODUCT_RETIRED"],
+    ["post", "/api/admin/consultants", "CONSULTANT_PRODUCT_RETIRED"],
+    ["patch", "/api/admin/consultants/:id", "CONSULTANT_PRODUCT_RETIRED"],
+    ["delete", "/api/admin/consultants/:id", "CONSULTANT_PRODUCT_RETIRED"],
+  ]) {
+    const matches = (manifest.retired_routes ?? []).filter((row) => row.method === method && row.path === path && row.code === code);
+    if (matches.length !== 1) problems.push(`2J retired manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
   }
 
   for (const [method, path, reader] of [
@@ -1282,6 +1504,13 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "client/src/pages/client-shortlist-page.tsx", "client/src/lib/internal-copy.ts",
     "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
     "scripts/check-object-authorization.mjs", "server/candidate-privacy/surfaces.json",
+    "server/lib/scopedFinancialAdminPublicAuthorization.ts",
+    "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.test.ts",
+    "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.routes.test.ts",
+    "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.pg.test.ts",
+    "server/admin.routes.ts", "client/src/hooks/use-subscription.ts", "client/src/hooks/use-ai-credits.ts",
+    "client/src/pages/org-billing-page.tsx", "client/src/pages/admin-super-dashboard.tsx",
+    "client/src/App.tsx", "client/src/components/QuickAccessBar.tsx",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -1306,6 +1535,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateWorkflowAuthority(root, problems);
     validateApplicationAiOutboundAuthority(root, problems);
     validateReviewerShareAuthority(root, problems);
+    validateScopedFinancialAdminPublicAuthority(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

@@ -11,54 +11,19 @@ export interface CreditBalance {
   periodEnd: string | null;
 }
 
-export interface CreditUsageEntry {
-  id: number;
-  action: string;
-  creditsUsed: number;
-  timestamp: string;
-  metadata?: Record<string, any>;
-}
-
-export interface OrgCreditDetails {
-  planAllocation: number;
-  bonusCredits: number;
-  customLimit: number | null;
-  effectiveLimit: number;
-  purchasedCredits: number;
-  rolloverCredits: number;
-  proratedCreditsAddedThisPeriod: number;
-  usedThisPeriod: number;
-  remaining: number;
-  periodStart: string | null;
-  periodEnd: string | null;
-  seatedMembers: number;
-}
-
-export interface OrgCreditLedgerEntry {
-  id: number;
-  type: string;
-  amount: number;
-  createdAt: string;
-  actor: {
-    userId: number | null;
-    name: string | null;
-    email: string | null;
+export interface OrganizationAiActivity {
+  windowDays: 30;
+  totals: {
+    operations: number;
+    tokensIn: number;
+    tokensOut: number;
   };
-  metadata: Record<string, any> | null;
-}
-
-export interface CreditUsageResponse {
-  userHistory: CreditUsageEntry[];
-  orgSummary: {
-    totalAllocated: number;
-    totalUsed: number;
-    totalRemaining: number;
-    includedAllocation: number;
-    purchasedCredits: number;
-    seatedMembers: number;
-  } | null;
-  orgDetails: OrgCreditDetails | null;
-  orgLedger: OrgCreditLedgerEntry[];
+  byKind: Array<{
+    kind: string;
+    operations: number;
+    tokensIn: number;
+    tokensOut: number;
+  }>;
 }
 
 // API functions
@@ -94,10 +59,11 @@ export function useAiCredits() {
   });
 }
 
-export function useAiCreditUsage() {
-  return useQuery<CreditUsageResponse>({
+export function useAiCreditUsage(enabled: boolean) {
+  return useQuery<OrganizationAiActivity>({
     queryKey: ['ai', 'credits', 'usage'],
     queryFn: fetchCreditUsage,
+    enabled,
     staleTime: 1000 * 60, // 1 minute
   });
 }

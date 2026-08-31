@@ -53,7 +53,6 @@ import {
   Phone,
 } from "lucide-react";
 import { format } from "date-fns";
-import type { PipelineStage } from "@shared/schema";
 import {
   Table,
   TableBody,
@@ -148,28 +147,6 @@ interface JobWithDetails {
     lastName: string;
     username: string;
   };
-}
-
-interface ApplicationWithDetails {
-  id: number;
-  fullName: string;
-  email: string;
-  phone: string;
-  coverLetter: string;
-  status: string;
-  currentStage?: number | null;
-  stageName?: string | null;
-  stageOrder?: number | null;
-  appliedAt: string;
-  viewedAt?: string;
-  downloadedAt?: string;
-  notes?: string;
-  job: {
-    id: number;
-    title: string;
-    company: string;
-  };
-  recruiterNotes?: string;
 }
 
 interface UserDetails {
@@ -287,10 +264,7 @@ export default function AdminSuperDashboard() {
   const { user } = useAuth();
   const [selectedJob, setSelectedJob] = useState<JobWithDetails | null>(null);
   const [previewJob, setPreviewJob] = useState<JobWithDetails | null>(null);
-  const [selectedApplication, setSelectedApplication] = useState<ApplicationWithDetails | null>(null);
   const [jobFilter, setJobFilter] = useState("all");
-  const [applicationFilter, setApplicationFilter] = useState("all");
-  const [applicationStageFilter, setApplicationStageFilter] = useState("all");
   const [userFilter, setUserFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null);
@@ -329,16 +303,6 @@ export default function AdminSuperDashboard() {
   // Fetch all jobs with details
   const { data: jobs, isLoading: jobsLoading } = useQuery<JobWithDetails[]>({
     queryKey: ["/api/admin/jobs/all"],
-  });
-
-  // Fetch all applications with details
-  const { data: applications, isLoading: applicationsLoading } = useQuery<ApplicationWithDetails[]>({
-    queryKey: ["/api/admin/applications/all"],
-  });
-
-  // Fetch pipeline stages for filtering and labels
-  const { data: pipelineStages = [] } = useQuery<PipelineStage[]>({
-    queryKey: ["/api/pipeline/stages"],
   });
 
   // Fetch all users
@@ -457,26 +421,6 @@ export default function AdminSuperDashboard() {
     onError: (error: Error) => {
       toast({
         title: "Failed to delete job",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  // Update application status mutation
-  const updateApplicationMutation = useMutation({
-    mutationFn: async ({ id, status, notes }: { id: number; status: string; notes?: string }) => {
-      const res = await apiRequest("PATCH", `/api/applications/${id}/status`, { status, notes });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/applications/all"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Application status updated successfully" });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to update application status",
         description: error.message,
         variant: "destructive",
       });
@@ -641,20 +585,6 @@ export default function AdminSuperDashboard() {
       job.location.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesFilter && matchesSearch;
-  });
-
-  const filteredApplications = applications?.filter(app => {
-    const matchesFilter = applicationFilter === "all" || app.status === applicationFilter;
-    const matchesStage = applicationStageFilter === "all" ||
-      (applicationStageFilter === "unassigned" && app.currentStage == null) ||
-      (applicationStageFilter !== "unassigned" && app.currentStage === parseInt(applicationStageFilter));
-    const matchesSearch = !searchTerm || 
-      app.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.job.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      app.job.company.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesFilter && matchesStage && matchesSearch;
   });
 
   const filteredUsers = users?.filter(user => {
@@ -855,10 +785,6 @@ export default function AdminSuperDashboard() {
             <TabsTrigger value="jobs" className="flex items-center gap-1.5">
               <Briefcase className="h-4 w-4" />
               Jobs
-            </TabsTrigger>
-            <TabsTrigger value="applications" className="flex items-center gap-1.5">
-              <FileTextIcon className="h-4 w-4" />
-              Applications
             </TabsTrigger>
             <TabsTrigger value="users" className="flex items-center gap-1.5">
               <Users className="h-4 w-4" />
@@ -1706,132 +1632,6 @@ export default function AdminSuperDashboard() {
             </Card>
           </TabsContent>
 
-          {/* Applications Management Tab */}
-          <TabsContent value="applications" className="space-y-6">
-            <Card className="shadow-sm">
-              <CardHeader>
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-                  <div>
-                    <CardTitle className="text-foreground">Applications Management</CardTitle>
-                    <CardDescription className="text-foreground/70">
-                      Review and manage all job applications
-                    </CardDescription>
-                  </div>
-                    <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <Search className="h-4 w-4 text-foreground/50" />
-                        <Input
-                          placeholder="Search applications..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="bg-card border-border"
-                      />
-                    </div>
-                      <Select value={applicationFilter} onValueChange={setApplicationFilter}>
-                        <SelectTrigger className="bg-card border-border">
-                          <Filter className="h-4 w-4 mr-2" />
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          <SelectItem value="all">All Applications</SelectItem>
-                          <SelectItem value="submitted">Submitted</SelectItem>
-                          <SelectItem value="reviewed">Under Review</SelectItem>
-                          <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                          <SelectItem value="rejected">Rejected</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Select value={applicationStageFilter} onValueChange={setApplicationStageFilter}>
-                        <SelectTrigger className="bg-card border-border">
-                          <Filter className="h-4 w-4 mr-2" />
-                          <SelectValue placeholder="Stage" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-card border-border">
-                          <SelectItem value="all">All Stages</SelectItem>
-                          <SelectItem value="unassigned">Unassigned</SelectItem>
-                          {pipelineStages
-                            .slice()
-                            .sort((a, b) => (a.order - b.order) || (a.id - b.id))
-                            .map((stage) => (
-                              <SelectItem key={stage.id} value={stage.id.toString()}>
-                                {stage.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </CardHeader>
-              <CardContent>
-                {applicationsLoading ? (
-                  <div className="text-center py-8 text-foreground/70">Loading applications...</div>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredApplications?.map((application) => (
-                      <div key={application.id} className="border border-border rounded-lg p-4 bg-muted/50">
-                        <div className="flex justify-between items-start">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center space-x-3">
-                            <h3 className="text-lg font-semibold text-foreground">{application.fullName}</h3>
-                            <Badge className={getStatusConfig(application.status).color}>
-                              {getStatusConfig(application.status).label}
-                            </Badge>
-                            {application.stageName && (
-                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                                {application.stageName}
-                              </Badge>
-                            )}
-                          </div>
-                            <div className="flex items-center space-x-4 text-sm text-foreground/70">
-                              <span>{application.email}</span>
-                              <span>{application.phone}</span>
-                              <span className="flex items-center space-x-1">
-                                <Calendar className="h-4 w-4" />
-                                <span>{format(new Date(application.appliedAt), "MMM d, yyyy")}</span>
-                              </span>
-                            </div>
-                            <p className="text-foreground/60 text-sm">
-                              Applied for: {application.job.title} at {application.job.company}
-                            </p>
-                            {application.notes && (
-                              <p className="text-foreground/60 text-sm bg-muted p-2 rounded">
-                                Notes: {application.notes}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setSelectedApplication(application)}
-                              className="border-border text-foreground hover:bg-muted"
-                            >
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                            <Select
-                              value={application.status}
-                              onValueChange={(status) => updateApplicationMutation.mutate({ id: application.id, status })}
-                            >
-                              <SelectTrigger className="w-32 bg-card border-border">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-card border-border">
-                                <SelectItem value="submitted">Submitted</SelectItem>
-                                <SelectItem value="reviewed">Under Review</SelectItem>
-                                <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                                <SelectItem value="rejected">Rejected</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Users Management Tab */}
           <TabsContent value="users" className="space-y-6">
             <Card className="shadow-sm" data-tour="user-management">
@@ -2155,11 +1955,6 @@ export default function AdminSuperDashboard() {
                     id: candidate.id,
                     label: `Candidate #${candidate.id}: ${candidate.firstName || candidate.username} ${candidate.lastName || ""}`.trim(),
                   })),
-                ...(applications ?? []).map((application) => ({
-                  type: "application" as const,
-                  id: application.id,
-                  label: `Application #${application.id}: ${application.fullName}`,
-                })),
               ]}
             />
           </TabsContent>
@@ -2694,64 +2489,6 @@ export default function AdminSuperDashboard() {
               >
                 <XCircle className="h-4 w-4 mr-1" />
                 Decline
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {/* Application Detail Dialog */}
-      {selectedApplication && (
-        <Dialog open={!!selectedApplication} onOpenChange={() => setSelectedApplication(null)}>
-          <DialogContent className="bg-card border-border max-w-2xl">
-            <DialogHeader>
-              <DialogTitle className="text-foreground">{selectedApplication.fullName}</DialogTitle>
-              <DialogDescription className="text-foreground/70">
-                Application for {selectedApplication.job.title} at {selectedApplication.job.company}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="text-foreground/70">
-                  Email: <span className="text-foreground">{selectedApplication.email}</span>
-                </div>
-                <div className="text-foreground/70">
-                  Phone: <span className="text-foreground">{selectedApplication.phone}</span>
-                </div>
-                <div className="text-foreground/70">
-                  Status: 
-                  <Badge className={`ml-2 ${getStatusConfig(selectedApplication.status).color}`}>
-                    {getStatusConfig(selectedApplication.status).label}
-                  </Badge>
-                </div>
-                <div className="text-foreground/70">
-                  Applied: <span className="text-foreground">{format(new Date(selectedApplication.appliedAt), "MMM d, yyyy")}</span>
-                </div>
-              </div>
-              {selectedApplication.coverLetter && (
-                <div>
-                  <span className="text-foreground/70 block mb-2">Cover Letter:</span>
-                  <div className="bg-muted p-3 rounded text-foreground text-sm max-h-32 overflow-y-auto">
-                    {selectedApplication.coverLetter}
-                  </div>
-                </div>
-              )}
-              {selectedApplication.notes && (
-                <div>
-                  <span className="text-foreground/70 block mb-2">Recruiter Notes:</span>
-                  <div className="bg-muted p-3 rounded text-foreground text-sm">
-                    {selectedApplication.notes}
-                  </div>
-                </div>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setSelectedApplication(null)}
-                className="border-border text-foreground hover:bg-muted"
-              >
-                Close
               </Button>
             </DialogFooter>
           </DialogContent>

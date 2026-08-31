@@ -26,7 +26,6 @@ const AdminFormsPage = lazy(() => import("@/pages/admin-forms-page"));
 const AdminEmailTemplatesPage = lazy(() => import("@/pages/admin-email-templates-page"));
 const FormEditorPage = lazy(() => import("@/pages/form-editor-page"));
 const AdminFormResponsesPage = lazy(() => import("@/pages/admin-form-responses-page"));
-const AdminConsultantsPage = lazy(() => import("@/pages/admin-consultants-page"));
 const AdminAIUsagePage = lazy(() => import("@/pages/admin-ai-usage-page"));
 const AdminAIJobsPage = lazy(() => import("@/pages/admin-ai-jobs-page"));
 const AdminFeedbackPage = lazy(() => import("@/pages/admin-feedback-page"));
@@ -140,7 +139,6 @@ function Router() {
       <ProtectedRoute path="/admin/forms/responses" component={AdminFormResponsesPage} requiredRole={['super_admin']} />
       <ProtectedRoute path="/admin/forms" component={AdminFormsPage} requiredRole={['super_admin', 'recruiter']} />
       <ProtectedRoute path="/admin/email-templates" component={AdminEmailTemplatesPage} requiredRole={['super_admin', 'recruiter']} />
-      <ProtectedRoute path="/admin/consultants" component={AdminConsultantsPage} requiredRole={['super_admin']} />
       <ProtectedRoute path="/admin/ai-usage" component={AdminAIUsagePage} requiredRole={['super_admin']} />
       <ProtectedRoute path="/admin/ai-jobs" component={AdminAIJobsPage} requiredRole={['super_admin']} />
       <ProtectedRoute path="/admin/feedback" component={AdminFeedbackPage} requiredRole={['super_admin']} />

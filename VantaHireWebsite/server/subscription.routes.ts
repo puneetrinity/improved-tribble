@@ -22,19 +22,14 @@ import {
   getSeatUsage,
   getMembersForSeatSelection,
   reduceSeats,
-  assignSeat,
-  unassignSeat,
 } from "./lib/seatService";
 import {
   getMemberCreditBalance,
-  getOrgCreditDetails,
-  getOrgCreditLedger,
-  getOrgCreditSummary,
-  getCreditUsageHistory,
   getUserDailyRateLimit,
   getPlanRateLimitInfo,
   getCurrentOrgCreditCycle,
   addProratedSeatCredits,
+  initializeMemberCredits,
 } from "./lib/creditService";
 import {
   createCheckoutOrder,
@@ -47,7 +42,6 @@ import {
 import {
   createPaymentTransaction,
   updatePaymentTransaction,
-  getOrganizationInvoices as getInvoices,
   getTransactionByCashfreeOrder,
   generateInvoiceData,
 } from "./lib/invoiceService";
@@ -60,6 +54,16 @@ import { db } from "./db";
 import { organizationMembers, users } from "@shared/schema";
 import { eq, inArray, and } from "drizzle-orm";
 import { getCommercialCatalog, getCreditPackConfig, PLAN_FREE } from "./lib/planConfig";
+import {
+  assignAuthorizedSeat,
+  listAuthorizedInvoices,
+  parseAuthorizedInvoiceFileName,
+  parseScopedFinancialId,
+  readAuthorizedInvoiceByFileName,
+  readAuthorizedInvoiceById,
+  readAuthorizedOrganizationAiActivity,
+  unassignAuthorizedSeat,
+} from "./lib/scopedFinancialAdminPublicAuthorization";
 
 // Input validation schemas
 const checkoutSchema = z.object({
@@ -75,10 +79,6 @@ const addSeatsSchema = z.object({
 const reduceSeatsSchema = z.object({
   newSeatCount: z.number().int().min(1),
   memberIdsToKeep: z.array(z.number().int().positive()),
-});
-
-const seatAssignSchema = z.object({
-  memberId: z.number().int().positive(),
 });
 
 const creditPackCheckoutSchema = z.object({
@@ -833,75 +833,81 @@ export function registerSubscriptionRoutes(
   // Assign seat to member
   app.post("/api/subscription/seats/assign", requireAuth, csrfProtection, async (req, res) => {
     try {
-      const user = req.user!;
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const memberId = typeof req.body?.memberId === "number"
+        ? parseScopedFinancialId(req.body.memberId)
+        : null;
+      if (memberId === null) {
+        res.status(400).json({ error: "Invalid member ID", code: "INVALID_MEMBER_ID" });
         return;
       }
 
-      if (!canManageBilling(orgResult.membership.role as any)) {
-        res.status(403).json({ error: "Only organization owner can assign seats" });
+      const result = await assignAuthorizedSeat(req.user!.id, memberId);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "Billing access denied", code: "BILLING_ACCESS_DENIED" });
+          return;
+        }
+        if (result.reason === "not_found") {
+          res.status(404).json({ error: "Member not found", code: "MEMBER_NOT_FOUND" });
+          return;
+        }
+        if (result.reason === "conflict" && result.code === "no_seats_available") {
+          res.status(409).json({ error: "No seats available", code: "NO_SEATS_AVAILABLE" });
+          return;
+        }
+        res.status(503).json({ error: "Seat command unavailable", code: "SEAT_COMMAND_UNAVAILABLE" });
         return;
       }
 
-      const { memberId } = seatAssignSchema.parse(req.body);
-
-      const member = await assignSeat(memberId);
-
-      res.json(member);
-    } catch (error: any) {
-      console.error("Error assigning seat:", error);
-      if (error.name === "ZodError") {
-        res.status(400).json({ error: "Invalid input", details: error.errors });
-        return;
+      if (result.value.changed) {
+        await initializeMemberCredits(result.value.memberId, result.value.organizationId);
       }
-      res.status(500).json({ error: error.message || "Failed to assign seat" });
+
+      res.json({ memberId: result.value.memberId, seatAssigned: result.value.seatAssigned });
+    } catch {
+      console.error("Seat assignment failed after authorization");
+      res.status(503).json({ error: "Seat command unavailable", code: "SEAT_COMMAND_UNAVAILABLE" });
     }
   });
 
   // Unassign seat from member
   app.post("/api/subscription/seats/unassign", requireAuth, csrfProtection, async (req, res) => {
     try {
-      const user = req.user!;
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const memberId = typeof req.body?.memberId === "number"
+        ? parseScopedFinancialId(req.body.memberId)
+        : null;
+      if (memberId === null) {
+        res.status(400).json({ error: "Invalid member ID", code: "INVALID_MEMBER_ID" });
         return;
       }
 
-      if (!canManageBilling(orgResult.membership.role as any)) {
-        res.status(403).json({ error: "Only organization owner can unassign seats" });
+      const result = await unassignAuthorizedSeat(req.user!.id, memberId);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "Billing access denied", code: "BILLING_ACCESS_DENIED" });
+          return;
+        }
+        if (result.reason === "not_found") {
+          res.status(404).json({ error: "Member not found", code: "MEMBER_NOT_FOUND" });
+          return;
+        }
+        if (result.reason === "conflict" && result.code === "owner_seat_required") {
+          res.status(409).json({ error: "Organization owner must retain a seat", code: "OWNER_SEAT_REQUIRED" });
+          return;
+        }
+        res.status(503).json({ error: "Seat command unavailable", code: "SEAT_COMMAND_UNAVAILABLE" });
         return;
       }
 
-      const { memberId } = seatAssignSchema.parse(req.body);
-
-      // Get member info before unassigning
-      const memberInfo = await db
-        .select({
-          email: users.username,
-          firstName: users.firstName,
-        })
-        .from(organizationMembers)
-        .innerJoin(users, eq(organizationMembers.userId, users.id))
-        .where(eq(organizationMembers.id, memberId))
-        .limit(1);
-
-      const member = await unassignSeat(memberId);
-
-      // Send notification email to unseated member
-      if (memberInfo.length > 0) {
+      if (result.value.changed) {
         const emailService = await getEmailService();
         if (emailService) {
           const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
-          const orgName = orgResult.organization.name;
-          const name = memberInfo[0].firstName || 'there';
+          const orgName = result.value.organizationName;
+          const name = result.value.firstName || 'there';
 
           await emailService.sendEmail({
-            to: memberInfo[0].email,
+            to: result.value.email,
             subject: `Your seat at ${orgName} has been removed`,
             html: `
               <h2>Seat Removed</h2>
@@ -916,14 +922,10 @@ export function registerSubscriptionRoutes(
         }
       }
 
-      res.json(member);
-    } catch (error: any) {
-      console.error("Error unassigning seat:", error);
-      if (error.name === "ZodError") {
-        res.status(400).json({ error: "Invalid input", details: error.errors });
-        return;
-      }
-      res.status(500).json({ error: error.message || "Failed to unassign seat" });
+      res.json({ memberId: result.value.memberId, seatAssigned: result.value.seatAssigned });
+    } catch {
+      console.error("Seat unassignment failed after authorization");
+      res.status(503).json({ error: "Seat command unavailable", code: "SEAT_COMMAND_UNAVAILABLE" });
     }
   });
 
@@ -1101,54 +1103,42 @@ export function registerSubscriptionRoutes(
 
   // List invoices
   app.get("/api/subscription/invoices", requireAuth, async (req, res) => {
-    try {
-      const user = req.user!;
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+    const result = await listAuthorizedInvoices(req.user!.id);
+    if (!result.ok) {
+      if (result.reason === "forbidden") {
+        res.status(403).json({ error: "Billing access denied", code: "BILLING_ACCESS_DENIED" });
         return;
       }
-
-      const invoices = await getInvoices(orgResult.organization.id);
-
-      res.json(invoices);
-    } catch (error: any) {
-      console.error("Error listing invoices:", error);
-      res.status(500).json({ error: "Failed to list invoices" });
+      res.status(503).json({ error: "Invoice authorization unavailable", code: "INVOICE_AUTHORIZATION_UNAVAILABLE" });
+      return;
     }
+    res.json(result.rows);
   });
 
   // Download invoice PDF
   app.get("/api/subscription/invoices/:transactionId/pdf", requireAuth, async (req, res) => {
     try {
-      const user = req.user!;
-      const transactionId = parseInt(req.params.transactionId);
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const transactionId = parseScopedFinancialId(req.params.transactionId);
+      if (transactionId === null) {
+        res.status(400).json({ error: "Invalid transaction ID", code: "INVALID_TRANSACTION_ID" });
         return;
       }
 
-      if (isNaN(transactionId)) {
-        res.status(400).json({ error: "Invalid transaction ID" });
+      const result = await readAuthorizedInvoiceById(req.user!.id, transactionId);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "Billing access denied", code: "BILLING_ACCESS_DENIED" });
+          return;
+        }
+        if (result.reason === "not_found") {
+          res.status(404).json({ error: "Invoice not found", code: "INVOICE_NOT_FOUND" });
+          return;
+        }
+        res.status(503).json({ error: "Invoice authorization unavailable", code: "INVOICE_AUTHORIZATION_UNAVAILABLE" });
         return;
       }
 
-      // Get transaction and verify it belongs to this org
-      const transaction = await getTransactionByCashfreeOrder(transactionId.toString());
-      // Fallback: get by ID
-      const invoices = await getInvoices(orgResult.organization.id);
-      const invoice = invoices.find(i => i.id === transactionId);
-
-      if (!invoice || invoice.status !== 'completed') {
-        res.status(404).json({ error: "Invoice not found" });
-        return;
-      }
-
-      // Check if PDF exists, generate if not
-      let invoiceUrl = invoice.invoiceUrl;
+      let invoiceUrl = result.value.invoiceUrl;
       if (!invoiceUrl) {
         invoiceUrl = await generateAndStoreInvoicePdf(transactionId);
         if (!invoiceUrl) {
@@ -1157,9 +1147,12 @@ export function registerSubscriptionRoutes(
         }
       }
 
-      // If URL starts with /api/invoices/, serve the local file
       if (invoiceUrl.startsWith('/api/invoices/')) {
-        const fileName = invoiceUrl.replace('/api/invoices/', '');
+        const fileName = `${result.value.invoiceNumber}.pdf`;
+        if (parseAuthorizedInvoiceFileName(fileName) === null || invoiceUrl !== `/api/invoices/${fileName}`) {
+          res.status(503).json({ error: "Invoice authorization unavailable", code: "INVOICE_AUTHORIZATION_UNAVAILABLE" });
+          return;
+        }
         const filePath = getLocalInvoicePath(fileName);
 
         if (!filePath) {
@@ -1171,6 +1164,10 @@ export function registerSubscriptionRoutes(
           }
 
           const newFileName = invoiceUrl.replace('/api/invoices/', '');
+          if (newFileName !== fileName || parseAuthorizedInvoiceFileName(newFileName) === null) {
+            res.status(503).json({ error: "Invoice authorization unavailable", code: "INVOICE_AUTHORIZATION_UNAVAILABLE" });
+            return;
+          }
           const newFilePath = getLocalInvoicePath(newFileName);
 
           if (!newFilePath) {
@@ -1190,10 +1187,14 @@ export function registerSubscriptionRoutes(
         return;
       }
 
-      // For GCS URLs, redirect
+      const redirectUrl = new URL(invoiceUrl);
+      if (redirectUrl.protocol !== 'https:' || redirectUrl.username || redirectUrl.password) {
+        res.status(503).json({ error: "Invoice authorization unavailable", code: "INVOICE_AUTHORIZATION_UNAVAILABLE" });
+        return;
+      }
       res.redirect(invoiceUrl);
-    } catch (error: any) {
-      console.error("Error downloading invoice:", error);
+    } catch {
+      console.error("Invoice download failed after authorization");
       res.status(500).json({ error: "Failed to download invoice" });
     }
   });
@@ -1201,27 +1202,23 @@ export function registerSubscriptionRoutes(
   // Serve local invoice files
   app.get("/api/invoices/:fileName", requireAuth, async (req, res) => {
     try {
-      const user = req.user!;
-      const { fileName } = req.params;
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const fileName = parseAuthorizedInvoiceFileName(req.params.fileName);
+      if (fileName === null) {
+        res.status(400).json({ error: "Invalid invoice file name", code: "INVALID_INVOICE_FILE_NAME" });
         return;
       }
 
-      // Validate fileName format (INV-XXXX-X-XXXXXX.pdf)
-      if (!fileName.match(/^INV-\d{4}-\d+-\d+\.pdf$/)) {
-        res.status(400).json({ error: "Invalid invoice file name" });
-        return;
-      }
-
-      // Verify the invoice belongs to this org by checking invoices
-      const invoices = await getInvoices(orgResult.organization.id);
-      const invoice = invoices.find(i => i.invoiceNumber && `${i.invoiceNumber}.pdf` === fileName);
-
-      if (!invoice) {
-        res.status(404).json({ error: "Invoice not found" });
+      const result = await readAuthorizedInvoiceByFileName(req.user!.id, fileName);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "Billing access denied", code: "BILLING_ACCESS_DENIED" });
+          return;
+        }
+        if (result.reason === "not_found") {
+          res.status(404).json({ error: "Invoice not found", code: "INVOICE_NOT_FOUND" });
+          return;
+        }
+        res.status(503).json({ error: "Invoice authorization unavailable", code: "INVOICE_AUTHORIZATION_UNAVAILABLE" });
         return;
       }
 
@@ -1234,8 +1231,8 @@ export function registerSubscriptionRoutes(
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.sendFile(filePath);
-    } catch (error: any) {
-      console.error("Error serving invoice:", error);
+    } catch {
+      console.error("Invoice file serving failed after authorization");
       res.status(500).json({ error: "Failed to serve invoice" });
     }
   });
@@ -1285,33 +1282,16 @@ export function registerSubscriptionRoutes(
 
   // Get credit usage history
   app.get("/api/ai/credits/usage", requireAuth, async (req, res) => {
-    try {
-      const user = req.user!;
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+    const result = await readAuthorizedOrganizationAiActivity(req.user!.id);
+    if (!result.ok) {
+      if (result.reason === "forbidden") {
+        res.status(403).json({ error: "Billing access denied", code: "BILLING_ACCESS_DENIED" });
         return;
       }
-
-      // Get org summary if owner/admin
-      const isAdmin = orgResult.membership.role === 'owner' || orgResult.membership.role === 'admin';
-
-      const userHistory = await getCreditUsageHistory(user.id);
-      const orgSummary = isAdmin ? await getOrgCreditSummary(orgResult.organization.id) : null;
-      const orgDetails = isAdmin ? await getOrgCreditDetails(orgResult.organization.id) : null;
-      const orgLedger = isAdmin ? await getOrgCreditLedger(orgResult.organization.id) : [];
-
-      res.json({
-        userHistory,
-        orgSummary,
-        orgDetails,
-        orgLedger,
-      });
-    } catch (error: any) {
-      console.error("Error getting credit usage:", error);
-      res.status(500).json({ error: "Failed to get credit usage" });
+      res.status(503).json({ error: "Usage unavailable", code: "USAGE_UNAVAILABLE" });
+      return;
     }
+    res.json(result.value);
   });
 
   // ===== Verify Order Status =====
@@ -1344,7 +1324,9 @@ export function registerSubscriptionRoutes(
         type: transaction.type,
         cashfreeStatus: orderStatus.status,
         paymentMethod: orderStatus.paymentMethod,
-        invoiceUrl: transaction.invoiceUrl,
+        downloadPath: transaction.status === 'completed' && transaction.invoiceNumber
+          ? `/api/subscription/invoices/${transaction.id}/pdf`
+          : null,
         failureReason: transaction.failureReason,
         totalAmount: transaction.totalAmount,
       });

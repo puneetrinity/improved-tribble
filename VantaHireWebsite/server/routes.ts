@@ -353,41 +353,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ============= CONSULTANT SHOWCASE ROUTES =============
 
   // Public: Get all active consultants
-  app.get("/api/consultants", async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const consultants = await storage.getActiveConsultants();
-      res.json(consultants);
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.get("/api/consultants", async (_req: Request, res: Response): Promise<void> => {
+    res.status(410).json({ error: "Consultant product retired", code: "CONSULTANT_PRODUCT_RETIRED" });
   });
 
   // Public: Get a specific consultant
-  app.get("/api/consultants/:id", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const id = Number(idParam);
-      if (!Number.isFinite(id) || id <= 0 || !Number.isInteger(id)) {
-        res.status(400).json({ error: "Invalid ID parameter" });
-        return;
-      }
-
-      const consultant = await storage.getConsultant(id);
-      if (!consultant || !consultant.isActive) {
-        res.status(404).json({ error: "Consultant not found" });
-        return;
-      }
-
-      res.json(consultant);
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.get("/api/consultants/:id", async (_req: Request, res: Response): Promise<void> => {
+    res.status(410).json({ error: "Consultant product retired", code: "CONSULTANT_PRODUCT_RETIRED" });
   });
 
 

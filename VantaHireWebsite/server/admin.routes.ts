@@ -37,6 +37,11 @@ import {
 } from '@shared/schema';
 import type { CsrfMiddleware } from './types/routes';
 import { privacyAllowedSql } from './candidate-privacy/decision';
+import {
+  parseAuthorizedUserRole,
+  parseScopedFinancialId,
+  updateAuthorizedUserRole,
+} from './lib/scopedFinancialAdminPublicAuthorization';
 
 const applicationPrivacyAllowed = () => sql.raw(
   privacyAllowedSql('application', 'applications.id', { globalUse: false }),
@@ -49,15 +54,6 @@ export function registerAdminRoutes(
   app: Express,
   csrfProtection: CsrfMiddleware
 ): void {
-  const normalizeConsultant = (consultant: any) => ({
-    ...consultant,
-    domains: Array.isArray(consultant?.domains)
-      ? consultant.domains.filter((domain: unknown): domain is string => typeof domain === 'string')
-      : typeof consultant?.domains === 'string'
-        ? consultant.domains.split(',').map((domain: string) => domain.trim()).filter(Boolean)
-        : [],
-  });
-
   // ============= ADMIN JOB MANAGEMENT =============
 
   // Get jobs by status for admin review
@@ -175,14 +171,11 @@ export function registerAdminRoutes(
   });
 
   // Get all applications with details for admin
-  app.get("/api/admin/applications/all", requireRole(['super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const applications = await storage.getAllApplicationsWithDetails();
-      res.json(applications);
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.get("/api/admin/applications/all", requireRole(['super_admin']), async (_req: Request, res: Response): Promise<void> => {
+    res.status(410).json({
+      error: "Admin application collection retired",
+      code: "ADMIN_APPLICATION_COLLECTION_RETIRED",
+    });
   });
 
   // ============= ADMIN USER MANAGEMENT =============
@@ -201,35 +194,28 @@ export function registerAdminRoutes(
   // Update user role (admin only)
   app.patch("/api/admin/users/:id/role", csrfProtection, requireRole(['super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const userId = Number(idParam);
-      const { role } = req.body;
-
-      if (!Number.isFinite(userId) || userId <= 0 || !Number.isInteger(userId)) {
-        res.status(400).json({ error: "Invalid user ID" });
+      const userId = parseScopedFinancialId(req.params.id);
+      const role = parseAuthorizedUserRole(req.body?.role);
+      if (userId === null || role === null) {
+        res.status(400).json({ error: "Invalid user ID or role", code: "INVALID_ROLE_UPDATE" });
         return;
       }
 
-      if (!['candidate', 'recruiter', 'super_admin', 'hiring_manager'].includes(role)) {
-        res.status(400).json({ error: "Invalid role. Must be candidate, recruiter, super_admin, or hiring_manager" });
+      const result = await updateAuthorizedUserRole(req.user!.id, userId, role);
+      if (!result.ok) {
+        if (result.reason === "not_found") {
+          res.status(404).json({ error: "User not found", code: "USER_NOT_FOUND" });
+          return;
+        }
+        res.status(503).json({ error: "Role update unavailable", code: "ROLE_UPDATE_UNAVAILABLE" });
         return;
       }
 
-      const user = await storage.updateUserRole(userId, role);
-
-      if (!user) {
-        res.status(404).json({ error: "User not found" });
-        return;
-      }
-
-      res.json(user);
+      res.json(result.value);
       return;
-    } catch (error) {
-      next(error);
+    } catch {
+      res.status(503).json({ error: "Role update unavailable", code: "ROLE_UPDATE_UNAVAILABLE" });
+      return;
     }
   });
 
@@ -385,80 +371,23 @@ export function registerAdminRoutes(
   // ============= ADMIN CONSULTANT MANAGEMENT =============
 
   // Admin: Get all consultants (including inactive)
-  app.get("/api/admin/consultants", requireRole(['super_admin']), async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const consultants = await storage.getConsultants();
-      res.json(consultants.map(normalizeConsultant));
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.get("/api/admin/consultants", requireRole(['super_admin']), async (_req: Request, res: Response): Promise<void> => {
+    res.status(410).json({ error: "Consultant product retired", code: "CONSULTANT_PRODUCT_RETIRED" });
   });
 
   // Admin: Create a new consultant
-  app.post("/api/admin/consultants", csrfProtection, requireRole(['super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const consultantData = req.body;
-      const consultant = await storage.createConsultant(consultantData);
-      res.status(201).json(normalizeConsultant(consultant));
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.post("/api/admin/consultants", csrfProtection, requireRole(['super_admin']), async (_req: Request, res: Response): Promise<void> => {
+    res.status(410).json({ error: "Consultant product retired", code: "CONSULTANT_PRODUCT_RETIRED" });
   });
 
   // Admin: Update a consultant
-  app.patch("/api/admin/consultants/:id", csrfProtection, requireRole(['super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const id = Number(idParam);
-      if (!Number.isFinite(id) || id <= 0 || !Number.isInteger(id)) {
-        res.status(400).json({ error: "Invalid ID parameter" });
-        return;
-      }
-
-      const consultant = await storage.updateConsultant(id, req.body);
-      if (!consultant) {
-        res.status(404).json({ error: "Consultant not found" });
-        return;
-      }
-
-      res.json(normalizeConsultant(consultant));
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.patch("/api/admin/consultants/:id", csrfProtection, requireRole(['super_admin']), async (_req: Request, res: Response): Promise<void> => {
+    res.status(410).json({ error: "Consultant product retired", code: "CONSULTANT_PRODUCT_RETIRED" });
   });
 
   // Admin: Delete a consultant
-  app.delete("/api/admin/consultants/:id", csrfProtection, requireRole(['super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const id = Number(idParam);
-      if (!Number.isFinite(id) || id <= 0 || !Number.isInteger(id)) {
-        res.status(400).json({ error: "Invalid ID parameter" });
-        return;
-      }
-
-      const deleted = await storage.deleteConsultant(id);
-      if (!deleted) {
-        res.status(404).json({ error: "Consultant not found" });
-        return;
-      }
-
-      res.json({ success: true });
-      return;
-    } catch (error) {
-      next(error);
-    }
+  app.delete("/api/admin/consultants/:id", csrfProtection, requireRole(['super_admin']), async (_req: Request, res: Response): Promise<void> => {
+    res.status(410).json({ error: "Consultant product retired", code: "CONSULTANT_PRODUCT_RETIRED" });
   });
 
   // ============= ADMIN FORM RESPONSES =============
