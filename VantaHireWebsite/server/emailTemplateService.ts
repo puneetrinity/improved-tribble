@@ -152,6 +152,111 @@ function isSendTemplatedEmailOptions(
   );
 }
 
+export interface AuthorizedTemplatedEmailContext {
+  applicationId: number;
+  templateId: number;
+  organizationId: number;
+  candidateName: string;
+  candidateEmail: string;
+  jobTitle: string;
+  recruiterName: string;
+  templateName: string;
+  templateType: string;
+  templateSubject: string;
+  templateBody: string;
+}
+
+function isAuthorizedTemplatedEmailContext(value: unknown): value is AuthorizedTemplatedEmailContext {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const context = value as AuthorizedTemplatedEmailContext;
+  const positive = (item: unknown) => typeof item === 'number' && Number.isSafeInteger(item) && item > 0;
+  const boundedText = (item: unknown, max: number) => typeof item === 'string' && item.length > 0 && item.length <= max;
+  return positive(context.applicationId)
+    && positive(context.templateId)
+    && positive(context.organizationId)
+    && boundedText(context.candidateName, 1_000)
+    && boundedText(context.candidateEmail, 1_000)
+    && boundedText(context.jobTitle, 2_000)
+    && boundedText(context.recruiterName, 1_000)
+    && boundedText(context.templateName, 1_000)
+    && boundedText(context.templateType, 1_000)
+    && boundedText(context.templateSubject, 20_000)
+    && boundedText(context.templateBody, 1_000_000);
+}
+
+/**
+ * Deliver a manually-authorized application email without re-reading its
+ * application, job or template by global id. The caller supplies only the
+ * immutable statement-bound context produced by the 2H authorization module.
+ */
+export async function sendAuthorizedTemplatedEmail(
+  context: AuthorizedTemplatedEmailContext,
+  options: SendTemplatedEmailOptions = {},
+): Promise<void> {
+  if (!isAuthorizedTemplatedEmailContext(context)) {
+    throw new Error('AUTHORIZED_EMAIL_CONTEXT_INVALID');
+  }
+
+  const variables: TemplateVariables = {
+    candidate_name: context.candidateName,
+    job_title: context.jobTitle,
+    recruiter_name: context.recruiterName,
+    company_name: 'VantaHire',
+    ...options.customVariables,
+  };
+  const renderedSubject = renderTemplate(context.templateSubject, variables);
+  const renderedBody = renderTemplate(context.templateBody, variables);
+  const subject = options.subjectOverride && options.subjectOverride.trim().length > 0
+    ? options.subjectOverride
+    : renderedSubject;
+  const body = options.bodyOverride && options.bodyOverride.trim().length > 0
+    ? options.bodyOverride
+    : renderedBody;
+
+  let previewUrl: string | null = null;
+  let status: 'success' | 'failed' = 'success';
+  let errorMessage: string | null = null;
+
+  try {
+    const svc = await getEmailService();
+    if (!svc || typeof svc.sendEmail !== 'function') {
+      status = 'failed';
+      errorMessage = 'Email service unavailable';
+    } else {
+      await requireCandidatePrivacyAllowed(
+        { type: 'application', id: context.applicationId },
+        { globalUse: false },
+      );
+      const result = await svc.sendEmail({
+        to: context.candidateEmail,
+        subject,
+        text: body,
+      });
+      if (result && typeof result === 'object' && 'messageId' in result) {
+        const nodemailerInfo = result as { messageId?: unknown };
+        if (typeof nodemailerInfo.messageId === 'string' && process.env.SMTP_HOST?.includes('ethereal')) {
+          previewUrl = `https://ethereal.email/message/${nodemailerInfo.messageId}`;
+        }
+      }
+    }
+  } catch (error) {
+    if (error instanceof CandidatePrivacyRestrictedError) throw error;
+    status = 'failed';
+    errorMessage = 'Email provider unavailable';
+  }
+
+  await db.insert(emailAuditLog).values({
+    applicationId: context.applicationId,
+    templateId: context.templateId,
+    templateType: context.templateType,
+    recipientEmail: context.candidateEmail,
+    subject,
+    status,
+    errorMessage,
+    previewUrl,
+  });
+}
+
 /**
  * Send an email using a template with application context
  */

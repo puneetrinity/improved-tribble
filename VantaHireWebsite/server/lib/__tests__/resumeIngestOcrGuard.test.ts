@@ -44,7 +44,6 @@ const mutations: Array<[string, string, string, string]> = [
   ['candidate writer call', 'server/ai.routes.ts', 'await extractResumeForOrdinaryIngest(file.buffer', 'await Promise.resolve(file.buffer'],
   ['candidate 503', 'server/ai.routes.ts', "code: 'RESUME_EXTRACTION_UNAVAILABLE'", "code: 'INVALID_RESUME'"],
   ['candidate upload ordering', 'server/ai.routes.ts', '// Extract text before upload.', 'const gcsPath = await uploadToGCS(file.buffer, file.originalname); // Extract text before upload.'],
-  ['application on-demand reader', 'server/applications.routes.ts', 'const buffer = await downloadFromGCS(application.resumeUrl);', 'const buffer = Buffer.alloc(0);'],
   ['AI on-demand reader', 'server/ai.routes.ts', 'const buffer = await downloadFromGCS(application.resumeUrl);', 'const buffer = Buffer.alloc(0);'],
   ['legacy bulk client', 'server/lib/googleVisionOcrClient.ts', 'files:asyncBatchAnnotate', 'files:annotate'],
   ['legacy bulk helper', 'server/lib/resumeImportExtraction.ts', 'extractTextWithGoogleVisionOcr', 'extractTextWithGoogleVisionIngestOcr'],
@@ -150,6 +149,17 @@ describe('ordinary-ingest OCR source guard', () => {
       ['candidate-privacy-current-failure'],
       ['object-authorization-current-failure'],
     )).toEqual(['candidate-privacy-current-failure', 'object-authorization-current-failure']);
+  });
+
+  it('delegates the retired AI-summary GCS fallback to the current object-authorization guard', () => {
+    expect(files['server/applications.routes.ts']).not.toContain(
+      "if (!resumeText && application.resumeUrl && application.resumeUrl.startsWith('gs://'))",
+    );
+    expect(composeSharedGuardProblems([], [
+      '/api/applications/:id/ai-summary restores a global/id-only candidate read or route-owned write.',
+    ])).toEqual([
+      '/api/applications/:id/ai-summary restores a global/id-only candidate read or route-owned write.',
+    ]);
   });
 
   it('accepts a later separately-governed package without inflating the shipped OCR boundary', () => {

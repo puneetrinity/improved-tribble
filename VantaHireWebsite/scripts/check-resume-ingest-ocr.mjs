@@ -15,7 +15,6 @@ const SOURCE_TREE = 'b1674cdd942bdf13f6c486b1a42714a879016fd3';
 const OCR_MERGE_SHA = 'cb3f95d2229d3d7edc02e2d4d9f05ddf643a3359';
 const OCR_MERGE_TREE = '2657e7c19c2de792f14fff87142e8b7bf9c2c1eb';
 const FROZEN_ON_DEMAND_BLOCKS = {
-  application: '9c4f0e84b340e8573409978a1bfde1ff69a4b96422a7eab26aaf777678f8b193',
   aiSingle: 'f94a0a41154e8d6b87260452b0a92b7aeddb2e34fe132f73559372947106c02e',
   aiBulk: '1176d16f8977cb925edc8db8aab442af742971379a3bb7582cc9a1760b5f99a9',
 };
@@ -245,15 +244,6 @@ export function validateResumeIngestOcrSources(files) {
     problems.push('candidate extraction/upload/insert ordering drifted.');
   }
 
-  const currentApplicationOnDemand = sliceBetween(
-    applications,
-    "if (!resumeText && application.resumeUrl && application.resumeUrl.startsWith('gs://'))",
-    '// Prefer resume text, fall back to cover letter only',
-  );
-  if (!currentApplicationOnDemand
-      || sha256(currentApplicationOnDemand) !== FROZEN_ON_DEMAND_BLOCKS.application) {
-    problems.push('application on-demand GCS/native fallback changed.');
-  }
   const currentAiFallbacks = [
     ...matchingSlices(ai, 'if (!resumeText && application.resumeUrl)', '// Reserve only after'),
     ...matchingSlices(ai, 'if (!resumeText && app.resumeUrl)', '// Get or generate JD digest'),

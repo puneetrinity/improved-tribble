@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "b902944c4452d2e3f6d6dc3ba07b0f41d0d1fd7bc080b8901ba69d438a4f1ed4",
+  "source_census_sha256": "625ef3717ba2bb3b28468406b037b71fa663042f4d18cbcba4e25211c98ecee0",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
@@ -283,8 +283,8 @@
       "direction": "read_write_queue_provider",
       "privacy_action": ["withdraw_global_matching", "request_erasure"],
       "organization_scope": "self_or_owning_org",
-      "enforcement": "Raw identity checks precede persistence/GCS; application anchors recheck before notifications, graph sync and bulk operations.",
-      "anchors": ["requireNewCandidateIdentityAllowed", "runPrivacyCheckedApplicationSideEffect", "requireCandidatePrivacyAllowed"]
+      "enforcement": "Raw identity checks precede persistence/GCS; application anchors recheck before notifications and graph sync; AI summary and similarity use statement-bound object/privacy grants before candidate reads and provider publication.",
+      "anchors": ["requireNewCandidateIdentityAllowed", "runPrivacyCheckedApplicationSideEffect", "requireCandidatePrivacyAllowed", "readAuthorizedApplicationAiSummaryContext", "readAuthorizedSimilarCandidates"]
     },
     {
       "id": "candidate-self-readers",
@@ -415,8 +415,8 @@
       "direction": "read_write_provider",
       "privacy_action": ["request_erasure"],
       "organization_scope": "owning_org",
-      "enforcement": "Application anchor is checked before draft/send; provider service performs the final recheck.",
-      "anchors": ["requireCandidatePrivacyAllowed", "sendTemplatedEmail"]
+      "enforcement": "Statement-bound application/job/template grants precede draft/send; a final application privacy check precedes each provider boundary and publication is re-authorized.",
+      "anchors": ["readAuthorizedManualEmailContext", "readAuthorizedEmailDraftContext", "requireCandidatePrivacyAllowed", "sendAuthorizedTemplatedEmail"]
     },
     {
       "id": "forms-and-feedback",
@@ -624,8 +624,8 @@
       "direction": "provider_write",
       "privacy_action": ["request_erasure"],
       "organization_scope": "owning_org",
-      "enforcement": "Application anchor is rechecked in the provider service immediately before candidate delivery.",
-      "anchors": ["requireCandidatePrivacyAllowed", "sendEmail"]
+      "enforcement": "Legacy callers retain their application re-read path; the manual route supplies an immutable statement-bound context to a no-re-read sender. Both paths recheck application privacy immediately before candidate delivery.",
+      "anchors": ["sendTemplatedEmail", "sendAuthorizedTemplatedEmail", "requireCandidatePrivacyAllowed", "sendEmail"]
     },
     {
       "id": "notification-provider-callgraph",

@@ -93,6 +93,13 @@ import {
   scheduleAuthorizedBulkApplicationInterviews,
   setAuthorizedApplicationReviewerRating,
 } from './lib/applicationWorkflowAuthorization';
+import {
+  parsePositiveDecimalJobId,
+  parseSimilarCandidateQuery,
+  publishAuthorizedApplicationAiSummary,
+  readAuthorizedApplicationAiSummaryContext,
+  readAuthorizedSimilarCandidates,
+} from './lib/applicationAiOutboundAuthorization';
 
 // Base URL for email links
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
@@ -1306,42 +1313,36 @@ export function registerApplicationsRoutes(
   // Get AI-suggested similar candidates from other jobs
   app.get("/api/jobs/:id/ai-similar-candidates", requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
+      const jobId = parsePositiveDecimalJobId(req.params.id);
+      if (jobId === null) {
+        res.status(400).json({ error: 'Invalid job ID', code: 'INVALID_JOB_ID' });
         return;
       }
-
-      const jobId = Number(idParam);
-      if (!Number.isFinite(jobId) || jobId <= 0 || !Number.isInteger(jobId)) {
-        res.status(400).json({ error: 'Invalid job ID' });
+      const query = parseSimilarCandidateQuery(req.query as Record<string, unknown>);
+      if (!query.ok) {
+        res.status(400).json({ error: 'Invalid similar candidate query', code: 'INVALID_SIMILAR_CANDIDATE_QUERY' });
         return;
       }
-
-      const minFitScore = req.query.minFitScore
-        ? parseInt(String(req.query.minFitScore), 10)
-        : undefined;
-      const limit = req.query.limit
-        ? parseInt(String(req.query.limit), 10)
-        : undefined;
-
-      const recruiterId = req.user!.id;
-
-      const options: { minFitScore?: number; limit?: number } = {};
-      if (typeof minFitScore === "number" && !Number.isNaN(minFitScore)) {
-        options.minFitScore = minFitScore;
+      const result = await readAuthorizedSimilarCandidates(
+        req.user!.id,
+        jobId,
+        query.minFitScore,
+        query.limit,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        if (result.reason === 'not_found') {
+          res.status(404).json({ error: 'Job not found', code: 'JOB_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
+        return;
       }
-      if (typeof limit === "number" && !Number.isNaN(limit)) {
-        options.limit = limit;
-      }
-
-      const candidates = await storage.getSimilarCandidatesForJob(jobId, recruiterId, options);
-
-      res.json(candidates);
+      res.json(result.rows);
       return;
-    } catch (error) {
-      console.error('[Similar Candidates] Error fetching similar candidates:', error);
-      next(error);
+    } catch {
+      res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+      return;
     }
   });
 
@@ -1950,25 +1951,11 @@ export function registerApplicationsRoutes(
   // ============= AI SUMMARY =============
 
   // Generate AI candidate summary - requires seat and AI feature access
-  app.post("/api/applications/:id/ai-summary", aiAnalysisRateLimit, requireRole(['recruiter', 'super_admin']), requireSeat(), requireFeatureAccess(FEATURES.AI_CONTENT), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  app.post("/api/applications/:id/ai-summary", aiAnalysisRateLimit, requireRole(['recruiter', 'super_admin']), requireSeat(), requireFeatureAccess(FEATURES.AI_CONTENT), async (req: Request, res: Response): Promise<void> => {
     try {
-      // Check AI credits for recruiters
-      if (req.user!.role === 'recruiter') {
-        const creditCheck = await hasEnoughCredits(req.user!.id, 1);
-        if (!creditCheck) {
-          res.status(403).json(await getAiCreditExhaustionPayload(req.user!.id, 1));
-          return;
-        }
-      }
-
-      const idParam = req.params.id;
-      if (!idParam) {
-        res.status(400).json({ error: 'Missing ID parameter' });
-        return;
-      }
-      const appId = Number(idParam);
-      if (!Number.isFinite(appId) || appId <= 0 || !Number.isInteger(appId)) {
-        res.status(400).json({ error: 'Invalid ID parameter' });
+      const appId = parsePositiveDecimalApplicationId(req.params.id);
+      if (appId === null) {
+        res.status(400).json({ error: 'Invalid application ID', code: 'INVALID_APPLICATION_ID' });
         return;
       }
 
@@ -1980,51 +1967,23 @@ export function registerApplicationsRoutes(
         return;
       }
 
-      const application = await storage.getApplication(appId);
-      if (!application) {
-        res.status(404).json({ error: 'Application not found' });
-        return;
-      }
-
-      const job = await storage.getJob(application.jobId);
-      if (!job) {
-        res.status(404).json({ error: 'Job not found' });
-        return;
-      }
-
-      let resumeText = '';
-
-      if (application.extractedResumeText) {
-        resumeText = application.extractedResumeText;
-      } else if (application.resumeId) {
-        const resumeData = await db.query.candidateResumes.findFirst({
-          where: eq(candidateResumes.id, application.resumeId)
-        });
-        resumeText = resumeData?.extractedText || '';
-      }
-
-      if (!resumeText && application.resumeUrl && application.resumeUrl.startsWith('gs://')) {
-        try {
-          await requireCandidatePrivacyAllowed(
-            { type: 'application', id: appId },
-            { globalUse: false },
-          );
-          const buffer = await downloadFromGCS(application.resumeUrl);
-          const extraction = await extractResumeText(buffer);
-          if (extraction.success && validateResumeText(extraction.text)) {
-            resumeText = extraction.text;
-          }
-        } catch (err) {
-          console.error('[AI Summary] Resume download/extract failed:', err);
+      const context = await readAuthorizedApplicationAiSummaryContext(
+        req.user!.id,
+        appId,
+        { allowPlatformAdmin: true },
+      );
+      if (!context.ok) {
+        if (context.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
         }
+        return;
       }
-
-      // Prefer resume text, fall back to cover letter only (not job description - that's not candidate content)
-      const effectiveText = resumeText || application.coverLetter || '';
-
-      if (!effectiveText) {
+      if (!context.value.candidateText) {
         res.status(400).json({
           error: 'No candidate content available',
+          code: 'NO_CANDIDATE_CONTENT',
           message: 'We could not find any candidate text to summarize. Please ensure a resume or cover letter is available for this application.',
         });
         return;
@@ -2036,61 +1995,46 @@ export function registerApplicationsRoutes(
         { globalUse: false },
       );
       const summaryResult = await generateCandidateSummary(
-        effectiveText,
-        job.title,
-        job.description,
-        application.name,
-        job.skills || [],
-        job.goodToHaveSkills || []
+        context.value.candidateText,
+        context.value.jobTitle,
+        context.value.jobDescription,
+        context.value.candidateName,
+        context.value.requiredSkills,
+        context.value.goodToHaveSkills,
       );
       const durationMs = Date.now() - startTime;
-
       const costUsd = calculateAiCost(summaryResult.tokensUsed.input, summaryResult.tokensUsed.output);
-
-      await requireCandidatePrivacyAllowed(
-        { type: 'application', id: appId },
-        { globalUse: false },
-      );
-      await db
-        .update(applications)
-        .set({
-          aiSummary: summaryResult.summary,
-          aiSummaryVersion: 1,
-          aiSuggestedAction: summaryResult.suggestedAction,
-          aiSuggestedActionReason: summaryResult.suggestedActionReason,
-          aiSummaryComputedAt: new Date(),
-          aiSummaryModelVersion: summaryResult.model_version,
-          aiStrengths: summaryResult.strengths,
-          aiConcerns: summaryResult.concerns,
-          aiKeyHighlights: summaryResult.keyHighlights,
-          // Skill analysis fields
-          aiRequiredSkillsMatched: summaryResult.requiredSkillsMatched,
-          aiRequiredSkillsMissing: summaryResult.requiredSkillsMissing,
-          aiRequiredSkillsMatchPercentage: summaryResult.requiredSkillsMatchPercentage,
-          aiRequiredSkillsDepthNotes: summaryResult.requiredSkillsDepthNotes,
-          aiGoodToHaveSkillsMatched: summaryResult.goodToHaveSkillsMatched,
-          aiGoodToHaveSkillsMissing: summaryResult.goodToHaveSkillsMissing,
-        })
-        .where(eq(applications.id, appId));
-
-      await db.insert(userAiUsage).values({
-        organizationId: job.organizationId ?? undefined,
-        userId: req.user!.id,
-        kind: 'summary',
-        tokensIn: summaryResult.tokensUsed.input,
-        tokensOut: summaryResult.tokensUsed.output,
-        costUsd,
-        metadata: {
-          applicationId: appId,
+      const publication = await publishAuthorizedApplicationAiSummary(
+        req.user!.id,
+        appId,
+        {
+          summary: summaryResult.summary,
+          suggestedAction: summaryResult.suggestedAction,
+          suggestedActionReason: summaryResult.suggestedActionReason,
+          strengths: summaryResult.strengths,
+          concerns: summaryResult.concerns,
+          keyHighlights: summaryResult.keyHighlights,
+          requiredSkillsMatched: summaryResult.requiredSkillsMatched,
+          requiredSkillsMissing: summaryResult.requiredSkillsMissing,
+          requiredSkillsMatchPercentage: summaryResult.requiredSkillsMatchPercentage,
+          requiredSkillsDepthNotes: summaryResult.requiredSkillsDepthNotes,
+          goodToHaveSkillsMatched: summaryResult.goodToHaveSkillsMatched,
+          goodToHaveSkillsMissing: summaryResult.goodToHaveSkillsMissing,
+          modelVersion: summaryResult.model_version,
+          tokensIn: summaryResult.tokensUsed.input,
+          tokensOut: summaryResult.tokensUsed.output,
+          costUsd,
           durationMs,
-          jobTitle: job.title,
-          candidateName: application.name,
         },
-      });
-
-      // Deduct credit for recruiters after successful generation
-      if (req.user!.role === 'recruiter') {
-        await useCredits(req.user!.id, 1);
+        { allowPlatformAdmin: true },
+      );
+      if (!publication.ok) {
+        if (publication.reason === 'not_found') {
+          res.status(404).json({ error: 'Application not found', code: 'APPLICATION_NOT_FOUND' });
+        } else {
+          res.status(503).json({ error: 'Authorization unavailable', code: 'AUTHORIZATION_UNAVAILABLE' });
+        }
+        return;
       }
 
       res.json({
@@ -2110,7 +2054,7 @@ export function registerApplicationsRoutes(
           goodToHaveSkillsMatched: summaryResult.goodToHaveSkillsMatched,
           goodToHaveSkillsMissing: summaryResult.goodToHaveSkillsMissing,
           modelVersion: summaryResult.model_version,
-          computedAt: new Date(),
+          computedAt: publication.value.computedAt,
           cost: parseFloat(costUsd),
           durationMs,
         }
@@ -2118,18 +2062,10 @@ export function registerApplicationsRoutes(
       return;
     } catch (error) {
       if (error instanceof CandidatePrivacyRestrictedError) {
-        res.status(503).json({ code: error.code });
+        res.status(503).json({ error: 'Candidate privacy restricted', code: error.code });
         return;
       }
-      console.error('[AI Summary] Error:', error);
-      if (error instanceof Error) {
-        res.status(500).json({
-          error: 'AI summary generation failed',
-          message: error.message
-        });
-      } else {
-        res.status(500).json({ error: 'Internal server error' });
-      }
+      res.status(500).json({ error: 'AI summary generation failed', code: 'AI_SUMMARY_FAILED' });
       return;
     }
   });
