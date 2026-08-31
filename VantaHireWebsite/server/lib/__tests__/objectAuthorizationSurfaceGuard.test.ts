@@ -52,7 +52,7 @@ function fixture(): string {
     join(APP_ROOT, "client", "src", "components", "ResumePreviewModal.tsx"),
     join(root, "client", "src", "components", "ResumePreviewModal.tsx"),
   );
-  for (const file of ["applications-page.tsx", "candidates-page.tsx"] as const) {
+  for (const file of ["applications-page.tsx", "candidates-page.tsx", "admin-forms-page.tsx", "client-shortlist-page.tsx"] as const) {
     cpSync(join(APP_ROOT, "client", "src", "pages", file), join(root, "client", "src", "pages", file));
   }
   cpSync(join(APP_ROOT, "client", "src", "lib", "internal-copy.ts"), join(root, "client", "src", "lib", "internal-copy.ts"));
@@ -985,5 +985,129 @@ describe("object authorization surface guard", () => {
     expect(problems).toContain(
       "/api/applications/:id/send-email logs raw candidate, template, provider or database data.",
     );
+  });
+
+  it("rejects reviewer/share operations split across multiple statements", () => {
+    const problems = mutate(fixture(), "server/lib/reviewerShareAuthorization.ts", (source) =>
+      source.replace(
+        "export async function readPublicClientShortlist(",
+        "async function forbiddenSecondStatement() { await db.execute(sql`SELECT 1`); }\n\nexport async function readPublicClientShortlist(",
+      ).replace(
+        "  try {\n    const result = await db.execute(sql`\n      WITH authorized_shortlist",
+        "  try {\n    await db.execute(sql`SELECT 1`);\n    const result = await db.execute(sql`\n      WITH authorized_shortlist",
+      ),
+    );
+    expect(problems).toContain("readPublicClientShortlist must execute exactly one database statement.");
+  });
+
+  it("rejects loss of current seat enforcement from form authority", () => {
+    const problems = mutate(fixture(), "server/lib/reviewerShareAuthorization.ts", (source) =>
+      source.replace("${organizationMembers.seatAssigned} = TRUE", "TRUE"),
+    );
+    expect(problems).toContain("reviewer/share authority anchor is missing: ${organizationMembers.seatAssigned} = TRUE");
+  });
+
+  it("rejects public shortlist email projection", () => {
+    const problems = mutate(fixture(), "server/lib/reviewerShareAuthorization.ts", (source) =>
+      source.replace(
+        "${applications.name} AS candidate_name,",
+        "${applications.name} AS candidate_name,\n               ${applications.email} AS candidate_email,",
+      ),
+    );
+    expect(problems).toContain("public shortlist restores forbidden projection: ${applications.email}");
+  });
+
+  it("rejects loss of opaque candidate reference binding", () => {
+    const problems = mutate(fixture(), "server/lib/reviewerShareAuthorization.ts", (source) =>
+      source.replace("${clientShortlistItems.publicRef} = ${candidateRef}::uuid", "${applications.id} = 1"),
+    );
+    expect(problems).toContain("public/client-feedback authority anchor is missing: ${clientShortlistItems.publicRef} = ${candidateRef}::uuid");
+  });
+
+  it("rejects default-true resume sharing", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0004_reviewer_share_authority.sql", (source) =>
+      source.replace("ADD COLUMN share_resume boolean NOT NULL DEFAULT FALSE", "ADD COLUMN share_resume boolean NOT NULL DEFAULT TRUE"),
+    );
+    expect(problems).toContain("reviewer/share migration anchor is missing: ADD COLUMN share_resume boolean NOT NULL DEFAULT FALSE");
+    expect(problems).toContain("reviewer/share migration checksum does not match migration 0004.");
+  });
+
+  it("rejects current-membership inference in the conservative migration", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0004_reviewer_share_authority.sql", (source) =>
+      `${source}\n-- forbidden classifier\nSELECT 1 FROM organization_members;\n`,
+    );
+    expect(problems).toContain("reviewer/share migration infers legacy authority from current identity or membership.");
+  });
+
+  it("rejects restoring a global form read", () => {
+    const problems = mutate(fixture(), "server/forms.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedFormTemplate(",
+        "await storage.getFormTemplate(formId);\n        const result = await readAuthorizedFormTemplate(",
+      ),
+    );
+    expect(problems).toContain("/api/forms/templates restores a target global read or id-only write.");
+  });
+
+  it("rejects form manage middleware drift", () => {
+    const problems = mutate(fixture(), "server/forms.routes.ts", (source) =>
+      source.replace(
+        'app.patch(\n    "/api/forms/templates/:id",\n    requireAuth,\n    requireRole([\'recruiter\', \'super_admin\']),\n    requireSeat(),',
+        'app.patch(\n    "/api/forms/templates/:id",\n    requireAuth,',
+      ),
+    );
+    expect(problems.some((problem) => problem.includes("/api/forms/templates/:id lost form route anchor"))).toBe(true);
+  });
+
+  it("rejects client-side creator-id authority inference", () => {
+    const problems = mutate(fixture(), "client/src/pages/admin-forms-page.tsx", (source) =>
+      source.replace("return template.canManage", "return user?.role === 'super_admin' || template.createdBy === user?.id"),
+    );
+    expect(problems).toContain("forms UI does not consume server-derived canManage.");
+    expect(problems).toContain("forms UI restores creator-id authority inference.");
+  });
+
+  it("rejects raw contact data restored to the public shortlist page", () => {
+    const problems = mutate(fixture(), "client/src/pages/client-shortlist-page.tsx", (source) =>
+      source.replace("{candidate.name}", "{candidate.name} {candidate.email}"),
+    );
+    expect(problems).toContain("public shortlist client restores forbidden field: candidate.email");
+  });
+
+  it("rejects share controls that default on", () => {
+    const problems = mutate(fixture(), "client/src/pages/application-management-page.tsx", (source) =>
+      source.replace(
+        "const [shareShortlistResumes, setShareShortlistResumes] = useState(false)",
+        "const [shareShortlistResumes, setShareShortlistResumes] = useState(true)",
+      ),
+    );
+    expect(problems).toContain("shortlist sharing control is missing: const [shareShortlistResumes, setShareShortlistResumes] = useState(false)");
+  });
+
+  it("rejects HM provider work before issuer authorization", () => {
+    const problems = mutate(fixture(), "server/hiringManagerInvitations.routes.ts", (source) =>
+      source.replace(
+        "const issuer = await resolveInvitationIssuerScope(",
+        "await getEmailService();\n        const issuer = await resolveInvitationIssuerScope(",
+      ),
+    );
+    expect(problems).toContain("HM issuer/user/replacement/provider order is unsafe.");
+  });
+
+  it("rejects global HM invitation deletion", () => {
+    const problems = mutate(fixture(), "server/hiringManagerInvitations.routes.ts", (source) =>
+      source.replace(
+        "const deleted = await cancelAuthorizedHiringManagerInvitation(issuer.value, id);",
+        "await storage.deleteHiringManagerInvitation(id);\n        const deleted = await cancelAuthorizedHiringManagerInvitation(issuer.value, id);",
+      ),
+    );
+    expect(problems).toContain("/api/hiring-manager-invitations/:id restores a target global read or id-only write.");
+  });
+
+  it("rejects reviewer/share migration checksum drift", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0004_reviewer_share_authority.sql", (source) =>
+      `${source}\n-- forbidden drift\n`,
+    );
+    expect(problems).toContain("reviewer/share migration checksum does not match migration 0004.");
   });
 });

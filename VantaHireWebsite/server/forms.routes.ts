@@ -26,6 +26,15 @@ import {
   requireCandidatePrivacyAllowed,
   requireNewCandidateIdentityAllowed,
 } from './candidate-privacy/decision';
+import {
+  createScopedFormTemplate,
+  deleteAuthorizedFormTemplate,
+  listAuthorizedFormTemplates,
+  parseReviewerShareId,
+  readAuthorizedFormTemplate,
+  readAuthorizedResponsesForForm,
+  updateAuthorizedFormTemplate,
+} from './lib/reviewerShareAuthorization';
 
 async function requireFormSubjectAllowed(invitation: {
   applicationId?: number | null;
@@ -131,7 +140,7 @@ const updateTemplateSchema = z.object({
   name: z.string().min(1).max(200).optional(),
   description: z.string().max(1000).optional(),
   isPublished: z.boolean().optional(),
-  fields: z.array(insertFormFieldSchema).optional(),
+  fields: z.array(insertFormFieldSchema).min(1).max(50).optional(),
 });
 
 const aiSuggestSchema = z.object({
@@ -139,6 +148,16 @@ const aiSuggestSchema = z.object({
   jobDescription: z.string().max(5000).optional(),
   goals: z.array(z.string()).default([]),
 });
+
+function scopedFields(fields: z.infer<typeof insertFormFieldSchema>[]) {
+  return fields.map((field) => ({
+    type: field.type,
+    label: field.label,
+    required: field.required,
+    ...(field.options !== undefined ? { options: field.options } : {}),
+    order: field.order,
+  }));
+}
 
 export function registerFormsRoutes(app: Express, csrfProtection?: (req: Request, res: Response, next: NextFunction) => void): void {
   console.log('📋 Registering forms routes...');
@@ -159,47 +178,22 @@ export function registerFormsRoutes(app: Express, csrfProtection?: (req: Request
       try {
         const body = createTemplateSchema.parse(req.body);
 
-        // Get user's organization
-        let organizationId: number | undefined;
-        if (req.user!.role === 'recruiter') {
-          const orgResult = await getUserOrganization(req.user!.id);
-          if (orgResult) {
-            organizationId = orgResult.organization.id;
-            await updateMemberActivity(req.user!.id);
-          }
-        }
-
-        // Insert form
-        const [form] = await db.insert(forms).values({
+        const result = await createScopedFormTemplate(req.user!.id, {
           name: body.name,
-          description: body.description,
+          description: body.description ?? null,
           isPublished: body.isPublished ?? true,
-          createdBy: req.user!.id,
-          organizationId,
-        }).returning();
-
-        // Insert fields
-        const fieldsData = body.fields.map(field => ({
-          formId: form.id,
-          type: field.type,
-          label: field.label,
-          required: field.required,
-          options: field.options,
-          order: field.order,
-        }));
-
-        const createdFields = await db.insert(formFields).values(fieldsData).returning();
-
-        return res.status(201).json({
-          ...form,
-          fields: createdFields.sort((a: any, b: any) => a.order - b.order),
-        });
+          fields: scopedFields(body.fields),
+        }, { allowPlatformAdmin: true });
+        if (!result.ok) {
+          const status = result.reason === 'unavailable' ? 503 : 404;
+          return res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'FORM_NOT_FOUND' });
+        }
+        return res.status(201).json(result.value);
       } catch (error: any) {
         if (error instanceof z.ZodError) {
           return res.status(400).json({ error: 'Invalid request data', details: error.errors });
         }
-        console.error('Error creating form template:', error);
-        return res.status(500).json({ error: 'Failed to create form template' });
+        return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
       }
     }
   );
@@ -309,46 +303,17 @@ export function registerFormsRoutes(app: Express, csrfProtection?: (req: Request
     "/api/forms/templates",
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
-    requireSeat({ allowNoOrg: true }),
+    requireSeat(),
     async (req: Request, res: Response) => {
       try {
-        const isAdmin = req.user!.role === 'super_admin';
-
-        // Get user's organization for data isolation
-        const orgResult = await getUserOrganization(req.user!.id);
-        const userOrgId = orgResult?.organization.id ?? null;
-
-        const superAdminIds = db.select({ id: users.id }).from(users).where(eq(users.role, 'super_admin'));
-        const publishedScope = userOrgId === null
-          ? and(isNull(forms.organizationId), inArray(forms.createdBy, superAdminIds))
-          : or(
-              eq(forms.organizationId, userOrgId),
-              and(isNull(forms.organizationId), inArray(forms.createdBy, superAdminIds))
-            );
-
-        // Admins see ALL templates (published + drafts for oversight)
-        // Recruiters see: (published templates in their org) OR (their own templates regardless of published status)
-        const templates = await db.query.forms.findMany({
-          where: isAdmin
-            ? undefined // No filter - admins see everything
-            : or(
-                // Published templates in the same organization
-                and(eq(forms.isPublished, true), publishedScope),
-                // Own templates (regardless of published or org)
-                eq(forms.createdBy, req.user!.id)
-              ),
-          with: {
-            fields: {
-              orderBy: (fields: any, { asc }: any) => [asc(fields.order)],
-            },
-          },
-          orderBy: (forms: any, { desc }: any) => [desc(forms.createdAt)],
-        });
-
-        res.json({ templates });
-      } catch (error: any) {
-        console.error('Error fetching form templates:', error);
-        res.status(500).json({ error: 'Failed to fetch form templates' });
+        const result = await listAuthorizedFormTemplates(
+          req.user!.id,
+          { allowPlatformAdmin: true },
+        );
+        if (!result.ok) return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
+        return res.json({ templates: result.rows });
+      } catch {
+        return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
       }
     }
   );
@@ -361,30 +326,16 @@ export function registerFormsRoutes(app: Express, csrfProtection?: (req: Request
     requireSeat(),
     async (req: Request, res: Response) => {
       try {
-        const formId = parseInt(req.params.id ?? '', 10);
-
-        const form = await db.query.forms.findFirst({
-          where: eq(forms.id, formId),
-          with: {
-            fields: {
-              orderBy: (fields: any, { asc }: any) => [asc(fields.order)],
-            },
-          },
-        });
-
-        if (!form) {
-          return res.status(404).json({ error: 'Form template not found' });
+        const formId = parseReviewerShareId(req.params.id);
+        if (!formId) return res.status(400).json({ error: 'INVALID_FORM_ID' });
+        const result = await readAuthorizedFormTemplate(req.user!.id, formId, { allowPlatformAdmin: true });
+        if (!result.ok) {
+          const status = result.reason === 'unavailable' ? 503 : 404;
+          return res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'FORM_NOT_FOUND' });
         }
-
-        // Check ownership (admins can access all, recruiters only their own)
-        if (req.user!.role !== 'super_admin' && form.createdBy !== req.user!.id) {
-          return res.status(403).json({ error: 'Unauthorized' });
-        }
-
-        return res.json(form);
-      } catch (error: any) {
-        console.error('Error fetching form template:', error);
-        return res.status(500).json({ error: 'Failed to fetch form template' });
+        return res.json(result.value);
+      } catch {
+        return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
       }
     }
   );
@@ -398,75 +349,31 @@ export function registerFormsRoutes(app: Express, csrfProtection?: (req: Request
     csrf,
     async (req: Request, res: Response) => {
       try {
-        const formId = parseInt(req.params.id ?? '', 10);
+        const formId = parseReviewerShareId(req.params.id);
+        if (!formId) return res.status(400).json({ error: 'INVALID_FORM_ID' });
         const body = updateTemplateSchema.parse(req.body);
-
-        // Check ownership
-        const existingForm = await db.query.forms.findFirst({
-          where: eq(forms.id, formId),
-        });
-
-        if (!existingForm) {
-          return res.status(404).json({ error: 'Form template not found' });
+        const patch = {
+          ...(body.name !== undefined ? { name: body.name } : {}),
+          ...(body.description !== undefined ? { description: body.description } : {}),
+          ...(body.isPublished !== undefined ? { isPublished: body.isPublished } : {}),
+          ...(body.fields !== undefined ? { fields: scopedFields(body.fields) } : {}),
+        };
+        const result = await updateAuthorizedFormTemplate(
+          req.user!.id,
+          formId,
+          patch,
+          { allowPlatformAdmin: true },
+        );
+        if (!result.ok) {
+          const status = result.reason === 'unavailable' ? 503 : 404;
+          return res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'FORM_NOT_FOUND' });
         }
-
-        if (req.user!.role !== 'super_admin' && existingForm.createdBy !== req.user!.id) {
-          return res.status(403).json({ error: 'Unauthorized' });
-        }
-
-        // Update form metadata
-        const updateData: any = { updatedAt: new Date() };
-        if (body.name !== undefined) updateData.name = body.name;
-        if (body.description !== undefined) updateData.description = body.description;
-        if (body.isPublished !== undefined) updateData.isPublished = body.isPublished;
-
-        const [updatedForm] = await db.update(forms)
-          .set(updateData)
-          .where(eq(forms.id, formId))
-          .returning();
-
-        // If fields provided, replace all fields atomically
-        if (body.fields) {
-          // Use transaction to prevent transient empty state
-          const newFields = await db.transaction(async (tx: any) => {
-            // Delete existing fields
-            await tx.delete(formFields).where(eq(formFields.formId, formId));
-
-            // Insert new fields
-            const fieldsData = body.fields!.map(field => ({
-              formId: formId,
-              type: field.type,
-              label: field.label,
-              required: field.required,
-              options: field.options,
-              order: field.order,
-            }));
-
-            return await tx.insert(formFields).values(fieldsData).returning();
-          });
-
-          return res.json({
-            ...updatedForm,
-            fields: newFields.sort((a: any, b: any) => a.order - b.order),
-          });
-        }
-
-        // Fetch existing fields if not replacing
-        const existingFields = await db.query.formFields.findMany({
-          where: eq(formFields.formId, formId),
-          orderBy: (fields: any, { asc }: any) => [asc(fields.order)],
-        });
-
-        return res.json({
-          ...updatedForm,
-          fields: existingFields,
-        });
+        return res.json(result.value);
       } catch (error: any) {
         if (error instanceof z.ZodError) {
           return res.status(400).json({ error: 'Invalid request data', details: error.errors });
         }
-        console.error('Error updating form template:', error);
-        return res.status(500).json({ error: 'Failed to update form template' });
+        return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
       }
     }
   );
@@ -480,41 +387,17 @@ export function registerFormsRoutes(app: Express, csrfProtection?: (req: Request
     csrf,
     async (req: Request, res: Response) => {
       try {
-        const formId = parseInt(req.params.id ?? '', 10);
-
-        // Check ownership
-        const existingForm = await db.query.forms.findFirst({
-          where: eq(forms.id, formId),
-        });
-
-        if (!existingForm) {
-          return res.status(404).json({ error: 'Form template not found' });
+        const formId = parseReviewerShareId(req.params.id);
+        if (!formId) return res.status(400).json({ error: 'INVALID_FORM_ID' });
+        const result = await deleteAuthorizedFormTemplate(req.user!.id, formId, { allowPlatformAdmin: true });
+        if (!result.ok) {
+          if (result.reason === 'unavailable') return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
+          if (result.reason === 'conflict') return res.status(409).json({ error: 'FORM_IN_USE' });
+          return res.status(404).json({ error: 'FORM_NOT_FOUND' });
         }
-
-        if (req.user!.role !== 'super_admin' && existingForm.createdBy !== req.user!.id) {
-          return res.status(403).json({ error: 'Unauthorized' });
-        }
-
-        // Check if invitations exist
-        const invitations = await db.query.formInvitations.findMany({
-          where: eq(formInvitations.formId, formId),
-          limit: 1,
-        });
-
-        if (invitations.length > 0) {
-          return res.status(400).json({
-            error: 'Cannot delete template with existing invitations',
-            hint: 'Consider unpublishing this template instead'
-          });
-        }
-
-        // Delete form (fields will cascade)
-        await db.delete(forms).where(eq(forms.id, formId));
-
         return res.json({ success: true, message: 'Template deleted successfully' });
-      } catch (error: any) {
-        console.error('Error deleting form template:', error);
-        return res.status(500).json({ error: 'Failed to delete form template' });
+      } catch {
+        return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
       }
     }
   );
@@ -1788,63 +1671,20 @@ VantaHire Team`;
     requireSeat(),
     async (req: Request, res: Response) => {
       try {
-        const formId = parseInt(req.params.id ?? '', 10);
-
-        if (!formId || !Number.isFinite(formId) || formId <= 0) {
-          return res.status(400).json({ error: 'Invalid form ID' });
+        const formId = parseReviewerShareId(req.params.id);
+        if (!formId) return res.status(400).json({ error: 'INVALID_FORM_ID' });
+        const result = await readAuthorizedResponsesForForm(
+          req.user!.id,
+          formId,
+          { allowPlatformAdmin: true },
+        );
+        if (!result.ok) {
+          const status = result.reason === 'unavailable' ? 503 : 404;
+          return res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'FORM_NOT_FOUND' });
         }
-
-        // Verify form exists and user owns it
-        const form = await db.query.forms.findFirst({
-          where: eq(forms.id, formId),
-        });
-
-        if (!form) {
-          return res.status(404).json({ error: 'Form not found' });
-        }
-
-        if (form.createdBy !== req.user!.id && req.user!.role !== 'super_admin') {
-          return res.status(403).json({ error: 'Unauthorized: You can only view responses for your own forms' });
-        }
-
-        // Fetch all responses submitted for invitations of this form
-        const responses = await db
-          .select({
-            response: formResponses,
-            invitation: formInvitations,
-            application: applications,
-          })
-          .from(formResponses)
-          .innerJoin(formInvitations, eq(formResponses.invitationId, formInvitations.id))
-          .innerJoin(applications, eq(formResponses.applicationId, applications.id))
-          .where(and(
-            eq(formInvitations.formId, formId),
-            sql.raw(privacyAllowedSql('application', 'applications.id', { globalUse: false })),
-          ))
-          .orderBy(desc(formResponses.submittedAt));
-
-        type ResponseRow = typeof responses[number];
-        const responseSummaries = responses.map((row: ResponseRow) => {
-          const snapshot: FormSnapshot = parseFormSnapshot(row.invitation.fieldSnapshot);
-          return {
-            id: row.response.id,
-            formName: snapshot.formName,
-            submittedAt: row.response.submittedAt,
-            invitationId: row.response.invitationId,
-            applicationId: row.application.id,
-            candidateName: row.application.name,
-            candidateEmail: row.application.email,
-          };
-        });
-
-        return res.json({
-          form: { id: form.id, name: form.name },
-          responses: responseSummaries,
-          total: responseSummaries.length
-        });
-      } catch (error: any) {
-        console.error('[Forms] Error fetching form responses:', error);
-        return res.status(500).json({ error: 'Failed to fetch form responses' });
+        return res.json(result.value);
+      } catch {
+        return res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
       }
     }
   );

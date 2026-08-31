@@ -27,6 +27,15 @@ import type { CsrfMiddleware } from './types/routes';
 import { getUserOrganization } from './lib/organizationService';
 import { updateMemberActivity } from './lib/membershipService';
 import { privacyAllowedSql } from './candidate-privacy/decision';
+import {
+  parseCandidateRef,
+  parseReviewerShareId,
+  parseShortlistToken,
+  readAuthorizedClientFeedback,
+  readPublicClientShortlist,
+  readPublicResumeLocator,
+  resolvePublicFeedbackTarget,
+} from './lib/reviewerShareAuthorization';
 
 const applicationPrivacyAllowed = () => sql.raw(
   privacyAllowedSql('application', 'applications.id', { globalUse: false }),
@@ -205,6 +214,8 @@ export function registerClientsRoutes(
         clientId: body.clientId,
         jobId: body.jobId,
         applicationIds: body.applicationIds,
+        shareResume: body.shareResume,
+        shareAiSummary: body.shareAiSummary,
         ...(body.title ? { title: body.title } : {}),
         ...(body.message ? { message: body.message } : {}),
         ...(body.expiresAt ? { expiresAt: new Date(body.expiresAt) } : {}),
@@ -241,56 +252,22 @@ export function registerClientsRoutes(
    */
   app.get("/api/client-shortlist/:token", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { token } = req.params;
-
+      const token = parseShortlistToken(req.params.token);
       if (!token) {
-        res.status(400).json({ error: 'Missing token' });
+        res.status(400).json({ error: 'INVALID_SHORTLIST_TOKEN' });
         return;
       }
-
-      const shortlistData = await storage.getClientShortlistByToken(token);
-
-      if (!shortlistData.shortlist || !shortlistData.client || !shortlistData.job) {
-        res.status(410).json({ error: 'Shortlist not found or expired' });
+      const result = await readPublicClientShortlist(
+        token,
+        process.env.CLIENT_SHORTLIST_SHOW_RESUME !== 'false',
+        process.env.CLIENT_SHORTLIST_SHOW_AI_SUMMARY !== 'false',
+      );
+      if (!result.ok) {
+        const status = result.reason === 'unavailable' ? 503 : 410;
+        res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'SHORTLIST_UNAVAILABLE' });
         return;
       }
-
-      // Environment controls for what clients can see
-      const showResume = process.env.CLIENT_SHORTLIST_SHOW_RESUME !== 'false'; // default: true
-      const showAiSummary = process.env.CLIENT_SHORTLIST_SHOW_AI_SUMMARY !== 'false'; // default: true
-
-      // Return sanitized data (no internal IDs, emails, etc.)
-      const candidates = shortlistData.items.map((item, index) => ({
-        id: item.application.id,
-        name: item.application.name,
-        email: item.application.email,
-        phone: item.application.phone || null,
-        position: item.position,
-        notes: item.notes,
-        // Conditionally include resume URL for download
-        resumeUrl: showResume ? (item.application.resumeUrl || null) : null,
-        coverLetter: item.application.coverLetter || null,
-        appliedAt: item.application.appliedAt,
-        // Conditionally include AI summary
-        aiSummary: showAiSummary ? (item.application.aiSummary || null) : null,
-        aiFitLabel: showAiSummary ? (item.application.aiFitLabel || null) : null,
-      }));
-
-      res.json({
-        title: shortlistData.shortlist.title || shortlistData.job.title,
-        message: shortlistData.shortlist.message,
-        client: {
-          name: shortlistData.client.name,
-        },
-        job: {
-          title: shortlistData.job.title,
-          location: shortlistData.job.location,
-          type: shortlistData.job.type,
-        },
-        candidates,
-        createdAt: shortlistData.shortlist.createdAt,
-        expiresAt: shortlistData.shortlist.expiresAt,
-      });
+      res.json(result.value);
       return;
     } catch (error) {
       next(error);
@@ -303,18 +280,9 @@ export function registerClientsRoutes(
    */
   app.post("/api/client-shortlist/:token/feedback", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { token } = req.params;
-
+      const token = parseShortlistToken(req.params.token);
       if (!token) {
-        res.status(400).json({ error: 'Missing token' });
-        return;
-      }
-
-      // Verify shortlist exists and is active
-      const shortlistData = await storage.getClientShortlistByToken(token);
-
-      if (!shortlistData.shortlist || !shortlistData.client) {
-        res.status(410).json({ error: 'Shortlist not found or expired' });
+        res.status(400).json({ error: 'INVALID_SHORTLIST_TOKEN' });
         return;
       }
 
@@ -324,24 +292,25 @@ export function registerClientsRoutes(
       const savedFeedback = [];
       for (const feedbackData of feedbackArray) {
         const parsed = insertClientFeedbackSchema.parse(feedbackData);
-
-        // Verify application is in this shortlist
-        const inShortlist = shortlistData.items.some(
-          item => item.application.id === parsed.applicationId
-        );
-
-        if (!inShortlist) {
-          res.status(400).json({
-            error: `Application ${parsed.applicationId} is not in this shortlist`
-          });
+        const candidateRef = parseCandidateRef(parsed.candidateRef);
+        if (!candidateRef) {
+          res.status(400).json({ error: 'INVALID_CANDIDATE_REFERENCE' });
           return;
         }
-
+        const target = await resolvePublicFeedbackTarget(token, candidateRef);
+        if (!target.ok) {
+          const status = target.reason === 'unavailable' ? 503 : 404;
+          res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'CANDIDATE_NOT_FOUND' });
+          return;
+        }
         const feedback = await storage.addClientFeedback({
-          ...parsed,
-          clientId: shortlistData.client.id,
-          shortlistId: shortlistData.shortlist.id,
-          ...(shortlistData.shortlist.organizationId != null && { organizationId: shortlistData.shortlist.organizationId }),
+          applicationId: target.value.applicationId,
+          recommendation: parsed.recommendation,
+          ...(parsed.notes !== undefined && { notes: parsed.notes }),
+          ...(parsed.rating !== undefined && { rating: parsed.rating }),
+          clientId: target.value.clientId,
+          shortlistId: target.value.shortlistId,
+          organizationId: target.value.organizationId,
         });
 
         savedFeedback.push(feedback);
@@ -369,59 +338,37 @@ export function registerClientsRoutes(
   });
 
   /**
-   * GET /api/client-shortlist/:token/resume/:applicationId
+   * GET /api/client-shortlist/:token/resume/:candidateRef
    * Download resume for a candidate in a shortlist (public, no auth required)
    * Only allows download if the application is in the shortlist
    */
-  app.get("/api/client-shortlist/:token/resume/:applicationId", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  app.get("/api/client-shortlist/:token/resume/:candidateRef", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { token, applicationId } = req.params;
-
-      if (!token || !applicationId) {
-        res.status(400).json({ error: 'Missing parameters' });
+      const token = parseShortlistToken(req.params.token);
+      const candidateRef = parseCandidateRef(req.params.candidateRef);
+      if (!token || !candidateRef) {
+        res.status(400).json({ error: 'INVALID_RESUME_REFERENCE' });
         return;
       }
-
-      // Check if resume download is enabled
-      if (process.env.CLIENT_SHORTLIST_SHOW_RESUME === 'false') {
-        res.status(403).json({ error: 'Resume download is disabled' });
+      const result = await readPublicResumeLocator(
+        token,
+        candidateRef,
+        process.env.CLIENT_SHORTLIST_SHOW_RESUME !== 'false',
+      );
+      if (!result.ok) {
+        const status = result.reason === 'unavailable' ? 503 : 404;
+        res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'RESUME_NOT_FOUND' });
         return;
       }
-
-      const appId = Number(applicationId);
-      if (!Number.isFinite(appId) || appId <= 0) {
-        res.status(400).json({ error: 'Invalid application ID' });
-        return;
-      }
-
-      // Verify shortlist exists and application is in it
-      const shortlistData = await storage.getClientShortlistByToken(token);
-      if (!shortlistData.shortlist || !shortlistData.items) {
-        res.status(404).json({ error: 'Shortlist not found' });
-        return;
-      }
-
-      const item = shortlistData.items.find(i => i.application.id === appId);
-      if (!item) {
-        res.status(403).json({ error: 'Application not in this shortlist' });
-        return;
-      }
-
-      const application = item.application;
-      if (!application.resumeUrl) {
-        res.status(404).json({ error: 'No resume available' });
-        return;
-      }
-
-      const url = application.resumeUrl;
+      const { locator: url, filename: authorizedFilename, candidateName } = result.value;
 
       // Stream PDF through server
       if (url.startsWith('gs://')) {
         try {
           const { downloadFromGCS } = await import('./gcs-storage');
           const buffer = await downloadFromGCS(url);
-          const filename = application.resumeFilename ||
-            `${application.name.replace(/[^a-zA-Z0-9]/g, '_')}_resume.pdf`;
+          const filename = authorizedFilename ||
+            `${candidateName.replace(/[^a-zA-Z0-9]/g, '_')}_resume.pdf`;
           const ext = filename.split('.').pop()?.toLowerCase() || 'pdf';
           const contentType = ext === 'pdf' ? 'application/pdf' : 'application/octet-stream';
 
@@ -430,9 +377,8 @@ export function registerClientsRoutes(
           res.setHeader('Content-Length', buffer.length);
           res.send(buffer);
           return;
-        } catch (gcsError) {
-          console.error('[Client Shortlist Resume] GCS download failed:', gcsError);
-          res.status(500).json({ error: 'Failed to retrieve resume' });
+        } catch {
+          res.status(503).json({ error: 'RESUME_UNAVAILABLE' });
           return;
         }
       } else if (/^https?:\/\//i.test(url)) {
@@ -452,17 +398,24 @@ export function registerClientsRoutes(
    * GET /api/applications/:id/client-feedback
    * Get client feedback for an application (requires auth)
   */
-  app.get("/api/applications/:id/client-feedback", requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  app.get("/api/applications/:id/client-feedback", requireRole(['recruiter', 'super_admin']), requireSeat(), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const applicationId = Number(req.params.id);
-
-      if (!Number.isFinite(applicationId) || applicationId <= 0) {
-        res.status(400).json({ error: 'Invalid application ID' });
+      const applicationId = parseReviewerShareId(req.params.id);
+      if (!applicationId) {
+        res.status(400).json({ error: 'INVALID_APPLICATION_ID' });
         return;
       }
-
-      const feedback = await storage.getClientFeedbackForApplication(applicationId);
-      res.json(feedback);
+      const result = await readAuthorizedClientFeedback(
+        req.user!.id,
+        applicationId,
+        { allowPlatformAdmin: true },
+      );
+      if (!result.ok) {
+        const status = result.reason === 'unavailable' ? 503 : 404;
+        res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'APPLICATION_NOT_FOUND' });
+        return;
+      }
+      res.json(result.rows);
       return;
     } catch (error) {
       next(error);

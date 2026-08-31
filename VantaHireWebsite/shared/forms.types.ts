@@ -56,6 +56,8 @@ export interface FormTemplateDTO {
   name: string;
   description?: string | null;
   isPublished: boolean;
+  ownershipScope: 'organization' | 'personal' | 'legacy_private';
+  canManage: boolean;
   createdBy: number;
   createdAt: string;
   updatedAt: string;

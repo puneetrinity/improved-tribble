@@ -111,6 +111,8 @@ export default function ApplicationManagementPage() {
   const [shortlistTitle, setShortlistTitle] = useState("");
   const [shortlistMessage, setShortlistMessage] = useState("");
   const [shortlistExpiresAt, setShortlistExpiresAt] = useState("");
+  const [shareShortlistResumes, setShareShortlistResumes] = useState(false);
+  const [shareShortlistAiSummaries, setShareShortlistAiSummaries] = useState(false);
   const [shortlistUrl, setShortlistUrl] = useState<string | null>(null);
 
   // AI Summary state
@@ -538,10 +540,14 @@ export default function ApplicationManagementPage() {
         message?: string;
         applicationIds: number[];
         expiresAt?: string;
+        shareResume: boolean;
+        shareAiSummary: boolean;
       } = {
         clientId: job.clientId,
         jobId,
         applicationIds: selectedApplications,
+        shareResume: shareShortlistResumes,
+        shareAiSummary: shareShortlistAiSummaries,
       };
       if (shortlistTitle.trim()) payload.title = shortlistTitle.trim();
       if (shortlistMessage.trim()) payload.message = shortlistMessage.trim();
@@ -1775,7 +1781,16 @@ export default function ApplicationManagementPage() {
         </Dialog>
 
         {/* Share Shortlist Dialog */}
-        <Dialog open={showShareShortlistDialog} onOpenChange={setShowShareShortlistDialog}>
+        <Dialog
+          open={showShareShortlistDialog}
+          onOpenChange={(open) => {
+            setShowShareShortlistDialog(open);
+            if (!open) {
+              setShareShortlistResumes(false);
+              setShareShortlistAiSummaries(false);
+            }
+          }}
+        >
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{applicationManagementCopy.dialogs.shortlist.title}</DialogTitle>
@@ -1823,6 +1838,38 @@ export default function ApplicationManagementPage() {
                   {applicationManagementCopy.dialogs.shortlist.expiresHint}
                 </p>
               </div>
+              <div className="space-y-3 rounded-md border border-border p-3">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="share-shortlist-resumes"
+                    checked={shareShortlistResumes}
+                    onCheckedChange={(checked) => setShareShortlistResumes(checked === true)}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="share-shortlist-resumes">
+                      {applicationManagementCopy.dialogs.shortlist.shareResumeLabel}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {applicationManagementCopy.dialogs.shortlist.shareResumeHelp}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="share-shortlist-ai-summaries"
+                    checked={shareShortlistAiSummaries}
+                    onCheckedChange={(checked) => setShareShortlistAiSummaries(checked === true)}
+                  />
+                  <div className="space-y-1">
+                    <Label htmlFor="share-shortlist-ai-summaries">
+                      {applicationManagementCopy.dialogs.shortlist.shareAiSummaryLabel}
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {applicationManagementCopy.dialogs.shortlist.shareAiSummaryHelp}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {shortlistUrl && (
                 <div className="p-3 bg-muted/50 border border-border rounded-md space-y-2">
@@ -1866,6 +1913,8 @@ export default function ApplicationManagementPage() {
                   setShortlistTitle("");
                   setShortlistMessage("");
                   setShortlistExpiresAt("");
+                  setShareShortlistResumes(false);
+                  setShareShortlistAiSummaries(false);
                 }}
               >
                 {applicationManagementCopy.dialogs.shortlist.close}

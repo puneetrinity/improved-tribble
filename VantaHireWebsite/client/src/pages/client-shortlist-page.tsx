@@ -16,15 +16,11 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users,
-  Briefcase,
-  MapPin,
-  Mail,
   CheckCircle2,
   XCircle,
   AlertCircle,
   Loader2,
   Download,
-  FileText,
   Sparkles,
 } from "lucide-react";
 
@@ -33,15 +29,10 @@ type ShortlistState = "loading" | "ready" | "submitting" | "success" | "expired"
 type Recommendation = "advance" | "reject" | "hold";
 
 interface ShortlistCandidate {
-  id: number;
+  candidateRef: string;
   name: string;
-  email: string;
-  phone: string | null;
   position: number;
-  notes: string | null;
-  resumeUrl: string | null;
-  coverLetter: string | null;
-  appliedAt: string;
+  resumeAvailable: boolean;
   aiSummary: string | null;
   aiFitLabel: string | null;
 }
@@ -75,7 +66,7 @@ export default function ClientShortlistPage() {
 
   const [state, setState] = useState<ShortlistState>("loading");
   const [data, setData] = useState<ShortlistResponse | null>(null);
-  const [feedback, setFeedback] = useState<Record<number, CandidateFeedbackState>>({});
+  const [feedback, setFeedback] = useState<Record<string, CandidateFeedbackState>>({});
   const [errorMessage, setErrorMessage] = useState<string>("");
 
   useEffect(() => {
@@ -102,9 +93,9 @@ export default function ClientShortlistPage() {
         if (!json) return;
         setData(json);
         // Initialise feedback state
-        const initial: Record<number, CandidateFeedbackState> = {};
+        const initial: Record<string, CandidateFeedbackState> = {};
         json.candidates.forEach((c) => {
-          initial[c.id] = { recommendation: "", notes: "", rating: null };
+          initial[c.candidateRef] = { recommendation: "", notes: "", rating: null };
         });
         setFeedback(initial);
         setState("ready");
@@ -116,32 +107,32 @@ export default function ClientShortlistPage() {
       });
   }, [token]);
 
-  const handleRecommendationChange = (applicationId: number, value: Recommendation) => {
+  const handleRecommendationChange = (candidateRef: string, value: Recommendation) => {
     setFeedback((prev) => ({
       ...prev,
-      [applicationId]: {
-        ...(prev[applicationId] || { recommendation: "", notes: "", rating: null }),
+      [candidateRef]: {
+        ...(prev[candidateRef] || { recommendation: "", notes: "", rating: null }),
         recommendation: value,
       },
     }));
   };
 
-  const handleNotesChange = (applicationId: number, value: string) => {
+  const handleNotesChange = (candidateRef: string, value: string) => {
     setFeedback((prev) => ({
       ...prev,
-      [applicationId]: {
-        ...(prev[applicationId] || { recommendation: "", notes: "", rating: null }),
+      [candidateRef]: {
+        ...(prev[candidateRef] || { recommendation: "", notes: "", rating: null }),
         notes: value,
       },
     }));
   };
 
-  const handleRatingChange = (applicationId: number, value: string) => {
+  const handleRatingChange = (candidateRef: string, value: string) => {
     const parsed = value ? parseInt(value, 10) : null;
     setFeedback((prev) => ({
       ...prev,
-      [applicationId]: {
-        ...(prev[applicationId] || { recommendation: "", notes: "", rating: null }),
+      [candidateRef]: {
+        ...(prev[candidateRef] || { recommendation: "", notes: "", rating: null }),
         rating: parsed && !Number.isNaN(parsed) ? parsed : null,
       },
     }));
@@ -152,8 +143,8 @@ export default function ClientShortlistPage() {
 
     const payload = Object.entries(feedback)
       .filter(([, fb]) => fb.recommendation !== "")
-      .map(([applicationId, fb]) => ({
-        applicationId: Number(applicationId),
+      .map(([candidateRef, fb]) => ({
+        candidateRef,
         recommendation: fb.recommendation,
         ...(fb.notes.trim() && { notes: fb.notes.trim() }),
         ...(fb.rating && { rating: fb.rating }),
@@ -278,36 +269,20 @@ export default function ClientShortlistPage() {
 
         {/* Candidates */}
         {data.candidates.map((candidate) => {
-          const fb = feedback[candidate.id] || {
+          const fb = feedback[candidate.candidateRef] || {
             recommendation: "",
             notes: "",
             rating: null,
           };
 
           return (
-            <Card key={candidate.id} className="shadow-sm border-border">
+            <Card key={candidate.candidateRef} className="shadow-sm border-border">
               <CardHeader>
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <CardTitle className="text-base text-foreground">
                       {candidate.name}
                     </CardTitle>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <Mail className="h-3 w-3" />
-                        {candidate.email}
-                      </span>
-                      {candidate.phone && (
-                        <span className="inline-flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          {candidate.phone}
-                        </span>
-                      )}
-                      <span>
-                        Applied on{" "}
-                        {new Date(candidate.appliedAt).toLocaleDateString()}
-                      </span>
-                    </div>
                   </div>
                   <Badge variant="outline" className="text-xs">
                     #{candidate.position}
@@ -315,28 +290,6 @@ export default function ClientShortlistPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {candidate.notes && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">
-                      Recruiter Notes
-                    </Label>
-                    <p className="text-sm text-foreground mt-1">
-                      {candidate.notes}
-                    </p>
-                  </div>
-                )}
-
-                {candidate.coverLetter && (
-                  <div>
-                    <Label className="text-xs text-muted-foreground">
-                      Candidate Cover Letter
-                    </Label>
-                    <p className="text-sm text-foreground mt-1 whitespace-pre-wrap">
-                      {candidate.coverLetter}
-                    </p>
-                  </div>
-                )}
-
                 {/* AI Summary */}
                 {candidate.aiSummary && (
                   <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
@@ -369,12 +322,12 @@ export default function ClientShortlistPage() {
                 )}
 
                 {/* Resume Download */}
-                {candidate.resumeUrl && token && (
+                {candidate.resumeAvailable && token && (
                   <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open(`/api/client-shortlist/${token}/resume/${candidate.id}`, "_blank")}
+                      onClick={() => window.open(`/api/client-shortlist/${token}/resume/${candidate.candidateRef}`, "_blank")}
                       className="text-sm"
                     >
                       <Download className="h-4 w-4 mr-2" />
@@ -410,7 +363,7 @@ export default function ClientShortlistPage() {
                               : ""
                           }
                           onClick={() =>
-                            handleRecommendationChange(candidate.id, value)
+                            handleRecommendationChange(candidate.candidateRef, value)
                           }
                         >
                           {value === "advance" && (
@@ -436,7 +389,7 @@ export default function ClientShortlistPage() {
                       <Textarea
                         value={fb.notes}
                         onChange={(e) =>
-                          handleNotesChange(candidate.id, e.target.value)
+                          handleNotesChange(candidate.candidateRef, e.target.value)
                         }
                         rows={3}
                         className="text-sm"
@@ -450,7 +403,7 @@ export default function ClientShortlistPage() {
                       <SelectRating
                         value={fb.rating}
                         onChange={(val) =>
-                          handleRatingChange(candidate.id, val)
+                          handleRatingChange(candidate.candidateRef, val)
                         }
                       />
                     </div>
@@ -515,4 +468,3 @@ function SelectRating({ value, onChange }: SelectRatingProps) {
     </div>
   );
 }
-

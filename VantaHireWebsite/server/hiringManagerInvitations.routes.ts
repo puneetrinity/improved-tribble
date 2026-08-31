@@ -17,6 +17,13 @@ import { getEmailService } from './simpleEmailService';
 import { insertHiringManagerInvitationSchema } from '@shared/schema';
 import type { CsrfMiddleware } from './types/routes';
 import rateLimit from 'express-rate-limit';
+import {
+  cancelAuthorizedHiringManagerInvitation,
+  listAuthorizedHiringManagerInvitations,
+  parseReviewerShareId,
+  replaceAuthorizedHiringManagerInvitation,
+  resolveInvitationIssuerScope,
+} from './lib/reviewerShareAuthorization';
 
 // Rate limiting for invitation creation (10 per hour per user)
 const invitationRateLimit = rateLimit({
@@ -126,6 +133,16 @@ export function registerHiringManagerInvitationRoutes(
         const body = insertHiringManagerInvitationSchema.parse(req.body);
         const email = body.email.toLowerCase();
 
+        const issuer = await resolveInvitationIssuerScope(
+          req.user!.id,
+          { allowPlatformAdmin: true },
+        );
+        if (!issuer.ok) {
+          const status = issuer.reason === 'unavailable' ? 503 : 404;
+          res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'INVITATION_NOT_FOUND' });
+          return;
+        }
+
         // Check if user with this email already exists
         const existingUser = await storage.getUserByUsername(email);
         if (existingUser) {
@@ -149,7 +166,6 @@ export function registerHiringManagerInvitationRoutes(
               text: `You already have a VantaHire account. Please sign in at ${BASE_URL}/recruiter-auth`,
             });
           }
-          console.log(`Invitation skipped: user already exists with email ${email} (alternate email sent)`);
           res.json({
             success: true,
             message: 'If this email is not already registered, an invitation will be sent.',
@@ -157,46 +173,26 @@ export function registerHiringManagerInvitationRoutes(
           return;
         }
 
-        // Check for existing pending invitation
-        const existingInvitation = await storage.getHiringManagerInvitationByEmail(email, 'pending');
-        if (existingInvitation) {
-          // Invalidate old invitation and create new one (resend flow)
-          await storage.invalidateHiringManagerInvitation(existingInvitation.id);
-        }
-
         // Generate token
         const token = generateToken();
         const tokenHash = hashToken(token);
-
-        // Get inviter details
-        const inviter = await storage.getUser(req.user!.id);
-        const inviterName = inviter
-          ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.username
-          : 'A recruiter';
 
         // Calculate expiry
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + INVITATION_EXPIRY_DAYS);
 
-        // Create invitation
-        const invitationData: {
-          email: string;
-          name?: string;
-          tokenHash: string;
-          invitedBy: number;
-          inviterName: string;
-          expiresAt: Date;
-        } = {
+        const invitation = await replaceAuthorizedHiringManagerInvitation(
+          issuer.value,
           email,
+          body.name ?? null,
           tokenHash,
-          invitedBy: req.user!.id,
-          inviterName,
           expiresAt,
-        };
-        if (body.name) {
-          invitationData.name = body.name;
+        );
+        if (!invitation.ok) {
+          const status = invitation.reason === 'unavailable' ? 503 : 404;
+          res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'INVITATION_NOT_FOUND' });
+          return;
         }
-        const invitation = await storage.createHiringManagerInvitation(invitationData);
 
         // Send email
         const emailService = await getEmailService();
@@ -206,7 +202,7 @@ export function registerHiringManagerInvitationRoutes(
             inviteeName?: string;
             token: string;
           } = {
-            inviterName,
+            inviterName: issuer.value.inviterName,
             token, // Send plaintext token in email
           };
           if (body.name) {
@@ -222,24 +218,22 @@ export function registerHiringManagerInvitationRoutes(
           });
 
           if (!sent) {
-            console.error(`Failed to send invitation email to ${email}`);
+            console.error('Hiring manager invitation email delivery failed');
           }
         } else {
           console.warn('Email service not available. Invitation created but email not sent.');
         }
 
-        console.log(`Hiring manager invitation sent to ${email} by user ${req.user!.id}`);
-
         res.status(201).json({
           success: true,
           message: 'Invitation sent successfully.',
           invitation: {
-            id: invitation.id,
-            email: invitation.email,
-            name: invitation.name,
-            status: invitation.status,
-            expiresAt: invitation.expiresAt,
-            createdAt: invitation.createdAt,
+            id: invitation.value.id,
+            email: invitation.value.email,
+            name: invitation.value.name,
+            status: invitation.value.status,
+            expiresAt: invitation.value.expiresAt,
+            createdAt: invitation.value.createdAt,
           },
         });
         return;
@@ -266,22 +260,18 @@ export function registerHiringManagerInvitationRoutes(
     requireSeat(),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        // Super admins see all, recruiters see their own
-        const invitedBy = req.user!.role === 'super_admin' ? undefined : req.user!.id;
-        const invitations = await storage.getPendingHiringManagerInvitations(invitedBy);
-
-        // Filter out sensitive data
-        const sanitized = invitations.map(inv => ({
-          id: inv.id,
-          email: inv.email,
-          name: inv.name,
-          status: inv.status,
-          expiresAt: inv.expiresAt,
-          createdAt: inv.createdAt,
-          inviterName: inv.inviterName,
-        }));
-
-        res.json(sanitized);
+        const issuer = await resolveInvitationIssuerScope(req.user!.id, { allowPlatformAdmin: true });
+        if (!issuer.ok) {
+          const status = issuer.reason === 'unavailable' ? 503 : 404;
+          res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'INVITATION_NOT_FOUND' });
+          return;
+        }
+        const invitations = await listAuthorizedHiringManagerInvitations(issuer.value);
+        if (!invitations.ok) {
+          res.status(503).json({ error: 'AUTHORIZATION_UNAVAILABLE' });
+          return;
+        }
+        res.json(invitations.rows);
         return;
       } catch (error) {
         next(error);
@@ -297,20 +287,21 @@ export function registerHiringManagerInvitationRoutes(
     requireSeat(),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const idParam = req.params.id;
-        if (!idParam) {
-          res.status(400).json({ error: 'Invitation ID required' });
+        const id = parseReviewerShareId(req.params.id);
+        if (!id) {
+          res.status(400).json({ error: 'INVALID_INVITATION_ID' });
           return;
         }
-        const id = parseInt(idParam, 10);
-        if (isNaN(id)) {
-          res.status(400).json({ error: 'Invalid invitation ID' });
+        const issuer = await resolveInvitationIssuerScope(req.user!.id, { allowPlatformAdmin: true });
+        if (!issuer.ok) {
+          const status = issuer.reason === 'unavailable' ? 503 : 404;
+          res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'INVITATION_NOT_FOUND' });
           return;
         }
-
-        const deleted = await storage.deleteHiringManagerInvitation(id);
-        if (!deleted) {
-          res.status(404).json({ error: 'Invitation not found' });
+        const deleted = await cancelAuthorizedHiringManagerInvitation(issuer.value, id);
+        if (!deleted.ok) {
+          const status = deleted.reason === 'unavailable' ? 503 : 404;
+          res.status(status).json({ error: status === 503 ? 'AUTHORIZATION_UNAVAILABLE' : 'INVITATION_NOT_FOUND' });
           return;
         }
 
