@@ -196,13 +196,13 @@ describe.skipIf(!enabled)("application AI/outbound exact-schema PostgreSQL", () 
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("keeps the shipped four-migration schema unchanged", async () => {
+  it("keeps the shipped five-migration schema unchanged", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
              to_regclass('public.application_reviewer_notes')::text notes_relation,
              to_regclass('public.resume_access_attempts')::text resume_relation
     `)).rows[0];
-    expect(row).toEqual({ ledger: 4, notes_relation: "application_reviewer_notes", resume_relation: "resume_access_attempts" });
+    expect(row).toEqual({ ledger: 5, notes_relation: "application_reviewer_notes", resume_relation: "resume_access_attempts" });
   });
 
   it("allows primary/co/admin summary context and collapses every unsafe boundary", async () => {

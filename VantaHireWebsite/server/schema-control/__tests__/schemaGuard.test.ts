@@ -37,6 +37,7 @@ const fixtureFiles = [
   "VantaHireWebsite/server/schema-migrations/0001_candidate_privacy_flow.sql",
   "VantaHireWebsite/server/schema-migrations/0002_resume_access_attempts.sql",
   "VantaHireWebsite/server/schema-migrations/0003_application_workflow_assessments.sql",
+  "VantaHireWebsite/server/schema-migrations/0004_reviewer_share_authority.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
   "VantaHireWebsite/scripts/check-schema-control.mjs",
@@ -135,6 +136,23 @@ const mutations: Array<{
     apply(root) {
       mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
         delete lock.migrations["0003"];
+      });
+    },
+  },
+  {
+    name: "reviewer-share migration edited after checksum",
+    expected: /applied migration 0004 .* was edited/,
+    apply(root) {
+      const relative = "VantaHireWebsite/server/schema-migrations/0004_reviewer_share_authority.sql";
+      write(root, relative, `${readFileSync(join(root, relative), "utf8")}\n-- forbidden drift\n`);
+    },
+  },
+  {
+    name: "reviewer-share migration omitted from checksum lock",
+    expected: /checksums\.lock versions do not exactly match migration files/,
+    apply(root) {
+      mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
+        delete lock.migrations["0004"];
       });
     },
   },

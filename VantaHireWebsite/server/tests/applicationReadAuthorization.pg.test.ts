@@ -364,7 +364,7 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
     return result;
   }
 
-  it("installs the exact pinned four-migration schema before testing", async () => {
+  it("installs the exact pinned five-migration schema before testing", async () => {
     if (!owner) throw new Error("Disposable authorization owner is unavailable.");
     const state = (await owner.query(`
       SELECT (SELECT count(*)::int FROM schema_control.applied) AS applied,
@@ -375,7 +375,7 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
              to_regclass('public.resume_access_attempts')::text AS resume_audit
     `)).rows[0];
     expect(state).toEqual({
-      applied: 4,
+      applied: 5,
       interview_type: "timestamp without time zone",
       privacy_columns: 10,
       resume_audit: "resume_access_attempts",

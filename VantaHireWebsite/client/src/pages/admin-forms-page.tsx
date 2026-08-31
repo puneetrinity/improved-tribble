@@ -182,7 +182,7 @@ export default function AdminFormsPage() {
   };
 
   const canEditTemplate = (template: FormTemplateDTO) => {
-    return user?.role === 'super_admin' || template.createdBy === user?.id;
+    return template.canManage;
   };
 
   // Bulk invite handlers

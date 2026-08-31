@@ -201,7 +201,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("installs ledger 4 and the exact additive assessment schema", async () => {
+  it("installs ledger 5 and the exact additive assessment schema", async () => {
     const result = await owner!.query(`
       SELECT
         (SELECT COUNT(*)::integer FROM schema_control.applied) AS ledger,
@@ -213,7 +213,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
           WHERE schemaname='public' AND tablename IN ('application_reviewer_notes','application_reviewer_ratings')) AS indexes
     `);
     expect(result.rows[0]).toMatchObject({
-      ledger: 4,
+      ledger: 5,
       notes_relation: "application_reviewer_notes",
       ratings_relation: "application_reviewer_ratings",
       indexes: 7,

@@ -756,6 +756,8 @@ export class DatabaseStorage implements IStorage {
     expiresAt?: Date;
     createdBy: number;
     organizationId?: number;
+    shareResume: boolean;
+    shareAiSummary: boolean;
   }): Promise<ClientShortlist> {
     const { requireCandidatePrivacyAllowed } = await import('./candidate-privacy/decision');
     await Promise.all(data.applicationIds.map((applicationId) =>
@@ -781,6 +783,8 @@ export class DatabaseStorage implements IStorage {
         message: data.message ?? null,
         expiresAt: data.expiresAt ?? null,
         createdBy: data.createdBy,
+        shareResume: data.shareResume,
+        shareAiSummary: data.shareAiSummary,
       })
       .returning();
 
@@ -871,7 +875,8 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async addClientFeedback(data: InsertClientFeedback & {
+  async addClientFeedback(data: Omit<InsertClientFeedback, 'candidateRef'> & {
+    applicationId: number;
     clientId: number;
     shortlistId?: number;
     organizationId?: number;

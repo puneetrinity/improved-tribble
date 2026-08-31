@@ -40,6 +40,15 @@ function exportedFunctionSource(source, symbol) {
   return next ? source.slice(match.index, match.index + match[0].length + next.index) : source.slice(match.index);
 }
 
+function classMethodSource(source, symbol) {
+  const startPattern = new RegExp(`\\n\\s{2}async\\s+${symbol}\\b`);
+  const match = startPattern.exec(source);
+  if (!match) return "";
+  const tail = source.slice(match.index + match[0].length);
+  const next = /\n\s{2}async\s+\w+\b/.exec(tail);
+  return next ? source.slice(match.index, match.index + match[0].length + next.index) : source.slice(match.index);
+}
+
 function routeCall(source, method, path) {
   const pattern = new RegExp(`app\\.${method}\\(\\s*["']${path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`, "g");
   const matches = [...source.matchAll(pattern)];
@@ -183,7 +192,6 @@ function validateApplicationAiOutboundAuthority(root, problems) {
       problems.push(`${path} logs raw candidate, template, provider or database data.`);
     }
   }
-
   const summaryRoute = routeCall(applicationRoutes, "post", "/api/applications/:id/ai-summary").source;
   for (const anchor of [
     "parsePositiveDecimalApplicationId", "INVALID_APPLICATION_ID", "APPLICATION_NOT_FOUND",
@@ -930,7 +938,7 @@ function validateKernel(root, problems) {
   } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
     problems.push("resume audit migration checksum does not match migration 0002.");
   }
-  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0004_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003"]'])
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0005_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004"]'])
     requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
   requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
 
@@ -957,6 +965,214 @@ function validateKernel(root, problems) {
   );
 }
 
+function validateReviewerShareAuthority(root, problems) {
+  const authority = read(root, "server/lib/reviewerShareAuthorization.ts");
+  const formsRoutes = read(root, "server/forms.routes.ts");
+  const clientRoutes = read(root, "server/clients.routes.ts");
+  const invitationRoutes = read(root, "server/hiringManagerInvitations.routes.ts");
+  const storage = read(root, "server/storage.ts");
+  const schema = read(root, "shared/schema.ts");
+  const migration = read(root, "server/schema-migrations/0004_reviewer_share_authority.sql");
+  const migrationLock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+  const catalog = read(root, "server/schema-migrations/catalog.lock.json");
+  const formsClient = read(root, "client/src/pages/admin-forms-page.tsx");
+  const managementClient = read(root, "client/src/pages/application-management-page.tsx");
+  const shortlistClient = read(root, "client/src/pages/client-shortlist-page.tsx");
+  const schemaControlTest = read(root, "server/schema-control/__tests__/schemaControl.pg.test.ts");
+
+  for (const symbol of [
+    "createScopedFormTemplate", "listAuthorizedFormTemplates", "readAuthorizedFormTemplate",
+    "updateAuthorizedFormTemplate", "deleteAuthorizedFormTemplate", "readAuthorizedResponsesForForm",
+    "readPublicClientShortlist", "readPublicResumeLocator", "resolvePublicFeedbackTarget",
+    "readAuthorizedClientFeedback", "resolveInvitationIssuerScope",
+    "replaceAuthorizedHiringManagerInvitation", "listAuthorizedHiringManagerInvitations",
+    "cancelAuthorizedHiringManagerInvitation",
+  ]) {
+    const source = exportedFunctionSource(authority, symbol);
+    if (!source) problems.push(`reviewer/share authorization operation is missing: ${symbol}`);
+    else if (count(source, "db.execute(") !== 1) problems.push(`${symbol} must execute exactly one database statement.`);
+  }
+
+  for (const anchor of [
+    "export function parseReviewerShareId", "export function parseCandidateRef", "export function parseShortlistToken",
+    "${forms.ownershipScope} = 'organization'", "${forms.organizationId} IS NOT NULL",
+    "${organizationMembers.seatAssigned} = TRUE", "${forms.createdBy} = ${actorId}",
+    "${forms.ownershipScope} IN ('personal', 'legacy_private')", "policy.allowPlatformAdmin",
+    "WITH authorized_form AS MATERIALIZED", "applicationPrivacyAllowed(false)",
+    "${applications.organizationId} = authorized_form.organization_id",
+    "${jobs.organizationId} = authorized_form.organization_id",
+  ]) requireAnchor(problems, authority, anchor, `reviewer/share authority anchor is missing: ${anchor}`);
+  if (count(authority, "${organizationMembers.seatAssigned} = TRUE") !== 5) {
+    problems.push("reviewer/share authority anchor is missing: ${organizationMembers.seatAssigned} = TRUE");
+  }
+
+  for (const anchor of [
+    "${clientShortlistItems.publicRef}::text AS candidate_ref",
+    "${clientShortlists.shareResume}", "${clientShortlists.shareAiSummary}",
+    "${clientShortlistItems.publicRef} = ${candidateRef}::uuid",
+    "${clientShortlists.shareResume} = TRUE", "authorizedApplicationId",
+    "${clientFeedback.organizationId} = authorized_application.organization_id",
+    "${clientShortlists.organizationId} = authorized_application.organization_id",
+  ]) requireAnchor(problems, authority, anchor, `public/client-feedback authority anchor is missing: ${anchor}`);
+  if (count(authority, "${clientShortlistItems.publicRef} = ${candidateRef}::uuid") !== 2) {
+    problems.push("public/client-feedback authority anchor is missing: ${clientShortlistItems.publicRef} = ${candidateRef}::uuid");
+  }
+
+  const publicReader = exportedFunctionSource(authority, "readPublicClientShortlist");
+  for (const forbidden of [
+    "${applications.email}", "${applications.phone}", "${applications.coverLetter}",
+    "${applications.resumeUrl} AS", "${applications.extractedResumeText}",
+    "${clientShortlistItems.notes}", "${applications.aiFitScore}",
+  ]) {
+    if (publicReader.includes(forbidden)) problems.push(`public shortlist restores forbidden projection: ${forbidden}`);
+  }
+
+  for (const anchor of [
+    "WITH actor_context AS MATERIALIZED", "membership_count = 1", "authorityScope",
+    "invalidated AS (", "inserted_invitation AS (", "lower(${email})",
+    "${hiringManagerInvitations.authorityScope} = 'organization'",
+    "${hiringManagerInvitations.organizationId} = ${issuer.organizationId}",
+    "${hiringManagerInvitations.invitedBy} = actor_context.actor_id",
+    "${hiringManagerInvitations.status} = 'pending'",
+  ]) requireAnchor(problems, authority, anchor, `HM invitation authority anchor is missing: ${anchor}`);
+  if (/console\.(?:log|warn|error)|error\?\.message|error\.message/.test(authority)) {
+    problems.push("reviewer/share authority logs raw data or errors.");
+  }
+
+  const routeContracts = [
+    [formsRoutes, "post", "/api/forms/templates", "createScopedFormTemplate"],
+    [formsRoutes, "get", "/api/forms/templates", "listAuthorizedFormTemplates"],
+    [formsRoutes, "get", "/api/forms/templates/:id", "readAuthorizedFormTemplate"],
+    [formsRoutes, "patch", "/api/forms/templates/:id", "updateAuthorizedFormTemplate"],
+    [formsRoutes, "delete", "/api/forms/templates/:id", "deleteAuthorizedFormTemplate"],
+    [formsRoutes, "get", "/api/forms/:id/responses", "readAuthorizedResponsesForForm"],
+    [clientRoutes, "get", "/api/client-shortlist/:token", "readPublicClientShortlist"],
+    [clientRoutes, "post", "/api/client-shortlist/:token/feedback", "resolvePublicFeedbackTarget"],
+    [clientRoutes, "get", "/api/client-shortlist/:token/resume/:candidateRef", "readPublicResumeLocator"],
+    [clientRoutes, "get", "/api/applications/:id/client-feedback", "readAuthorizedClientFeedback"],
+    [invitationRoutes, "post", "/api/hiring-manager-invitations", "replaceAuthorizedHiringManagerInvitation"],
+    [invitationRoutes, "get", "/api/hiring-manager-invitations", "listAuthorizedHiringManagerInvitations"],
+    [invitationRoutes, "delete", "/api/hiring-manager-invitations/:id", "cancelAuthorizedHiringManagerInvitation"],
+  ];
+  for (const [routes, method, path, operation] of routeContracts) {
+    const registration = routeCall(routes, method, path);
+    if (registration.count !== 1 || !registration.source) {
+      problems.push(`reviewer/share route registration must exist exactly once: ${method.toUpperCase()} ${path}`);
+      continue;
+    }
+    requireAnchor(problems, registration.source, operation, `${path} lost statement-bound command: ${operation}`);
+    const withoutApprovedConstantLogs = registration.source
+      .replace("console.error('Hiring manager invitation email delivery failed');", "")
+      .replace("console.warn('Email service not available. Invitation created but email not sent.');", "");
+    if (/console\.(?:log|warn|error)|error\?\.message|error\.message/.test(withoutApprovedConstantLogs)) {
+      problems.push(`${path} logs raw reviewer/share data or errors.`);
+    }
+  }
+
+  for (const [method, path] of [
+    ["post", "/api/forms/templates"], ["get", "/api/forms/templates"],
+    ["get", "/api/forms/templates/:id"], ["patch", "/api/forms/templates/:id"],
+    ["delete", "/api/forms/templates/:id"], ["get", "/api/forms/:id/responses"],
+  ]) {
+    const source = routeCall(formsRoutes, method, path).source;
+    for (const anchor of ["requireRole(['recruiter', 'super_admin'])", "requireSeat()", "AUTHORIZATION_UNAVAILABLE"]) {
+      requireAnchor(problems, source, anchor, `${path} lost form route anchor: ${anchor}`);
+    }
+    if (["post", "patch", "delete"].includes(method)) requireAnchor(problems, source, "csrf", `${path} lost CSRF middleware.`);
+  }
+  const feedbackRoute = routeCall(clientRoutes, "get", "/api/applications/:id/client-feedback").source;
+  for (const anchor of ["requireRole(['recruiter', 'super_admin'])", "requireSeat()", "APPLICATION_NOT_FOUND", "AUTHORIZATION_UNAVAILABLE"]) {
+    requireAnchor(problems, feedbackRoute, anchor, `client-feedback route lost anchor: ${anchor}`);
+  }
+  for (const [method, path] of [
+    ["post", "/api/hiring-manager-invitations"], ["get", "/api/hiring-manager-invitations"],
+    ["delete", "/api/hiring-manager-invitations/:id"],
+  ]) {
+    const source = routeCall(invitationRoutes, method, path).source;
+    for (const anchor of ["requireRole(['recruiter', 'super_admin'])", "requireSeat()", "INVITATION_NOT_FOUND", "AUTHORIZATION_UNAVAILABLE"]) {
+      requireAnchor(problems, source, anchor, `${path} lost HM route anchor: ${anchor}`);
+    }
+    if (["post", "delete"].includes(method)) requireAnchor(problems, source, "csrfProtection", `${path} lost CSRF middleware.`);
+  }
+
+  for (const [source, path] of [
+    [formsRoutes, "/api/forms/templates"],
+    [clientRoutes, "/api/applications/:id/client-feedback"],
+    [invitationRoutes, "/api/hiring-manager-invitations/:id"],
+  ]) {
+    if (/storage\.(?:getFormTemplate|getFormResponses|updateFormTemplate|deleteFormTemplate|getClientFeedbackForApplication|getHiringManagerInvitationsByInviter|deleteHiringManagerInvitation)\s*\(/.test(source)) {
+      problems.push(`${path} restores a target global read or id-only write.`);
+    }
+  }
+
+  const hmCreate = routeCall(invitationRoutes, "post", "/api/hiring-manager-invitations").source;
+  const issuerAt = hmCreate.indexOf("resolveInvitationIssuerScope");
+  const userAt = hmCreate.indexOf("storage.getUserByUsername");
+  const replaceAt = hmCreate.indexOf("replaceAuthorizedHiringManagerInvitation");
+  const firstProviderAt = hmCreate.indexOf("getEmailService");
+  const emailAt = hmCreate.lastIndexOf("emailService.sendEmail");
+  if (!(issuerAt >= 0 && userAt > issuerAt && replaceAt > userAt
+      && firstProviderAt > issuerAt && emailAt > replaceAt)) {
+    problems.push("HM issuer/user/replacement/provider order is unsafe.");
+  }
+
+  for (const anchor of [
+    "CREATE INDEX forms_authority_scope_idx", "ownership_scope = CASE",
+    "ADD COLUMN share_resume boolean NOT NULL DEFAULT FALSE",
+    "ADD COLUMN share_ai_summary boolean NOT NULL DEFAULT FALSE",
+    "ADD COLUMN public_ref uuid NOT NULL DEFAULT gen_random_uuid()",
+    "CREATE UNIQUE INDEX client_shortlist_items_public_ref_idx",
+    "ADD COLUMN organization_id integer NULL", "SET authority_scope = 'legacy_private'",
+    "hiring_manager_invitations_authority_scope_shape_check",
+    "CREATE INDEX hm_invitations_authority_issuer_idx", "CREATE INDEX hm_invitations_authority_email_idx",
+  ]) requireAnchor(problems, migration, anchor, `reviewer/share migration anchor is missing: ${anchor}`);
+  if (!/^[a-f0-9]{64}$/.test(migrationLock?.migrations?.["0004"] ?? "")) {
+    problems.push("reviewer/share migration is missing from checksums.lock.");
+  } else if (sha256(migration) !== migrationLock.migrations["0004"]) {
+    problems.push("reviewer/share migration checksum does not match migration 0004.");
+  }
+  if (/organization_members|\busers\b|current_user|current membership/i.test(migration)) {
+    problems.push("reviewer/share migration infers legacy authority from current identity or membership.");
+  }
+  if (migrationLock.catalog_lock_sha256 !== sha256(catalog)) problems.push("immutable adoption catalog checksum drifted.");
+  for (const anchor of [
+    'ownershipScope: text("ownership_scope").notNull()',
+    'shareResume: boolean("share_resume").notNull().default(false)',
+    'shareAiSummary: boolean("share_ai_summary").notNull().default(false)',
+    'publicRef: uuid("public_ref").notNull().defaultRandom()',
+    'authorityScope: text("authority_scope").notNull()',
+    "candidateRef: z.string().uuid()",
+  ]) requireAnchor(problems, schema, anchor, `reviewer/share Drizzle schema anchor is missing: ${anchor}`);
+
+  for (const anchor of [
+    'const file = `0005_${name}.sql`', '"0004_reviewer_share_authority.sql"',
+    'applied: ["0000", "0001", "0002", "0003", "0004"]',
+  ]) requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2I anchor: ${anchor}`);
+
+  requireAnchor(problems, formsClient, "return template.canManage", "forms UI does not consume server-derived canManage.");
+  if (formsClient.includes("user?.role === 'super_admin' || template.createdBy === user?.id")) {
+    problems.push("forms UI restores creator-id authority inference.");
+  }
+  for (const anchor of [
+    "const [shareShortlistResumes, setShareShortlistResumes] = useState(false)",
+    "const [shareShortlistAiSummaries, setShareShortlistAiSummaries] = useState(false)",
+    "shareResume: shareShortlistResumes", "shareAiSummary: shareShortlistAiSummaries",
+  ]) requireAnchor(problems, managementClient, anchor, `shortlist sharing control is missing: ${anchor}`);
+  for (const anchor of [
+    "candidateRef: string", "Record<string, CandidateFeedbackState>", "candidate.resumeAvailable",
+    "/resume/${candidate.candidateRef}", "candidateRef,",
+  ]) requireAnchor(problems, shortlistClient, anchor, `public shortlist client anchor is missing: ${anchor}`);
+  for (const forbidden of [
+    "candidate.email", "candidate.phone", "candidate.notes", "candidate.coverLetter",
+    "candidate.appliedAt", "candidate.resumeUrl", "applicationId: Number",
+  ]) if (shortlistClient.includes(forbidden)) problems.push(`public shortlist client restores forbidden field: ${forbidden}`);
+
+  const shortlistCreate = classMethodSource(storage, "createClientShortlist");
+  for (const anchor of ["shareResume", "shareAiSummary"]) {
+    requireAnchor(problems, shortlistCreate, anchor, `shortlist create plumbing lost ${anchor}.`);
+  }
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -981,8 +1197,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
     problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 20) {
-    problems.push("exactly twenty object/membership/workflow/AI-outbound routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 33) {
+    problems.push("exactly thirty-three object/membership/workflow/AI-outbound/reviewer-share routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 2) {
     problems.push("exactly two resume registrations must be retired.");
@@ -1008,6 +1224,25 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   ]) {
     const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
     if (matches.length !== 1) problems.push(`workflow manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
+  for (const [method, path, reader] of [
+    ["post", "/api/forms/templates", "createScopedFormTemplate"],
+    ["get", "/api/forms/templates", "listAuthorizedFormTemplates"],
+    ["get", "/api/forms/templates/:id", "readAuthorizedFormTemplate"],
+    ["patch", "/api/forms/templates/:id", "updateAuthorizedFormTemplate"],
+    ["delete", "/api/forms/templates/:id", "deleteAuthorizedFormTemplate"],
+    ["get", "/api/forms/:id/responses", "readAuthorizedResponsesForForm"],
+    ["get", "/api/client-shortlist/:token", "readPublicClientShortlist"],
+    ["post", "/api/client-shortlist/:token/feedback", "resolvePublicFeedbackTarget"],
+    ["get", "/api/client-shortlist/:token/resume/:candidateRef", "readPublicResumeLocator"],
+    ["get", "/api/applications/:id/client-feedback", "readAuthorizedClientFeedback"],
+    ["post", "/api/hiring-manager-invitations", "replaceAuthorizedHiringManagerInvitation"],
+    ["get", "/api/hiring-manager-invitations", "listAuthorizedHiringManagerInvitations"],
+    ["delete", "/api/hiring-manager-invitations/:id", "cancelAuthorizedHiringManagerInvitation"],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
+    if (matches.length !== 1) problems.push(`reviewer/share manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
   }
 
   for (const [method, path, reader] of [
@@ -1038,6 +1273,13 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts",
     "server/lib/__tests__/authorizedTemplatedEmail.test.ts",
     "server/schema-migrations/0003_application_workflow_assessments.sql",
+    "server/forms.routes.ts", "server/clients.routes.ts", "server/hiringManagerInvitations.routes.ts",
+    "server/lib/reviewerShareAuthorization.ts", "server/schema-migrations/0004_reviewer_share_authority.sql",
+    "server/lib/__tests__/reviewerShareAuthorization.test.ts",
+    "server/lib/__tests__/reviewerShareAuthorization.routes.test.ts",
+    "server/lib/__tests__/reviewerShareAuthorization.pg.test.ts",
+    "client/src/pages/admin-forms-page.tsx", "client/src/pages/application-management-page.tsx",
+    "client/src/pages/client-shortlist-page.tsx", "client/src/lib/internal-copy.ts",
     "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
     "scripts/check-object-authorization.mjs", "server/candidate-privacy/surfaces.json",
   ]) {
@@ -1063,6 +1305,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateKernel(root, problems);
     validateWorkflowAuthority(root, problems);
     validateApplicationAiOutboundAuthority(root, problems);
+    validateReviewerShareAuthority(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

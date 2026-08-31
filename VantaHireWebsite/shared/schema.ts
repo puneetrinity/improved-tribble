@@ -466,6 +466,8 @@ export const clientShortlists = pgTable("client_shortlists", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   expiresAt: timestamp("expires_at"), // Optional expiration
   status: text("status").notNull().default('active'), // 'active', 'expired', 'closed'
+  shareResume: boolean("share_resume").notNull().default(false),
+  shareAiSummary: boolean("share_ai_summary").notNull().default(false),
 }, (table) => ({
   clientIdIdx: index("client_shortlists_client_id_idx").on(table.clientId),
   jobIdIdx: index("client_shortlists_job_id_idx").on(table.jobId),
@@ -479,11 +481,13 @@ export const clientShortlistItems = pgTable("client_shortlist_items", {
   applicationId: integer("application_id").notNull().references(() => applications.id, { onDelete: 'cascade' }),
   position: integer("position").notNull(), // Order in the list
   notes: text("notes"), // Optional recruiter notes about this candidate
+  publicRef: uuid("public_ref").notNull().defaultRandom(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   shortlistIdIdx: index("client_shortlist_items_shortlist_id_idx").on(table.shortlistId),
   applicationIdIdx: index("client_shortlist_items_application_id_idx").on(table.applicationId),
   shortlistIdPositionIdx: index("client_shortlist_items_shortlist_position_idx").on(table.shortlistId, table.position),
+  publicRefIdx: uniqueIndex("client_shortlist_items_public_ref_idx").on(table.publicRef),
 }));
 
 export const clientFeedback = pgTable("client_feedback", {
@@ -512,9 +516,24 @@ export const forms = pgTable("forms", {
   createdBy: integer("created_by").notNull().references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  ownershipScope: text("ownership_scope").notNull().default('legacy_private'),
 }, (table) => ({
   createdByIdx: index("forms_created_by_idx").on(table.createdBy),
   isPublishedIdx: index("forms_is_published_idx").on(table.isPublished),
+  authorityScopeIdx: index("forms_authority_scope_idx")
+    .on(table.ownershipScope, table.organizationId, table.isPublished, table.createdBy),
+  ownershipScopeCheck: check(
+    "forms_ownership_scope_check",
+    sql`${table.ownershipScope} IN ('organization', 'personal', 'legacy_private')`,
+  ),
+  ownershipScopeShapeCheck: check(
+    "forms_ownership_scope_shape_check",
+    sql`(
+      (${table.ownershipScope} = 'organization' AND ${table.organizationId} IS NOT NULL)
+      OR
+      (${table.ownershipScope} IN ('personal', 'legacy_private') AND ${table.organizationId} IS NULL)
+    )`,
+  ),
 }));
 
 export const formFields = pgTable("form_fields", {
@@ -660,6 +679,8 @@ export const hiringManagerInvitations = pgTable("hiring_manager_invitations", {
   name: text("name"), // Optional invitee name
   token: text("token").notNull(), // SHA256 hashed token
   invitedBy: integer("invited_by").notNull().references(() => users.id),
+  organizationId: integer("organization_id").references(() => organizations.id, { onDelete: 'cascade' }),
+  authorityScope: text("authority_scope").notNull().default('legacy_private'),
   inviterName: text("inviter_name"), // Denormalized for email template
   expiresAt: timestamp("expires_at").notNull(), // 7 days default
   status: text("status").notNull().default('pending'), // 'pending', 'accepted', 'expired'
@@ -670,6 +691,22 @@ export const hiringManagerInvitations = pgTable("hiring_manager_invitations", {
   tokenIdx: uniqueIndex("hm_invitations_token_idx").on(table.token),
   invitedByIdx: index("hm_invitations_invited_by_idx").on(table.invitedBy),
   statusIdx: index("hm_invitations_status_idx").on(table.status),
+  authorityIssuerIdx: index("hm_invitations_authority_issuer_idx")
+    .on(table.authorityScope, table.organizationId, table.invitedBy, table.status, table.createdAt, table.id),
+  authorityEmailIdx: index("hm_invitations_authority_email_idx")
+    .on(table.authorityScope, table.organizationId, table.invitedBy, table.status, sql`lower(${table.email})`),
+  authorityScopeCheck: check(
+    "hiring_manager_invitations_authority_scope_check",
+    sql`${table.authorityScope} IN ('organization', 'platform', 'legacy_private')`,
+  ),
+  authorityScopeShapeCheck: check(
+    "hiring_manager_invitations_authority_scope_shape_check",
+    sql`(
+      (${table.authorityScope} = 'organization' AND ${table.organizationId} IS NOT NULL)
+      OR
+      (${table.authorityScope} IN ('platform', 'legacy_private') AND ${table.organizationId} IS NULL)
+    )`,
+  ),
 }));
 
 // Job Recruiters: Many-to-many relationship for co-recruiters on jobs
@@ -2675,10 +2712,12 @@ export const insertClientShortlistSchema = z.object({
   message: z.string().max(2000).optional(),
   applicationIds: z.array(z.number().int().positive()).min(1).max(50), // 1-50 candidates
   expiresAt: z.string().datetime().optional(),
+  shareResume: z.boolean(),
+  shareAiSummary: z.boolean(),
 });
 
 export const insertClientFeedbackSchema = z.object({
-  applicationId: z.number().int().positive(),
+  candidateRef: z.string().uuid(),
   recommendation: z.enum(['advance', 'reject', 'hold']),
   notes: z.string().max(2000).optional(),
   rating: z.number().int().min(1).max(5).optional(),

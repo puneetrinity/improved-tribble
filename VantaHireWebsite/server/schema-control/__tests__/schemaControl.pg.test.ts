@@ -87,11 +87,12 @@ function withForwardMigration(name: string, sql: string): string {
     "0001_candidate_privacy_flow.sql",
     "0002_resume_access_attempts.sql",
     "0003_application_workflow_assessments.sql",
+    "0004_reviewer_share_authority.sql",
     "catalog.lock.json",
   ]) {
     copyFileSync(join(migrationsDir, file), join(dir, file));
   }
-  const file = `0004_${name}.sql`;
+  const file = `0005_${name}.sql`;
   writeFileSync(join(dir, file), sql);
   const catalogBytes = readFileSync(join(dir, "catalog.lock.json"));
   const currentLock = JSON.parse(readFileSync(join(migrationsDir, "checksums.lock"), "utf8")) as {
@@ -107,7 +108,8 @@ function withForwardMigration(name: string, sql: string): string {
         "0001": currentLock.migrations["0001"],
         "0002": currentLock.migrations["0002"],
         "0003": currentLock.migrations["0003"],
-        "0004": sha256(sql),
+        "0004": currentLock.migrations["0004"],
+        "0005": sha256(sql),
       },
     }, null, 2)}\n`,
   );
@@ -240,7 +242,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
 
   it("installs the exact baseline once and repeats as a no-op", async () => {
     const first = await runReleaseMigration({ migrationsDir, creds: credentials(), connect });
-    expect(first).toEqual({ identityMode: "fresh", applied: ["0000", "0001", "0002", "0003"] });
+    expect(first).toEqual({ identityMode: "fresh", applied: ["0000", "0001", "0002", "0003", "0004"] });
 
     const second = await runReleaseMigration({ migrationsDir, creds: credentials(), connect });
     expect(second).toEqual({ identityMode: "adopted", applied: [] });
@@ -255,6 +257,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0001", apply_mode: "adopted" },
         { version: "0002", apply_mode: "adopted" },
         { version: "0003", apply_mode: "adopted" },
+        { version: "0004", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +
@@ -315,6 +318,52 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         checks: 5,
         indexes: 7,
       });
+      const reviewerShare = await client.query(`
+        SELECT
+          (SELECT COUNT(*)::integer FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='forms'
+              AND column_name='ownership_scope' AND is_nullable='NO') AS form_scope,
+          (SELECT COUNT(*)::integer FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='client_shortlists'
+              AND column_name IN ('share_resume','share_ai_summary')
+              AND is_nullable='NO' AND column_default='false') AS share_flags,
+          (SELECT COUNT(*)::integer FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='client_shortlist_items'
+              AND column_name='public_ref' AND data_type='uuid'
+              AND is_nullable='NO' AND column_default LIKE '%gen_random_uuid%') AS public_ref,
+          (SELECT COUNT(*)::integer FROM information_schema.columns
+            WHERE table_schema='public' AND table_name='hiring_manager_invitations'
+              AND column_name IN ('organization_id','authority_scope')) AS invitation_columns,
+          (SELECT COUNT(*)::integer FROM information_schema.columns
+            WHERE table_schema='public'
+              AND ((table_name='forms' AND column_name='ownership_scope')
+                OR (table_name='hiring_manager_invitations' AND column_name='authority_scope'))
+              AND column_default LIKE '%legacy_private%') AS fail_closed_defaults,
+          (SELECT COUNT(*)::integer FROM pg_constraint
+            WHERE conname IN (
+              'forms_ownership_scope_check','forms_ownership_scope_shape_check',
+              'hiring_manager_invitations_authority_scope_check',
+              'hiring_manager_invitations_authority_scope_shape_check'
+            )) AS checks,
+          (SELECT COUNT(*)::integer FROM pg_constraint
+            WHERE conrelid='public.hiring_manager_invitations'::regclass
+              AND contype='f' AND conname='hiring_manager_invitations_organization_id_fkey') AS invitation_fk,
+          (SELECT COUNT(*)::integer FROM pg_indexes
+            WHERE schemaname='public' AND indexname IN (
+              'forms_authority_scope_idx','client_shortlist_items_public_ref_idx',
+              'hm_invitations_authority_issuer_idx','hm_invitations_authority_email_idx'
+            )) AS indexes
+      `);
+      expect(reviewerShare.rows[0]).toEqual({
+        form_scope: 1,
+        share_flags: 2,
+        public_ref: 1,
+        invitation_columns: 2,
+        fail_closed_defaults: 2,
+        checks: 4,
+        invitation_fk: 1,
+        indexes: 4,
+      });
     } finally {
       await client.end();
     }
@@ -331,7 +380,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       creds: credentials(),
       connect,
     });
-    expect(upgraded.applied).toEqual(["0004"]);
+    expect(upgraded.applied).toEqual(["0005"]);
     const repeat = await runReleaseMigration({
       migrationsDir: upgradeDir,
       creds: credentials(),
@@ -345,11 +394,11 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       runReleaseMigration({ migrationsDir, creds: credentials(), connect, lockWaitMs: 120_000 }),
       runReleaseMigration({ migrationsDir, creds: credentials(), connect, lockWaitMs: 120_000 }),
     ]);
-    expect([...a.applied, ...b.applied]).toEqual(["0000", "0001", "0002", "0003"]);
+    expect([...a.applied, ...b.applied]).toEqual(["0000", "0001", "0002", "0003", "0004"]);
     const client = await directClient();
     try {
       const applied = await client.query("SELECT COUNT(*)::integer AS n FROM schema_control.applied");
-      expect(applied.rows[0]?.n).toBe(4);
+      expect(applied.rows[0]?.n).toBe(5);
       const runs = await client.query(
         "SELECT COUNT(*)::integer AS n, COUNT(*) FILTER (WHERE outcome='success')::integer AS success FROM schema_control.run",
       );
@@ -375,7 +424,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         "SELECT to_regclass('public.should_rollback') AS leaked, " +
           "(SELECT COUNT(*)::integer FROM schema_control.applied) AS applied",
       );
-      expect(state.rows[0]).toEqual({ leaked: null, applied: 4 });
+      expect(state.rows[0]).toEqual({ leaked: null, applied: 5 });
       await expect(
         assertSchemaReady({
           pg: { query: (text, params) => client.query(text, params as any) },
@@ -529,7 +578,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         },
         connect,
       });
-      expect(privacyUpgrade).toEqual({ identityMode: "adopted", applied: ["0001", "0002", "0003"] });
+      expect(privacyUpgrade).toEqual({ identityMode: "adopted", applied: ["0001", "0002", "0003", "0004"] });
       const noOp = await runReleaseMigration({
         migrationsDir,
         creds: {
@@ -563,7 +612,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         },
         connect,
       });
-      expect(forward).toEqual({ identityMode: "adopted", applied: ["0004"] });
+      expect(forward).toEqual({ identityMode: "adopted", applied: ["0005"] });
 
       const runtime = await runtimeClient();
       try {
@@ -575,7 +624,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
           expectedTargetId: adoptedTarget,
           criticalPostconditions: FLOW_CRITICAL_POSTCONDITIONS,
         });
-        expect(ready).toEqual({ version: "0004", applied: 5 });
+        expect(ready).toEqual({ version: "0005", applied: 6 });
         await runtime.query("ROLLBACK");
 
         // Readiness proves privileges catalogically. Positive execution proves
