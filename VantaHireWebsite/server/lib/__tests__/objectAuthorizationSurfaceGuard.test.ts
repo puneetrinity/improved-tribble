@@ -44,6 +44,8 @@ function fixture(): string {
   mkdirSync(join(root, "client", "src", "components", "kanban"), { recursive: true });
   mkdirSync(join(root, "client", "src", "pages"), { recursive: true });
   mkdirSync(join(root, "client", "src", "lib"), { recursive: true });
+  mkdirSync(join(root, "client", "src", "hooks"), { recursive: true });
+  cpSync(join(APP_ROOT, "client", "src", "App.tsx"), join(root, "client", "src", "App.tsx"));
   cpSync(
     join(APP_ROOT, "client", "src", "components", "kanban", "ApplicationDetailPanel.tsx"),
     join(root, "client", "src", "components", "kanban", "ApplicationDetailPanel.tsx"),
@@ -68,7 +70,18 @@ function fixture(): string {
     join(APP_ROOT, "client", "src", "pages", "org-billing-page.tsx"),
     join(root, "client", "src", "pages", "org-billing-page.tsx"),
   );
+  cpSync(
+    join(APP_ROOT, "client", "src", "pages", "admin-super-dashboard.tsx"),
+    join(root, "client", "src", "pages", "admin-super-dashboard.tsx"),
+  );
+  for (const file of ["use-subscription.ts", "use-ai-credits.ts"] as const) {
+    cpSync(join(APP_ROOT, "client", "src", "hooks", file), join(root, "client", "src", "hooks", file));
+  }
   mkdirSync(join(root, "client", "src", "components"), { recursive: true });
+  cpSync(
+    join(APP_ROOT, "client", "src", "components", "QuickAccessBar.tsx"),
+    join(root, "client", "src", "components", "QuickAccessBar.tsx"),
+  );
   cpSync(
     join(APP_ROOT, "client", "src", "components", "JobPostingStepper.tsx"),
     join(root, "client", "src", "components", "JobPostingStepper.tsx"),
@@ -1109,5 +1122,107 @@ describe("object authorization surface guard", () => {
       `${source}\n-- forbidden drift\n`,
     );
     expect(problems).toContain("reviewer/share migration checksum does not match migration 0004.");
+  });
+
+  it("rejects restoration of a global seat command", () => {
+    const problems = mutate(fixture(), "server/subscription.routes.ts", (source) =>
+      source.replace(
+        "const result = await assignAuthorizedSeat(req.user!.id, memberId);",
+        "await assignSeat(memberId);\n      const result = await assignAuthorizedSeat(req.user!.id, memberId);",
+      ),
+    );
+    expect(problems).toContain("assignAuthorizedSeat restores caller-org or global seat authority: assignSeat(");
+  });
+
+  it("rejects seat credit work before an authorized changed result", () => {
+    const problems = mutate(fixture(), "server/subscription.routes.ts", (source) =>
+      source.replace(
+        "const result = await assignAuthorizedSeat(req.user!.id, memberId);",
+        "await initializeMemberCredits(memberId, 1);\n      const result = await assignAuthorizedSeat(req.user!.id, memberId);",
+      ),
+    );
+    expect(problems).toContain("assignAuthorizedSeat side effects are not ordered after an authorized changed result.");
+  });
+
+  it("rejects loss of current owner admission from financial reads", () => {
+    const problems = mutate(fixture(), "server/lib/scopedFinancialAdminPublicAuthorization.ts", (source) =>
+      source.replace("membership.role = 'owner'", "membership.role = 'member'"),
+    );
+    expect(problems).toContain("2J scoped authority anchor count drifted: membership.role = 'owner'");
+  });
+
+  it("rejects invoice generation before exact statement-bound authorization", () => {
+    const problems = mutate(fixture(), "server/subscription.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedInvoiceById(req.user!.id, transactionId);",
+        "await generateAndStoreInvoicePdf(transactionId);\n      const result = await readAuthorizedInvoiceById(req.user!.id, transactionId);",
+      ),
+    );
+    expect(problems).toContain("readAuthorizedInvoiceById reaches invoice provider/file work before exact authorization.");
+  });
+
+  it("rejects raw usage metadata in the organization activity statement", () => {
+    const problems = mutate(fixture(), "server/lib/scopedFinancialAdminPublicAuthorization.ts", (source) =>
+      source.replace("usage.kind AS kind,", "usage.kind AS kind, usage.metadata AS metadata,"),
+    );
+    expect(problems).toContain("organization AI activity restores forbidden detail: usage.metadata");
+  });
+
+  it("rejects any restored production caller of the broad admin application helper", () => {
+    const problems = mutate(fixture(), "server/admin.routes.ts", (source) =>
+      source.replace(
+        "const stats = await storage.getAdminStats();",
+        "await storage.getAllApplicationsWithDetails();\n      const stats = await storage.getAdminStats();",
+      ),
+    );
+    expect(problems).toContain("retired admin application collection has a production caller: server/admin.routes.ts");
+  });
+
+  it("rejects loss of the stored platform-admin role check", () => {
+    const problems = mutate(fixture(), "server/lib/scopedFinancialAdminPublicAuthorization.ts", (source) =>
+      source.replace("actor.role = 'super_admin'", "actor.role = 'recruiter'"),
+    );
+    expect(problems).toContain("2J scoped authority anchor count drifted: actor.role = 'super_admin'");
+  });
+
+  it("rejects DB work restored to a consultant tombstone", () => {
+    const problems = mutate(fixture(), "server/admin.routes.ts", (source) =>
+      source.replace(
+        'app.get("/api/admin/consultants", requireRole([\'super_admin\']), async (_req: Request, res: Response): Promise<void> => {',
+        'app.get("/api/admin/consultants", requireRole([\'super_admin\']), async (_req: Request, res: Response): Promise<void> => {\n    await storage.getConsultants();',
+      ),
+    );
+    expect(problems).toContain("GET /api/admin/consultants tombstone restores work: storage.");
+  });
+
+  it("rejects a retired consultant navigation/API reference", () => {
+    const problems = mutate(fixture(), "client/src/components/QuickAccessBar.tsx", (source) =>
+      source.replace(
+        "const navItems = getNavItems();",
+        'const retired = "/api/consultants";\n  const navItems = getNavItems();',
+      ),
+    );
+    expect(problems).toContain("client restores retired/private surface: /api/consultants");
+  });
+
+  it("rejects retaining a deleted consultant client artifact", () => {
+    const root = fixture();
+    const file = join(root, "client/src/pages/admin-consultants-page.tsx");
+    writeFileSync(file, "export default function Retired() { return null; }\n", { mode: 0o600 });
+    expect(checkObjectAuthorization(root)).toContain(
+      "retired client artifact still exists: client/src/pages/admin-consultants-page.tsx",
+    );
+    rmSync(file);
+    expect(checkObjectAuthorization(root)).toEqual([]);
+  });
+
+  it("rejects protected financial identity/raw-error logging", () => {
+    const problems = mutate(fixture(), "server/subscription.routes.ts", (source) =>
+      source.replace(
+        "const result = await listAuthorizedInvoices(req.user!.id);",
+        "console.error(req.user);\n    const result = await listAuthorizedInvoices(req.user!.id);",
+      ),
+    );
+    expect(problems).toContain("GET /api/subscription/invoices logs protected identity, financial, path or raw-error data.");
   });
 });

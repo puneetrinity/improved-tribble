@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "e3914ee5eb3a788be5c1559b604a874ae8976f579b56b1ca7f678fe268cdeeba",
+  "source_census_sha256": "099409e78c30beb371c671b08732444798f5ee3f68780b303ce9387a75d49b62",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
@@ -382,8 +382,8 @@
       "direction": "read_count",
       "privacy_action": ["request_erasure"],
       "organization_scope": "platform_operator",
-      "enforcement": "Application SQL fences govern rows/aggregates; unsafe provider-backed legacy resume backfill is fail-closed.",
-      "anchors": ["applicationPrivacyAllowed", "candidate_privacy_reconciliation_required"]
+      "enforcement": "The routine full application collection is a fixed 410 tombstone; retained admin candidate aggregates remain SQL-fenced and unsafe provider-backed legacy resume backfill remains fail-closed.",
+      "anchors": ["ADMIN_APPLICATION_COLLECTION_RETIRED", "applicationPrivacyAllowed", "candidate_privacy_reconciliation_required"]
     },
     {
       "id": "ai-route-fences",
@@ -712,7 +712,7 @@
       "direction": "read_write_render",
       "privacy_action": ["withdraw_global_matching", "request_erasure"],
       "organization_scope": "super_admin",
-      "enforcement": "Minimal operator UI delegates authority, anchor validation and evidence UUID handling to server routes.",
+      "enforcement": "Aggregate-only operator UI has no routine application collection; privacy controls delegate authority, anchor validation and evidence UUID handling to server routes.",
       "anchors": ["AdminPrivacyRequestPanel", "Privacy requests"]
     },
     {

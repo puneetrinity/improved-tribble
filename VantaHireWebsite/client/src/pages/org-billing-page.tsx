@@ -65,12 +65,13 @@ import { orgBillingPageCopy } from "@/lib/internal-copy";
 export default function OrgBillingPage() {
   const queryClient = useQueryClient();
   const { data: orgData } = useOrganization();
+  const isOwner = orgData?.membership?.role === 'owner';
   const { data: subscription, isLoading: subLoading } = useSubscription();
   const { data: commercialConfig, isLoading: commercialConfigLoading } = useCommercialConfig();
   const { data: seatUsage, isLoading: seatUsageLoading } = useSeatUsage();
-  const { data: invoices, isLoading: invoicesLoading } = useInvoices();
+  const { data: invoices, isLoading: invoicesLoading } = useInvoices(isOwner);
   const { data: credits, isLoading: creditsLoading } = useAiCredits();
-  const { data: creditUsage, isLoading: creditUsageLoading } = useAiCreditUsage();
+  const { data: creditUsage, isLoading: creditUsageLoading } = useAiCreditUsage(isOwner);
   const createCheckout = useCreateCheckout();
   const createCreditPackCheckout = useCreateCreditPackCheckout();
   const cancelSubscription = useCancelSubscription();
@@ -92,7 +93,6 @@ export default function OrgBillingPage() {
   const plans = commercialConfig?.plans;
   const billingConfig = commercialConfig?.billing;
   const creditPackConfig = commercialConfig?.creditPack;
-  const isOwner = orgData?.membership?.role === 'owner';
   const freePlan = plans?.find(p => p.name === 'free') as any;
   const proPlan = plans?.find(p => p.name === 'pro') as any;
   const freePlanCard = commercialConfig?.planCards?.free;
@@ -258,40 +258,10 @@ export default function OrgBillingPage() {
   const creditUsagePercent = credits && credits.allocated > 0
     ? Math.min(100, Math.round((credits.used / credits.allocated) * 100))
     : 0;
-  const orgCreditDetails = creditUsage?.orgDetails;
-  const creditLedger = creditUsage?.orgLedger ?? [];
   const isPlanSectionLoading = subLoading || commercialConfigLoading || seatUsageLoading;
-  const isCreditsSectionLoading = creditsLoading || creditUsageLoading;
+  const isCreditsSectionLoading = creditsLoading || (isOwner && creditUsageLoading);
   const showCreditsSection = isCreditsSectionLoading || !!credits;
-  const showInvoicesSection = invoicesLoading || !!invoices?.length;
-
-  const formatCreditLedgerType = (type: string, metadata?: Record<string, any> | null) => {
-    if (type === "cycle_reset") return "Monthly allocation reset";
-    if (type === "seat_add_proration") {
-      const seatsAdded = Number(metadata?.additionalSeats || 0);
-      return seatsAdded > 0 ? `Seat add proration (+${seatsAdded} seat${seatsAdded === 1 ? "" : "s"})` : "Seat add proration";
-    }
-    if (type === "credit_pack_purchase") {
-      const reason = typeof metadata?.reason === "string" ? metadata.reason : "";
-      if (reason.startsWith("credit_pack:")) {
-        const quantity = Number(reason.split(":")[1] || 0);
-        return quantity > 0 ? `Credit pack purchase (${quantity} pack${quantity === 1 ? "" : "s"})` : "Credit pack purchase";
-      }
-      return "Credit pack purchase";
-    }
-    if (type === "bonus_grant") return "Bonus credits granted";
-    if (type === "bonus_clear") return "Bonus credits cleared";
-    if (type === "custom_limit") return "Custom credit limit change";
-    if (type === "migration") return "Legacy credit migration";
-    if (type === "usage") return "AI usage";
-    return type.replace(/_/g, " ");
-  };
-
-  const formatCreditLedgerAmount = (type: string, amount: number) => {
-    const negativeTypes = new Set(["usage", "bonus_clear"]);
-    const prefix = negativeTypes.has(type) ? "-" : "+";
-    return `${prefix}${Math.abs(amount).toLocaleString()}`;
-  };
+  const showInvoicesSection = isOwner && (invoicesLoading || !!invoices?.length);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -386,9 +356,9 @@ export default function OrgBillingPage() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {orderStatus.data?.invoiceUrl && orderStatus.data.status === 'completed' && (
+                {orderStatus.data?.downloadPath && orderStatus.data.status === 'completed' && (
                   <Button variant="outline" asChild>
-                    <a href={orderStatus.data.invoiceUrl} target="_blank" rel="noopener noreferrer">
+                    <a href={orderStatus.data.downloadPath} target="_blank" rel="noopener noreferrer">
                       <Download className="mr-2 h-4 w-4" />
                       Download Invoice
                     </a>
@@ -600,24 +570,50 @@ export default function OrgBillingPage() {
               Included credits this term: {currentIncludedCredits}
               {isPro ? ` (${proCreditsPerSeat} per seat × ${subscription?.seats || 1} seat${(subscription?.seats || 1) === 1 ? '' : 's'})` : ""}
             </div>
-            {orgCreditDetails && (
-              <div className="grid gap-3 md:grid-cols-4">
+            {isOwner && creditUsage && (
+              <div className="space-y-3 rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Organization AI activity</p>
+                  <p className="text-sm text-muted-foreground">
+                    Informational totals for the last {creditUsage.windowDays} days. This is not a credit ledger or balance.
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">Plan allocation</p>
-                  <p className="text-lg font-semibold">{orgCreditDetails.planAllocation.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Operations</p>
+                  <p className="text-lg font-semibold">{creditUsage.totals.operations.toLocaleString()}</p>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">Prorated seat credits</p>
-                  <p className="text-lg font-semibold">{orgCreditDetails.proratedCreditsAddedThisPeriod.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Input tokens</p>
+                  <p className="text-lg font-semibold">{creditUsage.totals.tokensIn.toLocaleString()}</p>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">Purchased available</p>
-                  <p className="text-lg font-semibold">{orgCreditDetails.purchasedCredits.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Output tokens</p>
+                  <p className="text-lg font-semibold">{creditUsage.totals.tokensOut.toLocaleString()}</p>
                 </div>
-                <div className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">Rollover carried</p>
-                  <p className="text-lg font-semibold">{orgCreditDetails.rolloverCredits.toLocaleString()}</p>
                 </div>
+                {creditUsage.byKind.length > 0 && (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Operation</TableHead>
+                        <TableHead className="text-right">Runs</TableHead>
+                        <TableHead className="text-right">Input tokens</TableHead>
+                        <TableHead className="text-right">Output tokens</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {creditUsage.byKind.map((entry) => (
+                        <TableRow key={entry.kind}>
+                          <TableCell className="font-medium">{entry.kind.replace(/_/g, " ")}</TableCell>
+                          <TableCell className="text-right">{entry.operations.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{entry.tokensIn.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">{entry.tokensOut.toLocaleString()}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
             )}
             {credits.purchasedCredits && credits.purchasedCredits > 0 && (
@@ -636,47 +632,6 @@ export default function OrgBillingPage() {
                 <Button onClick={() => setCreditPackDialogOpen(true)}>
                   Buy More Credits
                 </Button>
-              </div>
-            )}
-            {creditLedger.length > 0 && (
-              <div className="space-y-3">
-                <div>
-                  <p className="font-medium">Credit activity</p>
-                  <p className="text-sm text-muted-foreground">
-                    Included monthly credits, seat-add proration, top-ups, and AI usage for the shared org pool.
-                  </p>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Event</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Actor</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {creditLedger.slice(0, 10).map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{formatCreditLedgerType(entry.type, entry.metadata)}</p>
-                            {entry.type === "usage" && (
-                              <p className="text-xs text-muted-foreground">
-                                Recurring used first, then purchased credits.
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>{format(new Date(entry.createdAt), "MMM d, yyyy p")}</TableCell>
-                        <TableCell>{entry.actor?.name || entry.actor?.email || "System"}</TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCreditLedgerAmount(entry.type, entry.amount)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
               </div>
             )}
               </>
@@ -773,7 +728,6 @@ export default function OrgBillingPage() {
                   <TableHead>Type</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -781,26 +735,19 @@ export default function OrgBillingPage() {
                 {invoices.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">
-                      {invoice.invoiceNumber || `INV-${invoice.id}`}
+                      {invoice.invoiceNumber}
                     </TableCell>
                     <TableCell>{formatInvoiceType(invoice.type)}</TableCell>
                     <TableCell>
-                      {format(new Date(invoice.createdAt), 'MMM d, yyyy')}
+                      {format(new Date(invoice.completedAt), 'MMM d, yyyy')}
                     </TableCell>
                     <TableCell>{formatPriceINR(invoice.totalAmount)}</TableCell>
                     <TableCell>
-                      <Badge variant={invoice.status === 'completed' ? 'default' : 'secondary'}>
-                        {invoice.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {invoice.invoiceUrl && (
-                        <Button variant="ghost" size="sm" asChild>
-                          <a href={invoice.invoiceUrl} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
+                      <Button variant="ghost" size="sm" asChild>
+                        <a href={invoice.downloadPath} target="_blank" rel="noopener noreferrer">
+                          <Download className="h-4 w-4" />
+                        </a>
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
