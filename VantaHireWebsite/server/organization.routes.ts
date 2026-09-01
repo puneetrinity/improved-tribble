@@ -1,8 +1,9 @@
 import { z } from "zod";
 import type { Express, Request, Response, NextFunction } from "express";
-import { requireAuth } from "./auth";
+import { requireAuth, requireRole } from "./auth";
 import {
   createOrganization,
+  OrganizationSelfServiceGrantDeniedError,
   getOrganization,
   updateOrganization,
   deleteOrganization,
@@ -23,16 +24,18 @@ import {
 } from "./lib/organizationService";
 import {
   getOrganizationMembers,
-  getOrganizationMember,
   getMemberById,
-  updateMemberRole,
-  removeMember,
   leaveOrganization,
   canManageMembers,
   canManageBilling,
-  reassignJobs,
   getUserJobsInOrg,
 } from "./lib/membershipService";
+import {
+  changeOrganizationMemberRoleAndRevoke,
+  parsePrivilegeGrantId,
+  reassignOrganizationJobs,
+  removeOrganizationMemberAndRevoke,
+} from "./lib/privilegeGrantRevocation";
 import { createFreeSubscription } from "./lib/subscriptionService";
 import { hasAvailableSeats } from "./lib/seatService";
 import { initializeMemberCredits } from "./lib/creditService";
@@ -71,7 +74,7 @@ const changeRoleSchema = z.object({
 });
 
 const reassignContentSchema = z.object({
-  toUserId: z.number().int().positive(),
+  toUserId: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
 });
 
 const domainClaimSchema = z.object({
@@ -85,15 +88,9 @@ export function registerOrganizationRoutes(
   // ===== Organization CRUD =====
 
   // Create organization
-  app.post("/api/organizations", requireAuth, csrfProtection, async (req, res) => {
+  app.post("/api/organizations", requireAuth, requireRole(['recruiter']), csrfProtection, async (req, res) => {
     try {
       const user = req.user!;
-
-      // Check if user is already in an organization
-      if (await isUserInOrganization(user.id)) {
-        res.status(400).json({ error: "You are already a member of an organization" });
-        return;
-      }
 
       const validatedData = createOrgSchema.parse(req.body);
 
@@ -108,14 +105,26 @@ export function registerOrganizationRoutes(
         await initializeMemberCredits(orgResult.membership.id, org.id);
       }
 
-      res.status(201).json(org);
+      const {
+        authorityOrigin: _authorityOrigin,
+        selfCreatedByUserId: _selfCreatedByUserId,
+        ...organizationResponse
+      } = org;
+      res.status(201).json(organizationResponse);
     } catch (error: any) {
       console.error("Error creating organization:", error);
       if (error.name === "ZodError") {
         res.status(400).json({ error: "Invalid input", details: error.errors });
         return;
       }
-      res.status(500).json({ error: error.message || "Failed to create organization" });
+      if (error instanceof OrganizationSelfServiceGrantDeniedError) {
+        res.status(403).json({
+          error: "ORGANIZATION_CREATION_NOT_ALLOWED",
+          code: "ORGANIZATION_CREATION_NOT_ALLOWED",
+        });
+        return;
+      }
+      res.status(503).json({ error: "ORGANIZATION_CREATE_UNAVAILABLE", code: "ORGANIZATION_CREATE_UNAVAILABLE" });
     }
   });
 
@@ -318,42 +327,28 @@ export function registerOrganizationRoutes(
   app.delete("/api/organizations/members/:id", requireAuth, csrfProtection, async (req, res) => {
     try {
       const user = req.user!;
-      const memberId = parseInt(req.params.id ?? '0');
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const memberId = parsePrivilegeGrantId(req.params.id);
+      if (memberId === null) {
+        res.status(400).json({ error: "INVALID_ORGANIZATION_MEMBER_ID", code: "INVALID_ORGANIZATION_MEMBER_ID" });
         return;
       }
-
-      if (!canManageMembers(orgResult.membership.role as any)) {
-        res.status(403).json({ error: "You don't have permission to remove members" });
+      const result = await removeOrganizationMemberAndRevoke(user.id, memberId);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "MEMBER_ADMIN_ACCESS_DENIED", code: "MEMBER_ADMIN_ACCESS_DENIED" });
+        } else if (result.reason === "not_found") {
+          res.status(404).json({ error: "ORGANIZATION_MEMBER_NOT_FOUND", code: "ORGANIZATION_MEMBER_NOT_FOUND" });
+        } else if (result.reason === "conflict") {
+          const code = result.code === "jobs_owned" ? "MEMBER_JOBS_REASSIGN_REQUIRED" : "ORGANIZATION_MEMBER_PROTECTED";
+          res.status(409).json({ error: code, code });
+        } else {
+          res.status(503).json({ error: "MEMBER_ADMIN_UNAVAILABLE", code: "MEMBER_ADMIN_UNAVAILABLE" });
+        }
         return;
       }
-
-      const memberToRemove = await getMemberById(memberId);
-      if (!memberToRemove || memberToRemove.organizationId !== orgResult.organization.id) {
-        res.status(404).json({ error: "Member not found" });
-        return;
-      }
-
-      if (memberToRemove.role === 'owner') {
-        res.status(400).json({ error: "Cannot remove organization owner" });
-        return;
-      }
-
-      const ownedJobs = await getUserJobsInOrg(memberToRemove.userId, orgResult.organization.id);
-      if (ownedJobs.length > 0) {
-        res.status(400).json({ error: "Reassign this member's jobs before removing access" });
-        return;
-      }
-
-      await removeMember(memberId);
-
       res.json({ success: true });
-    } catch (error: any) {
-      console.error("Error removing member:", error);
-      res.status(500).json({ error: error.message || "Failed to remove member" });
+    } catch {
+      res.status(503).json({ error: "MEMBER_ADMIN_UNAVAILABLE", code: "MEMBER_ADMIN_UNAVAILABLE" });
     }
   });
 
@@ -361,42 +356,33 @@ export function registerOrganizationRoutes(
   app.patch("/api/organizations/members/:id/role", requireAuth, csrfProtection, async (req, res) => {
     try {
       const user = req.user!;
-      const memberId = parseInt(req.params.id ?? '0');
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const memberId = parsePrivilegeGrantId(req.params.id);
+      if (memberId === null) {
+        res.status(400).json({ error: "INVALID_ORGANIZATION_MEMBER_ID", code: "INVALID_ORGANIZATION_MEMBER_ID" });
         return;
       }
-
-      if (orgResult.membership.role !== 'owner') {
-        res.status(403).json({ error: "Only organization owner can change roles" });
-        return;
-      }
-
       const { role } = changeRoleSchema.parse(req.body);
-
-      const memberToUpdate = await getMemberById(memberId);
-      if (!memberToUpdate || memberToUpdate.organizationId !== orgResult.organization.id) {
-        res.status(404).json({ error: "Member not found" });
+      const result = await changeOrganizationMemberRoleAndRevoke(user.id, memberId, role);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "MEMBER_ADMIN_ACCESS_DENIED", code: "MEMBER_ADMIN_ACCESS_DENIED" });
+        } else if (result.reason === "not_found") {
+          res.status(404).json({ error: "ORGANIZATION_MEMBER_NOT_FOUND", code: "ORGANIZATION_MEMBER_NOT_FOUND" });
+        } else if (result.reason === "conflict") {
+          const code = result.code === "role_unchanged" ? "ORGANIZATION_MEMBER_ROLE_UNCHANGED" : "ORGANIZATION_MEMBER_PROTECTED";
+          res.status(409).json({ error: code, code });
+        } else {
+          res.status(503).json({ error: "MEMBER_ADMIN_UNAVAILABLE", code: "MEMBER_ADMIN_UNAVAILABLE" });
+        }
         return;
       }
-
-      if (memberToUpdate.role === 'owner') {
-        res.status(400).json({ error: "Cannot change owner's role" });
-        return;
-      }
-
-      const updated = await updateMemberRole(memberId, role);
-
-      res.json(updated);
+      res.json(result.value);
     } catch (error: any) {
-      console.error("Error changing member role:", error);
       if (error.name === "ZodError") {
         res.status(400).json({ error: "Invalid input", details: error.errors });
         return;
       }
-      res.status(500).json({ error: error.message || "Failed to change role" });
+      res.status(503).json({ error: "MEMBER_ADMIN_UNAVAILABLE", code: "MEMBER_ADMIN_UNAVAILABLE" });
     }
   });
 
@@ -404,43 +390,33 @@ export function registerOrganizationRoutes(
   app.post("/api/organizations/members/:id/reassign", requireAuth, csrfProtection, async (req, res) => {
     try {
       const user = req.user!;
-      const fromMemberId = parseInt(req.params.id ?? '0');
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const fromMemberId = parsePrivilegeGrantId(req.params.id);
+      if (fromMemberId === null) {
+        res.status(400).json({ error: "INVALID_ORGANIZATION_MEMBER_ID", code: "INVALID_ORGANIZATION_MEMBER_ID" });
         return;
       }
-
-      if (!canManageMembers(orgResult.membership.role as any)) {
-        res.status(403).json({ error: "You don't have permission to reassign content" });
-        return;
-      }
-
       const { toUserId } = reassignContentSchema.parse(req.body);
-
-      const fromMember = await getMemberById(fromMemberId);
-      if (!fromMember || fromMember.organizationId !== orgResult.organization.id) {
-        res.status(404).json({ error: "Source member not found" });
+      const result = await reassignOrganizationJobs(user.id, fromMemberId, toUserId);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "MEMBER_ADMIN_ACCESS_DENIED", code: "MEMBER_ADMIN_ACCESS_DENIED" });
+        } else if (result.reason === "not_found") {
+          res.status(404).json({ error: "ORGANIZATION_MEMBER_NOT_FOUND", code: "ORGANIZATION_MEMBER_NOT_FOUND" });
+        } else if (result.reason === "conflict") {
+          const code = result.code === "owner_source" ? "ORGANIZATION_OWNER_REASSIGN_FORBIDDEN" : "ORGANIZATION_REASSIGN_TARGET_INVALID";
+          res.status(409).json({ error: code, code });
+        } else {
+          res.status(503).json({ error: "MEMBER_ADMIN_UNAVAILABLE", code: "MEMBER_ADMIN_UNAVAILABLE" });
+        }
         return;
       }
-
-      const toMember = await getOrganizationMember(orgResult.organization.id, toUserId);
-      if (!toMember) {
-        res.status(404).json({ error: "Target member not found in organization" });
-        return;
-      }
-
-      const reassignedCount = await reassignJobs(fromMember.userId, toUserId, orgResult.organization.id);
-
-      res.json({ success: true, reassignedCount });
+      res.json({ success: true, reassignedCount: result.reassignedCount });
     } catch (error: any) {
-      console.error("Error reassigning content:", error);
       if (error.name === "ZodError") {
         res.status(400).json({ error: "Invalid input", details: error.errors });
         return;
       }
-      res.status(500).json({ error: error.message || "Failed to reassign content" });
+      res.status(503).json({ error: "MEMBER_ADMIN_UNAVAILABLE", code: "MEMBER_ADMIN_UNAVAILABLE" });
     }
   });
 

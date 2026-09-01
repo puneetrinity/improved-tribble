@@ -10,6 +10,7 @@ export const users = pgTable("users", {
   firstName: text("first_name"),
   lastName: text("last_name"),
   role: text("role").notNull().default("candidate"), // super_admin, recruiter, candidate, hiring_manager
+  authVersion: integer("auth_version").notNull().default(1),
   // Email verification
   emailVerified: boolean("email_verified").default(false),
   emailVerificationToken: text("email_verification_token"),
@@ -26,7 +27,9 @@ export const users = pgTable("users", {
   // Onboarding tracking
   onboardingCompletedAt: timestamp("onboarding_completed_at"),
   profileSkippedAt: timestamp("profile_skipped_at"),
-});
+}, (table) => ({
+  authVersionPositiveCheck: check("users_auth_version_positive_check", sql`${table.authVersion} > 0`),
+}));
 
 export const contactSubmissions = pgTable("contact_submissions", {
   id: serial("id").primaryKey(),
@@ -816,10 +819,25 @@ export const organizations = pgTable("organizations", {
 
   // Signal integration
   signalTenantId: text("signal_tenant_id").unique(),
+
+  // Durable provenance for authority-bearing self-service organization creation.
+  authorityOrigin: text("authority_origin"),
+  selfCreatedByUserId: integer("self_created_by_user_id").references(() => users.id, { onDelete: 'restrict' }),
 }, (table) => ({
   slugIdx: uniqueIndex("organizations_slug_idx").on(table.slug),
   domainIdx: index("organizations_domain_idx").on(table.domain),
   signalTenantIdx: uniqueIndex("organizations_signal_tenant_idx").on(table.signalTenantId),
+  selfServiceCreatorIdx: uniqueIndex("organizations_self_service_creator_idx")
+    .on(table.selfCreatedByUserId)
+    .where(sql`${table.authorityOrigin} = 'self_service_recruiter'`),
+  authorityOriginShapeCheck: check(
+    "organizations_authority_origin_shape_check",
+    sql`(
+      (${table.authorityOrigin} IS NULL AND ${table.selfCreatedByUserId} IS NULL)
+      OR (${table.authorityOrigin} = 'legacy_unknown' AND ${table.selfCreatedByUserId} IS NULL)
+      OR (${table.authorityOrigin} = 'self_service_recruiter' AND ${table.selfCreatedByUserId} IS NOT NULL)
+    )`,
+  ),
 }));
 
 // Organization members

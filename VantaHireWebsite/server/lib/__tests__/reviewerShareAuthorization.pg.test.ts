@@ -253,7 +253,7 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
       flags_false: true,
       distinct_refs: 2,
       invitations: [[90, "legacy_private", null]],
-      ledger: 5,
+      ledger: 6,
     });
     await provisionRuntimeRole({
       migrateUrl: migrationUrl, runtimeUrl, runtimeRole: new URL(runtimeUrl).username,
@@ -278,7 +278,7 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
     if (priorDir) rmSync(priorDir, { recursive: true, force: true });
   });
 
-  it("installs ledger 5 with exact defaults, checks, FK and indexes", async () => {
+  it("installs ledger 6 with exact defaults, checks, FK and indexes", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT count(*)::integer FROM schema_control.applied) ledger,
              (SELECT count(*)::integer FROM information_schema.columns WHERE table_name='client_shortlists'
@@ -294,7 +294,7 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
                ('forms_authority_scope_idx','client_shortlist_items_public_ref_idx',
                 'hm_invitations_authority_issuer_idx','hm_invitations_authority_email_idx')) indexes
     `)).rows[0];
-    expect(row).toEqual({ ledger: 5, flags: 2, fail_closed_defaults: 2, checks: 4, indexes: 4 });
+    expect(row).toEqual({ ledger: 6, flags: 2, fail_closed_defaults: 2, checks: 4, indexes: 4 });
   });
 
   it("enforces organization form read/manage, membership loss and legacy isolation", async () => {

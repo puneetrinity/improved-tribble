@@ -38,6 +38,10 @@ vi.mock('../mauticService', () => ({
 
 import { requireVerifiedCandidate } from '../../auth';
 import { getCandidateFitLimitPerMonth, getUserLimits } from '../aiLimits';
+import {
+  createAuthorizationSessionPayload,
+  parseAuthorizationSessionPayload,
+} from '../privilegeGrantRevocation';
 
 function read(relativeUrl: string): string {
   return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
@@ -137,6 +141,21 @@ describe('candidate portal authentication contracts', () => {
     expect(authSource).not.toMatch(/Verify your VantaHire|Welcome to VantaHire|Reset Your VantaHire/);
     expect(authSource).toContain('process.env.SESSION_SECRET');
     expect(authSource).toContain("'vantahire-dev-secret'");
+  });
+
+  it('preserves legacy version-one sessions and rejects stale or malformed version payloads', () => {
+    expect(parseAuthorizationSessionPayload(41)).toEqual({ id: 41, authVersion: 1 });
+    expect(parseAuthorizationSessionPayload({ id: 41, authVersion: 2 }))
+      .toEqual({ id: 41, authVersion: 2 });
+    expect(createAuthorizationSessionPayload({ id: 41, authVersion: 2 }))
+      .toEqual({ id: 41, authVersion: 2 });
+    expect(parseAuthorizationSessionPayload({ id: 41, authVersion: 1, role: 'candidate' }))
+      .toBeNull();
+
+    const authSource = read('../../auth.ts');
+    expect(authSource).toContain('user.authVersion !== serialized.authVersion');
+    expect(authSource).toContain('done(null, false)');
+    expect(authSource).not.toMatch(/DELETE\s+FROM\s+(?:public\.)?session/i);
   });
 });
 
