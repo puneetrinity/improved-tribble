@@ -447,9 +447,10 @@ function validateKernel(root, problems) {
     "hiring_manager.role = 'hiring_manager'",
     "${jobs.organizationId} = actor_context.organization_id",
     "${jobs.hiringManagerId} = hiring_manager.id",
-    "INNER JOIN ${organizationMembers} AS inviter_membership",
-    "inviter_membership.organization_id = actor_context.organization_id",
-    "LOWER(${hiringManagerInvitations.email}) = LOWER(hiring_manager.username)",
+    "${hiringManagerInvitations.authorityScope} = 'organization'",
+    "${hiringManagerInvitations.organizationId} = actor_context.organization_id",
+    "${hiringManagerInvitations.acceptedByUserId} = hiring_manager.id",
+    "${hiringManagerInvitations.revokedAt} IS NULL",
     "${hiringManagerInvitations.status} = 'accepted'",
     "${policy.allowPlatformAdmin} AND actor_context.actor_role = 'super_admin'",
     "SELECT DISTINCT hiring_manager.id AS id",
@@ -940,7 +941,7 @@ function validateKernel(root, problems) {
   } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
     problems.push("resume audit migration checksum does not match migration 0002.");
   }
-  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0006_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005"]'])
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0007_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006"]'])
     requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
   requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
 
@@ -1147,8 +1148,8 @@ function validateReviewerShareAuthority(root, problems) {
   ]) requireAnchor(problems, schema, anchor, `reviewer/share Drizzle schema anchor is missing: ${anchor}`);
 
   for (const anchor of [
-    'const file = `0006_${name}.sql`', '"0004_reviewer_share_authority.sql"',
-    'applied: ["0000", "0001", "0002", "0003", "0004", "0005"]',
+    'const file = `0007_${name}.sql`', '"0004_reviewer_share_authority.sql"',
+    'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006"]',
   ]) requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2I anchor: ${anchor}`);
 
   requireAnchor(problems, formsClient, "return template.canManage", "forms UI does not consume server-derived canManage.");
@@ -1647,6 +1648,167 @@ function validatePrivilegeGrantRevocation(root, problems) {
   }
 }
 
+function validateVersionedInvitationGrants(root, problems) {
+  const authority = read(root, "server/lib/versionedInvitationGrantAuthorization.ts");
+  const routes = read(root, "server/organization.routes.ts");
+  const service = read(root, "server/lib/organizationService.ts");
+  const auth = read(root, "server/auth.ts");
+  const directory = read(root, "server/lib/membershipScopedReadAuthorization.ts");
+  const schema = read(root, "shared/schema.ts");
+  const migration = read(root, "server/schema-migrations/0006_versioned_invitation_grants.sql");
+  const migrationLock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+
+  for (const [symbol, statement] of [
+    ["createOrResendOrganizationInvite", "db.execute("],
+    ["listOrganizationInvites", "db.execute("],
+    ["readOrganizationInvitePreview", "db.execute("],
+    ["cancelOrganizationInvite", "db.execute("],
+    ["readHiringManagerRegistrationGrant", "db.execute("],
+    ["acceptHiringManagerRegistrationGrant", "db.execute("],
+  ]) {
+    const source = exportedFunctionSource(authority, symbol);
+    if (!source || count(source, statement) !== 1) {
+      problems.push(`versioned invitation operation is not exactly one statement: ${symbol}`);
+    }
+  }
+  const accept = exportedFunctionSource(authority, "acceptOrganizationInvite");
+  if (count(accept, "db.transaction(") !== 1 || count(accept, "tx.execute(") !== 1
+      || count(accept, "backfillUserRecordsToOrg(tx") !== 1) {
+    problems.push("organization invitation acceptance must use one transaction, one state statement and the bounded backfill callback.");
+  }
+
+  for (const anchor of [
+    "HAVING COUNT(*) = 1",
+    "membership.seat_assigned = TRUE",
+    "membership.role IN ('owner', 'admin')",
+    "invitation.token = ${tokenHash}",
+    "invitation.state = 'pending'",
+    "invitation.version = target.version",
+    "invitation.expires_at > now()",
+    "state = 'superseded'",
+    "state = 'cancelled'",
+    "state = 'accepted'",
+    "accepted_by = account.id",
+    "INSERT INTO ${organizationMembers}",
+    "account.email_verified = TRUE",
+    "LOWER(account.username) = LOWER(presented.email)",
+    "accepted_by_user_id = account.id",
+    "invitation.grant_version = ${grantVersion}",
+    "account.role = 'hiring_manager'",
+    "accepted_history AS MATERIALIZED",
+    "WHEN EXISTS (SELECT 1 FROM accepted_history) THEN 'accepted_history'",
+  ]) requireAnchor(problems, authority, anchor, `versioned invitation authority anchor is missing: ${anchor}`);
+  for (const forbidden of [
+    "parseInt(", "allowNoOrg", "deleteOrganizationInvite", "getOrganizationInviteByToken",
+    "createOrganizationInvite(", "cancelOrganizationInviteById", "console.", "logger.",
+  ]) if (authority.includes(forbidden)) problems.push(`versioned invitation authority restores forbidden pattern: ${forbidden}`);
+  if (!authority.includes("createHash(\"sha256\").update(canonical).digest(\"hex\")")
+      || /invitation\.token\s*=\s*\$\{token\}(?!Hash)/.test(authority)) {
+    problems.push("versioned invitation token lookup is not strict SHA-256-only.");
+  }
+  const issuerProjection = authority.slice(
+    authority.indexOf("export interface OrganizationInviteIssuerProjection"),
+    authority.indexOf("export interface OrganizationInviteDeliveryContext"),
+  );
+  const previewProjection = authority.slice(
+    authority.indexOf("export interface OrganizationInvitePreviewProjection"),
+    authority.indexOf("export interface AcceptedOrganizationMembershipProjection"),
+  );
+  for (const forbidden of ["token", "version", "organizationId", "invitedBy", "cancelledAt", "supersededAt"]) {
+    if (issuerProjection.includes(forbidden) || previewProjection.includes(forbidden)) {
+      problems.push(`versioned invitation public projection exposes ${forbidden}.`);
+    }
+  }
+  for (const removed of [
+    "createOrganizationInvite", "getOrganizationInviteByToken", "getPendingInvitesForOrganization",
+    "acceptOrganizationInvite", "cancelOrganizationInvite",
+  ]) {
+    if (exportedFunctionSource(service, removed)) problems.push(`vulnerable organization invitation service remains exported: ${removed}`);
+  }
+
+  const routeContracts = [
+    ["post", "/api/organizations/members/invite", "createOrResendOrganizationInvite"],
+    ["get", "/api/organizations/invites", "listOrganizationInvites"],
+    ["delete", "/api/organizations/invites/:id", "cancelOrganizationInvite"],
+    ["get", "/api/invites/:token", "readOrganizationInvitePreview"],
+    ["post", "/api/invites/:token/accept", "acceptOrganizationInvite"],
+  ];
+  for (const [method, path, operation] of routeContracts) {
+    const block = routeCall(routes, method, path);
+    if (block.count !== 1 || !block.source.includes(`${operation}(`)) {
+      problems.push(`versioned invitation route lost protected operation: ${method.toUpperCase()} ${path}`);
+    }
+    for (const legacy of ["getOrganizationInviteByToken(", "createOrganizationInvite(", "acceptOrganizationInviteById(", "parseInt("]) {
+      if (block.source.includes(legacy)) problems.push(`versioned invitation route restores legacy/global behavior: ${legacy}`);
+    }
+  }
+  const create = routeCall(routes, "post", "/api/organizations/members/invite").source;
+  const authorizeAt = create.indexOf("createOrResendOrganizationInvite(");
+  const providerAt = create.indexOf(".sendEmail(");
+  const responseAt = create.indexOf("res.status(201).json(invite.value)");
+  if (!create.includes('randomBytes(32).toString("hex")')
+      || !create.includes("hashVersionedInvitationToken(plaintextToken)")
+      || !(authorizeAt >= 0 && authorizeAt < providerAt && providerAt < responseAt)
+      || create.includes("json(invite)") || create.includes("json(plaintextToken)")) {
+    problems.push("organization invite create/hash/commit/provider/projection order is unsafe.");
+  }
+  if (/console\.\w+\([^)]*plaintextToken/.test(create)) {
+    problems.push("organization invite route logs the plaintext bearer.");
+  }
+  const cancel = routeCall(routes, "delete", "/api/organizations/invites/:id").source;
+  if (!cancel.includes("parseVersionedInvitationId(req.params.id)")) {
+    problems.push("organization invitation cancellation lost the strict id parser.");
+  }
+  for (const [method, path] of [["get", "/api/invites/:token"], ["post", "/api/invites/:token/accept"]]) {
+    if (!routeCall(routes, method, path).source.includes("parseVersionedInvitationToken(token)")) {
+      problems.push(`${method.toUpperCase()} ${path} lost strict token parsing.`);
+    }
+  }
+
+  const register = routeCall(auth, "post", "/api/register").source;
+  for (const forbidden of ["getOrganizationInviteByToken", "verifyUserEmail(user.id)", "req.login(user"]) {
+    if (register.includes(forbidden)) problems.push(`organization registration restores bearer-to-account authority: ${forbidden}`);
+  }
+  for (const anchor of [
+    "storage.setVerificationToken(user.id, hash, expires)",
+    "sendVerificationEmail(username, token, firstName, inviteToken)",
+    "readHiringManagerRegistrationGrant(invitationToken)",
+    "acceptHiringManagerRegistrationGrant(",
+  ]) requireAnchor(problems, register, anchor, `registration invitation anchor is missing: ${anchor}`);
+
+  for (const anchor of [
+    "hiringManagerInvitations.authorityScope} = 'organization'",
+    "hiringManagerInvitations.organizationId} = actor_context.organization_id",
+    "hiringManagerInvitations.status} = 'accepted'",
+    "hiringManagerInvitations.acceptedByUserId} = hiring_manager.id",
+    "hiringManagerInvitations.revokedAt} IS NULL",
+  ]) requireAnchor(problems, directory, anchor, `HM accepted-user provenance anchor is missing: ${anchor}`);
+  for (const forbidden of ["hiringManagerInvitations.invitedBy", "inviter_membership", "hiringManagerInvitations.email} = hiring_manager.username"]) {
+    if (directory.includes(forbidden)) problems.push(`HM directory restores inferred invitation provenance: ${forbidden}`);
+  }
+
+  for (const anchor of [
+    'state: text("state").notNull()', 'version: integer("version").notNull().default(1)',
+    'acceptedByUserId: integer("accepted_by_user_id")', 'grantVersion: integer("grant_version").notNull().default(1)',
+    'organization_invites_state_shape_check', 'hiring_manager_invitations_accepted_user_shape_check',
+    'org_invites_pending_email_idx', 'hm_invitations_eligibility_idx',
+  ]) requireAnchor(problems, schema, anchor, `2L-B schema model anchor is missing: ${anchor}`);
+  for (const anchor of [
+    "sha256(convert_to(token, 'UTF8'))", "ELSE 'legacy_revoked'", "ALTER COLUMN state SET NOT NULL",
+    "organization_invites_state_shape_check", "org_invites_pending_email_idx",
+    "accepted_by_user_id = unique_hiring_manager.user_id", "HAVING count(*) = 1",
+    "hiring_manager_invitations_accepted_user_shape_check", "hm_invitations_eligibility_idx",
+  ]) requireAnchor(problems, migration, anchor, `2L-B migration anchor is missing: ${anchor}`);
+  if (/organization_members|inviter_membership|\bjobs\b|email_domain|current membership/i.test(migration)) {
+    problems.push("2L-B migration infers invitation authority from current mutable relationships.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(migrationLock?.migrations?.["0006"] ?? "")) {
+    problems.push("2L-B migration is missing from checksums.lock.");
+  } else if (sha256(migration) !== migrationLock.migrations["0006"]) {
+    problems.push("2L-B migration checksum does not match migration 0006.");
+  }
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -1671,8 +1833,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
     problems.push("exactly five WhatsApp and two talent-pool route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 51) {
-    problems.push("exactly fifty-one object/membership/workflow/AI-outbound/reviewer-share/financial-admin/talent-pool/privilege routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 57) {
+    problems.push("exactly fifty-seven protected authorization routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 9) {
     problems.push("exactly nine resume/application/consultant registrations must be retired.");
@@ -1712,6 +1874,20 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
       && row.reader === reader
       && JSON.stringify(row.projection) === JSON.stringify(projection));
     if (matches.length !== 1) problems.push(`privilege manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
+  for (const [method, path, reader, projection] of [
+    ["post", "/api/organizations/members/invite", "createOrResendOrganizationInvite", ["id", "email", "role", "expiresAt", "createdAt"]],
+    ["get", "/api/organizations/invites", "listOrganizationInvites", ["id", "email", "role", "expiresAt", "createdAt"]],
+    ["delete", "/api/organizations/invites/:id", "cancelOrganizationInvite", ["success"]],
+    ["get", "/api/invites/:token", "readOrganizationInvitePreview", ["organizationName", "email", "role", "expiresAt", "inviterName"]],
+    ["post", "/api/invites/:token/accept", "acceptOrganizationInvite", ["success", "membership"]],
+    ["post", "/api/register", "ordinaryVerification+versionedHiringManagerGrant", ["message", "requiresVerification", "emailDeliveryFailed"]],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === method
+      && row.path === path && row.reader === reader
+      && JSON.stringify(row.projection) === JSON.stringify(projection));
+    if (matches.length !== 1) problems.push(`versioned invitation manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
   }
 
   for (const [method, path, reader] of [
@@ -1827,6 +2003,13 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
     "server/tests/org-team-member-removal.routes.test.ts",
     "server/lib/__tests__/candidatePortalAuthQuotaContracts.test.ts",
+    "server/schema-migrations/0006_versioned_invitation_grants.sql",
+    "server/lib/versionedInvitationGrantAuthorization.ts",
+    "server/lib/__tests__/versionedInvitationGrantAuthorization.test.ts",
+    "server/lib/__tests__/versionedInvitationGrantAuthorization.routes.test.ts",
+    "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
+    "test/integration/invite-and-webhook.test.ts",
+    "test/integration/invite-seat-edge.test.ts",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -1854,6 +2037,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateScopedFinancialAdminPublicAuthority(root, problems);
     validateTalentPoolAuthority(root, problems);
     validatePrivilegeGrantRevocation(root, problems);
+    validateVersionedInvitationGrants(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

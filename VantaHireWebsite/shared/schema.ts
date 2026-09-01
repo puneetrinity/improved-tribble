@@ -688,6 +688,10 @@ export const hiringManagerInvitations = pgTable("hiring_manager_invitations", {
   expiresAt: timestamp("expires_at").notNull(), // 7 days default
   status: text("status").notNull().default('pending'), // 'pending', 'accepted', 'expired'
   acceptedAt: timestamp("accepted_at"),
+  acceptedByUserId: integer("accepted_by_user_id").references(() => users.id, { onDelete: 'restrict' }),
+  grantVersion: integer("grant_version").notNull().default(1),
+  revokedAt: timestamp("revoked_at"),
+  revokedBy: integer("revoked_by").references(() => users.id, { onDelete: 'restrict' }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   emailIdx: index("hm_invitations_email_idx").on(table.email),
@@ -698,6 +702,8 @@ export const hiringManagerInvitations = pgTable("hiring_manager_invitations", {
     .on(table.authorityScope, table.organizationId, table.invitedBy, table.status, table.createdAt, table.id),
   authorityEmailIdx: index("hm_invitations_authority_email_idx")
     .on(table.authorityScope, table.organizationId, table.invitedBy, table.status, sql`lower(${table.email})`),
+  eligibilityIdx: index("hm_invitations_eligibility_idx")
+    .on(table.authorityScope, table.organizationId, table.status, table.acceptedByUserId, table.revokedAt),
   authorityScopeCheck: check(
     "hiring_manager_invitations_authority_scope_check",
     sql`${table.authorityScope} IN ('organization', 'platform', 'legacy_private')`,
@@ -708,6 +714,31 @@ export const hiringManagerInvitations = pgTable("hiring_manager_invitations", {
       (${table.authorityScope} = 'organization' AND ${table.organizationId} IS NOT NULL)
       OR
       (${table.authorityScope} IN ('platform', 'legacy_private') AND ${table.organizationId} IS NULL)
+    )`,
+  ),
+  grantVersionCheck: check(
+    "hiring_manager_invitations_grant_version_positive_check",
+    sql`${table.grantVersion} >= 1`,
+  ),
+  revocationShapeCheck: check(
+    "hiring_manager_invitations_revocation_shape_check",
+    sql`(
+      (${table.revokedAt} IS NULL AND ${table.revokedBy} IS NULL)
+      OR (${table.revokedAt} IS NOT NULL AND ${table.revokedBy} IS NOT NULL)
+    )`,
+  ),
+  acceptedUserShapeCheck: check(
+    "hiring_manager_invitations_accepted_user_shape_check",
+    sql`(
+      ${table.acceptedByUserId} IS NULL
+      OR (
+        ${table.status} = 'accepted'
+        AND ${table.authorityScope} = 'organization'
+        AND ${table.organizationId} IS NOT NULL
+        AND ${table.acceptedAt} IS NOT NULL
+        AND ${table.revokedAt} IS NULL
+        AND ${table.revokedBy} IS NULL
+      )
     )`,
   ),
 }));
@@ -944,10 +975,52 @@ export const organizationInvites = pgTable("organization_invites", {
   invitedBy: integer("invited_by").notNull().references(() => users.id),
   acceptedAt: timestamp("accepted_at"),
   acceptedBy: integer("accepted_by").references(() => users.id),
+  state: text("state").notNull(),
+  version: integer("version").notNull().default(1),
+  cancelledAt: timestamp("cancelled_at"),
+  cancelledBy: integer("cancelled_by").references(() => users.id, { onDelete: 'restrict' }),
+  supersededAt: timestamp("superseded_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  orgEmailIdx: uniqueIndex("org_invites_org_email_idx").on(table.organizationId, table.email),
-  tokenIdx: uniqueIndex("org_invites_token_idx").on(table.token),
+  pendingOrgEmailIdx: uniqueIndex("org_invites_pending_email_idx")
+    .on(table.organizationId, sql`lower(${table.email})`)
+    .where(sql`${table.state} = 'pending'`),
+  organizationStateCreatedIdx: index("org_invites_org_state_created_idx")
+    .on(table.organizationId, table.state, table.createdAt.desc(), table.id.desc()),
+  tokenStateIdx: index("org_invites_token_state_idx").on(table.token, table.state),
+  stateCheck: check(
+    "organization_invites_state_check",
+    sql`${table.state} IN ('pending','accepted','cancelled','superseded','expired','legacy_revoked')`,
+  ),
+  versionCheck: check(
+    "organization_invites_version_positive_check",
+    sql`${table.version} >= 1`,
+  ),
+  stateShapeCheck: check(
+    "organization_invites_state_shape_check",
+    sql`(
+      (${table.state} = 'pending'
+        AND ${table.acceptedAt} IS NULL AND ${table.acceptedBy} IS NULL
+        AND ${table.cancelledAt} IS NULL AND ${table.cancelledBy} IS NULL
+        AND ${table.supersededAt} IS NULL)
+      OR (${table.state} = 'accepted'
+        AND ${table.acceptedAt} IS NOT NULL AND ${table.acceptedBy} IS NOT NULL
+        AND ${table.cancelledAt} IS NULL AND ${table.cancelledBy} IS NULL
+        AND ${table.supersededAt} IS NULL)
+      OR (${table.state} = 'cancelled'
+        AND ${table.acceptedAt} IS NULL AND ${table.acceptedBy} IS NULL
+        AND ${table.cancelledAt} IS NOT NULL AND ${table.cancelledBy} IS NOT NULL
+        AND ${table.supersededAt} IS NULL)
+      OR (${table.state} = 'superseded'
+        AND ${table.acceptedAt} IS NULL AND ${table.acceptedBy} IS NULL
+        AND ${table.cancelledAt} IS NULL AND ${table.cancelledBy} IS NULL
+        AND ${table.supersededAt} IS NOT NULL)
+      OR (${table.state} IN ('expired','legacy_revoked')
+        AND NOT (${table.acceptedAt} IS NOT NULL AND ${table.acceptedBy} IS NOT NULL)
+        AND ${table.cancelledAt} IS NULL AND ${table.cancelledBy} IS NULL
+        AND ${table.supersededAt} IS NULL)
+    )`,
+  ),
 }));
 
 // Organization join requests (for domain-based join)
@@ -2157,6 +2230,16 @@ export const hiringManagerInvitationsRelations = relations(hiringManagerInvitati
     fields: [hiringManagerInvitations.invitedBy],
     references: [users.id],
   }),
+  acceptedByUser: one(users, {
+    fields: [hiringManagerInvitations.acceptedByUserId],
+    references: [users.id],
+    relationName: "hiringManagerInvitationAcceptedByUser",
+  }),
+  revokedByUser: one(users, {
+    fields: [hiringManagerInvitations.revokedBy],
+    references: [users.id],
+    relationName: "hiringManagerInvitationRevokedByUser",
+  }),
 }));
 
 export const jobRecruitersRelations = relations(jobRecruiters, ({ one }) => ({
@@ -2264,6 +2347,11 @@ export const organizationInvitesRelations = relations(organizationInvites, ({ on
     fields: [organizationInvites.acceptedBy],
     references: [users.id],
     relationName: "acceptedByUser",
+  }),
+  cancelledByUser: one(users, {
+    fields: [organizationInvites.cancelledBy],
+    references: [users.id],
+    relationName: "organizationInviteCancelledByUser",
   }),
 }));
 

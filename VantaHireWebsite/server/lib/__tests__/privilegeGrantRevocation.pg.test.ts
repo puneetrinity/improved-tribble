@@ -230,9 +230,9 @@ describe.skipIf(!enabled)("privilege grant/revocation exact-schema PostgreSQL", 
     if (preMigrationDir) rmSync(preMigrationDir, { recursive: true, force: true });
   });
 
-  it("applies ledger 6 and classifies legacy rows without invented provenance", () => {
+  it("applies ledger 7 and preserves the 2L-A classification without invented provenance", () => {
     expect(migrationEvidence).toEqual({
-      ledger: 6,
+      ledger: 7,
       auth_version: 1,
       authority_origin: "legacy_unknown",
       self_created_by_user_id: null,

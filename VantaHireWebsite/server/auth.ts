@@ -11,13 +11,18 @@ import { pool } from "./db";
 import { getEmailService } from "./simpleEmailService";
 import rateLimit from "express-rate-limit";
 import { computeProfileCompletion } from "./lib/profileCompletion";
-import { getOrganizationInviteByToken } from "./lib/organizationService";
 import { queueMauticFirstLoginSync, queueMauticSignupSync } from "./lib/mauticService";
 import {
   createAuthorizationSessionPayload,
   parseAuthorizationSessionPayload,
   resetPasswordAndAdvanceAuthorization,
 } from "./lib/privilegeGrantRevocation";
+import {
+  acceptHiringManagerRegistrationGrant,
+  parseVersionedInvitationToken,
+  readHiringManagerRegistrationGrant,
+  type HiringManagerRegistrationGrant,
+} from "./lib/versionedInvitationGrantAuthorization";
 
 declare global {
   namespace Express {
@@ -341,39 +346,28 @@ export function setupAuth(app: Express) {
 
       // Handle invitation flows (hiring manager or co-recruiter)
       let finalRole = role;
-      let hiringManagerInvitation = null;
+      let hiringManagerInvitation: HiringManagerRegistrationGrant | null = null;
+      let hiringManagerPlaintextToken: string | null = null;
       let coRecruiterInvitation = null;
 
       if (invitationToken) {
         // Hiring manager invitation flow
-        if (typeof invitationToken !== 'string' || invitationToken.length !== 64) {
+        if (parseVersionedInvitationToken(invitationToken) === null) {
           res.status(400).json({ error: "Invalid invitation token format" });
           return;
         }
-
-        const tokenHash = hashToken(invitationToken);
-        hiringManagerInvitation = await storage.getHiringManagerInvitationByToken(tokenHash);
-
-        if (!hiringManagerInvitation) {
+        const grant = await readHiringManagerRegistrationGrant(invitationToken);
+        if (!grant.ok) {
+          if (grant.reason === "unavailable") {
+            res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
+            return;
+          }
           res.status(400).json({ error: "Invalid invitation token" });
           return;
         }
-
-        // Check if invitation is expired
-        if (new Date() > new Date(hiringManagerInvitation.expiresAt)) {
-          await storage.invalidateHiringManagerInvitation(hiringManagerInvitation.id);
-          res.status(400).json({ error: "Invitation has expired. Please request a new invitation." });
-          return;
-        }
-
-        // Check if already used
-        if (hiringManagerInvitation.status !== 'pending') {
-          res.status(400).json({ error: "Invitation has already been used or is no longer valid." });
-          return;
-        }
-
-        // Verify email matches
-        if (username.toLowerCase() !== hiringManagerInvitation.email.toLowerCase()) {
+        hiringManagerInvitation = grant.value;
+        hiringManagerPlaintextToken = invitationToken;
+        if (username !== hiringManagerInvitation.email.toLowerCase()) {
           res.status(400).json({ error: "Email must match the invitation email" });
           return;
         }
@@ -474,9 +468,19 @@ export function setupAuth(app: Express) {
       queueMauticSignupSync(user.id);
 
       // Mark invitation as accepted if this was an invitation flow
-      if (hiringManagerInvitation) {
-        await storage.markHiringManagerInvitationAccepted(hiringManagerInvitation.id);
-        console.log(`Hiring manager invitation accepted: ${hiringManagerInvitation.email} registered as user ${user.id}`);
+      if (hiringManagerInvitation && hiringManagerPlaintextToken) {
+        const accepted = await acceptHiringManagerRegistrationGrant(
+          user.id,
+          hiringManagerInvitation.id,
+          hiringManagerInvitation.grantVersion,
+          hiringManagerPlaintextToken,
+        );
+        if (!accepted.ok) {
+          const status = accepted.reason === "unavailable" ? 503 : 409;
+          const code = status === 503 ? "INVITATION_UNAVAILABLE" : "INVITATION_ACCEPTANCE_REFUSED";
+          res.status(status).json({ error: code, code });
+          return;
+        }
       } else if (coRecruiterInvitation) {
         // Add user to the job's recruiters and mark invitation as accepted
         await storage.addJobRecruiter(coRecruiterInvitation.jobId, user.id, coRecruiterInvitation.invitedBy, coRecruiterInvitation.organizationId ?? undefined);
@@ -484,73 +488,27 @@ export function setupAuth(app: Express) {
         console.log(`Co-recruiter invitation accepted: ${coRecruiterInvitation.email} registered as user ${user.id}, added to job ${coRecruiterInvitation.jobId}`);
       }
 
-      // Check if user is registering via a valid organization invite
-      // If so, auto-verify them since receiving the invite proves email ownership
-      let validOrgInvite = false;
-      if (inviteToken) {
-        try {
-          const orgInvite = await getOrganizationInviteByToken(inviteToken);
-          if (orgInvite &&
-              new Date() <= orgInvite.expiresAt &&
-              orgInvite.email.toLowerCase() === username.toLowerCase()) {
-            validOrgInvite = true;
-            // Auto-verify user - they proved email ownership by receiving the invite
-            await storage.verifyUserEmail(user.id);
-            console.log(`Auto-verified user ${user.id} via org invite (invite proves email ownership)`);
-          }
-        } catch (err) {
-          // If invite validation fails, fall through to normal verification flow
-          console.log('Org invite validation failed, requiring email verification:', err);
-        }
-      }
+      // Organization invite possession is not mailbox proof. Every new account
+      // completes the ordinary verification flow before signed-in acceptance.
+      const { token, hash } = generateVerificationToken();
+      const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      await storage.setVerificationToken(user.id, hash, expires);
 
-      if (validOrgInvite) {
-        // Auto-login since they're verified
-        req.login(user, (err) => {
-          if (err) {
-            console.error('Auto-login failed after org invite registration:', err);
-            res.status(201).json({
-              message: 'Registration successful. Please log in to continue.',
-              requiresVerification: false,
-            });
-            return;
-          }
-          res.status(201).json({
-            message: 'Registration successful.',
-            requiresVerification: false,
-            user: {
-              id: user.id,
-              username: user.username,
-              firstName: user.firstName,
-              lastName: user.lastName,
-              role: user.role,
-              emailVerified: true,
-            },
-          });
-          queueMauticFirstLoginSync(user.id);
-        });
-      } else {
-        // Normal flow: require email verification
-        const { token, hash } = generateVerificationToken();
-        const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-        await storage.setVerificationToken(user.id, hash, expires);
-
-        // Pass inviteToken for organization invites to preserve it through verification flow.
-        const emailSent = await sendVerificationEmail(username, token, firstName, inviteToken);
-        if (!emailSent) {
-          res.status(201).json({
-            message: 'Registration successful, but we could not send the verification email right now. Please use "Resend Verification Email" on the login screen.',
-            requiresVerification: true,
-            emailDeliveryFailed: true,
-          });
-          return;
-        }
-
+      // Preserve the organization invite only in the post-verification redirect.
+      const emailSent = await sendVerificationEmail(username, token, firstName, inviteToken);
+      if (!emailSent) {
         res.status(201).json({
-          message: 'Registration successful. Please check your email to verify your account.',
+          message: 'Registration successful, but we could not send the verification email right now. Please use "Resend Verification Email" on the login screen.',
           requiresVerification: true,
+          emailDeliveryFailed: true,
         });
+        return;
       }
+
+      res.status(201).json({
+        message: 'Registration successful. Please check your email to verify your account.',
+        requiresVerification: true,
+      });
     } catch (error) {
       next(error);
     }

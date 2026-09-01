@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { randomBytes } from "node:crypto";
 import type { Express, Request, Response, NextFunction } from "express";
 import { requireAuth, requireRole } from "./auth";
 import {
@@ -9,11 +10,6 @@ import {
   deleteOrganization,
   getUserOrganization,
   isUserInOrganization,
-  createOrganizationInvite,
-  getOrganizationInviteByToken,
-  getPendingInvitesForOrganization,
-  acceptOrganizationInvite,
-  cancelOrganizationInvite,
   createJoinRequest,
   getPendingJoinRequests,
   respondToJoinRequest,
@@ -36,6 +32,16 @@ import {
   reassignOrganizationJobs,
   removeOrganizationMemberAndRevoke,
 } from "./lib/privilegeGrantRevocation";
+import {
+  acceptOrganizationInvite,
+  cancelOrganizationInvite,
+  createOrResendOrganizationInvite,
+  hashVersionedInvitationToken,
+  listOrganizationInvites,
+  parseVersionedInvitationId,
+  parseVersionedInvitationToken,
+  readOrganizationInvitePreview,
+} from "./lib/versionedInvitationGrantAuthorization";
 import { createFreeSubscription } from "./lib/subscriptionService";
 import { hasAvailableSeats } from "./lib/seatService";
 import { initializeMemberCredits } from "./lib/creditService";
@@ -243,45 +249,38 @@ export function registerOrganizationRoutes(
   app.post("/api/organizations/members/invite", requireAuth, csrfProtection, async (req, res) => {
     try {
       const user = req.user!;
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
-        return;
-      }
-
-      if (!canManageMembers(orgResult.membership.role as any)) {
-        res.status(403).json({ error: "You don't have permission to invite members" });
-        return;
-      }
-
       const { email } = inviteMemberSchema.parse(req.body);
-
-      // Check if seats are available
-      const seatsAvailable = await hasAvailableSeats(orgResult.organization.id);
-      if (!seatsAvailable) {
-        res.status(400).json({ error: "No seats available. Please purchase more seats first." });
+      const plaintextToken = randomBytes(32).toString("hex");
+      const tokenHash = hashVersionedInvitationToken(plaintextToken);
+      if (tokenHash === null) {
+        res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
         return;
       }
-
-      // Check if email is already in an organization
-      // This is handled by the createOrganizationInvite function
-
-      // Always invite as 'member' - owner can promote to admin after joining
-      const invite = await createOrganizationInvite(
-        orgResult.organization.id,
-        email,
-        'member',
-        user.id
-      );
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const invite = await createOrResendOrganizationInvite(user.id, email, tokenHash, expiresAt);
+      if (!invite.ok) {
+        if (invite.reason === "forbidden") {
+          res.status(403).json({ error: "INVITATION_ACCESS_DENIED", code: "INVITATION_ACCESS_DENIED" });
+        } else if (invite.reason === "conflict") {
+          const code = invite.code === "no_seats"
+            ? "NO_SEATS_AVAILABLE"
+            : invite.code === "accepted_history"
+              ? "INVITATION_ACCEPTED_HISTORY"
+              : "USER_ALREADY_IN_ORGANIZATION";
+          res.status(409).json({ error: code, code });
+        } else {
+          res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
+        }
+        return;
+      }
 
       const emailService = await getEmailService();
       if (emailService) {
         const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
-        const inviteCode = invite.token;
+        const inviteCode = plaintextToken;
         const inviteUrl = `${baseUrl}/recruiter-auth?invite=${inviteCode}`;
-        const inviterName = user.firstName || user.username;
-        const orgName = orgResult.organization.name;
+        const inviterName = invite.delivery.inviterName;
+        const orgName = invite.delivery.organizationName;
 
         const subject = `You are invited to join ${orgName} on VantaHire`;
         const html = `
@@ -299,27 +298,27 @@ export function registerOrganizationRoutes(
         const text = `You're invited to join ${orgName} on VantaHire.\n\nClick to accept: ${inviteUrl}\n\nOr use invite code: ${inviteCode}`;
 
         const sent = await emailService.sendEmail({
-          to: invite.email,
+          to: invite.delivery.email,
           subject,
           html,
           text,
         });
 
         if (!sent) {
-          console.warn(`Failed to send org invite email to ${invite.email}`);
+          console.warn('Organization invitation email delivery failed');
         }
       } else {
         console.warn('Email service not available. Invite created but email not sent.');
       }
 
-      res.status(201).json(invite);
+      res.status(201).json(invite.value);
     } catch (error: any) {
       console.error("Error inviting member:", error);
       if (error.name === "ZodError") {
         res.status(400).json({ error: "Invalid input", details: error.errors });
         return;
       }
-      res.status(500).json({ error: error.message || "Failed to invite member" });
+      res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
     }
   });
 
@@ -446,24 +445,16 @@ export function registerOrganizationRoutes(
   app.get("/api/organizations/invites", requireAuth, async (req, res) => {
     try {
       const user = req.user!;
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const invites = await listOrganizationInvites(user.id);
+      if (!invites.ok) {
+        const status = invites.reason === "forbidden" ? 403 : 503;
+        const code = status === 403 ? "INVITATION_ACCESS_DENIED" : "INVITATION_UNAVAILABLE";
+        res.status(status).json({ error: code, code });
         return;
       }
-
-      if (!canManageMembers(orgResult.membership.role as any)) {
-        res.status(403).json({ error: "You don't have permission to view invites" });
-        return;
-      }
-
-      const invites = await getPendingInvitesForOrganization(orgResult.organization.id);
-
-      res.json(invites);
-    } catch (error: any) {
-      console.error("Error listing invites:", error);
-      res.status(500).json({ error: "Failed to list invites" });
+      res.json(invites.rows);
+    } catch {
+      res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
     }
   });
 
@@ -471,25 +462,25 @@ export function registerOrganizationRoutes(
   app.delete("/api/organizations/invites/:id", requireAuth, csrfProtection, async (req, res) => {
     try {
       const user = req.user!;
-      const inviteId = parseInt(req.params.id ?? '0');
-      const orgResult = await getUserOrganization(user.id);
-
-      if (!orgResult) {
-        res.status(404).json({ error: "Not a member of any organization" });
+      const inviteId = parseVersionedInvitationId(req.params.id);
+      if (inviteId === null) {
+        res.status(400).json({ error: "INVALID_INVITATION_ID", code: "INVALID_INVITATION_ID" });
         return;
       }
-
-      if (!canManageMembers(orgResult.membership.role as any)) {
-        res.status(403).json({ error: "You don't have permission to cancel invites" });
+      const result = await cancelOrganizationInvite(user.id, inviteId);
+      if (!result.ok) {
+        if (result.reason === "forbidden") {
+          res.status(403).json({ error: "INVITATION_ACCESS_DENIED", code: "INVITATION_ACCESS_DENIED" });
+        } else if (result.reason === "not_found") {
+          res.status(404).json({ error: "INVITATION_NOT_FOUND", code: "INVITATION_NOT_FOUND" });
+        } else {
+          res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
+        }
         return;
       }
-
-      await cancelOrganizationInvite(inviteId);
-
       res.json({ success: true });
-    } catch (error: any) {
-      console.error("Error canceling invite:", error);
-      res.status(500).json({ error: error.message || "Failed to cancel invite" });
+    } catch {
+      res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
     }
   });
 
@@ -497,34 +488,22 @@ export function registerOrganizationRoutes(
   app.get("/api/invites/:token", async (req, res) => {
     try {
       const token = req.params.token ?? '';
-      const invite = await getOrganizationInviteByToken(token);
-
-      if (!invite) {
-        res.status(404).json({ error: "Invite not found or expired" });
+      if (parseVersionedInvitationToken(token) === null) {
+        res.status(400).json({ error: "INVALID_INVITATION_TOKEN", code: "INVALID_INVITATION_TOKEN" });
         return;
       }
-
-      // Check if invite has expired
-      if (new Date() > invite.expiresAt) {
-        res.status(410).json({ error: "This invite has expired" });
+      const invite = await readOrganizationInvitePreview(token);
+      if (!invite.ok) {
+        if (invite.reason === "not_found") {
+          res.status(404).json({ error: "INVITATION_NOT_FOUND", code: "INVITATION_NOT_FOUND" });
+        } else {
+          res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
+        }
         return;
       }
-
-      const inviterFullName = invite.invitedByUser
-        ? [invite.invitedByUser.firstName, invite.invitedByUser.lastName].filter(Boolean).join(' ').trim()
-        : '';
-      const inviterName = inviterFullName || invite.invitedByUser?.username || 'A team member';
-
-      res.json({
-        organizationName: invite.organization.name,
-        email: invite.email,
-        role: invite.role,
-        expiresAt: invite.expiresAt,
-        inviterName,
-      });
-    } catch (error: any) {
-      console.error("Error getting invite:", error);
-      res.status(500).json({ error: "Failed to get invite details" });
+      res.json(invite.value);
+    } catch {
+      res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
     }
   });
 
@@ -533,42 +512,40 @@ export function registerOrganizationRoutes(
     try {
       const user = req.user!;
       const token = req.params.token ?? '';
-
-      // Check if user is already in an organization
-      if (await isUserInOrganization(user.id)) {
-        res.status(400).json({ error: "You are already a member of an organization. Leave your current organization first." });
+      if (parseVersionedInvitationToken(token) === null) {
+        res.status(400).json({ error: "INVALID_INVITATION_TOKEN", code: "INVALID_INVITATION_TOKEN" });
         return;
       }
-
-      const membership = await acceptOrganizationInvite(token, user.id, user.username);
+      const membership = await acceptOrganizationInvite(token, user.id);
+      if (!membership.ok) {
+        if (membership.reason === "forbidden") {
+          res.status(403).json({ error: "INVITATION_ACCESS_DENIED", code: "INVITATION_ACCESS_DENIED" });
+        } else if (membership.reason === "not_found") {
+          res.status(404).json({ error: "INVITATION_NOT_FOUND", code: "INVITATION_NOT_FOUND" });
+        } else if (membership.reason === "conflict") {
+          const code = membership.code === "no_seats" ? "NO_SEATS_AVAILABLE" : "USER_ALREADY_IN_ORGANIZATION";
+          res.status(409).json({ error: code, code });
+        } else {
+          res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
+        }
+        return;
+      }
 
       // Initialize credits for new member - best-effort, don't fail join if this fails
       // Lazy-init fallback exists in /api/onboarding-status
       try {
-        await initializeMemberCredits(membership.id, membership.organizationId);
+        await initializeMemberCredits(membership.value.id, membership.value.organizationId);
       } catch (creditError) {
         console.error('Failed to initialize credits for new member (will retry on onboarding):', {
-          memberId: membership.id,
-          orgId: membership.organizationId,
+          memberId: membership.value.id,
+          orgId: membership.value.organizationId,
           error: creditError,
         });
       }
 
-      res.json({ success: true, membership });
-    } catch (error: any) {
-      console.error("Error accepting invite:", error);
-      const msg = error.message || "Failed to accept invite";
-
-      // Return appropriate 4xx codes based on error type
-      if (msg.includes("different email address")) {
-        res.status(403).json({ error: msg });
-      } else if (msg.includes("No seats available")) {
-        res.status(409).json({ error: msg });
-      } else if (msg.includes("Invalid") || msg.includes("expired") || msg.includes("not found")) {
-        res.status(404).json({ error: msg });
-      } else {
-        res.status(500).json({ error: msg });
-      }
+      res.json({ success: true, membership: membership.value });
+    } catch {
+      res.status(503).json({ error: "INVITATION_UNAVAILABLE", code: "INVITATION_UNAVAILABLE" });
     }
   });
 

@@ -181,14 +181,14 @@ describe.skipIf(!enabled)("scoped financial/admin exact-schema PostgreSQL", () =
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("keeps the shipped six-migration schema unchanged", async () => {
+  it("keeps the shipped seven-migration schema unchanged", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
              to_regclass('public.application_reviewer_notes')::text notes_relation,
              to_regclass('public.client_shortlists')::text shortlists_relation
     `)).rows[0];
     expect(row).toEqual({
-      ledger: 6,
+      ledger: 7,
       notes_relation: "application_reviewer_notes",
       shortlists_relation: "client_shortlists",
     });
