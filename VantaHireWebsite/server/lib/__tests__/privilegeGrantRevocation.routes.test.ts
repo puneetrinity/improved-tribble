@@ -57,6 +57,16 @@ vi.mock("../privilegeGrantRevocation", () => ({
   changeOrganizationMemberRoleAndRevoke: mocks.changeRole,
   reassignOrganizationJobs: mocks.reassign,
 }));
+vi.mock("../versionedInvitationGrantAuthorization", () => ({
+  parseVersionedInvitationId: vi.fn(),
+  parseVersionedInvitationToken: vi.fn(),
+  hashVersionedInvitationToken: vi.fn(),
+  createOrResendOrganizationInvite: vi.fn(),
+  listOrganizationInvites: vi.fn(),
+  readOrganizationInvitePreview: vi.fn(),
+  cancelOrganizationInvite: vi.fn(),
+  acceptOrganizationInvite: vi.fn(),
+}));
 vi.mock("../subscriptionService", () => ({ createFreeSubscription: mocks.createFreeSubscription }));
 vi.mock("../seatService", () => ({ hasAvailableSeats: vi.fn() }));
 vi.mock("../creditService", () => ({ initializeMemberCredits: mocks.initializeMemberCredits }));

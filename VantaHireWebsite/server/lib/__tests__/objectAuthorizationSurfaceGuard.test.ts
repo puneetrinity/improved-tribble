@@ -42,10 +42,13 @@ function fixture(): string {
   cpSync(join(APP_ROOT, "shared"), join(root, "shared"), { recursive: true });
   cpSync(join(APP_ROOT, "scripts"), join(root, "scripts"), { recursive: true });
   mkdirSync(join(root, "test", "integration"), { recursive: true });
-  cpSync(
-    join(APP_ROOT, "test", "integration", "backward-compatibility.test.ts"),
-    join(root, "test", "integration", "backward-compatibility.test.ts"),
-  );
+  for (const file of [
+    "backward-compatibility.test.ts",
+    "invite-and-webhook.test.ts",
+    "invite-seat-edge.test.ts",
+  ] as const) {
+    cpSync(join(APP_ROOT, "test", "integration", file), join(root, "test", "integration", file));
+  }
   mkdirSync(join(root, "client", "src", "components", "kanban"), { recursive: true });
   mkdirSync(join(root, "client", "src", "pages"), { recursive: true });
   mkdirSync(join(root, "client", "src", "lib"), { recursive: true });
@@ -1445,5 +1448,93 @@ describe("object authorization surface guard", () => {
     expect(problems).toContain(
       "2L-A migration infers organization provenance from current identity or membership.",
     );
+  });
+
+  it("rejects a raw organization invitation token query", () => {
+    const problems = mutate(fixture(), "server/lib/versionedInvitationGrantAuthorization.ts", (source) =>
+      source.replace("invitation.token = ${tokenHash}", "invitation.token = ${token}"),
+    );
+    expect(problems).toContain("versioned invitation token lookup is not strict SHA-256-only.");
+  });
+
+  it("rejects ambiguous invitation issuer membership collapsed with LIMIT 1", () => {
+    const problems = mutate(fixture(), "server/lib/versionedInvitationGrantAuthorization.ts", (source) =>
+      source.replace("HAVING COUNT(*) = 1", "LIMIT 1"),
+    );
+    expect(problems).toContain("versioned invitation authority anchor is missing: HAVING COUNT(*) = 1");
+  });
+
+  it("rejects cancellation without the pending version compare-and-set", () => {
+    const problems = mutate(fixture(), "server/lib/versionedInvitationGrantAuthorization.ts", (source) =>
+      source.replace("invitation.version = target.version", "TRUE"),
+    );
+    expect(problems).toContain("versioned invitation authority anchor is missing: invitation.version = target.version");
+  });
+
+  it("rejects acceptance split outside its bounded transaction", () => {
+    const problems = mutate(fixture(), "server/lib/versionedInvitationGrantAuthorization.ts", (source) =>
+      source.replace("return await db.transaction(", "return await Promise.resolve(")
+        .replace("const result = await tx.execute(sql`", "const result = await db.execute(sql`"),
+    );
+    expect(problems).toContain(
+      "organization invitation acceptance must use one transaction, one state statement and the bounded backfill callback.",
+    );
+  });
+
+  it("rejects accepted-history re-entry", () => {
+    const problems = mutate(fixture(), "server/lib/versionedInvitationGrantAuthorization.ts", (source) =>
+      source.replace("WHEN EXISTS (SELECT 1 FROM accepted_history) THEN 'accepted_history'", "WHEN FALSE THEN 'accepted_history'"),
+    );
+    expect(problems).toContain(
+      "versioned invitation authority anchor is missing: WHEN EXISTS (SELECT 1 FROM accepted_history) THEN 'accepted_history'",
+    );
+  });
+
+  it("rejects invitation provider work before the committed authority command", () => {
+    const problems = mutate(fixture(), "server/organization.routes.ts", (source) =>
+      source.replace(
+        "const invite = await createOrResendOrganizationInvite(user.id, email, tokenHash, expiresAt);",
+        "await (await getEmailService())?.sendEmail({ to: email, subject: 'x', html: plaintextToken });\n      const invite = await createOrResendOrganizationInvite(user.id, email, tokenHash, expiresAt);",
+      ),
+    );
+    expect(problems).toContain("organization invite create/hash/commit/provider/projection order is unsafe.");
+  });
+
+  it("rejects organization invite possession as registration verification", () => {
+    const problems = mutate(fixture(), "server/auth.ts", (source) =>
+      source.replace(
+        "// Organization invite possession is not mailbox proof.",
+        "await storage.verifyUserEmail(user.id);\n       req.login(user, () => undefined);\n       // Organization invite possession is not mailbox proof.",
+      ),
+    );
+    expect(problems).toContain("organization registration restores bearer-to-account authority: verifyUserEmail(user.id)");
+    expect(problems).toContain("organization registration restores bearer-to-account authority: req.login(user");
+  });
+
+  it("rejects email-only HM directory provenance", () => {
+    const problems = mutate(fixture(), "server/lib/membershipScopedReadAuthorization.ts", (source) =>
+      source.replace(
+        "${hiringManagerInvitations.acceptedByUserId} = hiring_manager.id",
+        "LOWER(${hiringManagerInvitations.email}) = LOWER(hiring_manager.username)",
+      ),
+    );
+    expect(problems).toContain(
+      "HM accepted-user provenance anchor is missing: hiringManagerInvitations.acceptedByUserId} = hiring_manager.id",
+    );
+  });
+
+  it("rejects activation of a pre-0006 unaccepted bearer", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0006_versioned_invitation_grants.sql", (source) =>
+      source.replace("ELSE 'legacy_revoked'", "ELSE 'pending'"),
+    );
+    expect(problems).toContain("2L-B migration anchor is missing: ELSE 'legacy_revoked'");
+    expect(problems).toContain("2L-B migration checksum does not match migration 0006.");
+  });
+
+  it("rejects current-membership inference in invitation migration", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0006_versioned_invitation_grants.sql", (source) =>
+      `${source}\n-- forbidden classifier\nSELECT 1 FROM organization_members;\n`,
+    );
+    expect(problems).toContain("2L-B migration infers invitation authority from current mutable relationships.");
   });
 });

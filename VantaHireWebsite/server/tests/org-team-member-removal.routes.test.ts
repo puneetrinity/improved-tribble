@@ -46,6 +46,16 @@ vi.mock('../lib/privilegeGrantRevocation', () => ({
   changeOrganizationMemberRoleAndRevoke: vi.fn(),
   reassignOrganizationJobs: vi.fn(),
 }));
+vi.mock('../lib/versionedInvitationGrantAuthorization', () => ({
+  parseVersionedInvitationId: vi.fn(),
+  parseVersionedInvitationToken: vi.fn(),
+  hashVersionedInvitationToken: vi.fn(),
+  createOrResendOrganizationInvite: vi.fn(),
+  listOrganizationInvites: vi.fn(),
+  readOrganizationInvitePreview: vi.fn(),
+  cancelOrganizationInvite: vi.fn(),
+  acceptOrganizationInvite: vi.fn(),
+}));
 
 vi.mock('../lib/subscriptionService', () => ({
   createFreeSubscription: vi.fn(),

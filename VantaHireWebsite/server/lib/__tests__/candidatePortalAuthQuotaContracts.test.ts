@@ -157,6 +157,21 @@ describe('candidate portal authentication contracts', () => {
     expect(authSource).toContain('done(null, false)');
     expect(authSource).not.toMatch(/DELETE\s+FROM\s+(?:public\.)?session/i);
   });
+
+  it('keeps organization invitation possession outside email verification and session creation', () => {
+    const authSource = read('../../auth.ts');
+    const registerStart = authSource.indexOf('app.post("/api/register"');
+    const loginStart = authSource.indexOf('app.post("/api/login"', registerStart);
+    const register = authSource.slice(registerStart, loginStart);
+
+    expect(registerStart).toBeGreaterThan(-1);
+    expect(loginStart).toBeGreaterThan(registerStart);
+    expect(register).not.toContain('getOrganizationInviteByToken');
+    expect(register).not.toContain('verifyUserEmail(user.id)');
+    expect(register).not.toContain('req.login(user');
+    expect(register).toContain('storage.setVerificationToken(user.id, hash, expires)');
+    expect(register).toContain('sendVerificationEmail(username, token, firstName, inviteToken)');
+  });
 });
 
 describe('candidate monthly match quota contracts', () => {

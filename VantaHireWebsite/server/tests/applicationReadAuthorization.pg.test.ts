@@ -144,13 +144,14 @@ async function installFixture(): Promise<void> {
       (1,1,1001,102,101),
       (2,1,1001,105,101);
     INSERT INTO hiring_manager_invitations
-      (id,email,name,token,invited_by,inviter_name,expires_at,status,accepted_at)
+      (id,email,name,token,invited_by,inviter_name,expires_at,status,accepted_at,
+       organization_id,authority_scope,accepted_by_user_id,grant_version)
     VALUES
-      (1,'hm@example.invalid','Duplicate manager','fixture-hm-token-1',101,'Primary','2099-01-01','accepted','2026-08-26'),
-      (2,'alpha-invited-hm@example.invalid','Invited manager','fixture-hm-token-2',101,'Primary','2099-01-01','accepted','2026-08-26'),
-      (3,'beta-foreign-invite@example.invalid','Foreign invited manager','fixture-hm-token-3',201,'Foreign','2099-01-01','accepted','2026-08-26'),
-      (4,'invited-recruiter@example.invalid','Wrong role','fixture-hm-token-4',101,'Primary','2099-01-01','accepted','2026-08-26'),
-      (5,'pending-hm@example.invalid','Pending manager','fixture-hm-token-5',101,'Primary','2099-01-01','pending',NULL);
+      (1,'hm@example.invalid','Duplicate manager','fixture-hm-token-1',101,'Primary','2099-01-01','accepted','2026-08-26',1,'organization',302,1),
+      (2,'alpha-invited-hm@example.invalid','Invited manager','fixture-hm-token-2',101,'Primary','2099-01-01','accepted','2026-08-26',1,'organization',304,2),
+      (3,'beta-foreign-invite@example.invalid','Foreign invited manager','fixture-hm-token-3',201,'Foreign','2099-01-01','accepted','2026-08-26',2,'organization',305,1),
+      (4,'invited-recruiter@example.invalid','Wrong role','fixture-hm-token-4',101,'Primary','2099-01-01','accepted','2026-08-26',1,'organization',306,1),
+      (5,'pending-hm@example.invalid','Pending manager','fixture-hm-token-5',101,'Primary','2099-01-01','pending',NULL,1,'organization',NULL,1);
     INSERT INTO candidate_resumes (id,user_id,label,gcs_path,extracted_text,is_default)
     VALUES (9001,301,'Fallback resume','gs://configured/resumes/fallback.pdf','candidate-resume fallback',true);
     INSERT INTO applications
@@ -364,7 +365,7 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
     return result;
   }
 
-  it("installs the exact pinned six-migration schema before testing", async () => {
+  it("installs the exact pinned seven-migration schema before testing", async () => {
     if (!owner) throw new Error("Disposable authorization owner is unavailable.");
     const state = (await owner.query(`
       SELECT (SELECT count(*)::int FROM schema_control.applied) AS applied,
@@ -375,7 +376,7 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
              to_regclass('public.resume_access_attempts')::text AS resume_audit
     `)).rows[0];
     expect(state).toEqual({
-      applied: 6,
+      applied: 7,
       interview_type: "timestamp without time zone",
       privacy_columns: 10,
       resume_audit: "resume_access_attempts",
@@ -429,6 +430,22 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
         role: "hiring_manager",
       },
     ] });
+  });
+
+  it("keeps HM invitation eligibility invariant to inviter movement and exact to accepted user id", async () => {
+    if (!owner) throw new Error("Disposable authorization owner is unavailable.");
+    try {
+      await owner.query("UPDATE organization_members SET organization_id=2 WHERE user_id=101");
+      const afterMove = await directory(102);
+      expect(afterMove.ok && afterMove.rows.map((row) => row.id)).toEqual([304, 302]);
+
+      await owner.query("UPDATE hiring_manager_invitations SET accepted_by_user_id=305 WHERE id=2");
+      const afterSwap = await directory(102);
+      expect(afterSwap.ok && afterSwap.rows.map((row) => row.id)).toEqual([305, 302]);
+    } finally {
+      await owner.query("UPDATE hiring_manager_invitations SET accepted_by_user_id=304 WHERE id=2");
+      await owner.query("UPDATE organization_members SET organization_id=1 WHERE user_id=101");
+    }
   });
 
   it("returns authorized empty for unseated, removed-membership and unsupported actors", async () => {

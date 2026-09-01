@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 const execute = vi.hoisted(() => vi.fn());
 
@@ -97,6 +98,16 @@ describe("membership-scoped hiring-manager directory", () => {
     const result = await readAuthorizedHiringManagerDirectory(7, { allowPlatformAdmin: true });
     expect(result).toEqual({ ok: false, reason: "unavailable" });
     expect(JSON.stringify(result)).not.toContain("raw-secret");
+  });
+
+  it("binds invitation eligibility to stored organization and the exact accepted user", () => {
+    const source = readFileSync(new URL("../membershipScopedReadAuthorization.ts", import.meta.url), "utf8");
+    expect(source).toContain("hiringManagerInvitations.acceptedByUserId");
+    expect(source).toContain("hiringManagerInvitations.organizationId");
+    expect(source).toContain("hiringManagerInvitations.authorityScope");
+    expect(source).toContain("hiringManagerInvitations.revokedAt");
+    expect(source).not.toContain("hiringManagerInvitations.invitedBy");
+    expect(source).not.toMatch(/hiringManagerInvitations\.email[^\n]+hiring_manager\.username/);
   });
 
   it.each([

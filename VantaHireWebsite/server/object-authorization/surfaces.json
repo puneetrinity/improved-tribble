@@ -2,288 +2,1223 @@
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
   "route_registration_census": 316,
-  "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool and organization privilege commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection and consultant product are retired. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant and talent-pool conversion/suggestions remain outside this closure.",
+  "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection and consultant product are retired. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
     {
       "method": "get",
       "path": "/api/applications/:id/history",
       "reader": "readAuthorizedApplicationStageHistory",
-      "projection": ["fromStage", "toStage", "changedAt", "notes"]
+      "projection": [
+        "fromStage",
+        "toStage",
+        "changedAt",
+        "notes"
+      ]
     },
     {
       "method": "get",
       "path": "/api/applications/:id/email-history",
       "reader": "readAuthorizedApplicationEmailHistory",
-      "projection": ["id", "templateName", "templateType", "recipientEmail", "sentAt", "status", "sentBy"]
+      "projection": [
+        "id",
+        "templateName",
+        "templateType",
+        "recipientEmail",
+        "sentAt",
+        "status",
+        "sentBy"
+      ]
     },
     {
       "method": "get",
       "path": "/api/applications/:id/interview/ics",
       "reader": "readAuthorizedApplicationInterviewInvite",
-      "projection": ["candidateName", "candidateEmail", "jobTitle", "interviewDate", "interviewTime", "interviewLocation", "interviewNotes"]
+      "projection": [
+        "candidateName",
+        "candidateEmail",
+        "jobTitle",
+        "interviewDate",
+        "interviewTime",
+        "interviewLocation",
+        "interviewNotes"
+      ]
     },
     {
       "method": "get",
       "path": "/api/applications/:id/whatsapp-history",
       "reader": "readAuthorizedApplicationWhatsAppHistory",
-      "projection": ["templateName", "templateType", "status", "sentAt", "deliveredAt", "readAt", "sentBy"]
+      "projection": [
+        "templateName",
+        "templateType",
+        "status",
+        "sentAt",
+        "deliveredAt",
+        "readAt",
+        "sentBy"
+      ]
     },
     {
       "method": "get",
       "path": "/api/applications/:id/resume",
       "reader": "readAuthorizedApplicationResumeFile",
-      "projection": ["applicationId", "organizationId", "resumeUrl", "resumeFilename"]
+      "projection": [
+        "applicationId",
+        "organizationId",
+        "resumeUrl",
+        "resumeFilename"
+      ]
     },
     {
       "method": "get",
       "path": "/api/applications/:id/resume-text",
       "reader": "readAuthorizedApplicationResumeText",
-      "projection": ["applicationId", "organizationId", "text"]
+      "projection": [
+        "applicationId",
+        "organizationId",
+        "text"
+      ]
     },
     {
       "method": "get",
       "path": "/api/jobs/:id/applications",
       "reader": "requireSeat+isRecruiterOnJob",
-      "projection": ["existingApplicationCollection"]
+      "projection": [
+        "existingApplicationCollection"
+      ]
     },
     {
       "method": "get",
       "path": "/api/subscription/seats/usage",
       "reader": "requireSeat+getSeatUsage",
-      "projection": ["existingSeatUsage", "existingSeatRoster"]
+      "projection": [
+        "existingSeatUsage",
+        "existingSeatRoster"
+      ]
     },
     {
       "method": "get",
       "path": "/api/users",
       "reader": "readAuthorizedHiringManagerDirectory",
-      "projection": ["id", "username", "firstName", "lastName", "role"]
+      "projection": [
+        "id",
+        "username",
+        "firstName",
+        "lastName",
+        "role"
+      ]
     },
     {
       "method": "patch",
       "path": "/api/applications/:id/stage",
       "reader": "moveAuthorizedApplicationStage",
-      "projection": ["applicationId", "stageId", "stageName", "changedAt"]
+      "projection": [
+        "applicationId",
+        "stageId",
+        "stageName",
+        "changedAt"
+      ]
     },
     {
       "method": "patch",
       "path": "/api/applications/:id/interview",
       "reader": "scheduleAuthorizedApplicationInterview",
-      "projection": ["applicationId", "interviewDate", "interviewTime", "interviewLocation", "interviewNotes", "updatedAt"]
+      "projection": [
+        "applicationId",
+        "interviewDate",
+        "interviewTime",
+        "interviewLocation",
+        "interviewNotes",
+        "updatedAt"
+      ]
     },
     {
       "method": "patch",
       "path": "/api/applications/bulk/interview",
       "reader": "scheduleAuthorizedBulkApplicationInterviews",
-      "projection": ["applicationId", "interviewDate", "interviewTime", "interviewLocation", "interviewNotes", "updatedAt"]
+      "projection": [
+        "applicationId",
+        "interviewDate",
+        "interviewTime",
+        "interviewLocation",
+        "interviewNotes",
+        "updatedAt"
+      ]
     },
     {
       "method": "post",
       "path": "/api/applications/:id/notes",
       "reader": "addAuthorizedApplicationReviewerNote",
-      "projection": ["applicationId", "note"]
+      "projection": [
+        "applicationId",
+        "note"
+      ]
     },
     {
       "method": "patch",
       "path": "/api/applications/:id/rating",
       "reader": "setAuthorizedApplicationReviewerRating",
-      "projection": ["applicationId", "reviewerId", "rating", "rubricVersion", "updatedAt"]
+      "projection": [
+        "applicationId",
+        "reviewerId",
+        "rating",
+        "rubricVersion",
+        "updatedAt"
+      ]
     },
     {
       "method": "get",
       "path": "/api/applications/:id/feedback",
       "reader": "readAuthorizedApplicationFeedback",
-      "projection": ["id", "applicationId", "authorId", "overallScore", "recommendation", "notes", "rubricVersion", "createdAt", "updatedAt", "author"]
+      "projection": [
+        "id",
+        "applicationId",
+        "authorId",
+        "overallScore",
+        "recommendation",
+        "notes",
+        "rubricVersion",
+        "createdAt",
+        "updatedAt",
+        "author"
+      ]
     },
     {
       "method": "post",
       "path": "/api/applications/:id/feedback",
       "reader": "addAuthorizedApplicationFeedback",
-      "projection": ["id", "applicationId", "authorId", "overallScore", "recommendation", "notes", "rubricVersion", "createdAt", "updatedAt", "author"]
+      "projection": [
+        "id",
+        "applicationId",
+        "authorId",
+        "overallScore",
+        "recommendation",
+        "notes",
+        "rubricVersion",
+        "createdAt",
+        "updatedAt",
+        "author"
+      ]
     },
     {
       "method": "post",
       "path": "/api/applications/:id/ai-summary",
       "reader": "readAuthorizedApplicationAiSummaryContext+publishAuthorizedApplicationAiSummary",
-      "projection": ["message", "summary"]
+      "projection": [
+        "message",
+        "summary"
+      ]
     },
     {
       "method": "get",
       "path": "/api/jobs/:id/ai-similar-candidates",
       "reader": "readAuthorizedSimilarCandidates",
-      "projection": ["applicationId", "candidateName", "candidateEmail", "sourceJobId", "sourceJobTitle", "aiFitScore", "aiFitLabel", "currentStage"]
+      "projection": [
+        "applicationId",
+        "candidateName",
+        "candidateEmail",
+        "sourceJobId",
+        "sourceJobTitle",
+        "aiFitScore",
+        "aiFitLabel",
+        "currentStage"
+      ]
     },
     {
       "method": "post",
       "path": "/api/applications/:id/send-email",
       "reader": "readAuthorizedManualEmailContext+sendAuthorizedTemplatedEmail",
-      "projection": ["success"]
+      "projection": [
+        "success"
+      ]
     },
     {
       "method": "post",
       "path": "/api/email/draft",
       "reader": "readAuthorizedEmailDraftContext+recordAuthorizedEmailDraftUsage",
-      "projection": ["subject", "body"]
+      "projection": [
+        "subject",
+        "body"
+      ]
     },
-    { "method": "post", "path": "/api/forms/templates", "reader": "createScopedFormTemplate", "projection": ["id", "name", "description", "isPublished", "createdBy", "createdAt", "updatedAt", "ownershipScope", "canManage", "fields"] },
-    { "method": "get", "path": "/api/forms/templates", "reader": "listAuthorizedFormTemplates", "projection": ["id", "name", "description", "isPublished", "createdBy", "createdAt", "updatedAt", "ownershipScope", "canManage", "fields"] },
-    { "method": "get", "path": "/api/forms/templates/:id", "reader": "readAuthorizedFormTemplate", "projection": ["id", "name", "description", "isPublished", "createdBy", "createdAt", "updatedAt", "ownershipScope", "canManage", "fields"] },
-    { "method": "patch", "path": "/api/forms/templates/:id", "reader": "updateAuthorizedFormTemplate", "projection": ["id", "name", "description", "isPublished", "createdBy", "createdAt", "updatedAt", "ownershipScope", "canManage", "fields"] },
-    { "method": "delete", "path": "/api/forms/templates/:id", "reader": "deleteAuthorizedFormTemplate", "projection": ["success"] },
-    { "method": "get", "path": "/api/forms/:id/responses", "reader": "readAuthorizedResponsesForForm", "projection": ["form", "responses", "total"] },
-    { "method": "get", "path": "/api/client-shortlist/:token", "reader": "readPublicClientShortlist", "projection": ["title", "message", "client", "job", "candidates", "createdAt", "expiresAt"] },
-    { "method": "post", "path": "/api/client-shortlist/:token/feedback", "reader": "resolvePublicFeedbackTarget", "projection": ["success", "count", "message"] },
-    { "method": "get", "path": "/api/client-shortlist/:token/resume/:candidateRef", "reader": "readPublicResumeLocator", "projection": ["bounded_file_or_redirect"] },
-    { "method": "get", "path": "/api/applications/:id/client-feedback", "reader": "readAuthorizedClientFeedback", "projection": ["id", "recommendation", "notes", "rating", "createdAt", "clientName"] },
-    { "method": "post", "path": "/api/hiring-manager-invitations", "reader": "replaceAuthorizedHiringManagerInvitation", "projection": ["success", "message", "invitation"] },
-    { "method": "get", "path": "/api/hiring-manager-invitations", "reader": "listAuthorizedHiringManagerInvitations", "projection": ["id", "email", "name", "status", "expiresAt", "createdAt", "inviterName"] },
-    { "method": "delete", "path": "/api/hiring-manager-invitations/:id", "reader": "cancelAuthorizedHiringManagerInvitation", "projection": ["success", "message"] },
-    { "method": "post", "path": "/api/subscription/seats/assign", "reader": "assignAuthorizedSeat", "projection": ["memberId", "seatAssigned"] },
-    { "method": "post", "path": "/api/subscription/seats/unassign", "reader": "unassignAuthorizedSeat", "projection": ["memberId", "seatAssigned"] },
-    { "method": "get", "path": "/api/subscription/invoices", "reader": "listAuthorizedInvoices", "projection": ["id", "invoiceNumber", "type", "totalAmount", "completedAt", "downloadPath"] },
-    { "method": "get", "path": "/api/subscription/invoices/:transactionId/pdf", "reader": "readAuthorizedInvoiceById", "projection": ["bounded_file_or_redirect"] },
-    { "method": "get", "path": "/api/invoices/:fileName", "reader": "readAuthorizedInvoiceByFileName", "projection": ["bounded_file"] },
-    { "method": "get", "path": "/api/ai/credits/usage", "reader": "readAuthorizedOrganizationAiActivity", "projection": ["windowDays", "totals", "byKind"] },
-    { "method": "patch", "path": "/api/admin/users/:id/role", "reader": "updateAuthorizedUserRole", "projection": ["id", "email", "firstName", "lastName", "role", "emailVerified"] },
-    { "method": "get", "path": "/api/talent-pool", "reader": "listAuthorizedTalentPoolCandidates", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
-    { "method": "get", "path": "/api/talent-pool/:id", "reader": "readAuthorizedTalentPoolCandidate", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
-    { "method": "post", "path": "/api/talent-pool", "reader": "readAuthorizedTalentPoolCreateContext+createAuthorizedTalentPoolCandidate", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
-    { "method": "put", "path": "/api/talent-pool/:id", "reader": "readAuthorizedTalentPoolCandidate+updateAuthorizedTalentPoolCandidate", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
-    { "method": "delete", "path": "/api/talent-pool/:id", "reader": "removeAuthorizedTalentPoolCandidate", "projection": [] },
-    { "method": "post", "path": "/api/talent-pool/:id/restore", "reader": "restoreAuthorizedTalentPoolCandidate", "projection": ["candidate", "message"] },
-    { "method": "post", "path": "/api/organizations", "reader": "createOrganization", "projection": ["id", "name", "slug", "logo", "domain", "domainVerified", "domainApprovedBy", "domainApprovedAt", "gstin", "billingName", "billingAddress", "billingCity", "billingState", "billingPincode", "billingContactEmail", "billingContactName", "settings", "isActive", "createdAt", "updatedAt", "signalTenantId"] },
-    { "method": "delete", "path": "/api/organizations/members/:id", "reader": "removeOrganizationMemberAndRevoke", "projection": ["success"] },
-    { "method": "patch", "path": "/api/organizations/members/:id/role", "reader": "changeOrganizationMemberRoleAndRevoke", "projection": ["id", "userId", "role", "seatAssigned"] },
-    { "method": "post", "path": "/api/organizations/members/:id/reassign", "reader": "reassignOrganizationJobs", "projection": ["success", "reassignedCount"] },
-    { "method": "post", "path": "/api/reset-password", "reader": "resetPasswordAndAdvanceAuthorization", "projection": ["message"] }
+    {
+      "method": "post",
+      "path": "/api/forms/templates",
+      "reader": "createScopedFormTemplate",
+      "projection": [
+        "id",
+        "name",
+        "description",
+        "isPublished",
+        "createdBy",
+        "createdAt",
+        "updatedAt",
+        "ownershipScope",
+        "canManage",
+        "fields"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/forms/templates",
+      "reader": "listAuthorizedFormTemplates",
+      "projection": [
+        "id",
+        "name",
+        "description",
+        "isPublished",
+        "createdBy",
+        "createdAt",
+        "updatedAt",
+        "ownershipScope",
+        "canManage",
+        "fields"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/forms/templates/:id",
+      "reader": "readAuthorizedFormTemplate",
+      "projection": [
+        "id",
+        "name",
+        "description",
+        "isPublished",
+        "createdBy",
+        "createdAt",
+        "updatedAt",
+        "ownershipScope",
+        "canManage",
+        "fields"
+      ]
+    },
+    {
+      "method": "patch",
+      "path": "/api/forms/templates/:id",
+      "reader": "updateAuthorizedFormTemplate",
+      "projection": [
+        "id",
+        "name",
+        "description",
+        "isPublished",
+        "createdBy",
+        "createdAt",
+        "updatedAt",
+        "ownershipScope",
+        "canManage",
+        "fields"
+      ]
+    },
+    {
+      "method": "delete",
+      "path": "/api/forms/templates/:id",
+      "reader": "deleteAuthorizedFormTemplate",
+      "projection": [
+        "success"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/forms/:id/responses",
+      "reader": "readAuthorizedResponsesForForm",
+      "projection": [
+        "form",
+        "responses",
+        "total"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/client-shortlist/:token",
+      "reader": "readPublicClientShortlist",
+      "projection": [
+        "title",
+        "message",
+        "client",
+        "job",
+        "candidates",
+        "createdAt",
+        "expiresAt"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/client-shortlist/:token/feedback",
+      "reader": "resolvePublicFeedbackTarget",
+      "projection": [
+        "success",
+        "count",
+        "message"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/client-shortlist/:token/resume/:candidateRef",
+      "reader": "readPublicResumeLocator",
+      "projection": [
+        "bounded_file_or_redirect"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/applications/:id/client-feedback",
+      "reader": "readAuthorizedClientFeedback",
+      "projection": [
+        "id",
+        "recommendation",
+        "notes",
+        "rating",
+        "createdAt",
+        "clientName"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/hiring-manager-invitations",
+      "reader": "replaceAuthorizedHiringManagerInvitation",
+      "projection": [
+        "success",
+        "message",
+        "invitation"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/hiring-manager-invitations",
+      "reader": "listAuthorizedHiringManagerInvitations",
+      "projection": [
+        "id",
+        "email",
+        "name",
+        "status",
+        "expiresAt",
+        "createdAt",
+        "inviterName"
+      ]
+    },
+    {
+      "method": "delete",
+      "path": "/api/hiring-manager-invitations/:id",
+      "reader": "cancelAuthorizedHiringManagerInvitation",
+      "projection": [
+        "success",
+        "message"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/subscription/seats/assign",
+      "reader": "assignAuthorizedSeat",
+      "projection": [
+        "memberId",
+        "seatAssigned"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/subscription/seats/unassign",
+      "reader": "unassignAuthorizedSeat",
+      "projection": [
+        "memberId",
+        "seatAssigned"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/subscription/invoices",
+      "reader": "listAuthorizedInvoices",
+      "projection": [
+        "id",
+        "invoiceNumber",
+        "type",
+        "totalAmount",
+        "completedAt",
+        "downloadPath"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/subscription/invoices/:transactionId/pdf",
+      "reader": "readAuthorizedInvoiceById",
+      "projection": [
+        "bounded_file_or_redirect"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/invoices/:fileName",
+      "reader": "readAuthorizedInvoiceByFileName",
+      "projection": [
+        "bounded_file"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/ai/credits/usage",
+      "reader": "readAuthorizedOrganizationAiActivity",
+      "projection": [
+        "windowDays",
+        "totals",
+        "byKind"
+      ]
+    },
+    {
+      "method": "patch",
+      "path": "/api/admin/users/:id/role",
+      "reader": "updateAuthorizedUserRole",
+      "projection": [
+        "id",
+        "email",
+        "firstName",
+        "lastName",
+        "role",
+        "emailVerified"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/talent-pool",
+      "reader": "listAuthorizedTalentPoolCandidates",
+      "projection": [
+        "id",
+        "name",
+        "email",
+        "phone",
+        "source",
+        "notes",
+        "resumeUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/talent-pool/:id",
+      "reader": "readAuthorizedTalentPoolCandidate",
+      "projection": [
+        "id",
+        "name",
+        "email",
+        "phone",
+        "source",
+        "notes",
+        "resumeUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/talent-pool",
+      "reader": "readAuthorizedTalentPoolCreateContext+createAuthorizedTalentPoolCandidate",
+      "projection": [
+        "id",
+        "name",
+        "email",
+        "phone",
+        "source",
+        "notes",
+        "resumeUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
+      "method": "put",
+      "path": "/api/talent-pool/:id",
+      "reader": "readAuthorizedTalentPoolCandidate+updateAuthorizedTalentPoolCandidate",
+      "projection": [
+        "id",
+        "name",
+        "email",
+        "phone",
+        "source",
+        "notes",
+        "resumeUrl",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    {
+      "method": "delete",
+      "path": "/api/talent-pool/:id",
+      "reader": "removeAuthorizedTalentPoolCandidate",
+      "projection": []
+    },
+    {
+      "method": "post",
+      "path": "/api/talent-pool/:id/restore",
+      "reader": "restoreAuthorizedTalentPoolCandidate",
+      "projection": [
+        "candidate",
+        "message"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/organizations",
+      "reader": "createOrganization",
+      "projection": [
+        "id",
+        "name",
+        "slug",
+        "logo",
+        "domain",
+        "domainVerified",
+        "domainApprovedBy",
+        "domainApprovedAt",
+        "gstin",
+        "billingName",
+        "billingAddress",
+        "billingCity",
+        "billingState",
+        "billingPincode",
+        "billingContactEmail",
+        "billingContactName",
+        "settings",
+        "isActive",
+        "createdAt",
+        "updatedAt",
+        "signalTenantId"
+      ]
+    },
+    {
+      "method": "delete",
+      "path": "/api/organizations/members/:id",
+      "reader": "removeOrganizationMemberAndRevoke",
+      "projection": [
+        "success"
+      ]
+    },
+    {
+      "method": "patch",
+      "path": "/api/organizations/members/:id/role",
+      "reader": "changeOrganizationMemberRoleAndRevoke",
+      "projection": [
+        "id",
+        "userId",
+        "role",
+        "seatAssigned"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/organizations/members/:id/reassign",
+      "reader": "reassignOrganizationJobs",
+      "projection": [
+        "success",
+        "reassignedCount"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/reset-password",
+      "reader": "resetPasswordAndAdvanceAuthorization",
+      "projection": [
+        "message"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/organizations/members/invite",
+      "reader": "createOrResendOrganizationInvite",
+      "projection": [
+        "id",
+        "email",
+        "role",
+        "expiresAt",
+        "createdAt"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/organizations/invites",
+      "reader": "listOrganizationInvites",
+      "projection": [
+        "id",
+        "email",
+        "role",
+        "expiresAt",
+        "createdAt"
+      ]
+    },
+    {
+      "method": "delete",
+      "path": "/api/organizations/invites/:id",
+      "reader": "cancelOrganizationInvite",
+      "projection": [
+        "success"
+      ]
+    },
+    {
+      "method": "get",
+      "path": "/api/invites/:token",
+      "reader": "readOrganizationInvitePreview",
+      "projection": [
+        "organizationName",
+        "email",
+        "role",
+        "expiresAt",
+        "inviterName"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/invites/:token/accept",
+      "reader": "acceptOrganizationInvite",
+      "projection": [
+        "success",
+        "membership"
+      ]
+    },
+    {
+      "method": "post",
+      "path": "/api/register",
+      "reader": "ordinaryVerification+versionedHiringManagerGrant",
+      "projection": [
+        "message",
+        "requiresVerification",
+        "emailDeliveryFailed"
+      ]
+    }
   ],
   "retired_routes": [
-    { "method": "patch", "path": "/api/applications/:id/download", "code": "RESUME_DOWNLOAD_TRACKING_RETIRED" },
-    { "method": "get", "path": "/api/candidates/external-resume", "code": "EXTERNAL_RESUME_PROXY_RETIRED" },
-    { "method": "get", "path": "/api/admin/applications/all", "code": "ADMIN_APPLICATION_COLLECTION_RETIRED" },
-    { "method": "get", "path": "/api/consultants", "code": "CONSULTANT_PRODUCT_RETIRED" },
-    { "method": "get", "path": "/api/consultants/:id", "code": "CONSULTANT_PRODUCT_RETIRED" },
-    { "method": "get", "path": "/api/admin/consultants", "code": "CONSULTANT_PRODUCT_RETIRED" },
-    { "method": "post", "path": "/api/admin/consultants", "code": "CONSULTANT_PRODUCT_RETIRED" },
-    { "method": "patch", "path": "/api/admin/consultants/:id", "code": "CONSULTANT_PRODUCT_RETIRED" },
-    { "method": "delete", "path": "/api/admin/consultants/:id", "code": "CONSULTANT_PRODUCT_RETIRED" }
+    {
+      "method": "patch",
+      "path": "/api/applications/:id/download",
+      "code": "RESUME_DOWNLOAD_TRACKING_RETIRED"
+    },
+    {
+      "method": "get",
+      "path": "/api/candidates/external-resume",
+      "code": "EXTERNAL_RESUME_PROXY_RETIRED"
+    },
+    {
+      "method": "get",
+      "path": "/api/admin/applications/all",
+      "code": "ADMIN_APPLICATION_COLLECTION_RETIRED"
+    },
+    {
+      "method": "get",
+      "path": "/api/consultants",
+      "code": "CONSULTANT_PRODUCT_RETIRED"
+    },
+    {
+      "method": "get",
+      "path": "/api/consultants/:id",
+      "code": "CONSULTANT_PRODUCT_RETIRED"
+    },
+    {
+      "method": "get",
+      "path": "/api/admin/consultants",
+      "code": "CONSULTANT_PRODUCT_RETIRED"
+    },
+    {
+      "method": "post",
+      "path": "/api/admin/consultants",
+      "code": "CONSULTANT_PRODUCT_RETIRED"
+    },
+    {
+      "method": "patch",
+      "path": "/api/admin/consultants/:id",
+      "code": "CONSULTANT_PRODUCT_RETIRED"
+    },
+    {
+      "method": "delete",
+      "path": "/api/admin/consultants/:id",
+      "code": "CONSULTANT_PRODUCT_RETIRED"
+    }
   ],
   "governed_files": [
-    { "file": "../.github/workflows/ci.yml", "sha256": "ae8172202f6f6fa60e7976ec0866be8378c8ae47eea23819b88092bfffcf1ac1" },
-    { "file": "package.json", "sha256": "7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe" },
-    { "file": "vitest.server.config.ts", "sha256": "aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe" },
-    { "file": "server/applications.routes.ts", "sha256": "5c512400add01ec88cda3944ba1dea0aca2373783e7e322bc6c57746e24f4846" },
-    { "file": "server/communications.routes.ts", "sha256": "631501873ea9fed6610e82eaab31979682c647f3dfeb396e2514c936f13bb108" },
-    { "file": "server/emailTemplateService.ts", "sha256": "461c3e81e95a719601e254aaf71063fde554f18f698447da9fe294c1c8d26166" },
-    { "file": "server/forms.routes.ts", "sha256": "60f67da5381a2bebb67814e59808a2a2628d59453ee809de48b4823136c06fbe" },
-    { "file": "server/clients.routes.ts", "sha256": "0f76376aa6022d3b01807515ac93ac0a274dedefd39bccc4c6d5727d267b53b1" },
-    { "file": "server/hiringManagerInvitations.routes.ts", "sha256": "7d37a795377d26be870bc4d18442a918828dda62400a7b67fb0ef6733a5c2491" },
-    { "file": "server/subscription.routes.ts", "sha256": "394fff646a46c289531082965c6ec8ab8f2228604cad305edc1da9cc55082ad7" },
-    { "file": "server/routes.ts", "sha256": "1d92983c81b063e82915f7b7ef2a588a81ff6d61ab5be1da1fe75b391ca51ab9" },
-    { "file": "server/resume.routes.ts", "sha256": "8a85106836a3bb681e66e1a25bf0dcedeb8181e00b4bbb669c1b8e85c446d26e" },
-    { "file": "server/candidates.semantic.routes.ts", "sha256": "9116127419c1f515d11d504786408ef1f2622e9365a74ec55f0fb93b70059a4a" },
-    { "file": "server/gcs-storage.ts", "sha256": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802" },
-    { "file": "server/auth.ts", "sha256": "e2634ecb94ab6cb4cc99d9aec8b8d5c52a976466b7f0b85023df088591cfdf55" },
-    { "file": "server/candidate-privacy/surfaces.json", "sha256": "685d9434540aaa5ccdf31fe56c2bcc12597f6e57fde009767b3b1c8e9f53daef" },
-    { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "6fe7a1bed64866da80b94ad2a52f69c8dd82a16b94d06d081f7a59d92c609762" },
-    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "1b48f1e384d36754f24ad23e1eaafe464f50ba4a7d54b7cb76b52ca896b68eac" },
-    { "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts", "sha256": "afbd24fd5559e4864bcbf06afef737dbf151dcb419e7d69972180e8f611055ac" },
-    { "file": "server/lib/__tests__/membershipScopedReadAuthorization.routes.test.ts", "sha256": "8bb40a2aa05775ff95da9e105baf07506acdd4f3b0d92f22bd6bcd7943ced659" },
-    { "file": "server/lib/__tests__/resumeAccessAuthorization.routes.test.ts", "sha256": "a607c1f9b019e5b23327aa8f14fc5305bb4201e6bff68ceb428cd65a6634320c" },
-    { "file": "server/lib/__tests__/whatsappHistoryAuthorization.routes.test.ts", "sha256": "a6a1e7c36c57bcb88e6d900670e64f71809b48034006cfa2d739bd1b3545baa7" },
-    { "file": "server/lib/applicationReadAuthorization.ts", "sha256": "474ea56028bde0005c404ec9b3c16a2373681e7564ec4f941454719475ea0544" },
-    { "file": "server/lib/membershipScopedReadAuthorization.ts", "sha256": "3b77886dc1aacaaced273f44fb434749e0f11c145b406928da9343dd5181c216" },
-    { "file": "server/lib/applicationWorkflowAuthorization.ts", "sha256": "b048bd6f2fa81ae7467390a83b2f3208ca4f4274d64b062d83f4d3162cb17e48" },
-    { "file": "server/lib/applicationAiOutboundAuthorization.ts", "sha256": "ef0527e93ddceb9147c82ef214c6c76b599d06464cd8e94d0871af89db14073a" },
-    { "file": "server/lib/reviewerShareAuthorization.ts", "sha256": "94f931cffc055a8e9c0a84c73585ed92e30d2a55b8cc64a79c626537a80ba575" },
-    { "file": "server/lib/__tests__/reviewerShareAuthorization.test.ts", "sha256": "a2a1e64e185a2946264e730fd47fff40d497431ae58b73437702e41b15d29d29" },
-    { "file": "server/lib/__tests__/reviewerShareAuthorization.routes.test.ts", "sha256": "4510d117abd5a64c6dd5afc87beedaff97f983d72330fd94667009d9c22644d3" },
-    { "file": "server/lib/__tests__/reviewerShareAuthorization.pg.test.ts", "sha256": "c2cee32e4326e78fcd088f8db87fe86e685d930a47d9f5bad04bf91d19f9a4c3" },
-    { "file": "server/lib/__tests__/applicationAiOutboundAuthorization.test.ts", "sha256": "0b27f7dbddfe4724ff6d778eb538a50c7212558e35de86047e1938ea4bb590d7" },
-    { "file": "server/lib/__tests__/applicationAiOutboundAuthorization.routes.test.ts", "sha256": "6b90981648739fc961587283d868a87dbac78bcb1c6f2f34993fc3b2ffac5306" },
-    { "file": "server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts", "sha256": "e0f8dcf75fbb888a83cfc6461be1fcfbf76b5f101dcd843a3c8dcc9c3242e610" },
-    { "file": "server/lib/__tests__/authorizedTemplatedEmail.test.ts", "sha256": "3b11f903912d7f57ae6ac736d9b3222b1dd97609a510ddb700c9a35e1162b4d2" },
-    { "file": "server/lib/__tests__/applicationWorkflowAuthorization.test.ts", "sha256": "6b32e97e63d694dea1eddb2f576ea3f3c42c0ffde4e1284f6cf495e022379c90" },
-    { "file": "server/lib/__tests__/applicationWorkflowAuthorization.routes.test.ts", "sha256": "cd3a4a814ccd9d7086a830253f63b9265d71bc98d153929e1c637f4491880243" },
-    { "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts", "sha256": "5809988e68c1b080b29f8d9ba474e855fdfcd77584278f801f5f185b36730567" },
-    { "file": "server/storage.ts", "sha256": "8c7a06331d36249ca7e115c85a5193d2ad66949b5f0ad9eb51df1c95d3f06c31" },
-    { "file": "server/tests/applicationReadAuthorization.pg.test.ts", "sha256": "0889ae3d38a979dfdff2ba6c5f5e9621da9cbb283e8023176f011c2feb476ac9" },
-    { "file": "server/tests/candidatePrivacy.pg.test.ts", "sha256": "8b55fe6e46848ee2e21ef437ed37428b030b8cb0eb3167d3f9d472342943bd27" },
-    { "file": "server/tests/interviewIcsAuthorization.routes.test.ts", "sha256": "5f24cda1c7f4d499a317ca4e998d71bb99df40880d2295231b78505efbdf3e59" },
-    { "file": "server/tests/hiring-manager-feedback-access.routes.test.ts", "sha256": "2f6432802bafbdb4a7f80617412237277130bdc76df3e75d398daa7e598f4bad" },
-    { "file": "server/whatsapp.routes.ts", "sha256": "6fe33d722f4be777ed138d9ba3a80689cf4d01f31eeb9b14a1ff26ddfac844ca" },
-    { "file": "scripts/check-object-authorization.mjs", "sha256": "5984e71205f89d1cf245188dab1556729c1f31c276498d171c0987815959656f" },
-    { "file": "client/src/pages/candidates-page.tsx", "sha256": "94a944e1543310d76db639b421490eb51f7e4388304527f6d92a807743f611ea" },
-    { "file": "client/src/pages/application-management-page.tsx", "sha256": "eeffcc55702106ed7eee26b340455bbd542767d7c1bbf4318d1236bcf4f65156" },
-    { "file": "client/src/pages/admin-forms-page.tsx", "sha256": "1de0261cdd0c31e45926208190591f7a85ca981e93a08c3551dbf96804c3321f" },
-    { "file": "client/src/pages/client-shortlist-page.tsx", "sha256": "88a05ced490861103b5697bbb700165c5c33c9885cdf3aaf56bddf714762ca28" },
-    { "file": "client/src/pages/applications-page.tsx", "sha256": "d4a9481cf12817c9999f311443af55e7dcfd50c1eb8fd1e499b34620ccde559e" },
-    { "file": "client/src/lib/internal-copy.ts", "sha256": "1b7103a38504f5fb405518e7e803b37edbbc37a03c50bd71ea6dd5ee7dae2885" },
-    { "file": "shared/schema.ts", "sha256": "096e009b2be00d404eca37d9b918c2fa92e1edc516a5ea3690ce1eab69b87103" },
-    { "file": "shared/forms.types.ts", "sha256": "79eb6938b98e2b0de1e5852dbf09f987608a8cffe68232fae302483bf5027db7" },
-    { "file": "server/schema-migrations/0002_resume_access_attempts.sql", "sha256": "a8a838cff654c8da79820d45aac8fbfc0fec8a8411553dde9f3a1f05ba6d713c" },
-    { "file": "server/schema-migrations/0003_application_workflow_assessments.sql", "sha256": "d32de49a1449bb6bc5c6608cbd0055c04695544b693ef1620864c555e0b3ef9c" },
-    { "file": "server/schema-migrations/0004_reviewer_share_authority.sql", "sha256": "c813900aa1c56c2ec5d181b47f27aed046ca6ffe3a5028dc6631a94aa9131804" },
-    { "file": "server/schema-migrations/checksums.lock", "sha256": "8fd4149b8f714e70be1a97c36aa1ce207f2e50d0703af36b3918a0bd9401f86f" },
-    { "file": "server/schema-control/__tests__/schemaControl.pg.test.ts", "sha256": "dca6cf2b0eb7ff0b1aee07a2b00439d0ea96a39ccd9cb4f8ecde51447cc12a47" },
-    { "file": "server/schema-control/__tests__/schemaGuard.test.ts", "sha256": "2b32a97e8474482b8baa3503f3b9937d6882658dad76317d6196db9d5aea0639" },
-    { "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts", "sha256": "11c35501ac2afb0a14c097ed8360cb1224814129ddfc3fad69d9be3da5516ca2" },
-    { "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.test.ts", "sha256": "ede45888fa07542e49e3c3a27d853566dc6fcf671e2ab5fcc399d6fb28f2e2d9" },
-    { "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.routes.test.ts", "sha256": "b626b559dc01e15bb44c2aada0704dc62abdc73113ed57fe90c68466801d5d2e" },
-    { "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.pg.test.ts", "sha256": "6fec68a76027fb7d60ba2cfcd50fcf92159dbbc2fd2497471a1940ba7cdc06b1" },
-    { "file": "server/admin.routes.ts", "sha256": "9c914fa0475a02df019dc505fbeabb95e12a5cbdfa9054e4ebba88ac6391d5d6" },
-    { "file": "client/src/hooks/use-subscription.ts", "sha256": "ea57acb1557f973d1895120d5f8b4d2e928b8c75e581157d752487e0a919ff99" },
-    { "file": "client/src/hooks/use-ai-credits.ts", "sha256": "2fa151e53146df105a4f75efa4bcb273e5606c0a3cf473ab5f0c4124b427cff7" },
-    { "file": "client/src/pages/org-billing-page.tsx", "sha256": "a85d1a64605b7d8756f6e2dc9c9e23ae9082f6fb259df519e970aa5370e33d6c" },
-    { "file": "client/src/pages/admin-super-dashboard.tsx", "sha256": "63e7981ffecc244d8b1f537c0b4e2f3bfe9105166be66e92648378c23ca21403" },
-    { "file": "client/src/App.tsx", "sha256": "05927965067586cc753ff9c48d3d39005ae86343a9f17eff9d2c535a53175e4d" },
-    { "file": "client/src/components/QuickAccessBar.tsx", "sha256": "f2ee1c8e446fbb40f6735ad1d39e73f1835d268ad1271298363b3c43f374a9f5" },
-    { "file": "server/talent-pool.routes.ts", "sha256": "d11cacc618d848f154d5434d5e0697cd17bc3c6c442db9b253d28e81e233dda3" },
-    { "file": "server/lib/talentPoolAuthorization.ts", "sha256": "1658edb7c8ecb4093ade2f4b4b47e5a1ac9806e7398fc2a2185cb8b46046ec79" },
-    { "file": "server/lib/__tests__/talentPoolAuthorization.test.ts", "sha256": "bf26c7d1dc2732598855fb8a3c7b4953bf3e117db7d83d1cbb3df7c1e69b856c" },
-    { "file": "server/lib/__tests__/talentPoolAuthorization.routes.test.ts", "sha256": "408d4767bf201eabd8281b65ef187ee3e400a949738ed4f79c1a1d70c108e58b" },
-    { "file": "server/lib/__tests__/talentPoolAuthorization.pg.test.ts", "sha256": "5350537015b7b931022d63fa2e6e7302f0f8d49ca78455cbdf809e41a80b7c4c" },
-    { "file": "test/integration/backward-compatibility.test.ts", "sha256": "385cd315bbfc2050b00e1982b037a5b4621f88cd42fdca6bac8386a9d96b0549" },
-    { "file": "server/organization.routes.ts", "sha256": "5d21dbd73c2f3867f802b47fbed596cc232e52f4f857ab9eda41596473bc0902" },
-    { "file": "server/lib/organizationService.ts", "sha256": "2cfc8546b49f4ae20c7da48824ec2791f8e774fe3f44cdbc04a41e2a5ba9164c" },
-    { "file": "server/lib/privilegeGrantRevocation.ts", "sha256": "994530aa048703eac0a179a201f299c12d66c17671666dad1b13bc469fb11e78" },
-    { "file": "server/schema-migrations/0005_privilege_authorization_version.sql", "sha256": "31110ede0fffacfe3e0dd5d82bd3ce7bdcbb29c80b73e282cc2b80ef721ad42e" },
-    { "file": "server/lib/__tests__/privilegeGrantRevocation.test.ts", "sha256": "5fe5009f71d08fd664b7b4a77987b3d8cbf81a11e3da9dc00287f711319b3e10" },
-    { "file": "server/lib/__tests__/privilegeGrantRevocation.routes.test.ts", "sha256": "3a85ac0cd66f3ea63cff73dabcefb62e8f699aaa7f80af0209ced130a63cfb61" },
-    { "file": "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts", "sha256": "5f2c3f920c11c65080886f4963c772a0106231c71362196d3da76143a357bca8" },
-    { "file": "server/tests/org-team-member-removal.routes.test.ts", "sha256": "1ee70db734b5ab70ab9ebdafc2d3101012a77a7659a457447a35de70ac071541" },
-    { "file": "server/lib/__tests__/candidatePortalAuthQuotaContracts.test.ts", "sha256": "a4b1be3c1ec4a317ab29ac66d2324f8eb3d0443d499d57df7cc43d106fd55fa7" }
+    {
+      "file": "../.github/workflows/ci.yml",
+      "sha256": "ae8172202f6f6fa60e7976ec0866be8378c8ae47eea23819b88092bfffcf1ac1"
+    },
+    {
+      "file": "package.json",
+      "sha256": "7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe"
+    },
+    {
+      "file": "vitest.server.config.ts",
+      "sha256": "aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe"
+    },
+    {
+      "file": "server/applications.routes.ts",
+      "sha256": "5c512400add01ec88cda3944ba1dea0aca2373783e7e322bc6c57746e24f4846"
+    },
+    {
+      "file": "server/communications.routes.ts",
+      "sha256": "631501873ea9fed6610e82eaab31979682c647f3dfeb396e2514c936f13bb108"
+    },
+    {
+      "file": "server/emailTemplateService.ts",
+      "sha256": "461c3e81e95a719601e254aaf71063fde554f18f698447da9fe294c1c8d26166"
+    },
+    {
+      "file": "server/forms.routes.ts",
+      "sha256": "60f67da5381a2bebb67814e59808a2a2628d59453ee809de48b4823136c06fbe"
+    },
+    {
+      "file": "server/clients.routes.ts",
+      "sha256": "0f76376aa6022d3b01807515ac93ac0a274dedefd39bccc4c6d5727d267b53b1"
+    },
+    {
+      "file": "server/hiringManagerInvitations.routes.ts",
+      "sha256": "7d37a795377d26be870bc4d18442a918828dda62400a7b67fb0ef6733a5c2491"
+    },
+    {
+      "file": "server/subscription.routes.ts",
+      "sha256": "394fff646a46c289531082965c6ec8ab8f2228604cad305edc1da9cc55082ad7"
+    },
+    {
+      "file": "server/routes.ts",
+      "sha256": "1d92983c81b063e82915f7b7ef2a588a81ff6d61ab5be1da1fe75b391ca51ab9"
+    },
+    {
+      "file": "server/resume.routes.ts",
+      "sha256": "8a85106836a3bb681e66e1a25bf0dcedeb8181e00b4bbb669c1b8e85c446d26e"
+    },
+    {
+      "file": "server/candidates.semantic.routes.ts",
+      "sha256": "9116127419c1f515d11d504786408ef1f2622e9365a74ec55f0fb93b70059a4a"
+    },
+    {
+      "file": "server/gcs-storage.ts",
+      "sha256": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802"
+    },
+    {
+      "file": "server/auth.ts",
+      "sha256": "25113b8fa50d0845ccb205b4fa02bae7c424e7b13aed30149d87b7e06a54b468"
+    },
+    {
+      "file": "server/candidate-privacy/surfaces.json",
+      "sha256": "5ad3223a4c1edf1b42fb8d365029f6a2c23b8dd4b77c32f5ab18db79566ecb9b"
+    },
+    {
+      "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
+      "sha256": "6fe7a1bed64866da80b94ad2a52f69c8dd82a16b94d06d081f7a59d92c609762"
+    },
+    {
+      "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
+      "sha256": "28cb2a25b5cf8b131c170ecca45dbf8998a16058b89cd2a97096453bad0ac2de"
+    },
+    {
+      "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
+      "sha256": "e933680ce549295988173e58a0c5b673f635f7d4334ef837504559c7d55756db"
+    },
+    {
+      "file": "server/lib/__tests__/membershipScopedReadAuthorization.routes.test.ts",
+      "sha256": "29ad8afa4ff0e1d244f77823488b195a2d8cf44c13998d05a4743d1685950b19"
+    },
+    {
+      "file": "server/lib/__tests__/resumeAccessAuthorization.routes.test.ts",
+      "sha256": "a607c1f9b019e5b23327aa8f14fc5305bb4201e6bff68ceb428cd65a6634320c"
+    },
+    {
+      "file": "server/lib/__tests__/whatsappHistoryAuthorization.routes.test.ts",
+      "sha256": "a6a1e7c36c57bcb88e6d900670e64f71809b48034006cfa2d739bd1b3545baa7"
+    },
+    {
+      "file": "server/lib/applicationReadAuthorization.ts",
+      "sha256": "474ea56028bde0005c404ec9b3c16a2373681e7564ec4f941454719475ea0544"
+    },
+    {
+      "file": "server/lib/membershipScopedReadAuthorization.ts",
+      "sha256": "696b8a607b01987838f7f2b4301323ed1f1f3007235f6e857fa62c96cc39e4e1"
+    },
+    {
+      "file": "server/lib/applicationWorkflowAuthorization.ts",
+      "sha256": "b048bd6f2fa81ae7467390a83b2f3208ca4f4274d64b062d83f4d3162cb17e48"
+    },
+    {
+      "file": "server/lib/applicationAiOutboundAuthorization.ts",
+      "sha256": "ef0527e93ddceb9147c82ef214c6c76b599d06464cd8e94d0871af89db14073a"
+    },
+    {
+      "file": "server/lib/reviewerShareAuthorization.ts",
+      "sha256": "94f931cffc055a8e9c0a84c73585ed92e30d2a55b8cc64a79c626537a80ba575"
+    },
+    {
+      "file": "server/lib/__tests__/reviewerShareAuthorization.test.ts",
+      "sha256": "a2a1e64e185a2946264e730fd47fff40d497431ae58b73437702e41b15d29d29"
+    },
+    {
+      "file": "server/lib/__tests__/reviewerShareAuthorization.routes.test.ts",
+      "sha256": "4510d117abd5a64c6dd5afc87beedaff97f983d72330fd94667009d9c22644d3"
+    },
+    {
+      "file": "server/lib/__tests__/reviewerShareAuthorization.pg.test.ts",
+      "sha256": "bf1a7065af33eefbef37addc64e837aabe21bc9f77710a0483802da4001f0fbe"
+    },
+    {
+      "file": "server/lib/__tests__/applicationAiOutboundAuthorization.test.ts",
+      "sha256": "0b27f7dbddfe4724ff6d778eb538a50c7212558e35de86047e1938ea4bb590d7"
+    },
+    {
+      "file": "server/lib/__tests__/applicationAiOutboundAuthorization.routes.test.ts",
+      "sha256": "6b90981648739fc961587283d868a87dbac78bcb1c6f2f34993fc3b2ffac5306"
+    },
+    {
+      "file": "server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts",
+      "sha256": "5ae813621c2af76f118f1f38ac067a3e84544cc55e7ec5ade24f5fc6d75c90f1"
+    },
+    {
+      "file": "server/lib/__tests__/authorizedTemplatedEmail.test.ts",
+      "sha256": "3b11f903912d7f57ae6ac736d9b3222b1dd97609a510ddb700c9a35e1162b4d2"
+    },
+    {
+      "file": "server/lib/__tests__/applicationWorkflowAuthorization.test.ts",
+      "sha256": "6b32e97e63d694dea1eddb2f576ea3f3c42c0ffde4e1284f6cf495e022379c90"
+    },
+    {
+      "file": "server/lib/__tests__/applicationWorkflowAuthorization.routes.test.ts",
+      "sha256": "cd3a4a814ccd9d7086a830253f63b9265d71bc98d153929e1c637f4491880243"
+    },
+    {
+      "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
+      "sha256": "75dddda4d910218c64cd25ab7dc3263a46a861e4b508b001ed5da77d250824f3"
+    },
+    {
+      "file": "server/storage.ts",
+      "sha256": "8c7a06331d36249ca7e115c85a5193d2ad66949b5f0ad9eb51df1c95d3f06c31"
+    },
+    {
+      "file": "server/tests/applicationReadAuthorization.pg.test.ts",
+      "sha256": "68381bc610fcc5bade2795e9af7825ae95148af12f7a99f57cd6052df64e6fc1"
+    },
+    {
+      "file": "server/tests/candidatePrivacy.pg.test.ts",
+      "sha256": "4bfcfaf850fefd118113fd6683b9a0566fdd0a73e6acefc429a4c1b1ff1e9c36"
+    },
+    {
+      "file": "server/tests/interviewIcsAuthorization.routes.test.ts",
+      "sha256": "5f24cda1c7f4d499a317ca4e998d71bb99df40880d2295231b78505efbdf3e59"
+    },
+    {
+      "file": "server/tests/hiring-manager-feedback-access.routes.test.ts",
+      "sha256": "2f6432802bafbdb4a7f80617412237277130bdc76df3e75d398daa7e598f4bad"
+    },
+    {
+      "file": "server/whatsapp.routes.ts",
+      "sha256": "6fe33d722f4be777ed138d9ba3a80689cf4d01f31eeb9b14a1ff26ddfac844ca"
+    },
+    {
+      "file": "scripts/check-object-authorization.mjs",
+      "sha256": "1fa3fcbb625768af8d631db234316b3b070e094415d239223415675b58e26348"
+    },
+    {
+      "file": "client/src/pages/candidates-page.tsx",
+      "sha256": "94a944e1543310d76db639b421490eb51f7e4388304527f6d92a807743f611ea"
+    },
+    {
+      "file": "client/src/pages/application-management-page.tsx",
+      "sha256": "eeffcc55702106ed7eee26b340455bbd542767d7c1bbf4318d1236bcf4f65156"
+    },
+    {
+      "file": "client/src/pages/admin-forms-page.tsx",
+      "sha256": "1de0261cdd0c31e45926208190591f7a85ca981e93a08c3551dbf96804c3321f"
+    },
+    {
+      "file": "client/src/pages/client-shortlist-page.tsx",
+      "sha256": "88a05ced490861103b5697bbb700165c5c33c9885cdf3aaf56bddf714762ca28"
+    },
+    {
+      "file": "client/src/pages/applications-page.tsx",
+      "sha256": "d4a9481cf12817c9999f311443af55e7dcfd50c1eb8fd1e499b34620ccde559e"
+    },
+    {
+      "file": "client/src/lib/internal-copy.ts",
+      "sha256": "1b7103a38504f5fb405518e7e803b37edbbc37a03c50bd71ea6dd5ee7dae2885"
+    },
+    {
+      "file": "shared/schema.ts",
+      "sha256": "de45a5868d2c2638a43d08ab9a7aeca6ce0b79e7e181b32b23936ff5686e7352"
+    },
+    {
+      "file": "shared/forms.types.ts",
+      "sha256": "79eb6938b98e2b0de1e5852dbf09f987608a8cffe68232fae302483bf5027db7"
+    },
+    {
+      "file": "server/schema-migrations/0002_resume_access_attempts.sql",
+      "sha256": "a8a838cff654c8da79820d45aac8fbfc0fec8a8411553dde9f3a1f05ba6d713c"
+    },
+    {
+      "file": "server/schema-migrations/0003_application_workflow_assessments.sql",
+      "sha256": "d32de49a1449bb6bc5c6608cbd0055c04695544b693ef1620864c555e0b3ef9c"
+    },
+    {
+      "file": "server/schema-migrations/0004_reviewer_share_authority.sql",
+      "sha256": "c813900aa1c56c2ec5d181b47f27aed046ca6ffe3a5028dc6631a94aa9131804"
+    },
+    {
+      "file": "server/schema-migrations/checksums.lock",
+      "sha256": "0e8b1e84faa81b45e5885428aab1671937e6a7f6096aa2469f6545f3d1892a89"
+    },
+    {
+      "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
+      "sha256": "9fa3741b4bde9c3760303e47db8a3eabf93653e1ae35b657ced0b32b5d9c7798"
+    },
+    {
+      "file": "server/schema-control/__tests__/schemaGuard.test.ts",
+      "sha256": "b00de20153b0b933c70d88696591fffec3281799eb8592471d8e69fd85df5c81"
+    },
+    {
+      "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
+      "sha256": "11c35501ac2afb0a14c097ed8360cb1224814129ddfc3fad69d9be3da5516ca2"
+    },
+    {
+      "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.test.ts",
+      "sha256": "ede45888fa07542e49e3c3a27d853566dc6fcf671e2ab5fcc399d6fb28f2e2d9"
+    },
+    {
+      "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.routes.test.ts",
+      "sha256": "b626b559dc01e15bb44c2aada0704dc62abdc73113ed57fe90c68466801d5d2e"
+    },
+    {
+      "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.pg.test.ts",
+      "sha256": "befb79221d0ecddf4c03feefb20df5a03ef9e2925c7e2ec7aee8e210a2020af1"
+    },
+    {
+      "file": "server/admin.routes.ts",
+      "sha256": "9c914fa0475a02df019dc505fbeabb95e12a5cbdfa9054e4ebba88ac6391d5d6"
+    },
+    {
+      "file": "client/src/hooks/use-subscription.ts",
+      "sha256": "ea57acb1557f973d1895120d5f8b4d2e928b8c75e581157d752487e0a919ff99"
+    },
+    {
+      "file": "client/src/hooks/use-ai-credits.ts",
+      "sha256": "2fa151e53146df105a4f75efa4bcb273e5606c0a3cf473ab5f0c4124b427cff7"
+    },
+    {
+      "file": "client/src/pages/org-billing-page.tsx",
+      "sha256": "a85d1a64605b7d8756f6e2dc9c9e23ae9082f6fb259df519e970aa5370e33d6c"
+    },
+    {
+      "file": "client/src/pages/admin-super-dashboard.tsx",
+      "sha256": "63e7981ffecc244d8b1f537c0b4e2f3bfe9105166be66e92648378c23ca21403"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "sha256": "05927965067586cc753ff9c48d3d39005ae86343a9f17eff9d2c535a53175e4d"
+    },
+    {
+      "file": "client/src/components/QuickAccessBar.tsx",
+      "sha256": "f2ee1c8e446fbb40f6735ad1d39e73f1835d268ad1271298363b3c43f374a9f5"
+    },
+    {
+      "file": "server/talent-pool.routes.ts",
+      "sha256": "d11cacc618d848f154d5434d5e0697cd17bc3c6c442db9b253d28e81e233dda3"
+    },
+    {
+      "file": "server/lib/talentPoolAuthorization.ts",
+      "sha256": "1658edb7c8ecb4093ade2f4b4b47e5a1ac9806e7398fc2a2185cb8b46046ec79"
+    },
+    {
+      "file": "server/lib/__tests__/talentPoolAuthorization.test.ts",
+      "sha256": "bf26c7d1dc2732598855fb8a3c7b4953bf3e117db7d83d1cbb3df7c1e69b856c"
+    },
+    {
+      "file": "server/lib/__tests__/talentPoolAuthorization.routes.test.ts",
+      "sha256": "408d4767bf201eabd8281b65ef187ee3e400a949738ed4f79c1a1d70c108e58b"
+    },
+    {
+      "file": "server/lib/__tests__/talentPoolAuthorization.pg.test.ts",
+      "sha256": "5fda9c8634bf4923d9437fd0d8ccdeb7c16ebca7937059cb7aeb9bf418422023"
+    },
+    {
+      "file": "test/integration/backward-compatibility.test.ts",
+      "sha256": "385cd315bbfc2050b00e1982b037a5b4621f88cd42fdca6bac8386a9d96b0549"
+    },
+    {
+      "file": "server/organization.routes.ts",
+      "sha256": "e921e0f53c0b6d4d4621efd4254d9f4c0bf6cd6300d4cd8f453ed87912946d2a"
+    },
+    {
+      "file": "server/lib/organizationService.ts",
+      "sha256": "63aa964be35c26641d612488f9f1cc1219b851a668b4351ad96367ce8cb2401d"
+    },
+    {
+      "file": "server/lib/privilegeGrantRevocation.ts",
+      "sha256": "994530aa048703eac0a179a201f299c12d66c17671666dad1b13bc469fb11e78"
+    },
+    {
+      "file": "server/schema-migrations/0005_privilege_authorization_version.sql",
+      "sha256": "31110ede0fffacfe3e0dd5d82bd3ce7bdcbb29c80b73e282cc2b80ef721ad42e"
+    },
+    {
+      "file": "server/lib/__tests__/privilegeGrantRevocation.test.ts",
+      "sha256": "5fe5009f71d08fd664b7b4a77987b3d8cbf81a11e3da9dc00287f711319b3e10"
+    },
+    {
+      "file": "server/lib/__tests__/privilegeGrantRevocation.routes.test.ts",
+      "sha256": "b7d207fa452b179382c65dc64a7893bf15325cd3f4757ad450082f347f3e99fc"
+    },
+    {
+      "file": "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
+      "sha256": "404c07e80edcb2926dd945a14ba39e8614cb704b63552aa6424f8ad0ba32fbd6"
+    },
+    {
+      "file": "server/tests/org-team-member-removal.routes.test.ts",
+      "sha256": "454de47cb298e5b9620a9c3bb8ecc84db7d55ebb3d95d48b6e907f3b5ff16656"
+    },
+    {
+      "file": "server/lib/__tests__/candidatePortalAuthQuotaContracts.test.ts",
+      "sha256": "b887e440c019bc2b6f7c35697bfea2aa48c0a63e5e3cd3ac3e99c3c22d6350b3"
+    },
+    {
+      "file": "server/schema-migrations/0006_versioned_invitation_grants.sql",
+      "sha256": "52bce39fffa581c06b9d2c3b8c0142dbe24a737cc52be9b3c224d1f25a89d3ff"
+    },
+    {
+      "file": "server/lib/versionedInvitationGrantAuthorization.ts",
+      "sha256": "a3448fd08365d48dbb46de07e3da820f7701576b35212df9593afdeb813ad49b"
+    },
+    {
+      "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.test.ts",
+      "sha256": "d573c7222196b78ad1e62894e55c47b12d8fba1ba4c9d9196a1352b1b63e0395"
+    },
+    {
+      "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.routes.test.ts",
+      "sha256": "a088b0566cf6b722dc0ec093d620061a44bde92cdf408eb22fbdc943c9816d70"
+    },
+    {
+      "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
+      "sha256": "00eeb6e3e075604e0a762eb6a3d252ffac6866c973e022f0a3a858a913b5385f"
+    },
+    {
+      "file": "test/integration/invite-and-webhook.test.ts",
+      "sha256": "7c7d28840680efaffd9cff2d3fbafedc3b3700eae935800f3e71b24292140c75"
+    },
+    {
+      "file": "test/integration/invite-seat-edge.test.ts",
+      "sha256": "51bffe1ed84a60e78f0a9a700f004b4ba8bc0253e0b2921c49e747828cdcc661"
+    }
   ],
   "frozen_route_blocks": [
-    { "method": "get", "path": "/api/webhooks/whatsapp", "sha256": "7f536ad1b199d3a8b6cfc23abe20ddfd2cc4a8c4da6a6858eb091de4659edca8" },
-    { "method": "post", "path": "/api/webhooks/whatsapp", "sha256": "03f20507fc5dc844eb1623a93ce44252462de728a3eee39e11c7ab1918b56b7b" },
-    { "method": "get", "path": "/api/whatsapp/templates", "sha256": "8dc442300f589aba740493e143739ebbc977f80308099b3ed8c42638ab9d8057" },
-    { "method": "post", "path": "/api/applications/:id/send-whatsapp", "sha256": "b9424fbd742367071f034ec6492f51af5cf6dc6e1dec6279c529bdf054123c6a" },
-    { "method": "get", "path": "/api/whatsapp/status", "sha256": "00a91814c0d7055de5912b83120264f75af42dd7da3d53394a14c76412e9bdcb" },
-    { "method": "post", "path": "/api/talent-pool/:id/convert", "sha256": "50709054de9122d6ade65822d15a059cd35df2d41491c524c7f6cd1f5484a090" },
-    { "method": "get", "path": "/api/jobs/:jobId/talent-pool/suggestions", "sha256": "56d2ddc38fb60c5074318aa501457e97933a0e83face6472b80cfed45f629363" }
+    {
+      "method": "get",
+      "path": "/api/webhooks/whatsapp",
+      "sha256": "7f536ad1b199d3a8b6cfc23abe20ddfd2cc4a8c4da6a6858eb091de4659edca8"
+    },
+    {
+      "method": "post",
+      "path": "/api/webhooks/whatsapp",
+      "sha256": "03f20507fc5dc844eb1623a93ce44252462de728a3eee39e11c7ab1918b56b7b"
+    },
+    {
+      "method": "get",
+      "path": "/api/whatsapp/templates",
+      "sha256": "8dc442300f589aba740493e143739ebbc977f80308099b3ed8c42638ab9d8057"
+    },
+    {
+      "method": "post",
+      "path": "/api/applications/:id/send-whatsapp",
+      "sha256": "b9424fbd742367071f034ec6492f51af5cf6dc6e1dec6279c529bdf054123c6a"
+    },
+    {
+      "method": "get",
+      "path": "/api/whatsapp/status",
+      "sha256": "00a91814c0d7055de5912b83120264f75af42dd7da3d53394a14c76412e9bdcb"
+    },
+    {
+      "method": "post",
+      "path": "/api/talent-pool/:id/convert",
+      "sha256": "50709054de9122d6ade65822d15a059cd35df2d41491c524c7f6cd1f5484a090"
+    },
+    {
+      "method": "get",
+      "path": "/api/jobs/:jobId/talent-pool/suggestions",
+      "sha256": "56d2ddc38fb60c5074318aa501457e97933a0e83face6472b80cfed45f629363"
+    }
   ],
   "frozen_files": [
-    { "file": "package-lock.json", "sha256": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539" },
-    { "file": "server/lib/seatService.ts", "sha256": "769682ceceaa192023937cd59f4747ad403a67e4989de94537aafdbbdb73b0a9" },
-    { "file": "server/lib/membershipService.ts", "sha256": "c0019fbdd01f25b6636aa6c3b3a9886c8be0d174a105b68c2e0106e6057de510" },
-    { "file": "server/lib/creditService.ts", "sha256": "93269a26f91fd8333e77580de15c19e52df836cd50b50dc50642718058a0b129" },
-    { "file": "server/lib/subscriptionService.ts", "sha256": "878277462f9e72f9b22362ba91055a40124f12b1a8133793d2b35f00306d1a4d" },
-    { "file": "server/lib/invoiceService.ts", "sha256": "804f0004d838c188b63fc9c611207afead2db3c8d64f7ff8469188121e23ebda" },
-    { "file": "server/lib/invoicePdfService.ts", "sha256": "aa30c2e9350e95170e96596a94ae961fb0471791384a91dc8a1f9c6ef700531c" },
-    { "file": "server/lib/cashfreeClient.ts", "sha256": "664b76acbbb2047c3791585619a06ed9c2a0d34c8713d5c9e8f4e6f98fe37b8b" },
-    { "file": "server/lib/planConfig.ts", "sha256": "60f983fe6403488ae62166f06b5ae10f7ab6e9d1b43901885e17f07b340dff97" },
-    { "file": "server/simpleEmailService.ts", "sha256": "862795e04b8a0d2db5480bfa93445deab8e27c3cbc0886707430d5f234e755cf" },
-    { "file": "server/webhooks/cashfree.webhook.ts", "sha256": "26f9cb50b1548f494427251ff6e4e22e0990b2344ff17b5e633b1ab6dcb75024" },
-    { "file": "server/index.ts", "sha256": "caf52020b4c3105cda43ed3fbacde6960dc3b23aef55263a352fa249a84e3447" },
-    { "file": "server/aiWorker.ts", "sha256": "844c10cd2302675d66d2b7fefac777fdf17d9f5593992732f36d1e4dc3eb5c1e" },
-    { "file": "scripts/check-candidate-privacy-surfaces.mjs", "sha256": "f19ccb484a63b20ba8867001733cffb43ea0520106ea18429cf938607749d784" },
-    { "file": "client/src/pages/job-edit-page.tsx", "sha256": "d9a3f983bd32d0088e27c3ee501d1f0c3619044c194b9f5dbb437144403b4f38" },
-    { "file": "client/src/components/JobPostingStepper.tsx", "sha256": "e5924ca374640e2a1f65d41dd6da1ca12e281195ce4173569af2219dbb437c3d" },
-    { "file": "server/schema-control/manifest.ts", "sha256": "16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2" },
-    { "file": "server/schema-migrations/0000_baseline.sql", "sha256": "3fd883d6fb45d0c52acc69bff16949185948bb51e5d732f57247f542814aa129" },
-    { "file": "server/schema-migrations/0001_candidate_privacy_flow.sql", "sha256": "a050e6b3e72a61b1d73c9124ddcd10eb6309f804891412dec9e15288df8c77c8" },
-    { "file": "server/lib/icsGenerator.ts", "sha256": "a78b08f0821d0f36bfbebe5c4932192b2769350c43e1e100ec78d8e92e240f03" },
-    { "file": "client/src/components/kanban/ApplicationDetailPanel.tsx", "sha256": "2844c96fb9e5bd435d8825d0591cc592fbcf3d52a60b7df01cf7de09f9bb00d2" },
-    { "file": "client/src/components/ResumePreviewModal.tsx", "sha256": "05803ec5341695786c9a29fba713cbaff1e06f39989cc87d06818c1c224d1adb" }
+    {
+      "file": "package-lock.json",
+      "sha256": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539"
+    },
+    {
+      "file": "server/lib/seatService.ts",
+      "sha256": "769682ceceaa192023937cd59f4747ad403a67e4989de94537aafdbbdb73b0a9"
+    },
+    {
+      "file": "server/lib/membershipService.ts",
+      "sha256": "c0019fbdd01f25b6636aa6c3b3a9886c8be0d174a105b68c2e0106e6057de510"
+    },
+    {
+      "file": "server/lib/creditService.ts",
+      "sha256": "93269a26f91fd8333e77580de15c19e52df836cd50b50dc50642718058a0b129"
+    },
+    {
+      "file": "server/lib/subscriptionService.ts",
+      "sha256": "878277462f9e72f9b22362ba91055a40124f12b1a8133793d2b35f00306d1a4d"
+    },
+    {
+      "file": "server/lib/invoiceService.ts",
+      "sha256": "804f0004d838c188b63fc9c611207afead2db3c8d64f7ff8469188121e23ebda"
+    },
+    {
+      "file": "server/lib/invoicePdfService.ts",
+      "sha256": "aa30c2e9350e95170e96596a94ae961fb0471791384a91dc8a1f9c6ef700531c"
+    },
+    {
+      "file": "server/lib/cashfreeClient.ts",
+      "sha256": "664b76acbbb2047c3791585619a06ed9c2a0d34c8713d5c9e8f4e6f98fe37b8b"
+    },
+    {
+      "file": "server/lib/planConfig.ts",
+      "sha256": "60f983fe6403488ae62166f06b5ae10f7ab6e9d1b43901885e17f07b340dff97"
+    },
+    {
+      "file": "server/simpleEmailService.ts",
+      "sha256": "862795e04b8a0d2db5480bfa93445deab8e27c3cbc0886707430d5f234e755cf"
+    },
+    {
+      "file": "server/webhooks/cashfree.webhook.ts",
+      "sha256": "26f9cb50b1548f494427251ff6e4e22e0990b2344ff17b5e633b1ab6dcb75024"
+    },
+    {
+      "file": "server/index.ts",
+      "sha256": "caf52020b4c3105cda43ed3fbacde6960dc3b23aef55263a352fa249a84e3447"
+    },
+    {
+      "file": "server/aiWorker.ts",
+      "sha256": "844c10cd2302675d66d2b7fefac777fdf17d9f5593992732f36d1e4dc3eb5c1e"
+    },
+    {
+      "file": "scripts/check-candidate-privacy-surfaces.mjs",
+      "sha256": "f19ccb484a63b20ba8867001733cffb43ea0520106ea18429cf938607749d784"
+    },
+    {
+      "file": "client/src/pages/job-edit-page.tsx",
+      "sha256": "d9a3f983bd32d0088e27c3ee501d1f0c3619044c194b9f5dbb437144403b4f38"
+    },
+    {
+      "file": "client/src/components/JobPostingStepper.tsx",
+      "sha256": "e5924ca374640e2a1f65d41dd6da1ca12e281195ce4173569af2219dbb437c3d"
+    },
+    {
+      "file": "server/schema-control/manifest.ts",
+      "sha256": "16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2"
+    },
+    {
+      "file": "server/schema-migrations/0000_baseline.sql",
+      "sha256": "3fd883d6fb45d0c52acc69bff16949185948bb51e5d732f57247f542814aa129"
+    },
+    {
+      "file": "server/schema-migrations/0001_candidate_privacy_flow.sql",
+      "sha256": "a050e6b3e72a61b1d73c9124ddcd10eb6309f804891412dec9e15288df8c77c8"
+    },
+    {
+      "file": "server/lib/icsGenerator.ts",
+      "sha256": "a78b08f0821d0f36bfbebe5c4932192b2769350c43e1e100ec78d8e92e240f03"
+    },
+    {
+      "file": "client/src/components/kanban/ApplicationDetailPanel.tsx",
+      "sha256": "2844c96fb9e5bd435d8825d0591cc592fbcf3d52a60b7df01cf7de09f9bb00d2"
+    },
+    {
+      "file": "client/src/components/ResumePreviewModal.tsx",
+      "sha256": "05803ec5341695786c9a29fba713cbaff1e06f39989cc87d06818c1c224d1adb"
+    }
   ]
 }

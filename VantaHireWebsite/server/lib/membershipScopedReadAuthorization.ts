@@ -99,11 +99,13 @@ export async function readAuthorizedHiringManagerDirectory(
                  OR EXISTS (
                    SELECT 1
                      FROM ${hiringManagerInvitations}
-                     INNER JOIN ${organizationMembers} AS inviter_membership
-                       ON inviter_membership.user_id = ${hiringManagerInvitations.invitedBy}
-                      AND inviter_membership.organization_id = actor_context.organization_id
-                    WHERE LOWER(${hiringManagerInvitations.email}) = LOWER(hiring_manager.username)
+                    WHERE ${hiringManagerInvitations.authorityScope} = 'organization'
+                      AND ${hiringManagerInvitations.organizationId} = actor_context.organization_id
                       AND ${hiringManagerInvitations.status} = 'accepted'
+                      AND ${hiringManagerInvitations.acceptedAt} IS NOT NULL
+                      AND ${hiringManagerInvitations.acceptedByUserId} = hiring_manager.id
+                      AND ${hiringManagerInvitations.revokedAt} IS NULL
+                      AND ${hiringManagerInvitations.grantVersion} >= 1
                  )
                )
              )

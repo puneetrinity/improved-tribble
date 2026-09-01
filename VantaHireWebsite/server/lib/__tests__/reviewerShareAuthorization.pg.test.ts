@@ -245,6 +245,9 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
              (SELECT bool_and(NOT share_resume AND NOT share_ai_summary) FROM client_shortlists) flags_false,
              (SELECT count(DISTINCT public_ref)::integer FROM client_shortlist_items) distinct_refs,
              (SELECT jsonb_agg(jsonb_build_array(id,authority_scope,organization_id) ORDER BY id) FROM hiring_manager_invitations) invitations,
+             (SELECT count(*)::integer FROM hiring_manager_invitations
+               WHERE accepted_by_user_id IS NULL AND grant_version=1
+                 AND revoked_at IS NULL AND revoked_by IS NULL) grant_safe,
              (SELECT count(*)::integer FROM schema_control.applied) ledger
     `)).rows[0];
     expect(before).toEqual({ forms: 2, shortlists: 1, items: 2, invitations: 1 });
@@ -253,7 +256,8 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
       flags_false: true,
       distinct_refs: 2,
       invitations: [[90, "legacy_private", null]],
-      ledger: 6,
+      grant_safe: 1,
+      ledger: 7,
     });
     await provisionRuntimeRole({
       migrateUrl: migrationUrl, runtimeUrl, runtimeRole: new URL(runtimeUrl).username,
@@ -278,7 +282,7 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
     if (priorDir) rmSync(priorDir, { recursive: true, force: true });
   });
 
-  it("installs ledger 6 with exact defaults, checks, FK and indexes", async () => {
+  it("installs ledger 7 with exact defaults, checks, FK and indexes", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT count(*)::integer FROM schema_control.applied) ledger,
              (SELECT count(*)::integer FROM information_schema.columns WHERE table_name='client_shortlists'
@@ -294,7 +298,18 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
                ('forms_authority_scope_idx','client_shortlist_items_public_ref_idx',
                 'hm_invitations_authority_issuer_idx','hm_invitations_authority_email_idx')) indexes
     `)).rows[0];
-    expect(row).toEqual({ ledger: 6, flags: 2, fail_closed_defaults: 2, checks: 4, indexes: 4 });
+    expect(row).toEqual({ ledger: 7, flags: 2, fail_closed_defaults: 2, checks: 4, indexes: 4 });
+    const grant = (await owner!.query(`
+      SELECT (SELECT count(*)::integer FROM information_schema.columns
+                WHERE table_name='hiring_manager_invitations'
+                  AND column_name IN ('accepted_by_user_id','grant_version','revoked_at','revoked_by')) columns,
+             (SELECT count(*)::integer FROM pg_constraint WHERE conname IN
+                ('hiring_manager_invitations_grant_version_positive_check',
+                 'hiring_manager_invitations_revocation_shape_check',
+                 'hiring_manager_invitations_accepted_user_shape_check')) checks,
+             (SELECT count(*)::integer FROM pg_indexes WHERE indexname='hm_invitations_eligibility_idx') indexes
+    `)).rows[0];
+    expect(grant).toEqual({ columns: 4, checks: 3, indexes: 1 });
   });
 
   it("enforces organization form read/manage, membership loss and legacy isolation", async () => {

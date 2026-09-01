@@ -311,6 +311,14 @@ describe("membership-scoped read route admission", () => {
     expect(mocks.getUsers).not.toHaveBeenCalled();
   });
 
+  it("preserves an accepted-user provenance denial as an authorized empty directory", async () => {
+    mocks.readDirectory.mockResolvedValueOnce({ ok: true, rows: [] });
+    const result = await invoke(await buildApp(), "/api/users", { query: { role: "hiring_manager" } });
+    expect(result).toEqual({ status: 200, body: [] });
+    expect(mocks.readDirectory).toHaveBeenCalledTimes(1);
+    expect(mocks.getUsers).not.toHaveBeenCalled();
+  });
+
   it("maps a reader failure to a fixed 503 without a fallback directory read", async () => {
     mocks.readDirectory.mockResolvedValueOnce({ ok: false, reason: "unavailable" });
     const result = await invoke(await buildApp(), "/api/users", { query: { role: "hiring_manager" } });

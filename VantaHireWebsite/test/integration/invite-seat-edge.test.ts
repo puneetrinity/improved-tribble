@@ -1,6 +1,7 @@
 // @vitest-environment node
 import '../setup.integration';
 import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { createHash, randomBytes } from 'node:crypto';
 import request from 'supertest';
 import express from 'express';
 import { registerRoutes } from '../../server/routes';
@@ -12,14 +13,64 @@ import {
   organizationSubscriptions,
   users,
 } from '@shared/schema';
-import { eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import {
   addOrganizationMember,
   createOrganizationWithOwner,
   createRecruiterUser,
   ensurePlan,
 } from '../utils/db-helpers';
-import { createOrganizationInvite } from '../../server/lib/organizationService';
+
+async function createVersionedInvite(
+  organizationId: number,
+  email: string,
+  invitedBy: number,
+) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const plaintextToken = randomBytes(32).toString('hex');
+  const tokenHash = createHash('sha256').update(plaintextToken).digest('hex');
+  const current = await db.query.organizationInvites.findFirst({
+    where: and(
+      eq(organizationInvites.organizationId, organizationId),
+      eq(organizationInvites.email, normalizedEmail),
+      eq(organizationInvites.state, 'pending'),
+    ),
+    orderBy: [desc(organizationInvites.version), desc(organizationInvites.id)],
+  });
+  if (current) {
+    await db.update(organizationInvites).set({
+      state: 'superseded',
+      supersededAt: new Date(),
+    }).where(eq(organizationInvites.id, current.id));
+  }
+  const [invite] = await db.insert(organizationInvites).values({
+    organizationId,
+    email: normalizedEmail,
+    role: 'member',
+    token: tokenHash,
+    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    invitedBy,
+    state: 'pending',
+    version: (current?.version ?? 0) + 1,
+  }).returning();
+  return { ...invite, token: plaintextToken };
+}
+
+async function createSeatCapacity(organizationId: number, seats: number) {
+  const { plan } = await ensurePlan('free');
+  const now = new Date();
+  const [subscription] = await db.insert(organizationSubscriptions).values({
+    organizationId,
+    planId: plan.id,
+    seats,
+    billingCycle: 'monthly',
+    status: 'active',
+    startDate: now,
+    currentPeriodStart: now,
+    currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+  }).returning();
+  return subscription;
+}
 
 const HAS_DB = !!process.env.DATABASE_URL;
 const maybeDescribe = HAS_DB ? describe : describe.skip;
@@ -106,7 +157,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
     created.orgIds.push(otherOrg.id);
 
     // Create invite while user is NOT in any org yet
-    const invite = await createOrganizationInvite(otherOrg.id, user.username, 'member', otherOwner.id);
+    const invite = await createVersionedInvite(otherOrg.id, user.username, otherOwner.id);
     created.inviteIds.push(invite.id);
 
     // Now create an org for the user (user joins an org AFTER invite was created)
@@ -130,8 +181,8 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       .set('x-csrf-token', csrf.body?.token)
       .send();
 
-    expect(response.status).toBe(400);
-    expect(response.body?.error).toMatch(/already a member/i);
+    expect(response.status).toBe(409);
+    expect(response.body?.code).toBe('USER_ALREADY_IN_ORGANIZATION');
   });
 
   it('rejects expired invite tokens', async () => {
@@ -151,7 +202,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
     });
     created.orgIds.push(org.id);
 
-    const invite = await createOrganizationInvite(org.id, invitee.username, 'member', owner.id);
+    const invite = await createVersionedInvite(org.id, invitee.username, owner.id);
     created.inviteIds.push(invite.id);
 
     // Force expiry
@@ -173,10 +224,10 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       .send();
 
     expect(response.status).toBe(404);
-    expect(response.body?.error).toMatch(/expired/i);
+    expect(response.body?.code).toBe('INVITATION_NOT_FOUND');
   });
 
-  it('returns 410 for expired invite details', async () => {
+  it('collapses expired invite details to the fixed not-found response', async () => {
     const owner = await createRecruiterUser({
       username: `exp_owner_${Date.now()}@example.com`,
       password: 'password',
@@ -193,7 +244,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
     });
     created.orgIds.push(org.id);
 
-    const invite = await createOrganizationInvite(org.id, invitee.username, 'member', owner.id);
+    const invite = await createVersionedInvite(org.id, invitee.username, owner.id);
     created.inviteIds.push(invite.id);
 
     await db.update(organizationInvites)
@@ -202,8 +253,8 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
 
     const response = await request(app).get(`/api/invites/${invite.token}`);
 
-    expect(response.status).toBe(410);
-    expect(response.body?.error).toMatch(/expired/i);
+    expect(response.status).toBe(404);
+    expect(response.body?.code).toBe('INVITATION_NOT_FOUND');
   });
 
   it('rejects accept when invite expires after preview', async () => {
@@ -223,7 +274,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
     });
     created.orgIds.push(org.id);
 
-    const invite = await createOrganizationInvite(org.id, invitee.username, 'member', owner.id);
+    const invite = await createVersionedInvite(org.id, invitee.username, owner.id);
     created.inviteIds.push(invite.id);
 
     const previewResponse = await request(app).get(`/api/invites/${invite.token}`);
@@ -247,7 +298,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       .send();
 
     expect(response.status).toBe(404);
-    expect(response.body?.error).toMatch(/expired/i);
+    expect(response.body?.code).toBe('INVITATION_NOT_FOUND');
   });
 
   it('rejects invalid invite tokens', async () => {
@@ -270,8 +321,8 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       .set('x-csrf-token', csrf.body?.token)
       .send();
 
-    expect(response.status).toBe(404);
-    expect(response.body?.error).toMatch(/invalid|expired/i);
+    expect(response.status).toBe(400);
+    expect(response.body?.code).toBe('INVALID_INVITATION_TOKEN');
   });
 
   it('rejects invite reuse after it has been accepted', async () => {
@@ -294,8 +345,10 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       ownerId: owner.id,
     });
     created.orgIds.push(org.id);
+    const subscription = await createSeatCapacity(org.id, 2);
+    created.subscriptionIds.push(subscription.id);
 
-    const invite = await createOrganizationInvite(org.id, firstInvitee.username, 'member', owner.id);
+    const invite = await createVersionedInvite(org.id, firstInvitee.username, owner.id);
     created.inviteIds.push(invite.id);
 
     const firstAgent = request.agent(app);
@@ -327,7 +380,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       .send();
 
     expect(secondAccept.status).toBe(404);
-    expect(secondAccept.body?.error).toMatch(/invalid|expired/i);
+    expect(secondAccept.body?.code).toBe('INVITATION_NOT_FOUND');
   });
 
   it('invalidates older invites when a new invite is created for the same email', async () => {
@@ -346,11 +399,13 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       ownerId: owner.id,
     });
     created.orgIds.push(org.id);
+    const subscription = await createSeatCapacity(org.id, 2);
+    created.subscriptionIds.push(subscription.id);
 
-    const firstInvite = await createOrganizationInvite(org.id, invitee.username, 'member', owner.id);
+    const firstInvite = await createVersionedInvite(org.id, invitee.username, owner.id);
     created.inviteIds.push(firstInvite.id);
 
-    const secondInvite = await createOrganizationInvite(org.id, invitee.username, 'member', owner.id);
+    const secondInvite = await createVersionedInvite(org.id, invitee.username, owner.id);
     created.inviteIds.push(secondInvite.id);
 
     const agent = request.agent(app);
@@ -534,10 +589,9 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
     });
     created.orgIds.push(org.id);
 
-    const invite = await createOrganizationInvite(
+    const invite = await createVersionedInvite(
       org.id,
       `invitee_${Date.now()}@example.com`,
-      'member',
       owner.id
     );
     created.inviteIds.push(invite.id);
@@ -569,7 +623,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
     });
     created.orgIds.push(org.id);
 
-    const invite = await createOrganizationInvite(org.id, invitee.username, 'member', owner.id);
+    const invite = await createVersionedInvite(org.id, invitee.username, owner.id);
     created.inviteIds.push(invite.id);
 
     const agent = request.agent(app);
@@ -586,7 +640,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       .send();
 
     expect(response.status).toBe(403);
-    expect(response.body?.error).toMatch(/different email/i);
+    expect(response.body?.code).toBe('INVITATION_ACCESS_DENIED');
 
     const inviteAfter = await db.query.organizationInvites.findFirst({
       where: eq(organizationInvites.id, invite.id),
@@ -631,7 +685,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
     }).returning();
     created.subscriptionIds.push(subscription.id);
 
-    const invite = await createOrganizationInvite(org.id, invitee.username, 'member', owner.id);
+    const invite = await createVersionedInvite(org.id, invitee.username, owner.id);
     created.inviteIds.push(invite.id);
 
     const agent = request.agent(app);
@@ -648,7 +702,7 @@ maybeDescribe('Invite and seat enforcement edge cases', () => {
       .send();
 
     expect(response.status).toBe(409);
-    expect(response.body?.error).toMatch(/no seats available/i);
+    expect(response.body?.code).toBe('NO_SEATS_AVAILABLE');
 
     const inviteAfter = await db.query.organizationInvites.findFirst({
       where: eq(organizationInvites.id, invite.id),

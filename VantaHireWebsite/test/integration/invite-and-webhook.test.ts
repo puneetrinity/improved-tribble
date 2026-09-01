@@ -1,7 +1,7 @@
 // @vitest-environment node
 import '../setup.integration';
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import request from 'supertest';
 import express from 'express';
 import { registerRoutes } from '../../server/routes';
@@ -162,7 +162,8 @@ maybeDescribe('Invite + Cashfree webhook flows', () => {
       .send({ email: inviteEmail, role: 'member' });
 
     expect(inviteResponse.status).toBe(201);
-    expect(inviteResponse.body).toHaveProperty('token');
+    expect(inviteResponse.body).not.toHaveProperty('token');
+    expect(inviteResponse.body).not.toHaveProperty('version');
 
     if (inviteResponse.body?.id) {
       created.inviteIds.push(inviteResponse.body.id);
@@ -171,7 +172,14 @@ maybeDescribe('Invite + Cashfree webhook flows', () => {
     expect(emailMocks.sendEmail).toHaveBeenCalledTimes(1);
     const emailArgs = emailMocks.sendEmail.mock.calls[0][0];
     expect(emailArgs.to).toBe(inviteEmail.toLowerCase());
-    expect(emailArgs.html).toContain(`/recruiter-auth?invite=${inviteResponse.body.token}`);
+    const plaintextToken = String(emailArgs.html).match(/\/recruiter-auth\?invite=([0-9a-f]{64})/)?.[1];
+    expect(plaintextToken).toMatch(/^[0-9a-f]{64}$/);
+    const persisted = await db.query.organizationInvites.findFirst({
+      where: eq(organizationInvites.id, inviteResponse.body.id),
+    });
+    expect(persisted?.token).toBe(createHash('sha256').update(plaintextToken!).digest('hex'));
+    expect(persisted?.state).toBe('pending');
+    expect(persisted?.version).toBe(1);
   });
 
   it('includes invite token in verification email link during registration', async () => {

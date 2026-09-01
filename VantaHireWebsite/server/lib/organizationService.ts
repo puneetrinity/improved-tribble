@@ -2,7 +2,6 @@ import { db } from "../db";
 import {
   organizations,
   organizationMembers,
-  organizationInvites,
   organizationJoinRequests,
   domainClaimRequests,
   organizationSubscriptions,
@@ -11,21 +10,17 @@ import {
   type Organization,
   type InsertOrganization,
   type OrganizationMember,
-  type OrganizationInvite,
   type OrganizationJoinRequest,
   type DomainClaimRequest,
   type OrganizationRole,
-  type User,
 } from "@shared/schema";
-import { eq, and, desc, sql, or, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, or } from "drizzle-orm";
 import slugify from "slugify";
-import crypto from "crypto";
-import { hasAvailableSeats } from "./seatService";
 import { mergeDuplicatePipelineStagesForOrg } from "./pipelineStageMerge";
 
 // Backfill orphaned jobs, applications, clients, and child tables for a user joining an organization
 // This ensures legacy records (created before org existed) are associated with the new org
-async function backfillUserRecordsToOrg(
+export async function backfillUserRecordsToOrg(
   tx: any, // Drizzle transaction object
   userId: number,
   organizationId: number
@@ -372,146 +367,6 @@ export async function getOrganizationWithSubscription(orgId: number): Promise<{
     subscription: org.subscription || null,
     plan: org.subscription?.plan || null,
   };
-}
-
-// Invite token generation
-export function generateInviteToken(): string {
-  return crypto.randomBytes(32).toString('hex');
-}
-
-// Organization invites
-export async function createOrganizationInvite(
-  organizationId: number,
-  email: string,
-  role: OrganizationRole,
-  invitedBy: number
-): Promise<OrganizationInvite> {
-  const token = generateInviteToken();
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-
-  // Check if user already in another org
-  const existingUser = await db.query.users.findFirst({
-    where: eq(users.username, email.toLowerCase()),
-  });
-
-  if (existingUser) {
-    const inOrg = await isUserInOrganization(existingUser.id);
-    if (inOrg) {
-      throw new Error('User is already a member of another organization');
-    }
-  }
-
-  // Delete any existing pending invite for this email in this org
-  await db.delete(organizationInvites)
-    .where(and(
-      eq(organizationInvites.organizationId, organizationId),
-      eq(organizationInvites.email, email.toLowerCase()),
-      isNull(organizationInvites.acceptedAt)
-    ));
-
-  const [invite] = await db.insert(organizationInvites).values({
-    organizationId,
-    email: email.toLowerCase(),
-    role,
-    token,
-    expiresAt,
-    invitedBy,
-  }).returning();
-
-  return invite;
-}
-
-export async function getOrganizationInviteByToken(token: string): Promise<(OrganizationInvite & { organization: Organization; invitedByUser: User | null }) | undefined> {
-  return db.query.organizationInvites.findFirst({
-    where: and(
-      eq(organizationInvites.token, token),
-      isNull(organizationInvites.acceptedAt)
-    ),
-    with: {
-      organization: true,
-      invitedByUser: true,  // Get inviter details
-    },
-  });
-}
-
-export async function getPendingInvitesForOrganization(orgId: number): Promise<OrganizationInvite[]> {
-  return db.query.organizationInvites.findMany({
-    where: and(
-      eq(organizationInvites.organizationId, orgId),
-      isNull(organizationInvites.acceptedAt)
-    ),
-    orderBy: desc(organizationInvites.createdAt),
-  });
-}
-
-export async function acceptOrganizationInvite(
-  token: string,
-  userId: number,
-  userEmail: string
-): Promise<OrganizationMember> {
-  const invite = await getOrganizationInviteByToken(token);
-  if (!invite) {
-    throw new Error('Invalid or expired invite');
-  }
-
-  if (new Date() > invite.expiresAt) {
-    throw new Error('Invite has expired');
-  }
-
-  // Validate email matches invite
-  if (invite.email.toLowerCase() !== userEmail.toLowerCase()) {
-    throw new Error('This invite was sent to a different email address. Please use the correct email to accept this invite.');
-  }
-
-  // Check if user is already in another org
-  const inOrg = await isUserInOrganization(userId);
-  if (inOrg) {
-    throw new Error('You must leave your current organization first');
-  }
-
-  // Check seat availability
-  const seatsAvailable = await hasAvailableSeats(invite.organizationId);
-  if (!seatsAvailable) {
-    throw new Error('No seats available in this organization. Please contact the organization owner to add more seats.');
-  }
-
-  // Transaction: accept invite + add member + backfill records
-  const member = await db.transaction(async (tx: any) => {
-    // Update invite as accepted
-    await tx.update(organizationInvites)
-      .set({
-        acceptedAt: new Date(),
-        acceptedBy: userId,
-      })
-      .where(eq(organizationInvites.id, invite.id));
-
-    // Add user to organization
-    const [member] = await tx.insert(organizationMembers).values({
-      organizationId: invite.organizationId,
-      userId,
-      role: invite.role as OrganizationRole,
-      seatAssigned: true,
-      invitedBy: invite.invitedBy,
-      joinedAt: new Date(),
-    }).returning();
-
-    // Backfill orphaned jobs and applications for this user
-    await backfillUserRecordsToOrg(tx, userId, invite.organizationId);
-
-    return member;
-  });
-
-  try {
-    await mergeDuplicatePipelineStagesForOrg(invite.organizationId, { dryRun: false });
-  } catch (error) {
-    console.warn('[Org Backfill] Failed to merge duplicate pipeline stages after invite acceptance:', error);
-  }
-
-  return member;
-}
-
-export async function cancelOrganizationInvite(inviteId: number): Promise<void> {
-  await db.delete(organizationInvites).where(eq(organizationInvites.id, inviteId));
 }
 
 // Join requests (for domain-based joining)
