@@ -214,6 +214,7 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
       isPublished: true,
       createdBy: orgOwner.id,
       organizationId: org.id,
+      ownershipScope: 'organization',
       createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();
@@ -320,9 +321,8 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
     expect(templates.body.some((t: any) => t.id === orgTemplate.id)).toBe(false);
 
     const formTemplates = await agent.get('/api/forms/templates');
-    expect(formTemplates.status).toBe(200);
-    expect(formTemplates.body.templates.some((f: any) => f.id === defaultForm.id)).toBe(true);
-    expect(formTemplates.body.templates.some((f: any) => f.id === orgForm.id)).toBe(false);
+    expect(formTemplates.status).toBe(403);
+    expect(formTemplates.body.code).toBe('NO_ORGANIZATION');
 
     const clientList = await agent.get('/api/clients');
     expect(clientList.status).toBe(200);
@@ -330,9 +330,8 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
     expect(clientList.body.some((c: any) => c.id === orgClient.id)).toBe(false);
 
     const talentList = await agent.get('/api/talent-pool');
-    expect(talentList.status).toBe(200);
-    expect(talentList.body.candidates.some((c: any) => c.id === legacyTalent.id)).toBe(true);
-    expect(talentList.body.candidates.some((c: any) => c.id === orgTalent.id)).toBe(false);
+    expect(talentList.status).toBe(403);
+    expect(talentList.body.code).toBe('NO_ORGANIZATION');
   });
 
   it('shows defaults + org data for org recruiters without cross-org leakage', async () => {
@@ -467,6 +466,7 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
       isPublished: true,
       createdBy: ownerA.id,
       organizationId: orgA.id,
+      ownershipScope: 'organization',
       createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();
@@ -478,6 +478,7 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
       isPublished: true,
       createdBy: ownerB.id,
       organizationId: orgB.id,
+      ownershipScope: 'organization',
       createdAt: new Date(),
       updatedAt: new Date(),
     }).returning();
@@ -582,6 +583,15 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
     }).returning();
     created.talentIds.push(orgATalent.id);
 
+    const [orgBTalent] = await db.insert(talentPool).values({
+      email: `orgB_talent_${Date.now()}@example.com`,
+      name: 'OrgB Talent',
+      recruiterId: ownerB.id,
+      organizationId: orgB.id,
+      source: 'manual',
+    }).returning();
+    created.talentIds.push(orgBTalent.id);
+
     const agent = request.agent(app);
     await login(agent, ownerA.username, 'password');
 
@@ -601,7 +611,7 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
 
     const formTemplates = await agent.get('/api/forms/templates');
     expect(formTemplates.status).toBe(200);
-    expect(formTemplates.body.templates.some((f: any) => f.id === defaultForm.id)).toBe(true);
+    expect(formTemplates.body.templates.some((f: any) => f.id === defaultForm.id)).toBe(false);
     expect(formTemplates.body.templates.some((f: any) => f.id === legacyForm.id)).toBe(true);
     expect(formTemplates.body.templates.some((f: any) => f.id === orgAForm.id)).toBe(true);
     expect(formTemplates.body.templates.some((f: any) => f.id === orgBForm.id)).toBe(false);
@@ -632,8 +642,9 @@ maybeDescribe('Backward Compatibility - Legacy Access & Defaults', () => {
 
     const talentList = await agent.get('/api/talent-pool');
     expect(talentList.status).toBe(200);
-    expect(talentList.body.candidates.some((c: any) => c.id === legacyTalent.id)).toBe(true);
+    expect(talentList.body.candidates.some((c: any) => c.id === legacyTalent.id)).toBe(false);
     expect(talentList.body.candidates.some((c: any) => c.id === orgATalent.id)).toBe(true);
+    expect(talentList.body.candidates.some((c: any) => c.id === orgBTalent.id)).toBe(false);
   });
 });
 

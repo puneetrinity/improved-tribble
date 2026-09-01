@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "099409e78c30beb371c671b08732444798f5ee3f68780b303ce9387a75d49b62",
+  "source_census_sha256": "1b034e3dd2608d37547634fd34eb317993a6d7ecd88c7411003ac8abd42a2429",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
@@ -12,6 +12,7 @@
     "server/resume.routes.ts",
     "server/bulkResumeImport.routes.ts",
     "server/talent-pool.routes.ts",
+    "server/lib/talentPoolAuthorization.ts",
     "server/signal.routes.ts",
     "server/candidates.semantic.routes.ts",
     "server/recruiterDashboard.routes.ts",
@@ -67,6 +68,7 @@
     { "file": "server/resume.routes.ts", "classification": "fenced" },
     { "file": "server/bulkResumeImport.routes.ts", "classification": "fenced" },
     { "file": "server/talent-pool.routes.ts", "classification": "fenced" },
+    { "file": "server/lib/talentPoolAuthorization.ts", "classification": "fenced" },
     { "file": "server/signal.routes.ts", "classification": "fenced" },
     { "file": "server/candidates.semantic.routes.ts", "classification": "fenced" },
     { "file": "server/recruiterDashboard.routes.ts", "classification": "fenced" },
@@ -338,8 +340,19 @@
       "direction": "read_write",
       "privacy_action": ["organization_pool_remove", "organization_pool_restore", "request_erasure"],
       "organization_scope": "owning_org",
-      "enforcement": "Scoped active readers plus audited soft removal/restore; no global directive authority.",
-      "anchors": ["removeTalentPoolCandidate", "restoreTalentPoolCandidate", "removed from this organization"]
+      "enforcement": "Strict actor preflight precedes new-identity eligibility; statement-bound active-object reads/writes and audited soft removal/restore reauthorize through the dedicated module.",
+      "anchors": ["readAuthorizedTalentPoolCreateContext", "requireNewCandidateIdentityAllowed", "removeAuthorizedTalentPoolCandidate", "restoreAuthorizedTalentPoolCandidate"]
+    },
+    {
+      "id": "talent-pool-statement-bound-authority",
+      "file": "server/lib/talentPoolAuthorization.ts",
+      "symbol": "listAuthorizedTalentPoolCandidates",
+      "models": ["talent_pool", "talent_pool_membership_events", "candidate_privacy_requests"],
+      "direction": "read_write",
+      "privacy_action": ["organization_pool_remove", "organization_pool_restore", "request_erasure"],
+      "organization_scope": "owning_org",
+      "enforcement": "Every active collection/object projection and mutation is fenced with non-global candidate privacy inside its single statement; removal/restore events are atomic with the row change.",
+      "anchors": ["privacyAllowedSql(\"talent_pool\", \"pool.id\", { globalUse: false })", "HAVING COUNT(*) = 1", "talentPoolMembershipEvents"]
     },
     {
       "id": "signal-sourced-reader-writer",

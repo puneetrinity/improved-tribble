@@ -2,7 +2,7 @@
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
   "route_registration_census": 316,
-  "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity and routine-admin commands are fail-closed; protected authorization and mutations share statement-bound grants; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection and consultant product are retired. Seat-capacity serialization remains outside this closure.",
+  "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin and talent-pool commands are fail-closed; protected authorization and mutations share statement-bound grants; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection and consultant product are retired. Seat-capacity serialization and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
     {
       "method": "get",
@@ -143,7 +143,13 @@
     { "method": "get", "path": "/api/subscription/invoices/:transactionId/pdf", "reader": "readAuthorizedInvoiceById", "projection": ["bounded_file_or_redirect"] },
     { "method": "get", "path": "/api/invoices/:fileName", "reader": "readAuthorizedInvoiceByFileName", "projection": ["bounded_file"] },
     { "method": "get", "path": "/api/ai/credits/usage", "reader": "readAuthorizedOrganizationAiActivity", "projection": ["windowDays", "totals", "byKind"] },
-    { "method": "patch", "path": "/api/admin/users/:id/role", "reader": "updateAuthorizedUserRole", "projection": ["id", "email", "firstName", "lastName", "role", "emailVerified"] }
+    { "method": "patch", "path": "/api/admin/users/:id/role", "reader": "updateAuthorizedUserRole", "projection": ["id", "email", "firstName", "lastName", "role", "emailVerified"] },
+    { "method": "get", "path": "/api/talent-pool", "reader": "listAuthorizedTalentPoolCandidates", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
+    { "method": "get", "path": "/api/talent-pool/:id", "reader": "readAuthorizedTalentPoolCandidate", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
+    { "method": "post", "path": "/api/talent-pool", "reader": "readAuthorizedTalentPoolCreateContext+createAuthorizedTalentPoolCandidate", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
+    { "method": "put", "path": "/api/talent-pool/:id", "reader": "readAuthorizedTalentPoolCandidate+updateAuthorizedTalentPoolCandidate", "projection": ["id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt"] },
+    { "method": "delete", "path": "/api/talent-pool/:id", "reader": "removeAuthorizedTalentPoolCandidate", "projection": [] },
+    { "method": "post", "path": "/api/talent-pool/:id/restore", "reader": "restoreAuthorizedTalentPoolCandidate", "projection": ["candidate", "message"] }
   ],
   "retired_routes": [
     { "method": "patch", "path": "/api/applications/:id/download", "code": "RESUME_DOWNLOAD_TRACKING_RETIRED" },
@@ -172,9 +178,9 @@
     { "file": "server/candidates.semantic.routes.ts", "sha256": "9116127419c1f515d11d504786408ef1f2622e9365a74ec55f0fb93b70059a4a" },
     { "file": "server/gcs-storage.ts", "sha256": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802" },
     { "file": "server/auth.ts", "sha256": "634a9771eb8ad36a49ecd81f11a7d0d71b41bdfdec6893ddb301ec629ae42bd8" },
-    { "file": "server/candidate-privacy/surfaces.json", "sha256": "a67085797c9189aca6f04a4c7d8c6b8c156a676dc8d6fcdd4cfcfb8317e936a0" },
+    { "file": "server/candidate-privacy/surfaces.json", "sha256": "8c0ba28c65346d7903193226056555e1f1566425e0ffb0c87b9d83d1118436d1" },
     { "file": "server/lib/__tests__/applicationReadAuthorization.test.ts", "sha256": "6fe7a1bed64866da80b94ad2a52f69c8dd82a16b94d06d081f7a59d92c609762" },
-    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "aef9bfab0b47eaf914d084fda5fd1e4163ca2bbaa66c374c426f1f99f41cd31d" },
+    { "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts", "sha256": "dcd0ce3ea8e3404f91d883933bb95649b5b88cb51abab4b45c4ffa6c6b39e117" },
     { "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts", "sha256": "afbd24fd5559e4864bcbf06afef737dbf151dcb419e7d69972180e8f611055ac" },
     { "file": "server/lib/__tests__/membershipScopedReadAuthorization.routes.test.ts", "sha256": "8bb40a2aa05775ff95da9e105baf07506acdd4f3b0d92f22bd6bcd7943ced659" },
     { "file": "server/lib/__tests__/resumeAccessAuthorization.routes.test.ts", "sha256": "a607c1f9b019e5b23327aa8f14fc5305bb4201e6bff68ceb428cd65a6634320c" },
@@ -200,7 +206,7 @@
     { "file": "server/tests/interviewIcsAuthorization.routes.test.ts", "sha256": "5f24cda1c7f4d499a317ca4e998d71bb99df40880d2295231b78505efbdf3e59" },
     { "file": "server/tests/hiring-manager-feedback-access.routes.test.ts", "sha256": "2f6432802bafbdb4a7f80617412237277130bdc76df3e75d398daa7e598f4bad" },
     { "file": "server/whatsapp.routes.ts", "sha256": "6fe33d722f4be777ed138d9ba3a80689cf4d01f31eeb9b14a1ff26ddfac844ca" },
-    { "file": "scripts/check-object-authorization.mjs", "sha256": "2acad64790a6cd7101032ad460ebf471b7a738f360fd4358c77ffeac5708b172" },
+    { "file": "scripts/check-object-authorization.mjs", "sha256": "91dedc3f73aa6b34be223a57e2cbacbb66c48d336469cba89ab331a0571cec52" },
     { "file": "client/src/pages/candidates-page.tsx", "sha256": "94a944e1543310d76db639b421490eb51f7e4388304527f6d92a807743f611ea" },
     { "file": "client/src/pages/application-management-page.tsx", "sha256": "eeffcc55702106ed7eee26b340455bbd542767d7c1bbf4318d1236bcf4f65156" },
     { "file": "client/src/pages/admin-forms-page.tsx", "sha256": "1de0261cdd0c31e45926208190591f7a85ca981e93a08c3551dbf96804c3321f" },
@@ -225,14 +231,22 @@
     { "file": "client/src/pages/org-billing-page.tsx", "sha256": "a85d1a64605b7d8756f6e2dc9c9e23ae9082f6fb259df519e970aa5370e33d6c" },
     { "file": "client/src/pages/admin-super-dashboard.tsx", "sha256": "63e7981ffecc244d8b1f537c0b4e2f3bfe9105166be66e92648378c23ca21403" },
     { "file": "client/src/App.tsx", "sha256": "05927965067586cc753ff9c48d3d39005ae86343a9f17eff9d2c535a53175e4d" },
-    { "file": "client/src/components/QuickAccessBar.tsx", "sha256": "f2ee1c8e446fbb40f6735ad1d39e73f1835d268ad1271298363b3c43f374a9f5" }
+    { "file": "client/src/components/QuickAccessBar.tsx", "sha256": "f2ee1c8e446fbb40f6735ad1d39e73f1835d268ad1271298363b3c43f374a9f5" },
+    { "file": "server/talent-pool.routes.ts", "sha256": "d11cacc618d848f154d5434d5e0697cd17bc3c6c442db9b253d28e81e233dda3" },
+    { "file": "server/lib/talentPoolAuthorization.ts", "sha256": "1658edb7c8ecb4093ade2f4b4b47e5a1ac9806e7398fc2a2185cb8b46046ec79" },
+    { "file": "server/lib/__tests__/talentPoolAuthorization.test.ts", "sha256": "bf26c7d1dc2732598855fb8a3c7b4953bf3e117db7d83d1cbb3df7c1e69b856c" },
+    { "file": "server/lib/__tests__/talentPoolAuthorization.routes.test.ts", "sha256": "408d4767bf201eabd8281b65ef187ee3e400a949738ed4f79c1a1d70c108e58b" },
+    { "file": "server/lib/__tests__/talentPoolAuthorization.pg.test.ts", "sha256": "c76ed0f020780c3db29878b941985857632e00814321977cf026c64d50b4dcd9" },
+    { "file": "test/integration/backward-compatibility.test.ts", "sha256": "385cd315bbfc2050b00e1982b037a5b4621f88cd42fdca6bac8386a9d96b0549" }
   ],
   "frozen_route_blocks": [
     { "method": "get", "path": "/api/webhooks/whatsapp", "sha256": "7f536ad1b199d3a8b6cfc23abe20ddfd2cc4a8c4da6a6858eb091de4659edca8" },
     { "method": "post", "path": "/api/webhooks/whatsapp", "sha256": "03f20507fc5dc844eb1623a93ce44252462de728a3eee39e11c7ab1918b56b7b" },
     { "method": "get", "path": "/api/whatsapp/templates", "sha256": "8dc442300f589aba740493e143739ebbc977f80308099b3ed8c42638ab9d8057" },
     { "method": "post", "path": "/api/applications/:id/send-whatsapp", "sha256": "b9424fbd742367071f034ec6492f51af5cf6dc6e1dec6279c529bdf054123c6a" },
-    { "method": "get", "path": "/api/whatsapp/status", "sha256": "00a91814c0d7055de5912b83120264f75af42dd7da3d53394a14c76412e9bdcb" }
+    { "method": "get", "path": "/api/whatsapp/status", "sha256": "00a91814c0d7055de5912b83120264f75af42dd7da3d53394a14c76412e9bdcb" },
+    { "method": "post", "path": "/api/talent-pool/:id/convert", "sha256": "50709054de9122d6ade65822d15a059cd35df2d41491c524c7f6cd1f5484a090" },
+    { "method": "get", "path": "/api/jobs/:jobId/talent-pool/suggestions", "sha256": "56d2ddc38fb60c5074318aa501457e97933a0e83face6472b80cfed45f629363" }
   ],
   "frozen_files": [
     { "file": "package-lock.json", "sha256": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539" },

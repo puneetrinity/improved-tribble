@@ -41,6 +41,11 @@ function fixture(): string {
   cpSync(join(APP_ROOT, "server"), join(root, "server"), { recursive: true });
   cpSync(join(APP_ROOT, "shared"), join(root, "shared"), { recursive: true });
   cpSync(join(APP_ROOT, "scripts"), join(root, "scripts"), { recursive: true });
+  mkdirSync(join(root, "test", "integration"), { recursive: true });
+  cpSync(
+    join(APP_ROOT, "test", "integration", "backward-compatibility.test.ts"),
+    join(root, "test", "integration", "backward-compatibility.test.ts"),
+  );
   mkdirSync(join(root, "client", "src", "components", "kanban"), { recursive: true });
   mkdirSync(join(root, "client", "src", "pages"), { recursive: true });
   mkdirSync(join(root, "client", "src", "lib"), { recursive: true });
@@ -1224,5 +1229,131 @@ describe("object authorization surface guard", () => {
       ),
     );
     expect(problems).toContain("GET /api/subscription/invoices logs protected identity, financial, path or raw-error data.");
+  });
+
+  it("rejects fail-open talent-pool seat middleware", () => {
+    const problems = mutate(fixture(), "server/talent-pool.routes.ts", (source) =>
+      source.replace("requireSeat(),", "requireSeat({ allowNoOrg: true }),"),
+    );
+    expect(problems).toContain("all six talent-pool management routes require strict seat middleware.");
+  });
+
+  it("rejects ambiguous membership collapsed with LIMIT 1", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace("HAVING COUNT(*) = 1", "LIMIT 1"),
+    );
+    expect(problems).toContain("talent-pool authority restores forbidden pattern: LIMIT 1");
+  });
+
+  it("rejects recruiter-id authority OR organization authority", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace(
+        "actor_grant.organization_id = pool.organization_id",
+        "actor_grant.organization_id = pool.organization_id OR pool.recruiter_id = actor_grant.actor_user_id",
+      ),
+    );
+    expect(problems).toContain("talent-pool authority restores forbidden pattern: pool.recruiter_id =");
+  });
+
+  it("rejects global-use talent-pool privacy", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace("{ globalUse: false }", "{ globalUse: true }"),
+    );
+    expect(problems).toContain("talent-pool authority restores forbidden pattern: globalUse: true");
+  });
+
+  it("rejects privacy applied after list ordering", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace(
+        "AND ${PRIVACY_ALLOWED}\n      )",
+        "AND TRUE\n      )",
+      ).replace(
+        "ORDER BY authorized_candidate.\"createdAt\" DESC, authorized_candidate.id DESC)",
+        "ORDER BY authorized_candidate.\"createdAt\" DESC, authorized_candidate.id DESC) /* ${PRIVACY_ALLOWED} */",
+      ),
+    );
+    expect(problems).toContain("talent-pool list privacy fence must precede deterministic ordering.");
+  });
+
+  it("rejects a platform-wide talent-pool collection grant", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace(
+        "  if (!isPositiveSafeInteger(actorUserId)) return { ok: false, reason: \"unavailable\" };",
+        "  const platformCollection = \"super_admin\";\n  if (!isPositiveSafeInteger(actorUserId)) return { ok: false, reason: \"unavailable\" };",
+      ),
+    );
+    expect(problems).toContain("talent-pool collection/create restores platform scope.");
+  });
+
+  it("rejects a second statement in a talent-pool operation", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace(
+        "export async function readAuthorizedTalentPoolCandidate(",
+        "export async function readAuthorizedTalentPoolCandidate(",
+      ).replace(
+        "  try {\n    const result = await db.execute(sql`\n      WITH ${objectActorGrant(actorUserId, policy.allowPlatformAdmin)},",
+        "  try {\n    await db.execute(sql`SELECT 1`);\n    const result = await db.execute(sql`\n      WITH ${objectActorGrant(actorUserId, policy.allowPlatformAdmin)},",
+      ),
+    );
+    expect(problems).toContain("talent-pool operation is not exactly one statement: readAuthorizedTalentPoolCandidate");
+  });
+
+  it("rejects an event insert separated from its statement-bound remove", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace(
+        "export async function removeAuthorizedTalentPoolCandidate(",
+        "async function appendEventLater() { await db.execute(sql`INSERT INTO talent_pool_membership_events DEFAULT VALUES`); }\n\nexport async function removeAuthorizedTalentPoolCandidate(",
+      ),
+    );
+    expect(problems).toContain("talent-pool authority must contain exactly seven statement-bound commands.");
+  });
+
+  it("rejects an empty update that can reach authorization", () => {
+    const problems = mutate(fixture(), "server/talent-pool.routes.ts", (source) =>
+      source.replace("if (Object.keys(patch).length === 0)", "if (false)"),
+    );
+    expect(problems).toContain("talent-pool routes lost invariant: Object.keys(patch).length === 0");
+  });
+
+  it("rejects restoring the duplicate candidate existence oracle", () => {
+    const problems = mutate(fixture(), "server/talent-pool.routes.ts", (source) =>
+      source.replace(
+        "sendTalentPoolError(res, 409, \"TALENT_POOL_CANDIDATE_EXISTS\");",
+        "res.status(409).json({ code: \"TALENT_POOL_CANDIDATE_EXISTS\", existingId: 41 });",
+      ),
+    );
+    expect(problems).toContain("talent-pool management route restores oracle/permissive input: existingId");
+  });
+
+  it("rejects an id-only talent-pool storage re-read", () => {
+    const problems = mutate(fixture(), "server/talent-pool.routes.ts", (source) =>
+      source.replace(
+        "const result = await readAuthorizedTalentPoolCandidate(req.user!.id, candidateId, EXACT_OBJECT_POLICY);",
+        "await storage.getTalentPoolCandidate(candidateId);\n        const result = await readAuthorizedTalentPoolCandidate(req.user!.id, candidateId, EXACT_OBJECT_POLICY);",
+      ),
+    );
+    expect(problems).toContain("talent-pool management route restores id/recruiter storage path: storage.getTalentPoolCandidate");
+  });
+
+  it("rejects an internal organization id added to the candidate projection", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace("  id: number;", "  id: number;\n  organizationId: number;"),
+    );
+    expect(problems.some((problem) => problem.startsWith("talent-pool candidate projection drifted:"))).toBe(true);
+    expect(problems).toContain("talent-pool public projection exposes organizationId.");
+  });
+
+  it("rejects caller-supplied organization authority", () => {
+    const problems = mutate(fixture(), "server/lib/talentPoolAuthorization.ts", (source) =>
+      source.replace("export interface TalentPoolCreateInput {", "export interface TalentPoolCreateInput {\n  organizationId: number;"),
+    );
+    expect(problems).toContain("talent-pool authority restores forbidden pattern: organizationId:");
+  });
+
+  it("rejects drift in either frozen talent-pool handler", () => {
+    const problems = mutate(fixture(), "server/talent-pool.routes.ts", (source) =>
+      source.replace("Not authorized to convert this candidate", "Not authorized to convert this pool candidate"),
+    );
+    expect(problems).toContain("frozen talent-pool route drifted: POST /api/talent-pool/:id/convert");
   });
 });

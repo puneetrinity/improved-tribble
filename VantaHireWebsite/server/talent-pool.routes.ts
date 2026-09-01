@@ -1,12 +1,99 @@
 import type { Express, Request, Response, NextFunction } from "express";
+import { randomUUID } from "node:crypto";
 import { requireAuth, requireRole, requireSeat } from "./auth";
 import { storage } from "./storage";
 import { getUserOrganization } from "./lib/organizationService";
 import { z } from "zod";
-import { insertTalentPoolSchema } from "@shared/schema";
+import { requireNewCandidateIdentityAllowed } from "./candidate-privacy/decision";
+import {
+  createAuthorizedTalentPoolCandidate,
+  listAuthorizedTalentPoolCandidates,
+  parseTalentPoolId,
+  readAuthorizedTalentPoolCandidate,
+  readAuthorizedTalentPoolCreateContext,
+  removeAuthorizedTalentPoolCandidate,
+  restoreAuthorizedTalentPoolCandidate,
+  TALENT_POOL_SOURCES,
+  updateAuthorizedTalentPoolCandidate,
+  type TalentPoolEffectivePatch,
+  type TalentPoolObjectPolicy,
+} from "./lib/talentPoolAuthorization";
 
 // CSRF middleware import (use same pattern as other routes)
 import { doubleCsrfProtection } from "./csrf";
+
+const EXACT_OBJECT_POLICY: TalentPoolObjectPolicy = Object.freeze({ allowPlatformAdmin: true });
+
+const createTalentPoolCandidateSchema = z.object({
+  email: z.string().trim().email().max(255),
+  name: z.string().trim().min(1).max(255),
+  phone: z.string().trim().max(50).nullable().optional(),
+  source: z.enum(TALENT_POOL_SOURCES).optional().default("manual"),
+  notes: z.string().max(2000).nullable().optional(),
+  resumeUrl: z.string().url().nullable().optional(),
+}).strict();
+
+const updateTalentPoolCandidateSchema = z.object({
+  name: z.string().trim().min(1).max(255).optional(),
+  email: z.string().trim().email().max(255).optional(),
+  phone: z.string().trim().max(50).nullable().optional(),
+  notes: z.string().max(2000).nullable().optional(),
+  resumeUrl: z.string().url().nullable().optional(),
+}).strict();
+
+function sendTalentPoolError(
+  res: Response,
+  status: 400 | 403 | 404 | 409 | 503,
+  code:
+    | "INVALID_TALENT_POOL_ID"
+    | "TALENT_POOL_ACCESS_DENIED"
+    | "TALENT_POOL_CANDIDATE_NOT_FOUND"
+    | "TALENT_POOL_CANDIDATE_EXISTS"
+    | "TALENT_POOL_UPDATE_REQUIRED"
+    | "TALENT_POOL_AUTHORIZATION_UNAVAILABLE",
+): void {
+  res.status(status).json({ error: code, code });
+}
+
+function sendActorResult(
+  res: Response,
+  result: { ok: false; reason: "forbidden" | "unavailable" },
+): void {
+  if (result.reason === "forbidden") {
+    sendTalentPoolError(res, 403, "TALENT_POOL_ACCESS_DENIED");
+    return;
+  }
+  sendTalentPoolError(res, 503, "TALENT_POOL_AUTHORIZATION_UNAVAILABLE");
+}
+
+function sendObjectResult(
+  res: Response,
+  result: { ok: false; reason: "forbidden" | "not_found" | "unavailable" | "conflict" },
+): void {
+  switch (result.reason) {
+    case "forbidden":
+      sendTalentPoolError(res, 403, "TALENT_POOL_ACCESS_DENIED");
+      return;
+    case "not_found":
+      sendTalentPoolError(res, 404, "TALENT_POOL_CANDIDATE_NOT_FOUND");
+      return;
+    case "conflict":
+      sendTalentPoolError(res, 409, "TALENT_POOL_CANDIDATE_EXISTS");
+      return;
+    default:
+      sendTalentPoolError(res, 503, "TALENT_POOL_AUTHORIZATION_UNAVAILABLE");
+  }
+}
+
+function identityIdentifiers(input: {
+  email?: string | undefined;
+  phone?: string | null | undefined;
+}) {
+  const identifiers: Array<{ identifier_type: "email" | "phone"; value: string }> = [];
+  if (input.email) identifiers.push({ identifier_type: "email", value: input.email.trim().toLowerCase() });
+  if (input.phone?.trim()) identifiers.push({ identifier_type: "phone", value: input.phone.trim() });
+  return identifiers;
+}
 
 export function registerTalentPoolRoutes(app: Express) {
   const csrf = doubleCsrfProtection;
@@ -21,16 +108,15 @@ export function registerTalentPoolRoutes(app: Express) {
     "/api/talent-pool",
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
-    requireSeat({ allowNoOrg: true }),
+    requireSeat(),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const recruiterId = req.user!.id;
-        const candidates = await storage.getTalentPoolByRecruiter(recruiterId);
-
-        res.json({
-          candidates,
-          total: candidates.length,
-        });
+        const result = await listAuthorizedTalentPoolCandidates(req.user!.id);
+        if (!result.ok) {
+          sendActorResult(res, result);
+          return;
+        }
+        res.json({ candidates: result.rows, total: result.rows.length });
       } catch (error) {
         next(error);
       }
@@ -45,33 +131,20 @@ export function registerTalentPoolRoutes(app: Express) {
     "/api/talent-pool/:id",
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
-    requireSeat({ allowNoOrg: true }),
+    requireSeat(),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const idParam = req.params.id;
-        if (!idParam) {
-          res.status(400).json({ error: 'Missing candidate ID' });
+        const candidateId = parseTalentPoolId(req.params.id);
+        if (!candidateId) {
+          sendTalentPoolError(res, 400, "INVALID_TALENT_POOL_ID");
           return;
         }
-        const id = parseInt(idParam, 10);
-        if (isNaN(id) || id <= 0) {
-          res.status(400).json({ error: 'Invalid candidate ID' });
+        const result = await readAuthorizedTalentPoolCandidate(req.user!.id, candidateId, EXACT_OBJECT_POLICY);
+        if (!result.ok) {
+          sendObjectResult(res, result);
           return;
         }
-
-        const candidate = await storage.getTalentPoolCandidate(id);
-        if (!candidate) {
-          res.status(404).json({ error: 'Candidate not found' });
-          return;
-        }
-
-        // Verify ownership
-        if (candidate.recruiterId !== req.user!.id && req.user!.role !== 'super_admin') {
-          res.status(403).json({ error: 'Not authorized to view this candidate' });
-          return;
-        }
-
-        res.json(candidate);
+        res.json(result.value);
       } catch (error) {
         next(error);
       }
@@ -86,46 +159,27 @@ export function registerTalentPoolRoutes(app: Express) {
     "/api/talent-pool",
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
+    requireSeat(),
     csrf,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const bodySchema = insertTalentPoolSchema.extend({
-          source: z.enum(['external_form', 'manual', 'import']).optional().default('manual'),
-        });
-
-        const validation = bodySchema.safeParse(req.body);
+        const validation = createTalentPoolCandidateSchema.safeParse(req.body);
         if (!validation.success) {
-          res.status(400).json({ error: 'Validation error', details: validation.error.errors });
+          res.status(400).json({ error: "VALIDATION_ERROR", code: "VALIDATION_ERROR" });
           return;
         }
-
-        const { email, name, phone, source, notes, resumeUrl } = validation.data;
-
-        // Get user's organization
-        const orgResult = await getUserOrganization(req.user!.id);
-
-        // Check for duplicate
-        const existing = await storage.getTalentPoolByEmail(req.user!.id, email);
-        if (existing) {
-          res.status(409).json({
-            error: 'A candidate with this email already exists in your talent pool',
-            existingId: existing.id,
-          });
+        const context = await readAuthorizedTalentPoolCreateContext(req.user!.id);
+        if (!context.ok) {
+          sendActorResult(res, context);
           return;
         }
-
-        const candidate = await storage.createTalentPoolCandidate({
-          email,
-          name,
-          phone,
-          source,
-          notes,
-          resumeUrl,
-          recruiterId: req.user!.id,
-          ...(orgResult?.organization.id != null && { organizationId: orgResult.organization.id }),
-        });
-
-        res.status(201).json(candidate);
+        await requireNewCandidateIdentityAllowed(identityIdentifiers(validation.data));
+        const result = await createAuthorizedTalentPoolCandidate(req.user!.id, validation.data);
+        if (!result.ok) {
+          sendObjectResult(res, result);
+          return;
+        }
+        res.status(201).json(result.value);
       } catch (error) {
         next(error);
       }
@@ -140,74 +194,51 @@ export function registerTalentPoolRoutes(app: Express) {
     "/api/talent-pool/:id",
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
+    requireSeat(),
     csrf,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const idParam = req.params.id;
-        if (!idParam) {
-          res.status(400).json({ error: 'Missing candidate ID' });
+        const candidateId = parseTalentPoolId(req.params.id);
+        if (!candidateId) {
+          sendTalentPoolError(res, 400, "INVALID_TALENT_POOL_ID");
           return;
         }
-        const id = parseInt(idParam, 10);
-        if (isNaN(id) || id <= 0) {
-          res.status(400).json({ error: 'Invalid candidate ID' });
-          return;
-        }
-
-        // Verify candidate exists and user has access
-        const existing = await storage.getTalentPoolCandidate(id);
-        if (!existing) {
-          res.status(404).json({ error: 'Candidate not found' });
-          return;
-        }
-
-        if (existing.recruiterId !== req.user!.id && req.user!.role !== 'super_admin') {
-          res.status(403).json({ error: 'Not authorized to update this candidate' });
-          return;
-        }
-
-        const updateSchema = z.object({
-          name: z.string().min(1).max(255).optional(),
-          email: z.string().email().max(255).optional(),
-          phone: z.string().max(50).optional().nullable(),
-          notes: z.string().max(2000).optional().nullable(),
-          resumeUrl: z.string().url().optional().nullable(),
-        });
-
-        const validation = updateSchema.safeParse(req.body);
+        const validation = updateTalentPoolCandidateSchema.safeParse(req.body);
         if (!validation.success) {
-          res.status(400).json({ error: 'Validation error', details: validation.error.errors });
+          res.status(400).json({ error: "VALIDATION_ERROR", code: "VALIDATION_ERROR" });
           return;
         }
-
-        // If email is being changed, check for duplicates
-        if (validation.data.email && validation.data.email !== existing.email) {
-          const duplicate = await storage.getTalentPoolByEmail(req.user!.id, validation.data.email);
-          if (duplicate && duplicate.id !== id) {
-            res.status(409).json({
-              error: 'A candidate with this email already exists in your talent pool',
-              existingId: duplicate.id,
-            });
-            return;
-          }
-        }
-
-        // Build update object - convert null to undefined for InsertTalentPool compatibility
-        const updateData: Partial<{ name: string; email: string; phone: string; notes: string; resumeUrl: string }> = {};
-        if (validation.data.name !== undefined) updateData.name = validation.data.name;
-        if (validation.data.email !== undefined) updateData.email = validation.data.email;
-        // Convert null to undefined for optional fields (InsertTalentPool uses undefined, not null)
-        if (validation.data.phone !== undefined && validation.data.phone !== null) updateData.phone = validation.data.phone;
-        if (validation.data.notes !== undefined && validation.data.notes !== null) updateData.notes = validation.data.notes;
-        if (validation.data.resumeUrl !== undefined && validation.data.resumeUrl !== null) updateData.resumeUrl = validation.data.resumeUrl;
-
-        const updated = await storage.updateTalentPoolCandidate(id, updateData);
-        if (!updated) {
-          res.status(500).json({ error: 'Failed to update candidate' });
+        const patch: TalentPoolEffectivePatch = Object.fromEntries(
+          Object.entries(validation.data).filter((entry): entry is [string, string] => entry[1] !== null),
+        );
+        if (Object.keys(patch).length === 0) {
+          sendTalentPoolError(res, 400, "TALENT_POOL_UPDATE_REQUIRED");
           return;
         }
-
-        res.json(updated);
+        const context = await readAuthorizedTalentPoolCandidate(req.user!.id, candidateId, EXACT_OBJECT_POLICY);
+        if (!context.ok) {
+          sendObjectResult(res, context);
+          return;
+        }
+        const identityChanged = (
+          patch.email !== undefined && patch.email.toLowerCase() !== context.value.email.toLowerCase()
+        ) || (
+          patch.phone !== undefined && patch.phone !== (context.value.phone ?? "")
+        );
+        if (identityChanged) {
+          await requireNewCandidateIdentityAllowed(identityIdentifiers({ email: patch.email, phone: patch.phone }));
+        }
+        const result = await updateAuthorizedTalentPoolCandidate(
+          req.user!.id,
+          candidateId,
+          patch,
+          EXACT_OBJECT_POLICY,
+        );
+        if (!result.ok) {
+          sendObjectResult(res, result);
+          return;
+        }
+        res.json(result.value);
       } catch (error) {
         next(error);
       }
@@ -223,38 +254,25 @@ export function registerTalentPoolRoutes(app: Express) {
     "/api/talent-pool/:id",
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
+    requireSeat(),
     csrf,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const idParam = req.params.id;
-        if (!idParam) {
-          res.status(400).json({ error: 'Missing candidate ID' });
+        const candidateId = parseTalentPoolId(req.params.id);
+        if (!candidateId) {
+          sendTalentPoolError(res, 400, "INVALID_TALENT_POOL_ID");
           return;
         }
-        const id = parseInt(idParam, 10);
-        if (isNaN(id) || id <= 0) {
-          res.status(400).json({ error: 'Invalid candidate ID' });
+        const result = await removeAuthorizedTalentPoolCandidate(
+          req.user!.id,
+          candidateId,
+          randomUUID(),
+          EXACT_OBJECT_POLICY,
+        );
+        if (!result.ok) {
+          sendObjectResult(res, result);
           return;
         }
-
-        // Verify candidate exists and user has access
-        const existing = await storage.getTalentPoolCandidate(id);
-        if (!existing) {
-          res.status(404).json({ error: 'Candidate not found' });
-          return;
-        }
-
-        if (existing.recruiterId !== req.user!.id && req.user!.role !== 'super_admin') {
-          res.status(403).json({ error: 'Not authorized to remove this organization’s pool membership' });
-          return;
-        }
-
-        const removed = await storage.removeTalentPoolCandidate(id, req.user!.id);
-        if (!removed) {
-          res.status(409).json({ error: 'Candidate is already removed from this organization’s talent pool' });
-          return;
-        }
-
         res.status(204).send();
       } catch (error) {
         next(error);
@@ -267,37 +285,30 @@ export function registerTalentPoolRoutes(app: Express) {
     "/api/talent-pool/:id/restore",
     requireAuth,
     requireRole(['recruiter', 'super_admin']),
+    requireSeat(),
     csrf,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
       try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-          res.status(400).json({ error: 'Invalid candidate ID' });
+        const candidateId = parseTalentPoolId(req.params.id);
+        if (!candidateId) {
+          sendTalentPoolError(res, 400, "INVALID_TALENT_POOL_ID");
           return;
         }
-        const existing = await storage.getRemovedTalentPoolCandidate(id);
-        if (!existing) {
-          res.status(404).json({ error: 'Candidate not found' });
-          return;
-        }
-        if (existing.recruiterId !== req.user!.id && req.user!.role !== 'super_admin') {
-          res.status(403).json({ error: 'Not authorized to restore this organization’s pool membership' });
-          return;
-        }
-        const restored = await storage.restoreTalentPoolCandidate(id, req.user!.id);
-        if (!restored) {
-          res.status(404).json({ error: 'Candidate not found' });
+        const result = await restoreAuthorizedTalentPoolCandidate(
+          req.user!.id,
+          candidateId,
+          randomUUID(),
+          EXACT_OBJECT_POLICY,
+        );
+        if (!result.ok) {
+          sendObjectResult(res, result);
           return;
         }
         res.json({
-          candidate: restored,
+          candidate: result.value,
           message: 'Candidate restored to this organization’s talent pool',
         });
-      } catch (error: any) {
-        if (error?.code === '23505') {
-          res.status(409).json({ error: 'An active pool membership already exists for this candidate' });
-          return;
-        }
+      } catch (error) {
         next(error);
       }
     },
