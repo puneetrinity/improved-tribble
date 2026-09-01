@@ -823,7 +823,9 @@ function validateKernel(root, problems) {
     }
   }
 
-  for (const row of manifestFrozenRouteBlocks(root)) {
+  for (const row of manifestFrozenRouteBlocks(root).filter((entry) =>
+    entry.path.includes("whatsapp") || entry.path.includes("webhooks/whatsapp")
+  )) {
     const registration = routeCall(whatsappRoutes, row.method, row.path);
     if (registration.count !== 1 || !registration.source) {
       problems.push(`frozen WhatsApp route block is missing: ${row.method.toUpperCase()} ${row.path}`);
@@ -1369,6 +1371,138 @@ function validateScopedFinancialAdminPublicAuthority(root, problems) {
   }
 }
 
+function validateTalentPoolAuthority(root, problems) {
+  const authority = read(root, "server/lib/talentPoolAuthorization.ts");
+  const routes = read(root, "server/talent-pool.routes.ts");
+  const operations = [
+    "listAuthorizedTalentPoolCandidates",
+    "readAuthorizedTalentPoolCandidate",
+    "readAuthorizedTalentPoolCreateContext",
+    "createAuthorizedTalentPoolCandidate",
+    "updateAuthorizedTalentPoolCandidate",
+    "removeAuthorizedTalentPoolCandidate",
+    "restoreAuthorizedTalentPoolCandidate",
+  ];
+  if (count(authority, "db.execute(") !== operations.length) {
+    problems.push("talent-pool authority must contain exactly seven statement-bound commands.");
+  }
+  for (const operation of operations) {
+    const source = exportedFunctionSource(authority, operation);
+    if (!source || count(source, "db.execute(") !== 1) {
+      problems.push(`talent-pool operation is not exactly one statement: ${operation}`);
+    }
+  }
+
+  for (const anchor of [
+    "actor.role = 'recruiter'",
+    "membership.seat_assigned = TRUE",
+    "HAVING COUNT(*) = 1",
+    "pool.organization_id IS NOT NULL",
+    "privacyAllowedSql(\"talent_pool\", \"pool.id\", { globalUse: false })",
+    "actor_grant.organization_id = pool.organization_id",
+    "stored_actor.actor_role = 'super_admin'",
+    "INSERT INTO ${talentPoolMembershipEvents}",
+    "'removed', 'organization_pool_removal'",
+    "'restored', 'operator_restore'",
+  ]) requireAnchor(problems, authority, anchor, `talent-pool authority lost invariant: ${anchor}`);
+  for (const forbidden of [
+    "allowNoOrg", "globalUse: true", "LIMIT 1", "pool.recruiter_id =", "pool.recruiterId",
+    "organizationId:", "console.", "logger.", "storage.",
+  ]) if (authority.includes(forbidden)) problems.push(`talent-pool authority restores forbidden pattern: ${forbidden}`);
+  if (count(authority, "AND ${PRIVACY_ALLOWED}") !== 5) {
+    problems.push("talent-pool active object/list operations must apply exactly five SQL privacy fences.");
+  }
+
+  const listSource = exportedFunctionSource(authority, operations[0]);
+  if (listSource.indexOf("AND ${PRIVACY_ALLOWED}") < 0
+      || listSource.indexOf("AND ${PRIVACY_ALLOWED}") > listSource.indexOf("ORDER BY authorized_candidate")) {
+    problems.push("talent-pool list privacy fence must precede deterministic ordering.");
+  }
+  const listAndCreate = `${listSource}\n${exportedFunctionSource(authority, operations[2])}\n${exportedFunctionSource(authority, operations[3])}`;
+  if (listAndCreate.includes("allowPlatformAdmin") || listAndCreate.includes("super_admin")) {
+    problems.push("talent-pool collection/create restores platform scope.");
+  }
+
+  const projection = /export interface TalentPoolCandidateProjection\s*\{([\s\S]*?)\n\}/.exec(authority)?.[1] ?? "";
+  const projectionKeys = [...projection.matchAll(/^\s{2}(\w+):/gm)].map((match) => match[1]);
+  const expectedProjection = [
+    "id", "name", "email", "phone", "source", "notes", "resumeUrl", "createdAt", "updatedAt",
+  ];
+  if (JSON.stringify(projectionKeys) !== JSON.stringify(expectedProjection)) {
+    problems.push(`talent-pool candidate projection drifted: ${projectionKeys.join(",")}`);
+  }
+  for (const forbidden of [
+    "organizationId", "recruiterId", "formResponseId", "removedAt", "removedByUserId", "removalReason",
+  ]) if (projection.includes(forbidden)) problems.push(`talent-pool public projection exposes ${forbidden}.`);
+
+  const update = exportedFunctionSource(authority, "updateAuthorizedTalentPoolCandidate");
+  for (const anchor of [
+    "validEffectivePatch(patch)",
+    "SET name = CASE WHEN",
+    "email = CASE WHEN",
+    "phone = CASE WHEN",
+    "notes = CASE WHEN",
+    "resume_url = CASE WHEN",
+    "updated_at = NOW()",
+  ]) requireAnchor(problems, update, anchor, `talent-pool update lost allowlist/effective-patch invariant: ${anchor}`);
+  for (const forbidden of ["form_response_id", "SET organization_id", "organization_id = CASE", "recruiter_id = CASE", "SET recruiter_id"] ) {
+    if (update.includes(forbidden)) problems.push(`talent-pool update expands F290/authority scope: ${forbidden}`);
+  }
+
+  for (const [operation, eventType] of [
+    ["removeAuthorizedTalentPoolCandidate", "'removed'"],
+    ["restoreAuthorizedTalentPoolCandidate", "'restored'"],
+  ]) {
+    const source = exportedFunctionSource(authority, operation);
+    if (count(source, "INSERT INTO ${talentPoolMembershipEvents}") !== 1 || !source.includes(eventType)) {
+      problems.push(`talent-pool ${operation} lost its atomic membership event.`);
+    }
+  }
+
+  const managementEnd = routes.indexOf("POST /api/talent-pool/:id/convert");
+  const management = managementEnd > 0 ? routes.slice(0, managementEnd) : "";
+  if (count(management, "requireSeat()") !== 6 || management.includes("allowNoOrg")) {
+    problems.push("all six talent-pool management routes require strict seat middleware.");
+  }
+  for (const legacy of [
+    "storage.getTalentPoolByRecruiter", "storage.getTalentPoolCandidate", "storage.getRemovedTalentPoolCandidate",
+    "storage.getTalentPoolByEmail", "storage.createTalentPoolCandidate", "storage.updateTalentPoolCandidate",
+    "storage.removeTalentPoolCandidate", "storage.restoreTalentPoolCandidate",
+  ]) if (management.includes(legacy)) problems.push(`talent-pool management route restores id/recruiter storage path: ${legacy}`);
+  for (const anchor of [
+    "createTalentPoolCandidateSchema", "updateTalentPoolCandidateSchema", ").strict()",
+    "parseTalentPoolId(req.params.id)", "TALENT_POOL_UPDATE_REQUIRED",
+    "INVALID_TALENT_POOL_ID", "TALENT_POOL_ACCESS_DENIED", "TALENT_POOL_CANDIDATE_NOT_FOUND",
+    "TALENT_POOL_CANDIDATE_EXISTS", "TALENT_POOL_AUTHORIZATION_UNAVAILABLE",
+    "requireNewCandidateIdentityAllowed", "Object.keys(patch).length === 0",
+  ]) requireAnchor(problems, management, anchor, `talent-pool routes lost invariant: ${anchor}`);
+  for (const forbidden of ["existingId", "parseInt(req.params.id", "Number(req.params.id)"]) {
+    if (management.includes(forbidden)) problems.push(`talent-pool management route restores oracle/permissive input: ${forbidden}`);
+  }
+  const createContextAt = management.indexOf("readAuthorizedTalentPoolCreateContext(req.user!.id)");
+  const createPrivacyAt = management.indexOf("await requireNewCandidateIdentityAllowed", createContextAt);
+  const createWriteAt = management.indexOf("createAuthorizedTalentPoolCandidate(req.user!.id", createPrivacyAt);
+  if (!(createContextAt >= 0 && createContextAt < createPrivacyAt && createPrivacyAt < createWriteAt)) {
+    problems.push("talent-pool create must authorize before privacy and reauthorize in its final write.");
+  }
+  const updateContextAt = management.indexOf("readAuthorizedTalentPoolCandidate(req.user!.id, candidateId");
+  const updatePrivacyAt = management.indexOf("await requireNewCandidateIdentityAllowed", updateContextAt);
+  const updateWriteAt = management.indexOf("updateAuthorizedTalentPoolCandidate(", updatePrivacyAt);
+  if (!(updateContextAt >= 0 && updateContextAt < updatePrivacyAt && updatePrivacyAt < updateWriteAt)) {
+    problems.push("talent-pool identity update must authorize before privacy and reauthorize in its final write.");
+  }
+
+  for (const [method, path, expected] of [
+    ["post", "/api/talent-pool/:id/convert", "50709054de9122d6ade65822d15a059cd35df2d41491c524c7f6cd1f5484a090"],
+    ["get", "/api/jobs/:jobId/talent-pool/suggestions", "56d2ddc38fb60c5074318aa501457e97933a0e83face6472b80cfed45f629363"],
+  ]) {
+    const block = routeCall(routes, method, path);
+    if (block.count !== 1 || sha256(block.source) !== expected) {
+      problems.push(`frozen talent-pool route drifted: ${method.toUpperCase()} ${path}`);
+    }
+  }
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -1390,11 +1524,11 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (manifest.route_registration_census !== 316) {
     problems.push("object authorization route census contract is invalid.");
   }
-  if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 5) {
-    problems.push("exactly five non-history WhatsApp route blocks must be frozen.");
+  if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
+    problems.push("exactly five WhatsApp and two talent-pool route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 40) {
-    problems.push("exactly forty object/membership/workflow/AI-outbound/reviewer-share/financial-admin routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 46) {
+    problems.push("exactly forty-six object/membership/workflow/AI-outbound/reviewer-share/financial-admin/talent-pool routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 9) {
     problems.push("exactly nine resume/application/consultant registrations must be retired.");
@@ -1420,6 +1554,18 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   ]) {
     const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
     if (matches.length !== 1) problems.push(`workflow manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
+  for (const [method, path, reader] of [
+    ["get", "/api/talent-pool", "listAuthorizedTalentPoolCandidates"],
+    ["get", "/api/talent-pool/:id", "readAuthorizedTalentPoolCandidate"],
+    ["post", "/api/talent-pool", "readAuthorizedTalentPoolCreateContext+createAuthorizedTalentPoolCandidate"],
+    ["put", "/api/talent-pool/:id", "readAuthorizedTalentPoolCandidate+updateAuthorizedTalentPoolCandidate"],
+    ["delete", "/api/talent-pool/:id", "removeAuthorizedTalentPoolCandidate"],
+    ["post", "/api/talent-pool/:id/restore", "restoreAuthorizedTalentPoolCandidate"],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
+    if (matches.length !== 1) problems.push(`talent-pool manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
   }
 
   for (const [method, path, reader] of [
@@ -1511,6 +1657,11 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/admin.routes.ts", "client/src/hooks/use-subscription.ts", "client/src/hooks/use-ai-credits.ts",
     "client/src/pages/org-billing-page.tsx", "client/src/pages/admin-super-dashboard.tsx",
     "client/src/App.tsx", "client/src/components/QuickAccessBar.tsx",
+    "server/talent-pool.routes.ts", "server/lib/talentPoolAuthorization.ts",
+    "server/lib/__tests__/talentPoolAuthorization.test.ts",
+    "server/lib/__tests__/talentPoolAuthorization.routes.test.ts",
+    "server/lib/__tests__/talentPoolAuthorization.pg.test.ts",
+    "test/integration/backward-compatibility.test.ts",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -1536,6 +1687,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateApplicationAiOutboundAuthority(root, problems);
     validateReviewerShareAuthority(root, problems);
     validateScopedFinancialAdminPublicAuthority(root, problems);
+    validateTalentPoolAuthority(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }
