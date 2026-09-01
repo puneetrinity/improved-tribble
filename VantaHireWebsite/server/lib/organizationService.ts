@@ -164,18 +164,56 @@ export async function generateUniqueSlug(name: string): Promise<string> {
 }
 
 // Organization CRUD
+export class OrganizationSelfServiceGrantDeniedError extends Error {
+  constructor() {
+    super("ORGANIZATION_SELF_SERVICE_GRANT_DENIED");
+    this.name = "OrganizationSelfServiceGrantDeniedError";
+  }
+}
+
 export async function createOrganization(
-  data: Omit<InsertOrganization, 'slug'> & { slug?: string },
+  data: { name: string; slug?: string },
   ownerId: number
 ): Promise<Organization> {
   const slug = data.slug || await generateUniqueSlug(data.name);
 
   const org = await db.transaction(async (tx: any) => {
+    const [storedUser] = await tx
+      .select({
+        id: users.id,
+        role: users.role,
+        emailVerified: users.emailVerified,
+      })
+      .from(users)
+      .where(eq(users.id, ownerId))
+      .for('update');
+    if (!storedUser || storedUser.role !== 'recruiter' || storedUser.emailVerified !== true) {
+      throw new OrganizationSelfServiceGrantDeniedError();
+    }
+
+    const existingMemberships = await tx
+      .select({ id: organizationMembers.id })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.userId, ownerId));
+    const existingSelfServiceOrganizations = await tx
+      .select({ id: organizations.id })
+      .from(organizations)
+      .where(and(
+        eq(organizations.authorityOrigin, 'self_service_recruiter'),
+        eq(organizations.selfCreatedByUserId, ownerId),
+      ));
+    if (existingMemberships.length !== 0 || existingSelfServiceOrganizations.length !== 0) {
+      throw new OrganizationSelfServiceGrantDeniedError();
+    }
+
     // Create organization
     const [createdOrg] = await tx.insert(organizations).values({
-      ...data,
+      name: data.name,
       slug,
+      authorityOrigin: 'self_service_recruiter',
+      selfCreatedByUserId: ownerId,
     }).returning();
+    if (!createdOrg) throw new Error("ORGANIZATION_CREATE_RESULT_INVALID");
 
     const org = createdOrg.signalTenantId
       ? createdOrg

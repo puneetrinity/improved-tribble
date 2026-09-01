@@ -13,6 +13,11 @@ import rateLimit from "express-rate-limit";
 import { computeProfileCompletion } from "./lib/profileCompletion";
 import { getOrganizationInviteByToken } from "./lib/organizationService";
 import { queueMauticFirstLoginSync, queueMauticSignupSync } from "./lib/mauticService";
+import {
+  createAuthorizationSessionPayload,
+  parseAuthorizationSessionPayload,
+  resetPasswordAndAdvanceAuthorization,
+} from "./lib/privilegeGrantRevocation";
 
 declare global {
   namespace Express {
@@ -289,13 +294,29 @@ export function setupAuth(app: Express) {
     }),
   );
 
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser(async (id: number, done) => {
+  passport.serializeUser((user, done) => {
+    const payload = createAuthorizationSessionPayload(user);
+    if (!payload) {
+      done(new Error("AUTHORIZATION_SESSION_SERIALIZATION_FAILED"));
+      return;
+    }
+    done(null, payload);
+  });
+  passport.deserializeUser(async (payload: unknown, done) => {
     try {
-      const user = await storage.getUser(id);
+      const serialized = parseAuthorizationSessionPayload(payload);
+      if (!serialized) {
+        done(null, false);
+        return;
+      }
+      const user = await storage.getUser(serialized.id);
+      if (!user || user.authVersion !== serialized.authVersion) {
+        done(null, false);
+        return;
+      }
       done(null, user);
-    } catch (error) {
-      done(error);
+    } catch {
+      done(null, false);
     }
   });
 
@@ -916,9 +937,23 @@ export function setupAuth(app: Express) {
         return;
       }
 
-      // Update password and clear reset token
-      await storage.updateUserPassword(user.id, await hashPassword(password));
-      await storage.clearPasswordResetToken(user.id);
+      // Update the credential and its authorization version in one statement.
+      const passwordWrite = await resetPasswordAndAdvanceAuthorization(
+        user.id,
+        await hashPassword(password),
+      );
+      if (!passwordWrite.ok) {
+        res.status(503).json({ error: "Unable to reset password right now. Please try again later." });
+        return;
+      }
+
+      // Token clearing remains a separately tracked lifecycle boundary (F256).
+      try {
+        await storage.clearPasswordResetToken(user.id);
+      } catch {
+        res.status(503).json({ error: "Unable to complete password reset right now. Please try again later." });
+        return;
+      }
 
       res.json({ message: "Password has been reset successfully. You can now log in with your new password." });
     } catch (error) {

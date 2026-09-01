@@ -1356,4 +1356,94 @@ describe("object authorization surface guard", () => {
     );
     expect(problems).toContain("frozen talent-pool route drifted: POST /api/talent-pool/:id/convert");
   });
+
+  it("rejects removal of the seated privilege-actor predicate", () => {
+    const problems = mutate(fixture(), "server/lib/privilegeGrantRevocation.ts", (source) =>
+      source.replace("membership.seat_assigned = TRUE", "TRUE"),
+    );
+    expect(problems).toContain(
+      "privilege authority anchor is missing: membership.seat_assigned = TRUE",
+    );
+  });
+
+  it("rejects ambiguous privilege authority collapsed with LIMIT 1", () => {
+    const problems = mutate(fixture(), "server/lib/privilegeGrantRevocation.ts", (source) =>
+      source.replace("HAVING COUNT(*) = 1", "LIMIT 1"),
+    );
+    expect(problems).toContain("privilege authority restores forbidden pattern: LIMIT 1");
+  });
+
+  it("rejects member role mutation split from authorization-version advance", () => {
+    const problems = mutate(fixture(), "server/lib/privilegeGrantRevocation.ts", (source) =>
+      source.replace(
+        "auth_version = target_user.auth_version + 1",
+        "auth_version = target_user.auth_version",
+      ),
+    );
+    expect(problems).toContain(
+      "member removal and role change must each advance the target authorization version.",
+    );
+  });
+
+  it("rejects a session accepted without exact authorization-version comparison", () => {
+    const problems = mutate(fixture(), "server/auth.ts", (source) =>
+      source.replace(
+        "user.authVersion !== serialized.authVersion",
+        "false",
+      ),
+    );
+    expect(problems).toContain(
+      "authorization session/reset anchor is missing: user.authVersion !== serialized.authVersion",
+    );
+  });
+
+  it("rejects a request-supplied authorization version", () => {
+    const problems = mutate(fixture(), "server/lib/privilegeGrantRevocation.ts", (source) =>
+      source.replace(
+        "return { id: user.id, authVersion: user.authVersion };",
+        "return { id: user.id, authVersion: req.body.authVersion };",
+      ),
+    );
+    expect(problems).toContain("privilege authority restores forbidden pattern: authVersion: req.");
+  });
+
+  it("rejects destructive session deletion as revocation", () => {
+    const problems = mutate(fixture(), "server/auth.ts", (source) =>
+      `${source}\n// mutation canary\nawait db.execute(sql\`DELETE FROM public.session\`);\n`,
+    );
+    expect(problems).toContain(
+      "authorization session compatibility restores bare-id or destructive revocation.",
+    );
+  });
+
+  it("rejects password change without authorization-version advance", () => {
+    const problems = mutate(fixture(), "server/lib/privilegeGrantRevocation.ts", (source) =>
+      source.replace(
+        "auth_version = auth_version + 1",
+        "auth_version = auth_version",
+      ),
+    );
+    expect(problems).toContain(
+      "privilege authority anchor is missing: auth_version = auth_version + 1",
+    );
+  });
+
+  it("rejects caller-supplied organization authority fields", () => {
+    const problems = mutate(fixture(), "server/lib/organizationService.ts", (source) =>
+      source.replace("name: data.name,", "...data,\n      name: data.name,"),
+    );
+    expect(problems).toContain("organization creation accepts caller-supplied authority fields.");
+  });
+
+  it("rejects inferred legacy organization provenance", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0005_privilege_authorization_version.sql", (source) =>
+      source.replace(
+        "self_created_by_user_id = NULL",
+        "self_created_by_user_id = (SELECT MIN(user_id) FROM public.organization_members)",
+      ),
+    );
+    expect(problems).toContain(
+      "2L-A migration infers organization provenance from current identity or membership.",
+    );
+  });
 });

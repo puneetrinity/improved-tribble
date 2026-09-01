@@ -175,7 +175,7 @@ describe.skipIf(!enabled)("talent-pool exact-schema PostgreSQL", () => {
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("keeps the shipped five-migration schema and append-only event relation", async () => {
+  it("keeps the shipped six-migration schema and append-only event relation", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
              to_regclass('public.talent_pool_membership_events')::text event_relation,
@@ -186,7 +186,7 @@ describe.skipIf(!enabled)("talent-pool exact-schema PostgreSQL", () => {
              ) append_only_trigger
     `)).rows[0];
     expect(row).toEqual({
-      ledger: 5,
+      ledger: 6,
       event_relation: "talent_pool_membership_events",
       append_only_trigger: true,
     });

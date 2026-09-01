@@ -3,13 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import express from 'express';
 
 const getUserOrganizationMock = vi.fn();
-const canManageMembersMock = vi.fn();
-const getMemberByIdMock = vi.fn();
-const getUserJobsInOrgMock = vi.fn();
-const removeMemberMock = vi.fn();
+const removeMemberAndRevokeMock = vi.fn();
 
 vi.mock('../auth', () => ({
   requireAuth: (_req: any, _res: any, next: any) => next(),
+  requireRole: () => (_req: any, _res: any, next: any) => next(),
 }));
 
 vi.mock('../lib/organizationService', () => ({
@@ -35,15 +33,18 @@ vi.mock('../lib/organizationService', () => ({
 
 vi.mock('../lib/membershipService', () => ({
   getOrganizationMembers: vi.fn(),
-  getOrganizationMember: vi.fn(),
-  getMemberById: getMemberByIdMock,
-  updateMemberRole: vi.fn(),
-  removeMember: removeMemberMock,
+  getMemberById: vi.fn(),
   leaveOrganization: vi.fn(),
-  canManageMembers: canManageMembersMock,
+  canManageMembers: vi.fn(),
   canManageBilling: vi.fn(),
-  reassignJobs: vi.fn(),
-  getUserJobsInOrg: getUserJobsInOrgMock,
+  getUserJobsInOrg: vi.fn(),
+}));
+
+vi.mock('../lib/privilegeGrantRevocation', () => ({
+  parsePrivilegeGrantId: (value: unknown) => value === '123' ? 123 : null,
+  removeOrganizationMemberAndRevoke: removeMemberAndRevokeMock,
+  changeOrganizationMemberRoleAndRevoke: vi.fn(),
+  reassignOrganizationJobs: vi.fn(),
 }));
 
 vi.mock('../lib/subscriptionService', () => ({
@@ -155,36 +156,29 @@ describe('organization member removal guard', () => {
       organization: { id: 11 },
       membership: { role: 'owner' },
     });
-    canManageMembersMock.mockReturnValue(true);
   });
 
-  it('returns 400 when the member still owns jobs in the organization', async () => {
-    getMemberByIdMock.mockResolvedValue({
-      id: 123,
-      userId: 456,
-      organizationId: 11,
-      role: 'member',
+  it('returns a fixed conflict when the statement-bound command finds owned jobs', async () => {
+    removeMemberAndRevokeMock.mockResolvedValue({
+      ok: false,
+      reason: 'conflict',
+      code: 'jobs_owned',
     });
-    getUserJobsInOrgMock.mockResolvedValue([{ id: 9001, title: 'Backend Engineer' }]);
 
     const app = await buildApp();
 
     const result = await invokeDeleteRoute(app, '/api/organizations/members/:id', { id: '123' });
 
-    expect(result.status).toBe(400);
-    expect(result.body).toEqual({ error: "Reassign this member's jobs before removing access" });
-    expect(removeMemberMock).not.toHaveBeenCalled();
+    expect(result.status).toBe(409);
+    expect(result.body).toEqual({
+      error: 'MEMBER_JOBS_REASSIGN_REQUIRED',
+      code: 'MEMBER_JOBS_REASSIGN_REQUIRED',
+    });
+    expect(removeMemberAndRevokeMock).toHaveBeenCalledWith(77, 123);
   });
 
-  it('removes the member when they no longer own any jobs', async () => {
-    getMemberByIdMock.mockResolvedValue({
-      id: 123,
-      userId: 456,
-      organizationId: 11,
-      role: 'member',
-    });
-    getUserJobsInOrgMock.mockResolvedValue([]);
-    removeMemberMock.mockResolvedValue(undefined);
+  it('returns success only after the atomic removal and version advance', async () => {
+    removeMemberAndRevokeMock.mockResolvedValue({ ok: true });
 
     const app = await buildApp();
 
@@ -192,6 +186,6 @@ describe('organization member removal guard', () => {
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({ success: true });
-    expect(removeMemberMock).toHaveBeenCalledWith(123);
+    expect(removeMemberAndRevokeMock).toHaveBeenCalledWith(77, 123);
   });
 });

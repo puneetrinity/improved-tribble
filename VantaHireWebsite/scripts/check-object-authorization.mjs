@@ -940,7 +940,7 @@ function validateKernel(root, problems) {
   } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
     problems.push("resume audit migration checksum does not match migration 0002.");
   }
-  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0005_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004"]'])
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0006_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005"]'])
     requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
   requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
 
@@ -1147,8 +1147,8 @@ function validateReviewerShareAuthority(root, problems) {
   ]) requireAnchor(problems, schema, anchor, `reviewer/share Drizzle schema anchor is missing: ${anchor}`);
 
   for (const anchor of [
-    'const file = `0005_${name}.sql`', '"0004_reviewer_share_authority.sql"',
-    'applied: ["0000", "0001", "0002", "0003", "0004"]',
+    'const file = `0006_${name}.sql`', '"0004_reviewer_share_authority.sql"',
+    'applied: ["0000", "0001", "0002", "0003", "0004", "0005"]',
   ]) requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2I anchor: ${anchor}`);
 
   requireAnchor(problems, formsClient, "return template.canManage", "forms UI does not consume server-derived canManage.");
@@ -1503,6 +1503,150 @@ function validateTalentPoolAuthority(root, problems) {
   }
 }
 
+function validatePrivilegeGrantRevocation(root, problems) {
+  const authority = read(root, "server/lib/privilegeGrantRevocation.ts");
+  const auth = read(root, "server/auth.ts");
+  const routes = read(root, "server/organization.routes.ts");
+  const service = read(root, "server/lib/organizationService.ts");
+  const schema = read(root, "shared/schema.ts");
+  const migration = read(root, "server/schema-migrations/0005_privilege_authorization_version.sql");
+  const migrationLock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+  const catalog = read(root, "server/schema-migrations/catalog.lock.json");
+
+  for (const forbidden of [
+    "LIMIT 1", "allowNoOrg", "DELETE FROM session", "DELETE FROM public.session",
+    "updateMemberRole(", "removeMember(", "reassignJobs(", "authVersion: req.",
+  ]) {
+    if (authority.includes(forbidden)) problems.push(`privilege authority restores forbidden pattern: ${forbidden}`);
+  }
+
+  for (const anchor of [
+    "HAVING COUNT(*) = 1",
+    "membership.seat_assigned = TRUE",
+    "actor.role = 'recruiter'",
+    "target.role <> 'owner'",
+    "auth_version = target_user.auth_version + 1",
+    "job.organization_id = actor_context.organization_id",
+    "target_member.seat_assigned = TRUE",
+    "auth_version = auth_version + 1",
+  ]) requireAnchor(problems, authority, anchor, `privilege authority anchor is missing: ${anchor}`);
+  if (count(authority, "auth_version = target_user.auth_version + 1") !== 2) {
+    problems.push("member removal and role change must each advance the target authorization version.");
+  }
+
+  for (const symbol of [
+    "removeOrganizationMemberAndRevoke",
+    "changeOrganizationMemberRoleAndRevoke",
+    "reassignOrganizationJobs",
+    "resetPasswordAndAdvanceAuthorization",
+  ]) {
+    const source = exportedFunctionSource(authority, symbol);
+    if (!source) problems.push(`privilege authority operation is missing: ${symbol}`);
+    else if (count(source, "db.execute(") !== 1) {
+      problems.push(`privilege authority operation is not exactly one statement: ${symbol}`);
+    }
+  }
+  if (count(authority, "db.execute(") !== 4) {
+    problems.push("privilege authority must contain exactly four statement-bound commands.");
+  }
+
+  for (const anchor of [
+    "createAuthorizationSessionPayload(user)",
+    "parseAuthorizationSessionPayload(payload)",
+    "user.authVersion !== serialized.authVersion",
+    "done(null, false)",
+    "resetPasswordAndAdvanceAuthorization(",
+    "storage.clearPasswordResetToken(user.id)",
+  ]) requireAnchor(problems, auth, anchor, `authorization session/reset anchor is missing: ${anchor}`);
+  for (const anchor of [
+    "return { id: user.id, authVersion: user.authVersion }",
+    "return { id: value, authVersion: 1 }",
+    'keys.length !== 2 || keys[0] !== "authVersion" || keys[1] !== "id"',
+  ]) requireAnchor(problems, authority, anchor, `authorization session payload anchor is missing: ${anchor}`);
+  if (auth.includes("passport.serializeUser((user, done) => done(null, user.id))")
+      || /passport\.deserializeUser\(async \(id: number/.test(auth)
+      || /DELETE\s+FROM\s+(?:public\.)?session/i.test(auth)) {
+    problems.push("authorization session compatibility restores bare-id or destructive revocation.");
+  }
+  const reset = routeCall(auth, "post", "/api/reset-password");
+  const passwordAt = reset.source.indexOf("resetPasswordAndAdvanceAuthorization(");
+  const clearAt = reset.source.indexOf("storage.clearPasswordResetToken(user.id)", passwordAt);
+  if (reset.count !== 1 || passwordAt < 0 || clearAt <= passwordAt
+      || reset.source.includes("storage.updateUserPassword(")) {
+    problems.push("password reset must advance authorization with the password before separate token clearing.");
+  }
+  if (/\b(?:authVersion|password|session)\s*:/.test(reset.source)) {
+    problems.push("password reset exposes password/session/version state.");
+  }
+
+  const create = routeCall(routes, "post", "/api/organizations");
+  if (create.count !== 1
+      || !create.source.includes("requireAuth, requireRole(['recruiter']), csrfProtection")
+      || create.source.includes("isUserInOrganization(")
+      || !create.source.includes("createOrganization(validatedData, user.id)")) {
+    problems.push("organization creation lost stored recruiter admission or restored a pre-read grant.");
+  }
+  if (create.source.includes("res.status(201).json(org)")) {
+    problems.push("organization creation exposes internal authority provenance.");
+  }
+
+  for (const [method, path, operation] of [
+    ["delete", "/api/organizations/members/:id", "removeOrganizationMemberAndRevoke"],
+    ["patch", "/api/organizations/members/:id/role", "changeOrganizationMemberRoleAndRevoke"],
+    ["post", "/api/organizations/members/:id/reassign", "reassignOrganizationJobs"],
+  ]) {
+    const block = routeCall(routes, method, path);
+    if (block.count !== 1 || !block.source.includes("parsePrivilegeGrantId(req.params.id)")
+        || !block.source.includes(`${operation}(user.id`)) {
+      problems.push(`privilege route lost strict statement-bound adoption: ${method.toUpperCase()} ${path}`);
+    }
+    for (const legacy of ["getUserOrganization(", "getOrganizationMember(", "updateMemberRole(", "removeMember(", "reassignJobs("]) {
+      if (block.source.includes(legacy)) problems.push(`privilege route restores split/global helper: ${legacy}`);
+    }
+  }
+
+  const createService = exportedFunctionSource(service, "createOrganization");
+  for (const anchor of [
+    ".for('update')", "storedUser.role !== 'recruiter'", "storedUser.emailVerified !== true",
+    "existingMemberships.length !== 0", "existingSelfServiceOrganizations.length !== 0",
+    "authorityOrigin: 'self_service_recruiter'", "selfCreatedByUserId: ownerId",
+  ]) requireAnchor(problems, createService, anchor, `organization creation service anchor is missing: ${anchor}`);
+  if (createService.includes("...data")) problems.push("organization creation accepts caller-supplied authority fields.");
+
+  for (const anchor of [
+    'authVersion: integer("auth_version").notNull().default(1)',
+    'authorityOrigin: text("authority_origin")',
+    'selfCreatedByUserId: integer("self_created_by_user_id")',
+    'users_auth_version_positive_check',
+    'organizations_authority_origin_shape_check',
+    'organizations_self_service_creator_idx',
+  ]) requireAnchor(problems, schema, anchor, `2L-A schema model anchor is missing: ${anchor}`);
+  for (const anchor of [
+    "ADD COLUMN auth_version integer NOT NULL DEFAULT 1",
+    "CHECK (auth_version > 0)",
+    "SET authority_origin = 'legacy_unknown'",
+    "self_created_by_user_id = NULL",
+    "organizations_authority_origin_shape_check",
+    "organizations_self_service_creator_idx",
+    "WHERE authority_origin = 'self_service_recruiter'",
+  ]) requireAnchor(problems, migration, anchor, `2L-A migration anchor is missing: ${anchor}`);
+  if (!/^[a-f0-9]{64}$/.test(migrationLock?.migrations?.["0005"] ?? "")) {
+    problems.push("2L-A migration is missing from checksums.lock.");
+  } else if (sha256(migration) !== migrationLock.migrations["0005"]) {
+    problems.push("2L-A migration checksum does not match migration 0005.");
+  }
+  if (migrationLock.catalog_lock_sha256 !== sha256(catalog)) {
+    problems.push("immutable adoption catalog checksum drifted.");
+  }
+  if (/UPDATE\s+public\.(?:users|organization_members|session)\b/i.test(migration)
+      || /DELETE\s+FROM/i.test(migration)) {
+    problems.push("2L-A migration rewrites privilege/session rows.");
+  }
+  if (/organization_members|current_user|current membership/i.test(migration)) {
+    problems.push("2L-A migration infers organization provenance from current identity or membership.");
+  }
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -1527,8 +1671,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
     problems.push("exactly five WhatsApp and two talent-pool route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 46) {
-    problems.push("exactly forty-six object/membership/workflow/AI-outbound/reviewer-share/financial-admin/talent-pool routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 51) {
+    problems.push("exactly fifty-one object/membership/workflow/AI-outbound/reviewer-share/financial-admin/talent-pool/privilege routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 9) {
     problems.push("exactly nine resume/application/consultant registrations must be retired.");
@@ -1554,6 +1698,20 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   ]) {
     const matches = (manifest.routes ?? []).filter((row) => row.method === method && row.path === path && row.reader === reader);
     if (matches.length !== 1) problems.push(`workflow manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+  }
+
+  for (const [method, path, reader, projection] of [
+    ["post", "/api/organizations", "createOrganization", ["id", "name", "slug", "logo", "domain", "domainVerified", "domainApprovedBy", "domainApprovedAt", "gstin", "billingName", "billingAddress", "billingCity", "billingState", "billingPincode", "billingContactEmail", "billingContactName", "settings", "isActive", "createdAt", "updatedAt", "signalTenantId"]],
+    ["delete", "/api/organizations/members/:id", "removeOrganizationMemberAndRevoke", ["success"]],
+    ["patch", "/api/organizations/members/:id/role", "changeOrganizationMemberRoleAndRevoke", ["id", "userId", "role", "seatAssigned"]],
+    ["post", "/api/organizations/members/:id/reassign", "reassignOrganizationJobs", ["success", "reassignedCount"]],
+    ["post", "/api/reset-password", "resetPasswordAndAdvanceAuthorization", ["message"]],
+  ]) {
+    const matches = (manifest.routes ?? []).filter((row) => row.method === method
+      && row.path === path
+      && row.reader === reader
+      && JSON.stringify(row.projection) === JSON.stringify(projection));
+    if (matches.length !== 1) problems.push(`privilege manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
   }
 
   for (const [method, path, reader] of [
@@ -1662,6 +1820,13 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/talentPoolAuthorization.routes.test.ts",
     "server/lib/__tests__/talentPoolAuthorization.pg.test.ts",
     "test/integration/backward-compatibility.test.ts",
+    "server/organization.routes.ts", "server/lib/organizationService.ts",
+    "server/lib/privilegeGrantRevocation.ts", "server/schema-migrations/0005_privilege_authorization_version.sql",
+    "server/lib/__tests__/privilegeGrantRevocation.test.ts",
+    "server/lib/__tests__/privilegeGrantRevocation.routes.test.ts",
+    "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
+    "server/tests/org-team-member-removal.routes.test.ts",
+    "server/lib/__tests__/candidatePortalAuthQuotaContracts.test.ts",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -1688,6 +1853,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateReviewerShareAuthority(root, problems);
     validateScopedFinancialAdminPublicAuthority(root, problems);
     validateTalentPoolAuthority(root, problems);
+    validatePrivilegeGrantRevocation(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }
