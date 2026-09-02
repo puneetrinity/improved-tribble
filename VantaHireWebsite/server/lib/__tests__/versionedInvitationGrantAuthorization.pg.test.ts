@@ -247,9 +247,7 @@ describe.skipIf(!enabled)("versioned invitation grants exact-schema PostgreSQL",
 
   beforeEach(async () => {
     if (!owner || !safeTargetProven) throw new Error("Disposable 2L-B target not proven.");
-    await owner.query("ALTER TABLE public.decision_events DISABLE TRIGGER USER");
     await owner.query("TRUNCATE public.users, public.organizations, public.subscription_plans RESTART IDENTITY CASCADE");
-    await owner.query("ALTER TABLE public.decision_events ENABLE TRIGGER USER");
     await installFixture();
   });
 

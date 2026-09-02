@@ -880,7 +880,7 @@
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
-      "sha256": "a4ca7cbdeb2547e44c61af42fb883fbdd3466b98f24847886e7b3ef9d21deb86"
+      "sha256": "96fe0176e2a110be8b92b6507cf603ab49c6a483d80012ac2ab9191cce269cb1"
     },
     {
       "file": "server/storage.ts",
@@ -888,11 +888,11 @@
     },
     {
       "file": "server/tests/applicationReadAuthorization.pg.test.ts",
-      "sha256": "68381bc610fcc5bade2795e9af7825ae95148af12f7a99f57cd6052df64e6fc1"
+      "sha256": "6c930bf0887d7c3a538c8953e08ab8d686307de5d8bc577f03672344c624bb32"
     },
     {
       "file": "server/tests/candidatePrivacy.pg.test.ts",
-      "sha256": "4bfcfaf850fefd118113fd6683b9a0566fdd0a73e6acefc429a4c1b1ff1e9c36"
+      "sha256": "3221aea0ab0cc2c00857710de220638a460cb6e002707e124bfa75f680b5dcf2"
     },
     {
       "file": "server/tests/interviewIcsAuthorization.routes.test.ts",
@@ -908,7 +908,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "0308e30cf60613631adbe2c5d1c6be32d040a4719e636bb0ed1ab8ad7f8ee628"
+      "sha256": "a799a9abdcf7b09f1205e60d1154f99c0ea8de466077fde759d4fde7bdf50f1b"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -956,7 +956,7 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "c4175e5b63e77940bcd9b3b034f2c2633e36f1bb703c069e1364807dc89f1f72"
+      "sha256": "181d35ca19dad9f2753678ebcc0d70077fd6f79e9d5bd579524e8488beba3d1a"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
@@ -1088,7 +1088,7 @@
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
-      "sha256": "74aa63878057f6ca7711d7249e85db5d4aca0d12be27eb3c6637e12e2933401f"
+      "sha256": "6a7f7bbb56f3753f9efb6275e80c876ad26170b985ac9ccd6bdb892b50ea0d43"
     },
     {
       "file": "test/integration/invite-and-webhook.test.ts",
@@ -1116,7 +1116,7 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "43320997608fe2a84fc2a55f48c7beae1901f80b424c6e1d8c8aa5c2feae31cc"
+      "sha256": "eabd171f33206f7fb7f6385d1f14d6bdb82463b0e0fbaa1b22793104eefea5d4"
     }
   ],
   "frozen_route_blocks": [

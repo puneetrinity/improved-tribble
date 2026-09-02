@@ -191,9 +191,40 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
 
   beforeEach(async () => {
     if (!owner || !safeTargetProven) throw new Error("Disposable workflow target not proven.");
-    await owner.query("ALTER TABLE public.decision_events DISABLE TRIGGER USER");
+    const hasCommittedEvidence = (await owner.query(
+      "SELECT EXISTS (SELECT 1 FROM public.decision_events LIMIT 1) present",
+    )).rows[0]?.present === true;
+    if (hasCommittedEvidence) {
+      // Keep committed event evidence immutable. Independent examples get a
+      // rebuilt disposable schema rather than a disabled trigger or a
+      // non-empty truncate.
+      await owner.end();
+      owner = undefined;
+      await resetDatabase();
+      const rebuilt = await runReleaseMigration({
+        migrationsDir,
+        creds: {
+          migrateUrl: migrationUrl,
+          expectedTargetId: targetId,
+          environment: "development",
+          allowFreshInitialization: true,
+        },
+        connect: connectMigration,
+      });
+      if (rebuilt.applied.length !== 8 || rebuilt.applied.at(-1) !== "0007") {
+        throw new Error("Disposable workflow per-test schema rebuild refused.");
+      }
+      await provisionRuntimeRole({
+        migrateUrl: migrationUrl,
+        runtimeUrl,
+        runtimeRole: new URL(runtimeUrl).username,
+        expectedTargetId: targetId,
+        connectMigration,
+        connectRuntime,
+      });
+      owner = await clientFor(migrationUrl);
+    }
     await owner.query("TRUNCATE public.users, public.organizations RESTART IDENTITY CASCADE");
-    await owner.query("ALTER TABLE public.decision_events ENABLE TRIGGER USER");
     await installFixture();
   });
 

@@ -2012,7 +2012,7 @@ function validateDecisionEventSpine(root, problems) {
   for (const anchor of [
     "pre0007Manifest", "upgrade.applied.join(\",\") !== \"0007\"", "readinessAsRuntime",
     "same-stage a zero-write", "event insert fails", "history insertion fails", "concurrent moves",
-    "runtime insert-only ACL", "owner-level append-only triggers", "minimized evidence outlive mutable rows",
+    "runtime insert-only ACL", "evidence-preserving owner guards", "minimized evidence outlive mutable rows",
   ]) requireAnchor(problems, pgTest, anchor, `decision-event PostgreSQL lifecycle anchor is missing: ${anchor}`);
 
   for (const [symbol, expected] of [

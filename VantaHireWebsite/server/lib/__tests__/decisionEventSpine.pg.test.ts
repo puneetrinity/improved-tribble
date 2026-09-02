@@ -210,9 +210,41 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
 
   beforeEach(async () => {
     if (!owner || !safeTargetProven) throw new Error("Disposable 3A target not proven.");
-    await owner.query("ALTER TABLE public.decision_events DISABLE TRIGGER USER");
+    const hasCommittedEvidence = (await owner.query(
+      "SELECT EXISTS (SELECT 1 FROM public.decision_events LIMIT 1) present",
+    )).rows[0]?.present === true;
+    if (hasCommittedEvidence) {
+      // A committed event must never be erased through the product relation's
+      // mutation surface. Recreate the disposable schema between independent
+      // examples instead of disabling the production trigger or truncating
+      // non-empty evidence.
+      await owner.end();
+      owner = undefined;
+      await resetDatabase();
+      const rebuilt = await runReleaseMigration({
+        migrationsDir,
+        creds: {
+          migrateUrl: migrationUrl,
+          expectedTargetId: targetId,
+          environment: "development",
+          allowFreshInitialization: true,
+        },
+        connect: connectMigration,
+      });
+      if (rebuilt.applied.length !== 8 || rebuilt.applied.at(-1) !== "0007") {
+        throw new Error("Disposable 3A per-test schema rebuild refused.");
+      }
+      await provisionRuntimeRole({
+        migrateUrl: migrationUrl,
+        runtimeUrl,
+        runtimeRole: new URL(runtimeUrl).username,
+        expectedTargetId: targetId,
+        connectMigration,
+        connectRuntime,
+      });
+      owner = await clientFor(migrationUrl);
+    }
     await owner.query("TRUNCATE public.users, public.organizations RESTART IDENTITY CASCADE");
-    await owner.query("ALTER TABLE public.decision_events ENABLE TRIGGER USER");
     await installFixture();
   });
 
@@ -350,7 +382,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     expect(new Set(events.map((row) => row.event_sequence)).size).toBe(2);
   });
 
-  it("enforces runtime insert-only ACL and owner-level append-only triggers", async () => {
+  it("enforces runtime insert-only ACL and evidence-preserving owner guards", async () => {
     const runtime = await clientFor(runtimeUrl);
     try {
       const acl = (await owner!.query(`SELECT
@@ -372,6 +404,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     } finally {
       await runtime.end();
     }
+    await expect(owner!.query("TRUNCATE decision_events")).resolves.toBeDefined();
     await workflow.moveAuthorizedApplicationStage(101, 2001, 2, null, randomUUID(), { allowPlatformAdmin: true });
     for (const sql of [
       "UPDATE decision_events SET action_code=action_code", "DELETE FROM decision_events", "TRUNCATE decision_events",
