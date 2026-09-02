@@ -16,113 +16,7 @@ import {
 } from "@shared/schema";
 import { eq, and, desc, sql, or } from "drizzle-orm";
 import slugify from "slugify";
-import { mergeDuplicatePipelineStagesForOrg } from "./pipelineStageMerge";
 
-// Backfill orphaned jobs, applications, clients, and child tables for a user joining an organization
-// This ensures legacy records (created before org existed) are associated with the new org
-export async function backfillUserRecordsToOrg(
-  tx: any, // Drizzle transaction object
-  userId: number,
-  organizationId: number
-): Promise<void> {
-  // Update orphaned jobs posted by this user
-  await tx.execute(sql`
-    UPDATE jobs
-    SET organization_id = ${organizationId}
-    WHERE posted_by = ${userId}
-      AND organization_id IS NULL
-  `);
-
-  // Update orphaned clients created by this user
-  await tx.execute(sql`
-    UPDATE clients
-    SET organization_id = ${organizationId}
-    WHERE created_by = ${userId}
-      AND organization_id IS NULL
-  `);
-
-  // Update orphaned applications for this user's jobs that are now in the org
-  // Condition: app has no org, app's job is posted by this user, and job is now in this org
-  await tx.execute(sql`
-    UPDATE applications a
-    SET organization_id = ${organizationId}
-    FROM jobs j
-    WHERE a.organization_id IS NULL
-      AND a.job_id = j.id
-      AND j.posted_by = ${userId}
-      AND j.organization_id = ${organizationId}
-  `);
-
-  // Update child tables (job_analytics, job_audit_log) for this user's jobs
-  await tx.execute(sql`
-    UPDATE job_analytics ja
-    SET organization_id = ${organizationId}
-    FROM jobs j
-    WHERE ja.organization_id IS NULL
-      AND ja.job_id = j.id
-      AND j.posted_by = ${userId}
-      AND j.organization_id = ${organizationId}
-  `);
-
-  await tx.execute(sql`
-    UPDATE job_audit_log jal
-    SET organization_id = ${organizationId}
-    FROM jobs j
-    WHERE jal.organization_id IS NULL
-      AND jal.job_id = j.id
-      AND j.posted_by = ${userId}
-      AND j.organization_id = ${organizationId}
-  `);
-
-  // Update orphaned pipeline stages created by this user (excluding defaults)
-  await tx.execute(sql`
-    UPDATE pipeline_stages
-    SET organization_id = ${organizationId}
-    WHERE created_by = ${userId}
-      AND organization_id IS NULL
-      AND (is_default IS NULL OR is_default = false)
-  `);
-
-  // Update orphaned email templates created by this user (excluding defaults)
-  await tx.execute(sql`
-    UPDATE email_templates
-    SET organization_id = ${organizationId}
-    WHERE created_by = ${userId}
-      AND organization_id IS NULL
-      AND (is_default IS NULL OR is_default = false)
-  `);
-
-  // Update orphaned forms created by this user
-  await tx.execute(sql`
-    UPDATE forms
-    SET organization_id = ${organizationId}
-    WHERE created_by = ${userId}
-      AND organization_id IS NULL
-  `);
-
-  // Update form_invitations for this user's forms that are now in the org
-  await tx.execute(sql`
-    UPDATE form_invitations fi
-    SET organization_id = ${organizationId}
-    FROM forms f
-    WHERE fi.organization_id IS NULL
-      AND fi.form_id = f.id
-      AND f.created_by = ${userId}
-      AND f.organization_id = ${organizationId}
-  `);
-
-  // Update form_responses for this user's forms that are now in the org
-  await tx.execute(sql`
-    UPDATE form_responses fr
-    SET organization_id = ${organizationId}
-    FROM form_invitations fi
-    INNER JOIN forms f ON fi.form_id = f.id
-    WHERE fr.organization_id IS NULL
-      AND fr.invitation_id = fi.id
-      AND f.created_by = ${userId}
-      AND f.organization_id = ${organizationId}
-  `);
-}
 
 // Public email domains that cannot claim domain verification
 const PUBLIC_EMAIL_DOMAINS = [
@@ -229,17 +123,8 @@ export async function createOrganization(
       joinedAt: new Date(),
     });
 
-    // Backfill orphaned jobs and applications for this user
-    await backfillUserRecordsToOrg(tx, ownerId, org.id);
-
     return org;
   });
-
-  try {
-    await mergeDuplicatePipelineStagesForOrg(org.id, { dryRun: false });
-  } catch (error) {
-    console.warn('[Org Backfill] Failed to merge duplicate pipeline stages after org creation:', error);
-  }
 
   return org;
 }
@@ -435,7 +320,7 @@ export async function respondToJoinRequest(
     throw new Error('Join request has already been processed');
   }
 
-  // Transaction: update request + add member (if approved) + backfill records
+  // Transaction: update request + add member (if approved)
   const member = await db.transaction(async (tx: any) => {
     await tx.update(organizationJoinRequests)
       .set({
@@ -462,22 +347,11 @@ export async function respondToJoinRequest(
         joinedAt: new Date(),
       }).returning();
 
-      // Backfill orphaned jobs and applications for this user
-      await backfillUserRecordsToOrg(tx, request.userId, request.organizationId);
-
       return member;
     }
 
     return null;
   });
-
-  if (member) {
-    try {
-      await mergeDuplicatePipelineStagesForOrg(request.organizationId, { dryRun: false });
-    } catch (error) {
-      console.warn('[Org Backfill] Failed to merge duplicate pipeline stages after join approval:', error);
-    }
-  }
 
   return member;
 }

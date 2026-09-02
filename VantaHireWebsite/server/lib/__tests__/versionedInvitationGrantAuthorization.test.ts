@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   execute: vi.fn(),
   txExecute: vi.fn(),
-  backfill: vi.fn(),
 }));
 
 vi.mock("../../db", () => ({
@@ -14,7 +13,6 @@ vi.mock("../../db", () => ({
       callback({ execute: mocks.txExecute }),
   },
 }));
-vi.mock("../organizationService", () => ({ backfillUserRecordsToOrg: mocks.backfill }));
 
 import {
   acceptHiringManagerRegistrationGrant,
@@ -132,16 +130,14 @@ describe("statement-bound organization invitations", () => {
     expect(mocks.execute).toHaveBeenCalledTimes(1);
   });
 
-  it("accepts membership and backfills inside the same transaction", async () => {
+  it("accepts membership through exactly one statement without legacy attribution", async () => {
     mocks.txExecute.mockResolvedValueOnce({ rows: [{
       outcome: "ok", id: 71, organizationId: 10, userId: 7, role: "member", seatAssigned: true,
     }] });
-    mocks.backfill.mockResolvedValueOnce(undefined);
     await expect(acceptOrganizationInvite(token, 7)).resolves.toEqual({ ok: true, value: {
       id: 71, organizationId: 10, userId: 7, role: "member", seatAssigned: true,
     } });
     expect(mocks.txExecute).toHaveBeenCalledTimes(1);
-    expect(mocks.backfill).toHaveBeenCalledWith(expect.anything(), 7, 10);
   });
 
   it.each([
@@ -149,10 +145,10 @@ describe("statement-bound organization invitations", () => {
     ["forbidden", { ok: false, reason: "forbidden" }],
     ["already_member", { ok: false, reason: "conflict", code: "already_member" }],
     ["no_seats", { ok: false, reason: "conflict", code: "no_seats" }],
-  ] as const)("maps accept outcome %s with zero backfill", async (outcome, expected) => {
+  ] as const)("maps accept outcome %s without a second statement", async (outcome, expected) => {
     mocks.txExecute.mockResolvedValueOnce({ rows: [{ outcome }] });
     await expect(acceptOrganizationInvite(token, 7)).resolves.toEqual(expected);
-    expect(mocks.backfill).not.toHaveBeenCalled();
+    expect(mocks.txExecute).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -175,6 +171,8 @@ describe("exact hiring-manager grant binding", () => {
     expect(source).not.toContain("getOrganizationInviteByToken");
     expect(source).not.toContain("cancelOrganizationInvite(inviteId");
     expect(source).not.toContain("inviter_membership");
+    expect(source).not.toContain("backfillUserRecordsToOrg");
+    expect(source).not.toContain('from "./organizationService"');
     expect(source).toContain("accepted_by_user_id");
     expect(source).toContain("sha256");
   });

@@ -1477,7 +1477,7 @@ describe("object authorization surface guard", () => {
         .replace("const result = await tx.execute(sql`", "const result = await db.execute(sql`"),
     );
     expect(problems).toContain(
-      "organization invitation acceptance must use one transaction, one state statement and the bounded backfill callback.",
+      "organization invitation acceptance must use one transaction and one state/member statement with no legacy-attribution callback.",
     );
   });
 
@@ -1536,5 +1536,111 @@ describe("object authorization surface guard", () => {
       `${source}\n-- forbidden classifier\nSELECT 1 FROM organization_members;\n`,
     );
     expect(problems).toContain("2L-B migration infers invitation authority from current mutable relationships.");
+  });
+
+  it("rejects DB work or body-selected behavior in the retired attribution route", () => {
+    const problems = mutate(fixture(), "server/admin.routes.ts", (source) =>
+      source.replace(
+        "res.status(410).json({\n        error: \"Organization attribution repair retired\"",
+        "if (_req.body?.dryRun === false) await db.execute(sql`SELECT 1`);\n      res.status(410).json({\n        error: \"Organization attribution repair retired\"",
+      ),
+    );
+    expect(problems).toContain("retired organization-attribution tombstone restores work: req.body");
+    expect(problems).toContain("retired organization-attribution tombstone restores work: db.");
+  });
+
+  it("rejects a mutable or ignored retirement status", () => {
+    const problems = mutate(fixture(), "server/admin.routes.ts", (source) =>
+      source.replace(
+        "res.status(410).json({\n        error: \"Organization attribution repair retired\"",
+        "res.status(_req.body?.status ?? 200).json({\n        error: \"Organization attribution repair retired\"",
+      ),
+    );
+    expect(problems).toContain("retired organization-attribution route lost CSRF/admin ordering or its fixed 410 code.");
+    expect(problems).toContain("retired organization-attribution tombstone restores work: req.body");
+  });
+
+  it("rejects imports, credentials, flags or zero exit in the retired CLI", () => {
+    const problems = mutate(fixture(), "server/scripts/backfill-org-ids.ts", () =>
+      'import "../db";\nconst target = process.env.DATABASE_URL;\nif (process.env.DRY_RUN === "false") process.exitCode = 0;\n',
+    );
+    expect(problems).toContain("retired organization-attribution CLI is not the exact import-free refusal.");
+    expect(problems).toContain("retired organization-attribution CLI restores work: DATABASE_URL");
+    expect(problems).toContain("retired organization-attribution CLI restores work: DRY_RUN");
+  });
+
+  it("rejects a renamed automatic attribution callback after organization creation", () => {
+    const problems = mutate(fixture(), "server/lib/organizationService.ts", (source) =>
+      source.replace(
+        "\n  return org;\n}\n\nexport async function getOrganization",
+        "\n  await reconcileLegacyOwnership(ownerId, org.id);\n  return org;\n}\n\nexport async function getOrganization",
+      ),
+    );
+    expect(problems).toContain("organization creation restores an automatic legacy-attribution or merge callback.");
+  });
+
+  it("rejects a merge restored after the organization transaction", () => {
+    const problems = mutate(fixture(), "server/lib/organizationService.ts", (source) =>
+      source.replace(
+        "\n  return org;\n}\n\nexport async function getOrganization",
+        "\n  await mergeDuplicatePipelineStagesForOrg(org.id, { dryRun: false });\n  return org;\n}\n\nexport async function getOrganization",
+      ),
+    );
+    expect(problems).toContain("organization creation restores an automatic legacy-attribution or merge callback.");
+  });
+
+  it("rejects assembled SQL and poster inference in organization creation", () => {
+    const problems = mutate(fixture(), "server/lib/organizationService.ts", (source) =>
+      source.replace(
+        "\n  return org;\n}\n\nexport async function getOrganization",
+        '\n  const legacySql = "UPDATE jobs " + "SET organization_id = " + org.id + " WHERE posted_by = " + ownerId;\n  await db.execute(legacySql);\n  return org;\n}\n\nexport async function getOrganization',
+      ),
+    );
+    expect(problems).toContain("organization creation modifies or infers authority for an unrelated legacy table.");
+  });
+
+  it("rejects current-membership SQL restored to join approval", () => {
+    const problems = mutate(fixture(), "server/lib/organizationService.ts", (source) =>
+      source.replace(
+        "\n  return member;\n}\n\n// Domain claim requests",
+        "\n  await db.execute(sql`UPDATE jobs SET organization_id = 1 FROM organization_members WHERE jobs.posted_by = organization_members.user_id`);\n  return member;\n}\n\n// Domain claim requests",
+      ),
+    );
+    expect(problems).toContain("join approval modifies or infers authority for an unrelated legacy table.");
+    expect(problems).toContain("retired organization attribution is reconstructed from current membership.");
+  });
+
+  it("rejects dynamic legacy repair after versioned invitation acceptance", () => {
+    const problems = mutate(fixture(), "server/lib/versionedInvitationGrantAuthorization.ts", (source) =>
+      source.replace(
+        "const value: AcceptedOrganizationMembershipProjection = {",
+        'await (await import("./legacyOwnershipRepair")).repairByInvitationIssuer(actorUserId);\n          const value: AcceptedOrganizationMembershipProjection = {',
+      ),
+    );
+    expect(problems).toContain(
+      "organization invitation acceptance must use one transaction and one state/member statement with no legacy-attribution callback.",
+    );
+    expect(problems).toContain("versioned invitation acceptance restores an automatic legacy-attribution or merge callback.");
+  });
+
+  it("rejects stale invitation acceptance followed by a legacy backfill", () => {
+    const problems = mutate(fixture(), "server/lib/versionedInvitationGrantAuthorization.ts", (source) =>
+      source.replace(
+        "const value: AcceptedOrganizationMembershipProjection = {",
+        "await reconcileLegacyOwnershipFromInvitation(actorUserId);\n          const value: AcceptedOrganizationMembershipProjection = {",
+      ),
+    );
+    expect(problems).toContain(
+      "organization invitation acceptance must use one transaction and one state/member statement with no legacy-attribution callback.",
+    );
+  });
+
+  it("rejects a retirement PG test that contacts production", () => {
+    const problems = mutate(fixture(), "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts", (source) =>
+      `${source}\nfetch("https://ealana.com/api/health");\n`,
+    );
+    expect(problems).toContain(
+      "2M retirement test contacts a production, provider or customer surface: server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
+    );
   });
 });
