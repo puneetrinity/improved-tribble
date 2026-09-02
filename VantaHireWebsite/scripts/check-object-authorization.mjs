@@ -1673,8 +1673,8 @@ function validateVersionedInvitationGrants(root, problems) {
   }
   const accept = exportedFunctionSource(authority, "acceptOrganizationInvite");
   if (count(accept, "db.transaction(") !== 1 || count(accept, "tx.execute(") !== 1
-      || count(accept, "backfillUserRecordsToOrg(tx") !== 1) {
-    problems.push("organization invitation acceptance must use one transaction, one state statement and the bounded backfill callback.");
+      || /backfill|repair|reconcile|attribut|mergeDuplicatePipelineStages/i.test(accept)) {
+    problems.push("organization invitation acceptance must use one transaction and one state/member statement with no legacy-attribution callback.");
   }
 
   for (const anchor of [
@@ -1809,6 +1809,110 @@ function validateVersionedInvitationGrants(root, problems) {
   }
 }
 
+function validateUnsafeOrgAttributionRetirement(root, problems) {
+  const admin = read(root, "server/admin.routes.ts");
+  const cli = read(root, "server/scripts/backfill-org-ids.ts");
+  const service = read(root, "server/lib/organizationService.ts");
+  const invitation = read(root, "server/lib/versionedInvitationGrantAuthorization.ts");
+  const tombstone = routeCall(admin, "post", "/api/admin/ops/backfill-org-ids");
+  const expectedCli = 'const CODE = "ORG_ATTRIBUTION_REPAIR_RETIRED";\n\n'
+    + 'process.stderr.write(`${CODE}\\n`);\n'
+    + 'process.exitCode = 1;\n';
+
+  if (tombstone.count !== 1 || !tombstone.source) {
+    problems.push("retired organization-attribution route must exist exactly once.");
+  } else {
+    const csrfAt = tombstone.source.indexOf("csrfProtection");
+    const roleAt = tombstone.source.indexOf("requireRole(['super_admin'])");
+    const statusAt = tombstone.source.indexOf("res.status(410).json(");
+    const codeAt = tombstone.source.indexOf('code: "ORG_ATTRIBUTION_REPAIR_RETIRED"');
+    if (!(csrfAt >= 0 && roleAt > csrfAt && statusAt > roleAt && codeAt > statusAt)) {
+      problems.push("retired organization-attribution route lost CSRF/admin ordering or its fixed 410 code.");
+    }
+    for (const forbidden of [
+      "dryRun", "req.body", "req.params", "req.query", "db.", "storage.", "sql`", "execute(",
+      "organization_members", "mergeDuplicatePipelineStages", "console.", "logger.", "next(",
+    ]) {
+      if (tombstone.source.includes(forbidden)) {
+        problems.push(`retired organization-attribution tombstone restores work: ${forbidden}`);
+      }
+    }
+    if (/\b(?:for|while)\s*\(/.test(tombstone.source) || /error\?*\.message|String\(error\)/.test(tombstone.source)) {
+      problems.push("retired organization-attribution tombstone restores loops or raw-error output.");
+    }
+  }
+
+  if (cli !== expectedCli) {
+    problems.push("retired organization-attribution CLI is not the exact import-free refusal.");
+  }
+  for (const forbidden of [
+    "import ", "import(", "require(", "DATABASE_URL", "process.env", "DRY_RUN", "db", "sql", "schema",
+    "organizationId", "userId", "organization_members", "merge", "backfill", "process.argv", "console.",
+  ]) {
+    if (cli.includes(forbidden)) problems.push(`retired organization-attribution CLI restores work: ${forbidden}`);
+  }
+
+  const create = exportedFunctionSource(service, "createOrganization");
+  const joinApproval = exportedFunctionSource(service, "respondToJoinRequest");
+  const accept = exportedFunctionSource(invitation, "acceptOrganizationInvite");
+  for (const [label, source] of [
+    ["organization creation", create],
+    ["join approval", joinApproval],
+    ["versioned invitation acceptance", accept],
+  ]) {
+    if (!source) {
+      problems.push(`${label} entrypoint is missing from attribution-retirement coverage.`);
+      continue;
+    }
+    if (/backfill|repair|reconcile|attribut|mergeDuplicatePipelineStages|import\s*\(/i.test(source)) {
+      problems.push(`${label} restores an automatic legacy-attribution or merge callback.`);
+    }
+    if (/\b(?:jobs|clients|applications|job_analytics|job_audit_log|pipeline_stages|email_templates|forms|form_invitations|form_responses)\b/i.test(source)
+        || /SET\s+["']?organization_id|UPDATE[\s\S]{0,300}FROM\s+organization_members/i.test(source)) {
+      problems.push(`${label} modifies or infers authority for an unrelated legacy table.`);
+    }
+  }
+
+  const productionSources = walk(join(root, "server"))
+    .filter((file) => file.endsWith(".ts"))
+    .map((file) => readFileSync(file, "utf8"))
+    .join("\n");
+  if (/backfillUserRecordsToOrg/.test(productionSources)) {
+    problems.push("retired backfillUserRecordsToOrg still has a production definition or caller.");
+  }
+  if (/UPDATE[\s\S]{0,240}organization_id[\s\S]{0,240}FROM\s+organization_members/i.test(
+    [admin, cli, service, invitation].join("\n"),
+  )) {
+    problems.push("retired organization attribution is reconstructed from current membership.");
+  }
+
+  for (const file of [
+    "server/lib/__tests__/unsafeOrgAttributionRetirement.routes.test.ts",
+    "server/lib/__tests__/unsafeOrgAttributionRetirement.cli.test.ts",
+    "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
+  ]) {
+    const test = read(root, file);
+    if (/https:\/\/(?![^\s"']*\.invalid)|railway|flow_db\.url|ACTIVEKG|GROQ|BREVO|SENDGRID|customer@/i.test(test)) {
+      problems.push(`2M retirement test contacts a production, provider or customer surface: ${file}`);
+    }
+  }
+  const pgTest = read(root, "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts");
+  for (const anchor of [
+    "legacySnapshot", "organization_id IS NULL", "createOrganization(", "acceptOrganizationInvite(",
+    "respondToJoinRequest(", "duplicate_stages", "legacyAfter).toEqual(legacyBefore)",
+  ]) requireAnchor(problems, pgTest, anchor, `2M PostgreSQL conservation anchor is missing: ${anchor}`);
+
+  for (const [method, path, expected] of [
+    ["get", "/api/admin/ops/org-health", "5f396aa2fed43024096dd1e09c8bdf6d1afa011bf8790e69343b52fd9da460da"],
+    ["post", "/api/admin/ops/merge-duplicate-stages", "c14687779045cca381d79c5954ba625a0c7bc084f1671edc98e695846845c507"],
+  ]) {
+    const block = routeCall(admin, method, path);
+    if (block.count !== 1 || sha256(block.source) !== expected) {
+      problems.push(`frozen 2M neighboring route drifted: ${method.toUpperCase()} ${path}`);
+    }
+  }
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -1836,8 +1940,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.routes) || manifest.routes.length !== 57) {
     problems.push("exactly fifty-seven protected authorization routes must be governed.");
   }
-  if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 9) {
-    problems.push("exactly nine resume/application/consultant registrations must be retired.");
+  if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 10) {
+    problems.push("exactly ten resume/application/consultant/attribution registrations must be retired.");
   }
 
   for (const [path, reader] of [
@@ -1923,9 +2027,10 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     ["post", "/api/admin/consultants", "CONSULTANT_PRODUCT_RETIRED"],
     ["patch", "/api/admin/consultants/:id", "CONSULTANT_PRODUCT_RETIRED"],
     ["delete", "/api/admin/consultants/:id", "CONSULTANT_PRODUCT_RETIRED"],
+    ["post", "/api/admin/ops/backfill-org-ids", "ORG_ATTRIBUTION_REPAIR_RETIRED"],
   ]) {
     const matches = (manifest.retired_routes ?? []).filter((row) => row.method === method && row.path === path && row.code === code);
-    if (matches.length !== 1) problems.push(`2J retired manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
+    if (matches.length !== 1) problems.push(`retired manifest route is missing or duplicated: ${method.toUpperCase()} ${path}`);
   }
 
   for (const [method, path, reader] of [
@@ -2010,6 +2115,10 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
     "test/integration/invite-and-webhook.test.ts",
     "test/integration/invite-seat-edge.test.ts",
+    "server/scripts/backfill-org-ids.ts",
+    "server/lib/__tests__/unsafeOrgAttributionRetirement.routes.test.ts",
+    "server/lib/__tests__/unsafeOrgAttributionRetirement.cli.test.ts",
+    "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -2038,6 +2147,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateTalentPoolAuthority(root, problems);
     validatePrivilegeGrantRevocation(root, problems);
     validateVersionedInvitationGrants(root, problems);
+    validateUnsafeOrgAttributionRetirement(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

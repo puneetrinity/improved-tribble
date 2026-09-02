@@ -11,7 +11,6 @@ import {
 import { sql } from "drizzle-orm";
 
 import { db } from "../db";
-import { backfillUserRecordsToOrg } from "./organizationService";
 
 export interface OrganizationInviteIssuerProjection {
   id: number;
@@ -579,7 +578,6 @@ export async function acceptOrganizationInvite(
             role: "member",
             seatAssigned: true,
           };
-          await backfillUserRecordsToOrg(tx, value.userId, value.organizationId);
           return { ok: true, value };
         }
         case "forbidden": return { ok: false, reason: "forbidden" };

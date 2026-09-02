@@ -311,10 +311,23 @@ describe.skipIf(!enabled)("versioned invitation grants exact-schema PostgreSQL",
   });
 
   it("accepts a verified exact-email account atomically and rejects unverified or existing members", async () => {
+    await owner!.query(`
+      INSERT INTO jobs
+        (id,organization_id,title,location,type,description,posted_by,is_active,status,slug)
+      VALUES
+        (901,NULL,'Unknown-ownership role','Remote','full-time','Must remain unattributed',6,false,'pending','unknown-ownership-role')
+    `);
+    const unattributedBefore = (await owner!.query(
+      "SELECT to_jsonb(j) AS row FROM jobs j WHERE id=901",
+    )).rows[0]?.row;
+
     const accepted = await authorization.acceptOrganizationInvite(tokenA, 6);
     expect(accepted).toMatchObject({ ok: true, value: { organizationId: 10, userId: 6, role: "member", seatAssigned: true } });
     expect((await owner!.query("SELECT state,accepted_by FROM organization_invites WHERE id=101")).rows[0])
       .toEqual({ state: "accepted", accepted_by: 6 });
+    expect((await owner!.query(
+      "SELECT to_jsonb(j) AS row FROM jobs j WHERE id=901",
+    )).rows[0]?.row).toEqual(unattributedBefore);
 
     await owner!.query(`
       INSERT INTO organization_invites

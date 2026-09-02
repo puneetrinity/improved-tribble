@@ -2,7 +2,7 @@
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
   "route_registration_census": 316,
-  "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection and consultant product are retired. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
+  "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
     {
       "method": "get",
@@ -726,6 +726,11 @@
       "method": "delete",
       "path": "/api/admin/consultants/:id",
       "code": "CONSULTANT_PRODUCT_RETIRED"
+    },
+    {
+      "method": "post",
+      "path": "/api/admin/ops/backfill-org-ids",
+      "code": "ORG_ATTRIBUTION_REPAIR_RETIRED"
     }
   ],
   "governed_files": [
@@ -791,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "5ad3223a4c1edf1b42fb8d365029f6a2c23b8dd4b77c32f5ab18db79566ecb9b"
+      "sha256": "31090e422a448e7bf1c6683f4a34e8a606ad19cedb1d4608a8ab6a139f287a5a"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -799,7 +804,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "28cb2a25b5cf8b131c170ecca45dbf8998a16058b89cd2a97096453bad0ac2de"
+      "sha256": "148a79d2cd26aab8c69705b3af809d6b3763f07fa10733aab11aa1c88107a73c"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -903,7 +908,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "1fa3fcbb625768af8d631db234316b3b070e094415d239223415675b58e26348"
+      "sha256": "7c585ac6b09eac3b5498c1cb1a945488b0f1ae7c3beef4dae0ab1c7fa9db5a01"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -979,7 +984,7 @@
     },
     {
       "file": "server/admin.routes.ts",
-      "sha256": "9c914fa0475a02df019dc505fbeabb95e12a5cbdfa9054e4ebba88ac6391d5d6"
+      "sha256": "d55cee085e7abcdb9e307cf81f96c802a4e85b48216ea3f1c1a687d15656253d"
     },
     {
       "file": "client/src/hooks/use-subscription.ts",
@@ -1035,7 +1040,7 @@
     },
     {
       "file": "server/lib/organizationService.ts",
-      "sha256": "63aa964be35c26641d612488f9f1cc1219b851a668b4351ad96367ce8cb2401d"
+      "sha256": "5a5301a1d4b1e07adcc67b9ca5ab64d8e8332217f7f266c8d8682b2a6a690b34"
     },
     {
       "file": "server/lib/privilegeGrantRevocation.ts",
@@ -1071,11 +1076,11 @@
     },
     {
       "file": "server/lib/versionedInvitationGrantAuthorization.ts",
-      "sha256": "a3448fd08365d48dbb46de07e3da820f7701576b35212df9593afdeb813ad49b"
+      "sha256": "be53b405d2db3b57d3a91ff7394b81d1d6aaf2194f169f42fe380f3bd121b59b"
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.test.ts",
-      "sha256": "d573c7222196b78ad1e62894e55c47b12d8fba1ba4c9d9196a1352b1b63e0395"
+      "sha256": "4a646c2caf18d3f5e089e64f862c3bcf8d34d084a372843a74ddf21f53441be8"
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.routes.test.ts",
@@ -1083,7 +1088,7 @@
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
-      "sha256": "00eeb6e3e075604e0a762eb6a3d252ffac6866c973e022f0a3a858a913b5385f"
+      "sha256": "e7792f57683c6a21cdfaa6a369b34574411c77377cdf29bc9afc306f703d94b3"
     },
     {
       "file": "test/integration/invite-and-webhook.test.ts",
@@ -1092,6 +1097,22 @@
     {
       "file": "test/integration/invite-seat-edge.test.ts",
       "sha256": "51bffe1ed84a60e78f0a9a700f004b4ba8bc0253e0b2921c49e747828cdcc661"
+    },
+    {
+      "file": "server/scripts/backfill-org-ids.ts",
+      "sha256": "8dbb436679a5298e211f5a80d11c1d91e5060fd69e631f93b2e08781ccb47d01"
+    },
+    {
+      "file": "server/lib/__tests__/unsafeOrgAttributionRetirement.routes.test.ts",
+      "sha256": "73f01986d3cff460134c52f062a6dd6e9d392751f1c1cb95df71e999fa549285"
+    },
+    {
+      "file": "server/lib/__tests__/unsafeOrgAttributionRetirement.cli.test.ts",
+      "sha256": "bda0ffff5e6e136e1621cf091d7fdb5060acd8fca2f0fe412a70077388cca001"
+    },
+    {
+      "file": "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
+      "sha256": "62869a636a506a3affbeaf5f2ea5d385889108933ca61e96622757df7c8ed53e"
     }
   ],
   "frozen_route_blocks": [
