@@ -1655,6 +1655,7 @@ export function registerApplicationsRoutes(
         appId,
         validation.data.stageId,
         validation.data.notes ?? null,
+        randomUUID(),
         { allowPlatformAdmin: true },
       );
       if (!result.ok) {
@@ -1668,7 +1669,7 @@ export function registerApplicationsRoutes(
 
       // Fire-and-forget: automated status notification via email and WhatsApp (if enabled)
       const autoNotifications = process.env.EMAIL_AUTOMATION_ENABLED === 'true' || process.env.EMAIL_AUTOMATION_ENABLED === '1' || process.env.NOTIFICATION_AUTOMATION_ENABLED === 'true';
-      if (autoNotifications) {
+      if (result.value.changed && autoNotifications) {
         const stageName = result.value.stageName.toLowerCase();
         if (stageName.includes('offer') || stageName.includes('hired')) {
           runPrivacyCheckedApplicationSideEffect(appId, 'offer_notification', () => sendOfferNotification(appId));

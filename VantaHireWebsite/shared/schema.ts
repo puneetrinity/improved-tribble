@@ -1,4 +1,4 @@
-import { pgTable, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, pgSequence, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -276,6 +276,75 @@ export const applicationStageHistory = pgTable("application_stage_history", {
   notes: text("notes"),
   changedAt: timestamp("changed_at").defaultNow().notNull(),
 });
+
+// Wave 3A: global ordering for the append-only decision-event spine. Runtime
+// receives USAGE only; it cannot read/reset the sequence.
+export const decisionEventSequence = pgSequence("decision_event_sequence", {
+  startWith: 1,
+  minValue: 1,
+});
+
+export const decisionEvents = pgTable("decision_events", {
+  eventId: uuid("event_id").primaryKey(),
+  eventSequence: bigint("event_sequence", { mode: "number" }).notNull(),
+  aggregateSequence: bigint("aggregate_sequence", { mode: "number" }).notNull(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  aggregateType: text("aggregate_type").notNull(),
+  aggregateId: integer("aggregate_id").notNull(),
+  jobId: integer("job_id").notNull(),
+  actorUserId: integer("actor_user_id").notNull(),
+  requestingActorUserId: integer("requesting_actor_user_id"),
+  actionCode: text("action_code").notNull(),
+  sourceSurface: text("source_surface").notNull(),
+  eventSchemaVersion: integer("event_schema_version").notNull(),
+  taxonomyVersion: integer("taxonomy_version").notNull(),
+  rubricId: uuid("rubric_id"),
+  rubricVersion: integer("rubric_version"),
+  rubricApprovalMode: text("rubric_approval_mode"),
+  jdDigestVersion: integer("jd_digest_version"),
+  ratingContractVersion: text("rating_contract_version"),
+  recommendationAction: text("recommendation_action"),
+  recommendationModelVersion: text("recommendation_model_version"),
+  recommendationInputVersion: integer("recommendation_input_version"),
+  reasonCode: text("reason_code"),
+  idempotencyKey: text("idempotency_key"),
+  beforeState: jsonb("before_state").notNull(),
+  afterState: jsonb("after_state").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  eventSequenceUnique: uniqueIndex("decision_events_event_sequence_unique").on(table.eventSequence),
+  aggregateSequenceUnique: uniqueIndex("decision_events_aggregate_sequence_unique")
+    .on(table.organizationId, table.aggregateType, table.aggregateId, table.aggregateSequence),
+  idempotencyKeyUnique: uniqueIndex("decision_events_idempotency_key_unique")
+    .on(table.idempotencyKey)
+    .where(sql`${table.idempotencyKey} IS NOT NULL`),
+  organizationSequenceIdx: index("decision_events_organization_sequence_idx")
+    .on(table.organizationId, table.eventSequence),
+  aggregateSequenceIdx: index("decision_events_aggregate_sequence_idx")
+    .on(table.organizationId, table.aggregateType, table.aggregateId, table.eventSequence),
+  jobSequenceIdx: index("decision_events_job_sequence_idx")
+    .on(table.organizationId, table.jobId, table.eventSequence),
+  actionTimeIdx: index("decision_events_action_time_idx")
+    .on(table.organizationId, table.actionCode, table.occurredAt, table.eventSequence),
+  eventSequencePositive: check("decision_events_event_sequence_positive", sql`${table.eventSequence} > 0`),
+  aggregateSequencePositive: check("decision_events_aggregate_sequence_positive", sql`${table.aggregateSequence} > 0`),
+  aggregateIdentityPositive: check("decision_events_aggregate_identity_positive", sql`${table.aggregateId} > 0 AND ${table.jobId} > 0`),
+  actorPositive: check("decision_events_actor_positive", sql`${table.actorUserId} > 0`),
+  requestingActorPositive: check("decision_events_requesting_actor_positive", sql`${table.requestingActorUserId} IS NULL OR ${table.requestingActorUserId} > 0`),
+  aggregateTypeV1: check("decision_events_aggregate_type_v1", sql`${table.aggregateType} = 'application'`),
+  actionV1: check("decision_events_action_v1", sql`${table.actionCode} = 'application_stage_moved'`),
+  sourceV1: check("decision_events_source_v1", sql`${table.sourceSurface} = 'applications.stage_patch'`),
+  schemaVersionV1: check("decision_events_schema_version_v1", sql`${table.eventSchemaVersion} = 1`),
+  taxonomyVersionV1: check("decision_events_taxonomy_version_v1", sql`${table.taxonomyVersion} = 1`),
+  rubricShape: check("decision_events_rubric_shape", sql`(
+    (${table.rubricId} IS NULL AND ${table.rubricVersion} IS NULL AND ${table.rubricApprovalMode} IS NULL)
+    OR (${table.rubricId} IS NOT NULL AND ${table.rubricVersion} > 0
+      AND ${table.rubricApprovalMode} ~ '^[a-z0-9][a-z0-9_-]{0,79}$')
+  )`),
+  recommendationActionV1: check("decision_events_recommendation_action_v1", sql`${table.recommendationAction} IS NULL OR ${table.recommendationAction} IN ('advance','hold','reject')`),
+  stateChanged: check("decision_events_state_changed", sql`${table.beforeState}->'stage_id' IS DISTINCT FROM ${table.afterState}->'stage_id'`),
+}));
 
 // ATS: Application feedback (for hiring managers)
 export const applicationFeedback = pgTable("application_feedback", {

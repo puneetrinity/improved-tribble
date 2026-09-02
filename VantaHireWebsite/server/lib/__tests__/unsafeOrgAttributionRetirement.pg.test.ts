@@ -242,7 +242,7 @@ describe.skipIf(!enabled)("unsafe organization-attribution retirement exact-sche
 
   it("creates only the explicit organization, membership, invitation and join-request transitions", () => {
     expect(lifecycle).toEqual({
-      ledger: 7,
+      ledger: 8,
       created_org: 1,
       created_owner: 1,
       invite_accepted: true,
@@ -257,14 +257,14 @@ describe.skipIf(!enabled)("unsafe organization-attribution retirement exact-sche
     });
   });
 
-  it("keeps the runtime role DML-only with ledger 7 unchanged", async () => {
+  it("keeps the runtime role DML-only with ledger 8 unchanged", async () => {
     const runtime = await clientFor(runtimeUrl);
     try {
       await expect(runtime.query("ALTER TABLE jobs ADD COLUMN forbidden integer")).rejects.toThrow();
       expect((await runtime.query(
         "SELECT has_table_privilege(current_user,'jobs','SELECT,INSERT,UPDATE,DELETE') AS dml",
       )).rows[0]?.dml).toBe(true);
-      expect((await owner!.query("SELECT COUNT(*)::integer AS ledger FROM schema_control.applied")).rows[0]?.ledger).toBe(7);
+      expect((await owner!.query("SELECT COUNT(*)::integer AS ledger FROM schema_control.applied")).rows[0]?.ledger).toBe(8);
     } finally {
       await runtime.end();
     }

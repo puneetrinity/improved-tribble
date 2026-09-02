@@ -941,7 +941,7 @@ function validateKernel(root, problems) {
   } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
     problems.push("resume audit migration checksum does not match migration 0002.");
   }
-  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0007_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006"]'])
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0008_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007"]'])
     requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
   requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
 
@@ -1148,8 +1148,8 @@ function validateReviewerShareAuthority(root, problems) {
   ]) requireAnchor(problems, schema, anchor, `reviewer/share Drizzle schema anchor is missing: ${anchor}`);
 
   for (const anchor of [
-    'const file = `0007_${name}.sql`', '"0004_reviewer_share_authority.sql"',
-    'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006"]',
+    'const file = `0008_${name}.sql`', '"0004_reviewer_share_authority.sql"',
+    'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007"]',
   ]) requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2I anchor: ${anchor}`);
 
   requireAnchor(problems, formsClient, "return template.canManage", "forms UI does not consume server-derived canManage.");
@@ -1913,6 +1913,124 @@ function validateUnsafeOrgAttributionRetirement(root, problems) {
   }
 }
 
+function validateDecisionEventSpine(root, problems) {
+  const workflow = read(root, "server/lib/applicationWorkflowAuthorization.ts");
+  const routes = read(root, "server/applications.routes.ts");
+  const migration = read(root, "server/schema-migrations/0007_decision_event_spine.sql");
+  const lock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+  const schema = read(root, "shared/schema.ts");
+  const runtimeRole = read(root, "server/schema-control/runtimeRole.ts");
+  const readiness = read(root, "server/schema-control/readiness.ts");
+  const packageJson = read(root, "package.json");
+  const ci = read(root, "../.github/workflows/ci.yml");
+  const pgTest = read(root, "server/lib/__tests__/decisionEventSpine.pg.test.ts");
+  const stageCommand = exportedFunctionSource(workflow, "moveAuthorizedApplicationStage");
+  const stageRoute = routeCall(routes, "patch", "/api/applications/:id/stage");
+
+  for (const anchor of [
+    "CREATE SEQUENCE public.decision_event_sequence", "CREATE TABLE public.decision_events",
+    "organization_id integer NOT NULL REFERENCES public.organizations(id) ON DELETE RESTRICT",
+    "decision_events_aggregate_sequence_unique", "decision_events_idempotency_key_unique",
+    "octet_length(before_state::text) <= 1024", "octet_length(after_state::text) <= 1024",
+    "rubric_id IS NULL AND rubric_version IS NULL AND rubric_approval_mode IS NULL",
+    "recommendation_action IS NOT NULL\n    OR (recommendation_model_version IS NULL AND recommendation_input_version IS NULL)",
+    "flow_reject_decision_event_mutation", "decision_events_append_only",
+    "decision_events_truncate_append_only", "DECISION_EVENT_APPEND_ONLY",
+  ]) requireAnchor(problems, migration, anchor, `decision-event migration anchor is missing: ${anchor}`);
+  if (/REFERENCES public\.(?:applications|jobs|pipeline_stages|users)/.test(migration)) {
+    problems.push("decision-event migration restores a mutable aggregate/user foreign key.");
+  }
+  if (/\b(?:candidate_name|email|phone|resume|notes|narrative|free_text)\b/i.test(
+    migration.replace(/COMMENT ON[\s\S]*$/m, ""),
+  )) problems.push("decision-event relation persists a private or free-text field.");
+  if (!/^[a-f0-9]{64}$/.test(lock?.migrations?.["0007"] ?? "")
+      || sha256(migration) !== lock.migrations["0007"]) {
+    problems.push("decision-event migration checksum does not match migration 0007.");
+  }
+
+  for (const anchor of [
+    'pgSequence("decision_event_sequence"', 'pgTable("decision_events"',
+    'aggregateType: text("aggregate_type").notNull()', 'beforeState: jsonb("before_state").notNull()',
+    'afterState: jsonb("after_state").notNull()', "decision_events_rubric_shape",
+  ]) requireAnchor(problems, schema, anchor, `decision-event Drizzle schema anchor is missing: ${anchor}`);
+
+  if (!stageCommand || count(stageCommand, "db.execute(") !== 1) {
+    problems.push("moveAuthorizedApplicationStage must keep exactly one database statement.");
+  }
+  for (const anchor of [
+    "validUuid(eventId)", "transition AS MATERIALIZED", "nextval('public.decision_event_sequence')",
+    "INSERT INTO ${applicationStageHistory}", "inserted_event AS", "INSERT INTO ${decisionEvents}",
+    "'application_stage_moved'", "'applications.stage_patch'", "jsonb_build_object('stage_id', transition.current_stage)",
+    "jsonb_build_object('stage_id', transition.stage_id)", "INNER JOIN inserted_history",
+    "inserted_history.inserted = 1 AND inserted_event.inserted = 1", 'AS "changed"',
+  ]) requireAnchor(problems, stageCommand, anchor, `decision-event adopter anchor is missing: ${anchor}`);
+  const eventStart = stageCommand.indexOf("inserted_event AS");
+  const eventEnd = stageCommand.indexOf("RETURNING 1 AS inserted", eventStart);
+  const eventInsert = eventStart >= 0 && eventEnd > eventStart ? stageCommand.slice(eventStart, eventEnd) : "";
+  for (const forbidden of ["${notes}", "aiSuggestedActionReason", "stage_name", "rejectionReason", "rubricVersion}"]) {
+    if (eventInsert.includes(forbidden)) problems.push(`decision event copies forbidden inferred/private evidence: ${forbidden}`);
+  }
+  for (const anchor of [
+    "NULL,\n               NULL,\n               NULL,\n               transition.jd_digest_version",
+    "transition.jd_digest_version,\n               NULL,", "NULL,\n               NULL,\n               jsonb_build_object",
+  ]) requireAnchor(problems, eventInsert, anchor, `decision-event null/proxy contract is missing: ${anchor}`);
+
+  if (stageRoute.count !== 1 || !stageRoute.source) {
+    problems.push("decision-event stage route is missing or duplicated.");
+  } else {
+    for (const anchor of ["randomUUID()", "moveAuthorizedApplicationStage(", "result.value.changed && autoNotifications", "res.json({ success: true })"]) {
+      requireAnchor(problems, stageRoute.source, anchor, `decision-event stage route anchor is missing: ${anchor}`);
+    }
+    if (/validation\.data\.(?:event|organization|actor|action|source|taxonomy|rubric|recommendation|reason|idempotency)/.test(stageRoute.source)) {
+      problems.push("decision-event stage route accepts request-authored event provenance.");
+    }
+  }
+
+  for (const anchor of [
+    "c.relname='decision_events'", "has_table_privilege($1,c.oid,'INSERT')",
+    "NOT has_table_privilege($1,c.oid,'SELECT')", "NOT has_table_privilege($1,c.oid,'UPDATE')",
+    "NOT has_table_privilege($1,c.oid,'DELETE')", "NOT has_table_privilege($1,c.oid,'TRUNCATE')",
+    "c.relname='decision_event_sequence'", "has_sequence_privilege($1,c.oid,'USAGE')",
+    "NOT has_sequence_privilege($1,c.oid,'SELECT')", "NOT has_sequence_privilege($1,c.oid,'UPDATE')",
+    "GRANT INSERT ON TABLE ${DECISION_EVENT_TABLE}", "GRANT USAGE ON SEQUENCE ${DECISION_EVENT_SEQUENCE}",
+  ]) requireAnchor(problems, runtimeRole, anchor, `decision-event runtime-role anchor is missing: ${anchor}`);
+  for (const anchor of [
+    '"public.decision_events"', "to_regclass('public.decision_event_sequence')",
+    "decision_events_append_only", "decision_events_truncate_append_only",
+    "c.relname='decision_events'", "c.relname='decision_event_sequence'",
+  ]) requireAnchor(problems, readiness, anchor, `decision-event readiness anchor is missing: ${anchor}`);
+
+  for (const [script, file] of [
+    ["test:versioned-invitation-grants:pg", "versionedInvitationGrantAuthorization.pg.test.ts"],
+    ["test:unsafe-org-attribution-retirement:pg", "unsafeOrgAttributionRetirement.pg.test.ts"],
+    ["test:decision-event-spine:pg", "decisionEventSpine.pg.test.ts"],
+  ]) {
+    requireAnchor(problems, packageJson, `"${script}"`, `decision-event package script is missing: ${script}`);
+    requireAnchor(problems, packageJson, file, `decision-event package script target is missing: ${file}`);
+    requireAnchor(problems, ci, `npm run ${script}`, `decision-event CI step is missing: ${script}`);
+  }
+  for (const anchor of [
+    "pre0007Manifest", "upgrade.applied.join(\",\") !== \"0007\"", "readinessAsRuntime",
+    "same-stage a zero-write", "event insert fails", "history insertion fails", "concurrent moves",
+    "runtime insert-only ACL", "evidence-preserving owner guards", "minimized evidence outlive mutable rows",
+  ]) requireAnchor(problems, pgTest, anchor, `decision-event PostgreSQL lifecycle anchor is missing: ${anchor}`);
+
+  for (const [symbol, expected] of [
+    ["scheduleAuthorizedBulkApplicationInterviews", "adcd82d7a208907b758719aac776eba4a751a78484cff5c37ac219505067bfa9"],
+    ["scheduleAuthorizedApplicationInterview", "37ad0877d884d1d326904c570575c24a3fd81e120a6fa7243c5a7c853554144b"],
+  ]) if (sha256(exportedFunctionSource(workflow, symbol)) !== expected) {
+    problems.push(`frozen 3A workflow writer drifted: ${symbol}`);
+  }
+  for (const [method, path, expected] of [
+    ["patch", "/api/applications/bulk/interview", "87de7930dfd9ccd1b10d8af99de8d9d12a0179cccade7ef918ad2f210d110dfa"],
+    ["patch", "/api/applications/:id/interview", "ffd5e0117e3d14849b0811831b6e4ff087470a3faef3b97cc13a59e9dde2fbc1"],
+    ["patch", "/api/applications/:id/status", "cfec4be22ed2f1e688fe73122a2ef3eded26b5092a6bae380bd26a9fbc2613f4"],
+    ["patch", "/api/applications/bulk", "a6743ecb4b117ce192164d166b3665c536d6fff973b065e76094776c134636b2"],
+  ]) if (sha256(routeCall(routes, method, path).source) !== expected) {
+    problems.push(`frozen 3A route writer drifted: ${method.toUpperCase()} ${path}`);
+  }
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -1942,6 +2060,9 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 10) {
     problems.push("exactly ten resume/application/consultant/attribution registrations must be retired.");
+  }
+  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 96) {
+    problems.push("exactly ninety-six authorization files must be governed.");
   }
 
   for (const [path, reader] of [
@@ -2119,6 +2240,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/unsafeOrgAttributionRetirement.routes.test.ts",
     "server/lib/__tests__/unsafeOrgAttributionRetirement.cli.test.ts",
     "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
+    "server/lib/__tests__/decisionEventSpine.pg.test.ts",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -2148,6 +2270,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validatePrivilegeGrantRevocation(root, problems);
     validateVersionedInvitationGrants(root, problems);
     validateUnsafeOrgAttributionRetirement(root, problems);
+    validateDecisionEventSpine(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

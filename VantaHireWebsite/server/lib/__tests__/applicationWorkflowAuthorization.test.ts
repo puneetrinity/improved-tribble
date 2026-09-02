@@ -16,12 +16,16 @@ import {
 
 const policy = { allowPlatformAdmin: true } as const;
 const at = new Date("2026-08-30T12:00:00.000Z");
+const eventId = "30000000-0000-4000-8000-000000000001";
 
 beforeEach(() => execute.mockReset());
 
 describe("application workflow authorization input and failure contracts", () => {
   it("rejects invalid base inputs before a database statement", async () => {
-    await expect(moveAuthorizedApplicationStage(0, 1, 2, null, policy)).resolves.toEqual({
+    await expect(moveAuthorizedApplicationStage(0, 1, 2, null, eventId, policy)).resolves.toEqual({
+      ok: false, reason: "unavailable",
+    });
+    await expect(moveAuthorizedApplicationStage(1, 2, 3, null, "request-authored", policy)).resolves.toEqual({
       ok: false, reason: "unavailable",
     });
     await expect(scheduleAuthorizedApplicationInterview(1, 0, {
@@ -56,7 +60,7 @@ describe("application workflow authorization input and failure contracts", () =>
 
   it("collapses zero protected rows to not_found", async () => {
     execute.mockResolvedValueOnce({ rows: [] });
-    await expect(moveAuthorizedApplicationStage(1, 2, 3, null, policy)).resolves.toEqual({
+    await expect(moveAuthorizedApplicationStage(1, 2, 3, null, eventId, policy)).resolves.toEqual({
       ok: false, reason: "not_found",
     });
   });
@@ -68,7 +72,7 @@ describe("application workflow authorization input and failure contracts", () =>
     expect(JSON.stringify(failed)).not.toContain("secret");
 
     execute.mockResolvedValueOnce({ rows: [{ applicationId: 2, stageId: 3, stageName: "Review", changedAt: "bad" }] });
-    await expect(moveAuthorizedApplicationStage(1, 2, 3, null, policy)).resolves.toEqual({
+    await expect(moveAuthorizedApplicationStage(1, 2, 3, null, eventId, policy)).resolves.toEqual({
       ok: false, reason: "unavailable",
     });
   });
@@ -77,12 +81,24 @@ describe("application workflow authorization input and failure contracts", () =>
 describe("application workflow authorization minimum projections", () => {
   it("returns the exact stage projection from one statement", async () => {
     execute.mockResolvedValueOnce({ rows: [{
-      applicationId: 2, stageId: 3, stageName: "Review", changedAt: at,
+      applicationId: 2, stageId: 3, stageName: "Review", changedAt: at, changed: true,
     }] });
-    await expect(moveAuthorizedApplicationStage(1, 2, 3, "Reviewed", policy)).resolves.toEqual({
+    await expect(moveAuthorizedApplicationStage(1, 2, 3, "Reviewed", eventId, policy)).resolves.toEqual({
       ok: true,
-      value: { applicationId: 2, stageId: 3, stageName: "Review", changedAt: at.toISOString() },
+      value: { applicationId: 2, stageId: 3, stageName: "Review", changedAt: at.toISOString(), changed: true },
     });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns a truthful same-stage no-op from the same statement", async () => {
+    execute.mockResolvedValueOnce({ rows: [{
+      applicationId: 2, stageId: 3, stageName: "Review", changedAt: null, changed: false,
+    }] });
+    await expect(moveAuthorizedApplicationStage(1, 2, 3, "must not be persisted", eventId, policy))
+      .resolves.toEqual({
+        ok: true,
+        value: { applicationId: 2, stageId: 3, stageName: "Review", changedAt: null, changed: false },
+      });
     expect(execute).toHaveBeenCalledTimes(1);
   });
 

@@ -258,9 +258,9 @@ describe.skipIf(!enabled)("versioned invitation grants exact-schema PostgreSQL",
     if (preMigrationDir) rmSync(preMigrationDir, { recursive: true, force: true });
   });
 
-  it("applies ledger 7 and classifies legacy grants without inferred authority", () => {
+  it("applies ledger 8 and classifies legacy grants without inferred authority", () => {
     expect(migrationEvidence).toEqual({
-      ledger: 7,
+      ledger: 8,
       accepted_state: "accepted",
       pending_state: "legacy_revoked",
       token_hashed: true,

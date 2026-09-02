@@ -4,6 +4,7 @@ import {
   applicationReviewerRatings,
   applications,
   applicationStageHistory,
+  decisionEvents,
   jobRecruiters,
   jobs,
   organizationMembers,
@@ -22,7 +23,8 @@ export interface StageCommandProjection {
   applicationId: number;
   stageId: number;
   stageName: string;
-  changedAt: string;
+  changedAt: string | null;
+  changed: boolean;
 }
 
 export interface InterviewCommandProjection {
@@ -138,6 +140,16 @@ function nullableText(value: unknown): string | null {
   return value === null ? null : text(value);
 }
 
+function booleanValue(value: unknown): boolean {
+  if (typeof value !== "boolean") throw new Error("APPLICATION_WORKFLOW_RESULT_INVALID");
+  return value;
+}
+
+function validUuid(value: unknown): value is string {
+  return typeof value === "string"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function timestamp(value: unknown): string {
   const date = value instanceof Date
     ? value
@@ -248,15 +260,26 @@ export async function moveAuthorizedApplicationStage(
   applicationId: number,
   stageId: number,
   notes: string | null,
+  eventId: string,
   policy: ApplicationWorkflowPolicy,
 ): Promise<WorkflowCommandResult<StageCommandProjection>> {
-  if (!validBaseInputs(actorId, applicationId, policy) || !isPositiveSafeInteger(stageId)) {
+  if (!validBaseInputs(actorId, applicationId, policy) || !isPositiveSafeInteger(stageId) || !validUuid(eventId)) {
     return { ok: false, reason: "unavailable" };
   }
   try {
     const result = await db.execute(sql`
       WITH locked_application AS MATERIALIZED (
-        ${authorizedApplicationSelect(actorId, applicationId, policy, false)}
+        ${authorizedApplicationSelect(actorId, applicationId, policy, false, sql`,
+          ${jobs.id} AS job_id,
+          CASE
+            WHEN ${jobs.jdDigest} IS NOT NULL AND ${jobs.jdDigestVersion} > 0
+              THEN ${jobs.jdDigestVersion}
+            ELSE NULL
+          END AS jd_digest_version,
+          ${applications.aiSuggestedAction} AS recommendation_action,
+          ${applications.aiSummaryModelVersion} AS recommendation_model_version,
+          ${applications.aiDigestVersionUsed} AS recommendation_input_version
+        `)}
       ),
       authorized_stage AS MATERIALIZED (
         SELECT ${pipelineStages.id} AS stage_id,
@@ -269,14 +292,24 @@ export async function moveAuthorizedApplicationStage(
              OR (${pipelineStages.organizationId} IS NULL AND ${pipelineStages.isDefault} = TRUE)
            )
       ),
+      transition AS MATERIALIZED (
+        SELECT locked_application.*,
+               authorized_stage.stage_id,
+               authorized_stage.stage_name,
+               now() AS changed_at,
+               nextval('public.decision_event_sequence') AS event_sequence
+          FROM locked_application
+          INNER JOIN authorized_stage ON TRUE
+         WHERE locked_application.current_stage IS DISTINCT FROM authorized_stage.stage_id
+      ),
       updated_application AS (
         UPDATE ${applications}
-           SET current_stage = authorized_stage.stage_id,
-               stage_changed_at = now(),
+           SET current_stage = transition.stage_id,
+               stage_changed_at = transition.changed_at,
                stage_changed_by = ${actorId},
-               updated_at = now()
-          FROM locked_application, authorized_stage
-         WHERE ${applications.id} = locked_application.application_id
+               updated_at = transition.changed_at
+          FROM transition
+         WHERE ${applications.id} = transition.application_id
         RETURNING ${applications.id} AS application_id,
                   ${applications.currentStage} AS stage_id,
                   ${applications.stageChangedAt} AS changed_at
@@ -291,22 +324,106 @@ export async function moveAuthorizedApplicationStage(
           changed_at
         )
         SELECT updated_application.application_id,
-               locked_application.current_stage,
+               transition.current_stage,
                updated_application.stage_id,
                ${actorId},
                ${notes},
                updated_application.changed_at
           FROM updated_application
-          INNER JOIN locked_application ON locked_application.application_id = updated_application.application_id
-        RETURNING ${applicationStageHistory.applicationId} AS application_id
+          INNER JOIN transition ON transition.application_id = updated_application.application_id
+        RETURNING 1 AS inserted
+      ),
+      inserted_event AS (
+        INSERT INTO ${decisionEvents} (
+          event_id,
+          event_sequence,
+          aggregate_sequence,
+          organization_id,
+          aggregate_type,
+          aggregate_id,
+          job_id,
+          actor_user_id,
+          requesting_actor_user_id,
+          action_code,
+          source_surface,
+          event_schema_version,
+          taxonomy_version,
+          rubric_id,
+          rubric_version,
+          rubric_approval_mode,
+          jd_digest_version,
+          rating_contract_version,
+          recommendation_action,
+          recommendation_model_version,
+          recommendation_input_version,
+          reason_code,
+          idempotency_key,
+          before_state,
+          after_state,
+          occurred_at
+        )
+        SELECT ${eventId}::uuid,
+               transition.event_sequence,
+               transition.event_sequence,
+               transition.organization_id,
+               'application',
+               transition.application_id,
+               transition.job_id,
+               ${actorId},
+               NULL,
+               'application_stage_moved',
+               'applications.stage_patch',
+               1,
+               1,
+               NULL,
+               NULL,
+               NULL,
+               transition.jd_digest_version,
+               NULL,
+               CASE
+                 WHEN transition.recommendation_action IN ('advance', 'hold', 'reject')
+                   THEN transition.recommendation_action
+                 ELSE NULL
+               END,
+               CASE
+                 WHEN transition.recommendation_action IN ('advance', 'hold', 'reject')
+                  AND transition.recommendation_model_version IS NOT NULL
+                  AND octet_length(btrim(transition.recommendation_model_version)) BETWEEN 1 AND 120
+                   THEN btrim(transition.recommendation_model_version)
+                 ELSE NULL
+               END,
+               CASE
+                 WHEN transition.recommendation_action IN ('advance', 'hold', 'reject')
+                  AND transition.recommendation_input_version > 0
+                   THEN transition.recommendation_input_version
+                 ELSE NULL
+               END,
+               NULL,
+               NULL,
+               jsonb_build_object('stage_id', transition.current_stage),
+               jsonb_build_object('stage_id', transition.stage_id),
+               transition.changed_at
+          FROM transition
+          INNER JOIN updated_application
+            ON updated_application.application_id = transition.application_id
+          INNER JOIN inserted_history ON inserted_history.inserted = 1
+        RETURNING 1 AS inserted
       )
-      SELECT updated_application.application_id AS "applicationId",
-             updated_application.stage_id AS "stageId",
+      SELECT locked_application.application_id AS "applicationId",
+             authorized_stage.stage_id AS "stageId",
              authorized_stage.stage_name AS "stageName",
-             updated_application.changed_at AS "changedAt"
-        FROM updated_application
-        INNER JOIN authorized_stage ON authorized_stage.stage_id = updated_application.stage_id
-        INNER JOIN inserted_history ON inserted_history.application_id = updated_application.application_id
+             updated_application.changed_at AS "changedAt",
+             (updated_application.application_id IS NOT NULL) AS "changed"
+        FROM locked_application
+        INNER JOIN authorized_stage ON TRUE
+        LEFT JOIN updated_application
+          ON updated_application.application_id = locked_application.application_id
+        LEFT JOIN inserted_history
+          ON updated_application.application_id IS NOT NULL
+        LEFT JOIN inserted_event
+          ON updated_application.application_id IS NOT NULL
+       WHERE updated_application.application_id IS NULL
+          OR (inserted_history.inserted = 1 AND inserted_event.inserted = 1)
     `);
     const rows = rowsFrom(result);
     if (rows.length === 0) return { ok: false, reason: "not_found" };
@@ -318,7 +435,8 @@ export async function moveAuthorizedApplicationStage(
         applicationId: positiveInteger(row.applicationId),
         stageId: positiveInteger(row.stageId),
         stageName: text(row.stageName),
-        changedAt: timestamp(row.changedAt),
+        changedAt: row.changedAt === null ? null : timestamp(row.changedAt),
+        changed: booleanValue(row.changed),
       },
     };
   } catch {

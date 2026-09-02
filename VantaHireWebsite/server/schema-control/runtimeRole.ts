@@ -43,6 +43,9 @@ interface DatabaseFingerprint {
   port: number | null;
 }
 
+const DECISION_EVENT_TABLE = "public.decision_events";
+const DECISION_EVENT_SEQUENCE = "public.decision_event_sequence";
+
 function connectionTarget(raw: string): ConnectionTarget {
   try {
     const parsed = new URL(raw);
@@ -199,19 +202,46 @@ export async function assertRuntimeRoleContract(
          SELECT 1 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
           WHERE n.nspname='public' AND c.relkind IN ('r','p')
             AND NOT (
-              has_table_privilege($1,c.oid,'SELECT') AND has_table_privilege($1,c.oid,'INSERT')
-              AND has_table_privilege($1,c.oid,'UPDATE') AND has_table_privilege($1,c.oid,'DELETE')
-              AND NOT has_table_privilege($1,c.oid,'TRUNCATE')
-              AND NOT has_table_privilege($1,c.oid,'REFERENCES')
-              AND NOT has_table_privilege($1,c.oid,'TRIGGER')
+              (
+                c.relname='decision_events'
+                AND has_table_privilege($1,c.oid,'INSERT')
+                AND NOT has_table_privilege($1,c.oid,'SELECT')
+                AND NOT has_table_privilege($1,c.oid,'UPDATE')
+                AND NOT has_table_privilege($1,c.oid,'DELETE')
+                AND NOT has_table_privilege($1,c.oid,'TRUNCATE')
+                AND NOT has_table_privilege($1,c.oid,'REFERENCES')
+                AND NOT has_table_privilege($1,c.oid,'TRIGGER')
+              )
+              OR
+              (
+                c.relname<>'decision_events'
+                AND has_table_privilege($1,c.oid,'SELECT')
+                AND has_table_privilege($1,c.oid,'INSERT')
+                AND has_table_privilege($1,c.oid,'UPDATE')
+                AND has_table_privilege($1,c.oid,'DELETE')
+                AND NOT has_table_privilege($1,c.oid,'TRUNCATE')
+                AND NOT has_table_privilege($1,c.oid,'REFERENCES')
+                AND NOT has_table_privilege($1,c.oid,'TRIGGER')
+              )
             )
        )
        AND NOT EXISTS (
          SELECT 1 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
           WHERE n.nspname='public' AND c.relkind='S'
             AND NOT (
-              has_sequence_privilege($1,c.oid,'USAGE') AND has_sequence_privilege($1,c.oid,'SELECT')
-              AND has_sequence_privilege($1,c.oid,'UPDATE')
+              (
+                c.relname='decision_event_sequence'
+                AND has_sequence_privilege($1,c.oid,'USAGE')
+                AND NOT has_sequence_privilege($1,c.oid,'SELECT')
+                AND NOT has_sequence_privilege($1,c.oid,'UPDATE')
+              )
+              OR
+              (
+                c.relname<>'decision_event_sequence'
+                AND has_sequence_privilege($1,c.oid,'USAGE')
+                AND has_sequence_privilege($1,c.oid,'SELECT')
+                AND has_sequence_privilege($1,c.oid,'UPDATE')
+              )
             )
        )
        AND NOT EXISTS (
@@ -325,6 +355,26 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
       await migration.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE,SELECT,UPDATE ON SEQUENCES TO ${ident}`);
       await migration.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM ${ident}`);
       await migration.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO ${ident}`);
+
+      // Wave 3A's event authority is intentionally write-only to an ordinary
+      // runtime. Older disposable/pre-0007 manifests do not have the objects,
+      // so the exception is conditional on the reviewed migration being
+      // present. Current startup readiness independently requires them.
+      const decisionSpine = await migration.query(
+        "SELECT to_regclass($1) AS event_table, to_regclass($2) AS event_sequence",
+        [DECISION_EVENT_TABLE, DECISION_EVENT_SEQUENCE],
+      );
+      const eventTablePresent = Boolean(decisionSpine.rows[0]?.event_table);
+      const eventSequencePresent = Boolean(decisionSpine.rows[0]?.event_sequence);
+      if (eventTablePresent !== eventSequencePresent) {
+        throw new RuntimeRoleProvisionError("Decision-event table/sequence presence is inconsistent.");
+      }
+      if (eventTablePresent) {
+        await migration.query(`REVOKE ALL PRIVILEGES ON TABLE ${DECISION_EVENT_TABLE} FROM ${ident}`);
+        await migration.query(`GRANT INSERT ON TABLE ${DECISION_EVENT_TABLE} TO ${ident}`);
+        await migration.query(`REVOKE ALL PRIVILEGES ON SEQUENCE ${DECISION_EVENT_SEQUENCE} FROM ${ident}`);
+        await migration.query(`GRANT USAGE ON SEQUENCE ${DECISION_EVENT_SEQUENCE} TO ${ident}`);
+      }
 
       controlPlanePresent = Boolean(
         (await migration.query("SELECT to_regnamespace('schema_control') AS schema")).rows[0]?.schema,
