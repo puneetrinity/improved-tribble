@@ -225,6 +225,44 @@ describe("application workflow route mappings", () => {
     expect(mocks.notifyRejection).not.toHaveBeenCalled();
   });
 
+  it("server-authors event identity and notifies only for a real change", async () => {
+    process.env.EMAIL_AUTOMATION_ENABLED = "true";
+    mocks.moveStage.mockResolvedValue({ ok: true, value: {
+      applicationId: 2001, stageId: 2, stageName: "Interview",
+      changedAt: "2026-09-02T12:00:00.000Z", changed: true,
+    } });
+    await expect(invoke(await buildApp(), "patch", "/api/applications/:id/stage", {
+      id: "2001",
+      body: {
+        stageId: 2,
+        notes: "private note",
+        eventId: "request-controlled",
+        organizationId: 999,
+        actionCode: "reject",
+      },
+    })).resolves.toEqual({ status: 200, body: { success: true } });
+    expect(mocks.moveStage).toHaveBeenCalledTimes(1);
+    const call = mocks.moveStage.mock.calls[0]!;
+    expect(call.slice(0, 4)).toEqual([101, 2001, 2, "private note"]);
+    expect(call[4]).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    expect(call[4]).not.toBe("request-controlled");
+    expect(call[5]).toEqual({ allowPlatformAdmin: true });
+    expect(mocks.notifyStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves 200 compatibility but starts no notification for a same-stage no-op", async () => {
+    process.env.EMAIL_AUTOMATION_ENABLED = "true";
+    mocks.moveStage.mockResolvedValue({ ok: true, value: {
+      applicationId: 2001, stageId: 2, stageName: "Interview", changedAt: null, changed: false,
+    } });
+    await expect(invoke(await buildApp(), "patch", "/api/applications/:id/stage", {
+      id: "2001", body: { stageId: 2, notes: "must not be used" },
+    })).resolves.toEqual({ status: 200, body: { success: true } });
+    expect(mocks.notifyStatus).not.toHaveBeenCalled();
+    expect(mocks.notifyOffer).not.toHaveBeenCalled();
+    expect(mocks.notifyRejection).not.toHaveBeenCalled();
+  });
+
   it("returns only the command projections for note, rating and feedback", async () => {
     const app = await buildApp();
     const note = { applicationId: 2001, note: { id: 7, authorId: 101, createdAt: "2026-08-30T12:00:00.000Z" } };

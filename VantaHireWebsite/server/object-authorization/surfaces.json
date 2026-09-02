@@ -736,11 +736,11 @@
   "governed_files": [
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "ae8172202f6f6fa60e7976ec0866be8378c8ae47eea23819b88092bfffcf1ac1"
+      "sha256": "cd9e8afabce16240a98f0817aa6d1166fb1cf94cef32a9724a10182affc69bdc"
     },
     {
       "file": "package.json",
-      "sha256": "7a1a5a01e4d408f0512708444f6de976dce24ccaa2a1370ddfe9eb34add49dbe"
+      "sha256": "1b7d57536690b3834a6a6dba0fb14d382e289c9aad92663d72f0d4a21cd8cf5b"
     },
     {
       "file": "vitest.server.config.ts",
@@ -748,7 +748,7 @@
     },
     {
       "file": "server/applications.routes.ts",
-      "sha256": "5c512400add01ec88cda3944ba1dea0aca2373783e7e322bc6c57746e24f4846"
+      "sha256": "b90aa87a9ff2da60e5ab8baf480ad0f2526afcabdf8ba7be519e469246e9dc45"
     },
     {
       "file": "server/communications.routes.ts",
@@ -796,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "31090e422a448e7bf1c6683f4a34e8a606ad19cedb1d4608a8ab6a139f287a5a"
+      "sha256": "47943c1588600a1fc9495ea6f2f4b90f997b9a123be121b728fef0a429db46f8"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -804,7 +804,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "148a79d2cd26aab8c69705b3af809d6b3763f07fa10733aab11aa1c88107a73c"
+      "sha256": "2132e4e29bfbe88f3cd508bdac8a3c40e21cc23e882f17cd151ac9a0a85a136b"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -832,7 +832,7 @@
     },
     {
       "file": "server/lib/applicationWorkflowAuthorization.ts",
-      "sha256": "b048bd6f2fa81ae7467390a83b2f3208ca4f4274d64b062d83f4d3162cb17e48"
+      "sha256": "c7cf39e5648bf3b1e07bf785421990bb66f9dcd5befc5310087eb5a91f263b59"
     },
     {
       "file": "server/lib/applicationAiOutboundAuthorization.ts",
@@ -872,15 +872,15 @@
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.test.ts",
-      "sha256": "6b32e97e63d694dea1eddb2f576ea3f3c42c0ffde4e1284f6cf495e022379c90"
+      "sha256": "d78bf16dc8e615ed6262a97c776c70d82bb525dcef633d508aa91a0353724f88"
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.routes.test.ts",
-      "sha256": "cd3a4a814ccd9d7086a830253f63b9265d71bc98d153929e1c637f4491880243"
+      "sha256": "c4ca8c583e438570a9f286d261f199cb15c588637c2b26b3cddbb90652627b8e"
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
-      "sha256": "75dddda4d910218c64cd25ab7dc3263a46a861e4b508b001ed5da77d250824f3"
+      "sha256": "a4ca7cbdeb2547e44c61af42fb883fbdd3466b98f24847886e7b3ef9d21deb86"
     },
     {
       "file": "server/storage.ts",
@@ -908,7 +908,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "7c585ac6b09eac3b5498c1cb1a945488b0f1ae7c3beef4dae0ab1c7fa9db5a01"
+      "sha256": "0308e30cf60613631adbe2c5d1c6be32d040a4719e636bb0ed1ab8ad7f8ee628"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -936,7 +936,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "de45a5868d2c2638a43d08ab9a7aeca6ce0b79e7e181b32b23936ff5686e7352"
+      "sha256": "e32e2db06cc55cda4d966096e5ba75b68a26cf2b35bde24474913aa3551748eb"
     },
     {
       "file": "shared/forms.types.ts",
@@ -956,15 +956,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "0e8b1e84faa81b45e5885428aab1671937e6a7f6096aa2469f6545f3d1892a89"
+      "sha256": "c4175e5b63e77940bcd9b3b034f2c2633e36f1bb703c069e1364807dc89f1f72"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "9fa3741b4bde9c3760303e47db8a3eabf93653e1ae35b657ced0b32b5d9c7798"
+      "sha256": "8fd2a66c08fe4c1e6988b530de6498a47ec9cd682d65d334d3fc8b66e838bce6"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "b00de20153b0b933c70d88696591fffec3281799eb8592471d8e69fd85df5c81"
+      "sha256": "72661f08c7e07255ac8a2fcd3ed1e5f7bf366aeb86c893b11a24a14aeca09b32"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1088,7 +1088,7 @@
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
-      "sha256": "e7792f57683c6a21cdfaa6a369b34574411c77377cdf29bc9afc306f703d94b3"
+      "sha256": "74aa63878057f6ca7711d7249e85db5d4aca0d12be27eb3c6637e12e2933401f"
     },
     {
       "file": "test/integration/invite-and-webhook.test.ts",
@@ -1112,7 +1112,11 @@
     },
     {
       "file": "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
-      "sha256": "62869a636a506a3affbeaf5f2ea5d385889108933ca61e96622757df7c8ed53e"
+      "sha256": "97499298ed331153e24051ec682d48b0dac583ec7c070f331d25836bca88b7d9"
+    },
+    {
+      "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
+      "sha256": "43320997608fe2a84fc2a55f48c7beae1901f80b424c6e1d8c8aa5c2feae31cc"
     }
   ],
   "frozen_route_blocks": [

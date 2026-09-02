@@ -41,6 +41,7 @@ const FLOW_CORE_RELATIONS = [
   "public.candidate_privacy_remote_projection",
   "public.candidate_privacy_sync_state",
   "public.talent_pool_membership_events",
+  "public.decision_events",
 ] as const;
 
 /** Minimum catalog facts every Flow web/worker process requires to start. */
@@ -96,6 +97,35 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  'talent_pool_membership_events_append_only'
                )
                AND t.tgenabled <> 'D'
+          ) AS ok
+      `);
+      return result.rows[0]?.ok === true;
+    },
+  },
+  {
+    name: "Decision-event spine and append-only guards are exact",
+    async check(pg) {
+      const result = await pg.query(`
+        SELECT
+          to_regclass('public.decision_events') IS NOT NULL
+          AND to_regclass('public.decision_event_sequence') IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+              FROM pg_catalog.pg_proc p
+              JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+             WHERE n.nspname='public'
+               AND p.proname='flow_reject_decision_event_mutation'
+          )
+          AND (
+            SELECT COUNT(*)=2
+              FROM pg_catalog.pg_trigger t
+             WHERE t.tgrelid='public.decision_events'::regclass
+               AND NOT t.tgisinternal
+               AND t.tgenabled <> 'D'
+               AND (
+                 (t.tgname='decision_events_append_only' AND t.tgtype=27)
+                 OR (t.tgname='decision_events_truncate_append_only' AND t.tgtype=34)
+               )
           ) AS ok
       `);
       return result.rows[0]?.ok === true;
@@ -161,13 +191,27 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
              WHERE n.nspname = 'public'
                AND c.relkind IN ('r','p')
                AND NOT (
-                 has_table_privilege(current_user, c.oid, 'SELECT')
-                 AND has_table_privilege(current_user, c.oid, 'INSERT')
-                 AND has_table_privilege(current_user, c.oid, 'UPDATE')
-                 AND has_table_privilege(current_user, c.oid, 'DELETE')
-                 AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
-                 AND NOT has_table_privilege(current_user, c.oid, 'REFERENCES')
-                 AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
+                 (
+                   c.relname='decision_events'
+                   AND has_table_privilege(current_user, c.oid, 'INSERT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'SELECT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'UPDATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'DELETE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'REFERENCES')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
+                 )
+                 OR
+                 (
+                   c.relname<>'decision_events'
+                   AND has_table_privilege(current_user, c.oid, 'SELECT')
+                   AND has_table_privilege(current_user, c.oid, 'INSERT')
+                   AND has_table_privilege(current_user, c.oid, 'UPDATE')
+                   AND has_table_privilege(current_user, c.oid, 'DELETE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'REFERENCES')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
+                 )
                )
           )
           AND NOT EXISTS (
@@ -175,9 +219,19 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
              FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE n.nspname = 'public' AND c.relkind = 'S'
                AND NOT (
-                 has_sequence_privilege(current_user, c.oid, 'USAGE')
-                 AND has_sequence_privilege(current_user, c.oid, 'SELECT')
-                 AND has_sequence_privilege(current_user, c.oid, 'UPDATE')
+                 (
+                   c.relname='decision_event_sequence'
+                   AND has_sequence_privilege(current_user, c.oid, 'USAGE')
+                   AND NOT has_sequence_privilege(current_user, c.oid, 'SELECT')
+                   AND NOT has_sequence_privilege(current_user, c.oid, 'UPDATE')
+                 )
+                 OR
+                 (
+                   c.relname<>'decision_event_sequence'
+                   AND has_sequence_privilege(current_user, c.oid, 'USAGE')
+                   AND has_sequence_privilege(current_user, c.oid, 'SELECT')
+                   AND has_sequence_privilege(current_user, c.oid, 'UPDATE')
+                 )
                )
           )
           AND NOT EXISTS (

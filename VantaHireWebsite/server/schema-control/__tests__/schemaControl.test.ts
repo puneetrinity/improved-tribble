@@ -254,6 +254,10 @@ describe("read-only readiness", () => {
     await expect(check(pg)).resolves.toBe(true);
     expect(observedSql).toContain("NOT has_schema_privilege(current_user, 'public', 'CREATE')");
     expect(observedSql).toContain("pg_has_role");
+    expect(observedSql).toContain("c.relname='decision_events'");
+    expect(observedSql).toContain("c.relname='decision_event_sequence'");
+    expect(observedSql).toContain("NOT has_table_privilege(current_user, c.oid, 'SELECT')");
+    expect(observedSql).toContain("NOT has_sequence_privilege(current_user, c.oid, 'UPDATE')");
     expect(observedSql.trimStart()).toMatch(/^SELECT\b/i);
     expect(observedSql).not.toMatch(
       /\b(?:CREATE\s+(?:TABLE|SCHEMA|SEQUENCE|FUNCTION)|ALTER\s+TABLE|DROP\s+(?:TABLE|SCHEMA)|INSERT\s+INTO|UPDATE\s+\S+\s+SET|DELETE\s+FROM|TRUNCATE\s+TABLE)\b/i,
@@ -262,6 +266,26 @@ describe("read-only readiness", () => {
     await expect(
       check({ query: async () => ({ rows: [{ ok: false }] }) }),
     ).resolves.toBe(false);
+  });
+
+  it("checks the exact decision-event relation, sequence, function, and enabled triggers read-only", async () => {
+    const check = FLOW_CRITICAL_POSTCONDITIONS.find(
+      (postcondition) => postcondition.name === "Decision-event spine and append-only guards are exact",
+    )!.check;
+    let observedSql = "";
+    await expect(check({
+      async query(text: string) {
+        observedSql = text;
+        return { rows: [{ ok: true }] };
+      },
+    })).resolves.toBe(true);
+    expect(observedSql).toContain("to_regclass('public.decision_events')");
+    expect(observedSql).toContain("to_regclass('public.decision_event_sequence')");
+    expect(observedSql).toContain("flow_reject_decision_event_mutation");
+    expect(observedSql).toContain("decision_events_append_only");
+    expect(observedSql).toContain("decision_events_truncate_append_only");
+    expect(observedSql.trimStart()).toMatch(/^SELECT\b/i);
+    await expect(check({ query: async () => ({ rows: [{ ok: false }] }) })).resolves.toBe(false);
   });
 
   function fakePg(rows: {

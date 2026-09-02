@@ -191,7 +191,9 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
 
   beforeEach(async () => {
     if (!owner || !safeTargetProven) throw new Error("Disposable workflow target not proven.");
+    await owner.query("ALTER TABLE public.decision_events DISABLE TRIGGER USER");
     await owner.query("TRUNCATE public.users, public.organizations RESTART IDENTITY CASCADE");
+    await owner.query("ALTER TABLE public.decision_events ENABLE TRIGGER USER");
     await installFixture();
   });
 
@@ -201,7 +203,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("installs ledger 7 and the exact additive assessment schema", async () => {
+  it("installs ledger 8 and the exact additive assessment schema", async () => {
     const result = await owner!.query(`
       SELECT
         (SELECT COUNT(*)::integer FROM schema_control.applied) AS ledger,
@@ -213,7 +215,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
           WHERE schemaname='public' AND tablename IN ('application_reviewer_notes','application_reviewer_ratings')) AS indexes
     `);
     expect(result.rows[0]).toMatchObject({
-      ledger: 7,
+      ledger: 8,
       notes_relation: "application_reviewer_notes",
       ratings_relation: "application_reviewer_ratings",
       indexes: 7,
@@ -238,8 +240,8 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
   });
 
   it("binds stage authorization, mutation and history in one command", async () => {
-    const result = await workflow.moveAuthorizedApplicationStage(101, 2001, 2, "Advance", { allowPlatformAdmin: true });
-    expect(result).toMatchObject({ ok: true, value: { applicationId: 2001, stageId: 2, stageName: "Interview" } });
+    const result = await workflow.moveAuthorizedApplicationStage(101, 2001, 2, "Advance", "30000000-0000-4000-8000-000000000001", { allowPlatformAdmin: true });
+    expect(result).toMatchObject({ ok: true, value: { applicationId: 2001, stageId: 2, stageName: "Interview", changed: true } });
     const state = await owner!.query("SELECT current_stage,stage_changed_by FROM applications WHERE id=2001");
     expect(state.rows[0]).toEqual({ current_stage: 2, stage_changed_by: 101 });
     const history = await owner!.query("SELECT from_stage,to_stage,changed_by,notes FROM application_stage_history WHERE application_id=2001");
@@ -247,11 +249,11 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
   });
 
   it("allows the global default stage and refuses foreign/nondefault stages with zero writes", async () => {
-    await expect(workflow.moveAuthorizedApplicationStage(101, 2001, 4, null, { allowPlatformAdmin: true }))
+    await expect(workflow.moveAuthorizedApplicationStage(101, 2001, 4, null, "30000000-0000-4000-8000-000000000002", { allowPlatformAdmin: true }))
       .resolves.toMatchObject({ ok: true, value: { stageId: 4 } });
     for (const stageId of [3, 5]) {
       const before = await applicationState([2008]);
-      await expect(workflow.moveAuthorizedApplicationStage(101, 2008, stageId, null, { allowPlatformAdmin: true }))
+      await expect(workflow.moveAuthorizedApplicationStage(101, 2008, stageId, null, `30000000-0000-4000-8000-00000000000${stageId}`, { allowPlatformAdmin: true }))
         .resolves.toEqual({ ok: false, reason: "not_found" });
       expect(await applicationState([2008])).toEqual(before);
     }
@@ -326,7 +328,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
       .resolves.toEqual({ ok: false, reason: "not_found" });
     await expect(workflow.readAuthorizedApplicationFeedback(401, 2001, { allowPlatformAdmin: true }))
       .resolves.toMatchObject({ ok: true });
-    await expect(workflow.moveAuthorizedApplicationStage(302, 2001, 2, null, { allowPlatformAdmin: true }))
+    await expect(workflow.moveAuthorizedApplicationStage(302, 2001, 2, null, "30000000-0000-4000-8000-000000000009", { allowPlatformAdmin: true }))
       .resolves.toEqual({ ok: false, reason: "not_found" });
   });
 

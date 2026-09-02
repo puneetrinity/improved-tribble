@@ -825,6 +825,71 @@ describe("object authorization surface guard", () => {
     expect(problems).toContain("/api/applications/:id/stage can contact a candidate before its workflow command succeeds.");
   });
 
+  it("rejects removing the atomic decision-event join", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("INNER JOIN inserted_history", "LEFT JOIN inserted_history"),
+    );
+    expect(problems).toContain("decision-event adopter anchor is missing: INNER JOIN inserted_history");
+  });
+
+  it("rejects splitting the decision adopter into a second statement", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace(
+        "const result = await db.execute(sql`",
+        "await db.execute(sql`SELECT 1`);\n    const result = await db.execute(sql`",
+      ),
+    );
+    expect(problems).toContain("moveAuthorizedApplicationStage must keep exactly one database statement.");
+  });
+
+  it("rejects request-authored decision provenance", () => {
+    const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
+      source.replace("randomUUID(),", "validation.data.eventId,"),
+    );
+    expect(problems).toContain("decision-event stage route anchor is missing: randomUUID()");
+  });
+
+  it("rejects weakening the bounded event state payload", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0007_decision_event_spine.sql", (source) =>
+      source.replace("octet_length(before_state::text) <= 1024", "octet_length(before_state::text) <= 2048"),
+    );
+    expect(problems).toContain("decision-event migration anchor is missing: octet_length(before_state::text) <= 1024");
+  });
+
+  it("rejects weakening the all-or-nothing rubric reference", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0007_decision_event_spine.sql", (source) =>
+      source.replace(
+        "rubric_id IS NULL AND rubric_version IS NULL AND rubric_approval_mode IS NULL",
+        "rubric_id IS NULL",
+      ),
+    );
+    expect(problems).toContain("decision-event migration anchor is missing: rubric_id IS NULL AND rubric_version IS NULL AND rubric_approval_mode IS NULL");
+  });
+
+  it("rejects granting runtime reads of decision events", () => {
+    const problems = mutate(fixture(), "server/schema-control/runtimeRole.ts", (source) =>
+      source.replace("NOT has_table_privilege($1,c.oid,'SELECT')", "has_table_privilege($1,c.oid,'SELECT')"),
+    );
+    expect(problems).toContain("decision-event runtime-role anchor is missing: NOT has_table_privilege($1,c.oid,'SELECT')");
+  });
+
+  it("rejects omitting the decision-event CI lifecycle", () => {
+    const problems = mutate(fixture(), "../.github/workflows/ci.yml", (source) =>
+      source.replace("npm run test:decision-event-spine:pg", "npm run test:server"),
+    );
+    expect(problems).toContain("decision-event CI step is missing: test:decision-event-spine:pg");
+  });
+
+  it("rejects drift in a frozen neighboring workflow writer", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace(
+        "if (!validBaseInputs(actorId, applicationId, policy) || (fields.date !== null",
+        "if (false || !validBaseInputs(actorId, applicationId, policy) || (fields.date !== null",
+      ),
+    );
+    expect(problems).toContain("frozen 3A workflow writer drifted: scheduleAuthorizedApplicationInterview");
+  });
+
   it("rejects raw workflow route logging", () => {
     const problems = mutate(fixture(), "server/applications.routes.ts", (source) =>
       source.replace("const result = await setAuthorizedApplicationReviewerRating(", "console.error(req.body);\n      const result = await setAuthorizedApplicationReviewerRating("),
