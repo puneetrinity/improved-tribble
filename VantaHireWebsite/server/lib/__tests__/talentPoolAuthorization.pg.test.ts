@@ -4,12 +4,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../../schema-control/runner";
+import { loadManifest } from "../../schema-control/manifest";
 import { provisionRuntimeRole } from "../../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-talent-pool-authorization-test-target";
 const policy = { allowPlatformAdmin: true } as const;
 
@@ -175,7 +177,7 @@ describe.skipIf(!enabled)("talent-pool exact-schema PostgreSQL", () => {
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("keeps the shipped seven-migration schema and append-only event relation", async () => {
+  it("keeps the shipped current-ledger schema and append-only event relation", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
              to_regclass('public.talent_pool_membership_events')::text event_relation,
@@ -186,7 +188,7 @@ describe.skipIf(!enabled)("talent-pool exact-schema PostgreSQL", () => {
              ) append_only_trigger
     `)).rows[0];
     expect(row).toEqual({
-      ledger: 7,
+      ledger: currentLedger,
       event_relation: "talent_pool_membership_events",
       append_only_trigger: true,
     });

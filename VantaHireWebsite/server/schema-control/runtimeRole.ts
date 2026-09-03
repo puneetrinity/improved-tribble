@@ -45,6 +45,8 @@ interface DatabaseFingerprint {
 
 const DECISION_EVENT_TABLE = "public.decision_events";
 const DECISION_EVENT_SEQUENCE = "public.decision_event_sequence";
+const DECISION_OUTBOX_TABLE = "public.decision_projection_outbox";
+const DECISION_OUTBOX_SEQUENCE = "public.decision_projection_outbox_sequence";
 
 function connectionTarget(raw: string): ConnectionTarget {
   try {
@@ -203,7 +205,7 @@ export async function assertRuntimeRoleContract(
           WHERE n.nspname='public' AND c.relkind IN ('r','p')
             AND NOT (
               (
-                c.relname='decision_events'
+                c.relname IN ('decision_events','decision_projection_outbox')
                 AND has_table_privilege($1,c.oid,'INSERT')
                 AND NOT has_table_privilege($1,c.oid,'SELECT')
                 AND NOT has_table_privilege($1,c.oid,'UPDATE')
@@ -214,7 +216,7 @@ export async function assertRuntimeRoleContract(
               )
               OR
               (
-                c.relname<>'decision_events'
+                c.relname NOT IN ('decision_events','decision_projection_outbox')
                 AND has_table_privilege($1,c.oid,'SELECT')
                 AND has_table_privilege($1,c.oid,'INSERT')
                 AND has_table_privilege($1,c.oid,'UPDATE')
@@ -230,14 +232,14 @@ export async function assertRuntimeRoleContract(
           WHERE n.nspname='public' AND c.relkind='S'
             AND NOT (
               (
-                c.relname='decision_event_sequence'
+                c.relname IN ('decision_event_sequence','decision_projection_outbox_sequence')
                 AND has_sequence_privilege($1,c.oid,'USAGE')
                 AND NOT has_sequence_privilege($1,c.oid,'SELECT')
                 AND NOT has_sequence_privilege($1,c.oid,'UPDATE')
               )
               OR
               (
-                c.relname<>'decision_event_sequence'
+                c.relname NOT IN ('decision_event_sequence','decision_projection_outbox_sequence')
                 AND has_sequence_privilege($1,c.oid,'USAGE')
                 AND has_sequence_privilege($1,c.oid,'SELECT')
                 AND has_sequence_privilege($1,c.oid,'UPDATE')
@@ -374,6 +376,25 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
         await migration.query(`GRANT INSERT ON TABLE ${DECISION_EVENT_TABLE} TO ${ident}`);
         await migration.query(`REVOKE ALL PRIVILEGES ON SEQUENCE ${DECISION_EVENT_SEQUENCE} FROM ${ident}`);
         await migration.query(`GRANT USAGE ON SEQUENCE ${DECISION_EVENT_SEQUENCE} TO ${ident}`);
+      }
+
+      // Wave 3B uses the same write-only boundary for immutable projection
+      // intents. The pair is conditional only so historical manifests remain
+      // provisionable in isolated lifecycle tests.
+      const decisionOutbox = await migration.query(
+        "SELECT to_regclass($1) AS outbox_table, to_regclass($2) AS outbox_sequence",
+        [DECISION_OUTBOX_TABLE, DECISION_OUTBOX_SEQUENCE],
+      );
+      const outboxTablePresent = Boolean(decisionOutbox.rows[0]?.outbox_table);
+      const outboxSequencePresent = Boolean(decisionOutbox.rows[0]?.outbox_sequence);
+      if (outboxTablePresent !== outboxSequencePresent) {
+        throw new RuntimeRoleProvisionError("Decision-outbox table/sequence presence is inconsistent.");
+      }
+      if (outboxTablePresent) {
+        await migration.query(`REVOKE ALL PRIVILEGES ON TABLE ${DECISION_OUTBOX_TABLE} FROM ${ident}`);
+        await migration.query(`GRANT INSERT ON TABLE ${DECISION_OUTBOX_TABLE} TO ${ident}`);
+        await migration.query(`REVOKE ALL PRIVILEGES ON SEQUENCE ${DECISION_OUTBOX_SEQUENCE} FROM ${ident}`);
+        await migration.query(`GRANT USAGE ON SEQUENCE ${DECISION_OUTBOX_SEQUENCE} TO ${ident}`);
       }
 
       controlPlanePresent = Boolean(

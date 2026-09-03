@@ -7,12 +7,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../../schema-control/runner";
+import { loadManifest } from "../../schema-control/manifest";
 import { provisionRuntimeRole } from "../../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-versioned-invitation-grant-test-target";
 
 type AuthorizationModule = typeof import("../versionedInvitationGrantAuthorization");
@@ -258,9 +260,9 @@ describe.skipIf(!enabled)("versioned invitation grants exact-schema PostgreSQL",
     if (preMigrationDir) rmSync(preMigrationDir, { recursive: true, force: true });
   });
 
-  it("applies ledger 8 and classifies legacy grants without inferred authority", () => {
+  it("applies the current ledger and classifies legacy grants without inferred authority", () => {
     expect(migrationEvidence).toEqual({
-      ledger: 8,
+      ledger: currentLedger,
       accepted_state: "accepted",
       pending_state: "legacy_revoked",
       token_hashed: true,

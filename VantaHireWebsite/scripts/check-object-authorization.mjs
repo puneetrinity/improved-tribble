@@ -941,7 +941,7 @@ function validateKernel(root, problems) {
   } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
     problems.push("resume audit migration checksum does not match migration 0002.");
   }
-  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0008_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007"]'])
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0009_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]'])
     requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
   requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
 
@@ -1148,8 +1148,8 @@ function validateReviewerShareAuthority(root, problems) {
   ]) requireAnchor(problems, schema, anchor, `reviewer/share Drizzle schema anchor is missing: ${anchor}`);
 
   for (const anchor of [
-    'const file = `0008_${name}.sql`', '"0004_reviewer_share_authority.sql"',
-    'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007"]',
+    'const file = `0009_${name}.sql`', '"0004_reviewer_share_authority.sql"',
+    'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]',
   ]) requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2I anchor: ${anchor}`);
 
   requireAnchor(problems, formsClient, "return template.canManage", "forms UI does not consume server-derived canManage.");
@@ -1962,7 +1962,7 @@ function validateDecisionEventSpine(root, problems) {
     "INSERT INTO ${applicationStageHistory}", "inserted_event AS", "INSERT INTO ${decisionEvents}",
     "'application_stage_moved'", "'applications.stage_patch'", "jsonb_build_object('stage_id', transition.current_stage)",
     "jsonb_build_object('stage_id', transition.stage_id)", "INNER JOIN inserted_history",
-    "inserted_history.inserted = 1 AND inserted_event.inserted = 1", 'AS "changed"',
+    "inserted_history.inserted = 1 AND inserted_intent.inserted = 1", 'AS "changed"',
   ]) requireAnchor(problems, stageCommand, anchor, `decision-event adopter anchor is missing: ${anchor}`);
   const eventStart = stageCommand.indexOf("inserted_event AS");
   const eventEnd = stageCommand.indexOf("RETURNING 1 AS inserted", eventStart);
@@ -1987,17 +1987,18 @@ function validateDecisionEventSpine(root, problems) {
   }
 
   for (const anchor of [
-    "c.relname='decision_events'", "has_table_privilege($1,c.oid,'INSERT')",
+    "c.relname IN ('decision_events','decision_projection_outbox')", "has_table_privilege($1,c.oid,'INSERT')",
     "NOT has_table_privilege($1,c.oid,'SELECT')", "NOT has_table_privilege($1,c.oid,'UPDATE')",
     "NOT has_table_privilege($1,c.oid,'DELETE')", "NOT has_table_privilege($1,c.oid,'TRUNCATE')",
-    "c.relname='decision_event_sequence'", "has_sequence_privilege($1,c.oid,'USAGE')",
+    "c.relname IN ('decision_event_sequence','decision_projection_outbox_sequence')", "has_sequence_privilege($1,c.oid,'USAGE')",
     "NOT has_sequence_privilege($1,c.oid,'SELECT')", "NOT has_sequence_privilege($1,c.oid,'UPDATE')",
     "GRANT INSERT ON TABLE ${DECISION_EVENT_TABLE}", "GRANT USAGE ON SEQUENCE ${DECISION_EVENT_SEQUENCE}",
   ]) requireAnchor(problems, runtimeRole, anchor, `decision-event runtime-role anchor is missing: ${anchor}`);
   for (const anchor of [
     '"public.decision_events"', "to_regclass('public.decision_event_sequence')",
     "decision_events_append_only", "decision_events_truncate_append_only",
-    "c.relname='decision_events'", "c.relname='decision_event_sequence'",
+    "c.relname IN ('decision_events','decision_projection_outbox')",
+    "c.relname IN ('decision_event_sequence','decision_projection_outbox_sequence')",
   ]) requireAnchor(problems, readiness, anchor, `decision-event readiness anchor is missing: ${anchor}`);
 
   for (const [script, file] of [
@@ -2010,7 +2011,7 @@ function validateDecisionEventSpine(root, problems) {
     requireAnchor(problems, ci, `npm run ${script}`, `decision-event CI step is missing: ${script}`);
   }
   for (const anchor of [
-    "pre0007Manifest", "upgrade.applied.join(\",\") !== \"0007\"", "readinessAsRuntime",
+    "pre0007Manifest", "upgrade.applied.join(\",\") !== \"0007,0008\"", "readinessAsRuntime",
     "same-stage a zero-write", "event insert fails", "history insertion fails", "concurrent moves",
     "runtime insert-only ACL", "evidence-preserving owner guards", "minimized evidence outlive mutable rows",
   ]) requireAnchor(problems, pgTest, anchor, `decision-event PostgreSQL lifecycle anchor is missing: ${anchor}`);
@@ -2029,6 +2030,94 @@ function validateDecisionEventSpine(root, problems) {
   ]) if (sha256(routeCall(routes, method, path).source) !== expected) {
     problems.push(`frozen 3A route writer drifted: ${method.toUpperCase()} ${path}`);
   }
+}
+
+function validateDecisionProjectionOutbox(root, problems) {
+  const workflow = read(root, "server/lib/applicationWorkflowAuthorization.ts");
+  const migration = read(root, "server/schema-migrations/0008_decision_projection_outbox.sql");
+  const lock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+  const schema = read(root, "shared/schema.ts");
+  const runtimeRole = read(root, "server/schema-control/runtimeRole.ts");
+  const readiness = read(root, "server/schema-control/readiness.ts");
+  const packageJson = read(root, "package.json");
+  const ci = read(root, "../.github/workflows/ci.yml");
+  const pgTest = read(root, "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts");
+  const stageCommand = exportedFunctionSource(workflow, "moveAuthorizedApplicationStage");
+
+  for (const anchor of [
+    "CREATE SEQUENCE public.decision_projection_outbox_sequence",
+    "CREATE TABLE public.decision_projection_outbox",
+    "event_id uuid PRIMARY KEY REFERENCES public.decision_events(event_id) ON DELETE RESTRICT",
+    "organization_id integer NOT NULL REFERENCES public.organizations(id) ON DELETE RESTRICT",
+    "memory.organization_decision_inbox.v1", "payload_schema_version = 1",
+    "source_system = 'flow'", "subject_type = 'application'",
+    "decision_projection_outbox_delivery_sequence_unique",
+    "decision_projection_outbox_source_event_sequence_unique",
+    "octet_length(before_state::text) <= 1024", "octet_length(after_state::text) <= 1024",
+    "before_state->'stage_id' IS DISTINCT FROM after_state->'stage_id'",
+    "flow_reject_decision_projection_outbox_mutation", "decision_projection_outbox_append_only",
+    "decision_projection_outbox_truncate_append_only", "DECISION_OUTBOX_APPEND_ONLY",
+  ]) requireAnchor(problems, migration, anchor, `decision-projection outbox migration anchor is missing: ${anchor}`);
+  if (/REFERENCES public\.(?:applications|jobs|pipeline_stages|users)/.test(migration)) {
+    problems.push("decision-projection outbox restores a mutable aggregate/user foreign key.");
+  }
+  if (/\b(?:candidate_name|canonical_candidate|signal_candidate|email|phone|resume|notes|narrative|free_text|attempt|lease|acknowledge|error_text)\b/i.test(
+    migration.replace(/COMMENT ON[\s\S]*$/m, ""),
+  )) problems.push("decision-projection outbox persists PII, inferred identity, free text, or mutable delivery state.");
+  if (!/^[a-f0-9]{64}$/.test(lock?.migrations?.["0008"] ?? "")
+      || sha256(migration) !== lock.migrations["0008"]) {
+    problems.push("decision-projection outbox checksum does not match migration 0008.");
+  }
+
+  for (const anchor of [
+    'pgSequence("decision_projection_outbox_sequence"', 'pgTable("decision_projection_outbox"',
+    'eventId: uuid("event_id").primaryKey().references(() => decisionEvents.eventId',
+    'destination: text("destination").notNull()', 'beforeState: jsonb("before_state").notNull()',
+    'afterState: jsonb("after_state").notNull()', "decision_projection_outbox_state_changed",
+  ]) requireAnchor(problems, schema, anchor, `decision-projection Drizzle schema anchor is missing: ${anchor}`);
+
+  if (!stageCommand || count(stageCommand, "db.execute(") !== 1) {
+    problems.push("3B adopter must keep exactly one database statement.");
+  }
+  for (const anchor of [
+    "nextval('public.decision_event_sequence')", "nextval('public.decision_projection_outbox_sequence')",
+    "inserted_event AS", "inserted_intent AS", "INSERT INTO ${decisionProjectionOutbox}",
+    "FROM inserted_event", "'memory.organization_decision_inbox.v1'", "'flow'", "'application'",
+    "inserted_history.inserted = 1 AND inserted_intent.inserted = 1",
+  ]) requireAnchor(problems, stageCommand, anchor, `decision-projection adopter anchor is missing: ${anchor}`);
+  const intentStart = stageCommand.indexOf("inserted_intent AS");
+  const intentEnd = stageCommand.indexOf("RETURNING 1 AS inserted", intentStart);
+  const intentInsert = intentStart >= 0 && intentEnd > intentStart ? stageCommand.slice(intentStart, intentEnd) : "";
+  for (const forbidden of ["actor_user_id", "requesting_actor_user_id", "source_surface", "idempotency_key",
+    "recommendation_model_version", "recommendation_input_version", "${notes}", "stage_name", "fetch(",
+    "ACTIVEKG", "MEMORY_", "setTimeout", "setInterval"]) {
+    if (intentInsert.includes(forbidden)) problems.push(`decision projection copies or invokes forbidden material: ${forbidden}`);
+  }
+  if (/\bfetch\s*\(|ACTIVEKG|MEMORY_|setTimeout|setInterval|jwt-signer|activekg-client/.test(stageCommand)) {
+    problems.push("decision projection copies or invokes forbidden material: fetch(");
+  }
+
+  for (const anchor of [
+    "DECISION_OUTBOX_TABLE", "DECISION_OUTBOX_SEQUENCE",
+    "GRANT INSERT ON TABLE ${DECISION_OUTBOX_TABLE}",
+    "GRANT USAGE ON SEQUENCE ${DECISION_OUTBOX_SEQUENCE}",
+    "Decision-outbox table/sequence presence is inconsistent.",
+  ]) requireAnchor(problems, runtimeRole, anchor, `decision-projection runtime-role anchor is missing: ${anchor}`);
+  for (const anchor of [
+    '"public.decision_projection_outbox"', "to_regclass('public.decision_projection_outbox_sequence')",
+    "flow_reject_decision_projection_outbox_mutation", "decision_projection_outbox_append_only",
+    "decision_projection_outbox_truncate_append_only",
+  ]) requireAnchor(problems, readiness, anchor, `decision-projection readiness anchor is missing: ${anchor}`);
+
+  for (const anchor of [
+    '"test:decision-projection-outbox:pg"', "decisionProjectionOutbox.pg.test.ts",
+  ]) requireAnchor(problems, packageJson, anchor, `decision-projection package script is missing: ${anchor}`);
+  requireAnchor(problems, ci, "npm run test:decision-projection-outbox:pg",
+    "decision-projection CI step is missing.");
+  for (const anchor of [
+    "pre0008Manifest", "pre0008EventStayedUnprojected", "four writes back", "concurrent moves",
+    "INSERT-only/USAGE-only", "owner-level append-only", "outlive mutable rows", "fails readiness",
+  ]) requireAnchor(problems, pgTest, anchor, `decision-projection PostgreSQL lifecycle anchor is missing: ${anchor}`);
 }
 
 function manifestFrozenRouteBlocks(root) {
@@ -2061,8 +2150,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 10) {
     problems.push("exactly ten resume/application/consultant/attribution registrations must be retired.");
   }
-  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 96) {
-    problems.push("exactly ninety-six authorization files must be governed.");
+  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 97) {
+    problems.push("exactly ninety-seven authorization files must be governed.");
   }
 
   for (const [path, reader] of [
@@ -2241,6 +2330,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/unsafeOrgAttributionRetirement.cli.test.ts",
     "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
     "server/lib/__tests__/decisionEventSpine.pg.test.ts",
+    "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -2271,6 +2361,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateVersionedInvitationGrants(root, problems);
     validateUnsafeOrgAttributionRetirement(root, problems);
     validateDecisionEventSpine(root, problems);
+    validateDecisionProjectionOutbox(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

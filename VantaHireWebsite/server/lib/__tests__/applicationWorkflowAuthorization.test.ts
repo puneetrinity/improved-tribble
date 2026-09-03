@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const execute = vi.hoisted(() => vi.fn());
 
@@ -17,6 +20,7 @@ import {
 const policy = { allowPlatformAdmin: true } as const;
 const at = new Date("2026-08-30T12:00:00.000Z");
 const eventId = "30000000-0000-4000-8000-000000000001";
+const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "applicationWorkflowAuthorization.ts"), "utf8");
 
 beforeEach(() => execute.mockReset());
 
@@ -79,6 +83,29 @@ describe("application workflow authorization input and failure contracts", () =>
 });
 
 describe("application workflow authorization minimum projections", () => {
+  it("keeps the stage event and projection intent in one provider-free statement", () => {
+    const start = source.indexOf("export async function moveAuthorizedApplicationStage");
+    const end = source.indexOf("\nfunction interviewProjection", start);
+    const stage = source.slice(start, end);
+    expect(stage.match(/db\.execute\(/g)).toHaveLength(1);
+    expect(stage).toContain("nextval('public.decision_event_sequence')");
+    expect(stage).toContain("nextval('public.decision_projection_outbox_sequence')");
+    expect(stage).toContain("inserted_event AS");
+    expect(stage).toContain("inserted_intent AS");
+    expect(stage).toContain("INSERT INTO ${decisionProjectionOutbox}");
+    expect(stage).toContain("'memory.organization_decision_inbox.v1'");
+    expect(stage).toContain("INNER JOIN inserted_history");
+    expect(stage).toContain("FROM inserted_event");
+    expect(stage).toContain("inserted_history.inserted = 1 AND inserted_intent.inserted = 1");
+    expect(stage).not.toMatch(/\bfetch\s*\(|ACTIVEKG|MEMORY_|jwt|setTimeout|setInterval/);
+    const intentStart = stage.indexOf("inserted_intent AS");
+    const intent = stage.slice(intentStart, stage.indexOf("RETURNING 1 AS inserted", intentStart));
+    for (const forbidden of ["actor_user_id", "requesting_actor_user_id", "source_surface", "idempotency_key",
+      "recommendation_model_version", "recommendation_input_version", "${notes}", "stage_name"]) {
+      expect(intent).not.toContain(forbidden);
+    }
+  });
+
   it("returns the exact stage projection from one statement", async () => {
     execute.mockResolvedValueOnce({ rows: [{
       applicationId: 2, stageId: 3, stageName: "Review", changedAt: at, changed: true,

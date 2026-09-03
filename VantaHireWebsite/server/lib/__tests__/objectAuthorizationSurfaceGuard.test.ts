@@ -880,6 +880,64 @@ describe("object authorization surface guard", () => {
     expect(problems).toContain("decision-event CI step is missing: test:decision-event-spine:pg");
   });
 
+  it("rejects removing the atomic decision-projection intent join", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("FROM inserted_event", "FROM transition"),
+    );
+    expect(problems).toContain("decision-projection adopter anchor is missing: FROM inserted_event");
+  });
+
+  it("rejects copying actor authority into the projection envelope", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) => {
+      const intentStart = source.indexOf("inserted_intent AS");
+      return source.slice(0, intentStart) + source.slice(intentStart).replace(
+        "SELECT ${eventId}::uuid,",
+        "SELECT ${eventId}::uuid,\n               transition.actor_user_id,",
+      );
+    });
+    expect(problems).toContain("decision projection copies or invokes forbidden material: actor_user_id");
+  });
+
+  it("rejects a network call from the decision-projection adopter", () => {
+    const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
+      source.replace("inserted_intent AS", "fetch('https://example.invalid');\n      inserted_intent AS"),
+    );
+    expect(problems).toContain("decision projection copies or invokes forbidden material: fetch(");
+  });
+
+  it("rejects weakening the bounded projection state payload", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0008_decision_projection_outbox.sql", (source) =>
+      source.replace("octet_length(before_state::text) <= 1024", "octet_length(before_state::text) <= 2048"),
+    );
+    expect(problems).toContain("decision-projection outbox migration anchor is missing: octet_length(before_state::text) <= 1024");
+  });
+
+  it("rejects a mutable application foreign key in the projection outbox", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0008_decision_projection_outbox.sql", (source) =>
+      source.replace("subject_id integer NOT NULL", "subject_id integer NOT NULL REFERENCES public.applications(id)"),
+    );
+    expect(problems).toContain("decision-projection outbox restores a mutable aggregate/user foreign key.");
+  });
+
+  it("rejects granting runtime reads of decision-projection intents", () => {
+    const problems = mutate(fixture(), "server/schema-control/runtimeRole.ts", (source) =>
+      source.replace(
+        "GRANT INSERT ON TABLE ${DECISION_OUTBOX_TABLE} TO ${ident}",
+        "GRANT SELECT,INSERT ON TABLE ${DECISION_OUTBOX_TABLE} TO ${ident}",
+      ),
+    );
+    expect(problems).toContain(
+      "decision-projection runtime-role anchor is missing: GRANT INSERT ON TABLE ${DECISION_OUTBOX_TABLE}",
+    );
+  });
+
+  it("rejects omitting the decision-projection CI lifecycle", () => {
+    const problems = mutate(fixture(), "../.github/workflows/ci.yml", (source) =>
+      source.replace("npm run test:decision-projection-outbox:pg", "npm run test:server"),
+    );
+    expect(problems).toContain("decision-projection CI step is missing.");
+  });
+
   it("rejects drift in a frozen neighboring workflow writer", () => {
     const problems = mutate(fixture(), "server/lib/applicationWorkflowAuthorization.ts", (source) =>
       source.replace(

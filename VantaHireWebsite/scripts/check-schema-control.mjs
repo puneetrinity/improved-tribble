@@ -245,6 +245,37 @@ if (!existsSync(lockPath) || !existsSync(catalogLockPath)) {
   }
 }
 
+// Wave 3B: lifecycle resets may never switch off every user trigger. Historical
+// partial-manifest assertions remain explicit, while suites that install the
+// full directory must derive the latest count from the manifest.
+for (const absolute of walk(serverRoot)) {
+  if (!/\.pg\.test\.ts$/.test(absolute)) continue;
+  const source = readFileSync(absolute, "utf8");
+  const path = relative(appRoot, absolute).replaceAll("\\", "/");
+  if (/\bDISABLE\s+TRIGGER\s+USER\b/i.test(source)) {
+    problems.push(`PostgreSQL lifecycle broadly disables production triggers: ${path}`);
+  }
+}
+for (const path of [
+  "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
+  "server/lib/__tests__/decisionEventSpine.pg.test.ts",
+  "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
+  "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
+  "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
+  "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
+  "server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts",
+  "server/lib/__tests__/reviewerShareAuthorization.pg.test.ts",
+  "server/lib/__tests__/talentPoolAuthorization.pg.test.ts",
+  "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.pg.test.ts",
+  "server/tests/candidatePrivacy.pg.test.ts",
+  "server/tests/applicationReadAuthorization.pg.test.ts",
+]) {
+  const source = readFileSync(join(appRoot, path), "utf8");
+  if (!/loadManifest\(migrationsDir\)\.length/.test(source)) {
+    problems.push(`full-ledger PostgreSQL lifecycle does not derive the current manifest count: ${path}`);
+  }
+}
+
 return [...new Set(problems)];
 }
 

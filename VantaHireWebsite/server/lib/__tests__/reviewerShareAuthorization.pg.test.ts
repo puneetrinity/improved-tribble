@@ -6,12 +6,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../../schema-control/runner";
+import { loadManifest } from "../../schema-control/manifest";
 import { provisionRuntimeRole } from "../../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-object-authorization-test-target";
 const token = "a".repeat(64);
 const candidateRef = "123e4567-e89b-42d3-a456-426614174000";
@@ -257,7 +259,7 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
       distinct_refs: 2,
       invitations: [[90, "legacy_private", null]],
       grant_safe: 1,
-      ledger: 7,
+      ledger: currentLedger,
     });
     await provisionRuntimeRole({
       migrateUrl: migrationUrl, runtimeUrl, runtimeRole: new URL(runtimeUrl).username,
@@ -282,7 +284,7 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
     if (priorDir) rmSync(priorDir, { recursive: true, force: true });
   });
 
-  it("installs ledger 7 with exact defaults, checks, FK and indexes", async () => {
+  it("installs the current ledger with exact defaults, checks, FK and indexes", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT count(*)::integer FROM schema_control.applied) ledger,
              (SELECT count(*)::integer FROM information_schema.columns WHERE table_name='client_shortlists'
@@ -298,7 +300,7 @@ describe.skipIf(!enabled)("reviewer/share exact-schema PostgreSQL", () => {
                ('forms_authority_scope_idx','client_shortlist_items_public_ref_idx',
                 'hm_invitations_authority_issuer_idx','hm_invitations_authority_email_idx')) indexes
     `)).rows[0];
-    expect(row).toEqual({ ledger: 7, flags: 2, fail_closed_defaults: 2, checks: 4, indexes: 4 });
+    expect(row).toEqual({ ledger: currentLedger, flags: 2, fail_closed_defaults: 2, checks: 4, indexes: 4 });
     const grant = (await owner!.query(`
       SELECT (SELECT count(*)::integer FROM information_schema.columns
                 WHERE table_name='hiring_manager_invitations'

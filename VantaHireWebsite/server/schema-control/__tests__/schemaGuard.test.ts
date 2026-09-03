@@ -41,8 +41,21 @@ const fixtureFiles = [
   "VantaHireWebsite/server/schema-migrations/0005_privilege_authorization_version.sql",
   "VantaHireWebsite/server/schema-migrations/0006_versioned_invitation_grants.sql",
   "VantaHireWebsite/server/schema-migrations/0007_decision_event_spine.sql",
+  "VantaHireWebsite/server/schema-migrations/0008_decision_projection_outbox.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
+  "VantaHireWebsite/server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/decisionEventSpine.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/reviewerShareAuthorization.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/talentPoolAuthorization.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/scopedFinancialAdminPublicAuthorization.pg.test.ts",
+  "VantaHireWebsite/server/tests/candidatePrivacy.pg.test.ts",
+  "VantaHireWebsite/server/tests/applicationReadAuthorization.pg.test.ts",
   "VantaHireWebsite/scripts/check-schema-control.mjs",
 ];
 
@@ -208,6 +221,40 @@ const mutations: Array<{
       mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
         delete lock.migrations["0007"];
       });
+    },
+  },
+  {
+    name: "decision-projection outbox migration edited after checksum",
+    expected: /applied migration 0008 .* was edited/,
+    apply(root) {
+      const relative = "VantaHireWebsite/server/schema-migrations/0008_decision_projection_outbox.sql";
+      write(root, relative, `${readFileSync(join(root, relative), "utf8")}\n-- forbidden drift\n`);
+    },
+  },
+  {
+    name: "decision-projection outbox migration omitted from checksum lock",
+    expected: /checksums\.lock versions do not exactly match migration files/,
+    apply(root) {
+      mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
+        delete lock.migrations["0008"];
+      });
+    },
+  },
+  {
+    name: "PostgreSQL lifecycle broadly disables user triggers",
+    expected: /broadly disables production triggers/,
+    apply(root) {
+      const relative = "VantaHireWebsite/server/lib/__tests__/decisionProjectionOutbox.pg.test.ts";
+      write(root, relative, `${readFileSync(join(root, relative), "utf8")}\n// DISABLE TRIGGER USER\n`);
+    },
+  },
+  {
+    name: "full-ledger lifecycle restores a stale literal",
+    expected: /does not derive the current manifest count/,
+    apply(root) {
+      const relative = "VantaHireWebsite/server/lib/__tests__/privilegeGrantRevocation.pg.test.ts";
+      write(root, relative, readFileSync(join(root, relative), "utf8")
+        .replace("loadManifest(migrationsDir).length", "7"));
     },
   },
   {

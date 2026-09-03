@@ -736,11 +736,11 @@
   "governed_files": [
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "cd9e8afabce16240a98f0817aa6d1166fb1cf94cef32a9724a10182affc69bdc"
+      "sha256": "142044b7ce172a675d05b584cdf30e38098cef8b3e51ca115274433a2792579c"
     },
     {
       "file": "package.json",
-      "sha256": "1b7d57536690b3834a6a6dba0fb14d382e289c9aad92663d72f0d4a21cd8cf5b"
+      "sha256": "1c0e5b9c477745e69ea74b3f415d2a244a4acfac34888dfd2c4bf9b146468f07"
     },
     {
       "file": "vitest.server.config.ts",
@@ -796,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "47943c1588600a1fc9495ea6f2f4b90f997b9a123be121b728fef0a429db46f8"
+      "sha256": "43a84eb26e4445e705d0861be089bebe2534890179f17a34cf0cf8b46bb3c0c7"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -804,7 +804,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "2132e4e29bfbe88f3cd508bdac8a3c40e21cc23e882f17cd151ac9a0a85a136b"
+      "sha256": "b9b62b4f74b5e6e34fe99b87bcf1f96a9c6a4a20c5293e5bfcaececb6186ed28"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -832,7 +832,7 @@
     },
     {
       "file": "server/lib/applicationWorkflowAuthorization.ts",
-      "sha256": "c7cf39e5648bf3b1e07bf785421990bb66f9dcd5befc5310087eb5a91f263b59"
+      "sha256": "4fa0af5c16eca70025be6c0fc9abf37f36440a8b022ee9053417a18b2cc1f2de"
     },
     {
       "file": "server/lib/applicationAiOutboundAuthorization.ts",
@@ -852,7 +852,7 @@
     },
     {
       "file": "server/lib/__tests__/reviewerShareAuthorization.pg.test.ts",
-      "sha256": "bf1a7065af33eefbef37addc64e837aabe21bc9f77710a0483802da4001f0fbe"
+      "sha256": "979a2ad33e0d5a9dd474e4dd990c34a8f520eb1b7556b64dc4707316d735b769"
     },
     {
       "file": "server/lib/__tests__/applicationAiOutboundAuthorization.test.ts",
@@ -864,7 +864,7 @@
     },
     {
       "file": "server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts",
-      "sha256": "5ae813621c2af76f118f1f38ac067a3e84544cc55e7ec5ade24f5fc6d75c90f1"
+      "sha256": "90929dfbc534db0b5a62956b44ba7dd2a85096de72cbe494465f9d67a362f713"
     },
     {
       "file": "server/lib/__tests__/authorizedTemplatedEmail.test.ts",
@@ -872,7 +872,7 @@
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.test.ts",
-      "sha256": "d78bf16dc8e615ed6262a97c776c70d82bb525dcef633d508aa91a0353724f88"
+      "sha256": "2b93e82e873f37d23b5bddfcfe7aec2aee595bd7462193f4f18a45caf175048d"
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.routes.test.ts",
@@ -880,7 +880,7 @@
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
-      "sha256": "96fe0176e2a110be8b92b6507cf603ab49c6a483d80012ac2ab9191cce269cb1"
+      "sha256": "c48eed8fb5018054cb7c81c40f66f4bee9342e3770071168c41a7f2cfebe59e5"
     },
     {
       "file": "server/storage.ts",
@@ -888,11 +888,11 @@
     },
     {
       "file": "server/tests/applicationReadAuthorization.pg.test.ts",
-      "sha256": "6c930bf0887d7c3a538c8953e08ab8d686307de5d8bc577f03672344c624bb32"
+      "sha256": "f22e54e1de51484bb9f0743d4000131d387a21eca55a2f0577d708a70fea2f80"
     },
     {
       "file": "server/tests/candidatePrivacy.pg.test.ts",
-      "sha256": "3221aea0ab0cc2c00857710de220638a460cb6e002707e124bfa75f680b5dcf2"
+      "sha256": "aed4108690a27fc54782d767205000b365112d90188ff9981049dfcf77cc9359"
     },
     {
       "file": "server/tests/interviewIcsAuthorization.routes.test.ts",
@@ -908,7 +908,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "a799a9abdcf7b09f1205e60d1154f99c0ea8de466077fde759d4fde7bdf50f1b"
+      "sha256": "3d96cf579e562b0281f74422265ddb92b5505068609f1e1cb79adfce2e59bb68"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -936,7 +936,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "e32e2db06cc55cda4d966096e5ba75b68a26cf2b35bde24474913aa3551748eb"
+      "sha256": "c9de8738496fb8df1c03b13616c05d452ac3429d0f31bc1673089d8a51189b1d"
     },
     {
       "file": "shared/forms.types.ts",
@@ -956,15 +956,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "181d35ca19dad9f2753678ebcc0d70077fd6f79e9d5bd579524e8488beba3d1a"
+      "sha256": "d66d8e8f70a4e2bdcf80a51200c0a531a56cf4ecf416f6a95daf0fd985e5ee2e"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "8fd2a66c08fe4c1e6988b530de6498a47ec9cd682d65d334d3fc8b66e838bce6"
+      "sha256": "f9cacfc6e9fb9a63298867a12941dff44a0354123e17e0471d79d2106f2ca20d"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "72661f08c7e07255ac8a2fcd3ed1e5f7bf366aeb86c893b11a24a14aeca09b32"
+      "sha256": "fae71a2dd9586ffbcd6a29bf84a7e808d60e80ced6feb86105bb598e572df26c"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -980,7 +980,7 @@
     },
     {
       "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.pg.test.ts",
-      "sha256": "befb79221d0ecddf4c03feefb20df5a03ef9e2925c7e2ec7aee8e210a2020af1"
+      "sha256": "87716d387fcd9e494ec1c7900cd8cb3af1c953581af09c14618d6de672d33f35"
     },
     {
       "file": "server/admin.routes.ts",
@@ -1028,7 +1028,7 @@
     },
     {
       "file": "server/lib/__tests__/talentPoolAuthorization.pg.test.ts",
-      "sha256": "5fda9c8634bf4923d9437fd0d8ccdeb7c16ebca7937059cb7aeb9bf418422023"
+      "sha256": "618360201cd492dddea0fff0f644d080e0bfa4ee8a2a7e9606da4d591b3553e3"
     },
     {
       "file": "test/integration/backward-compatibility.test.ts",
@@ -1060,7 +1060,7 @@
     },
     {
       "file": "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
-      "sha256": "404c07e80edcb2926dd945a14ba39e8614cb704b63552aa6424f8ad0ba32fbd6"
+      "sha256": "024fefeb7c60472230ed86d8e93c0b777a24de4eee7a20a97d82e17b68b15c14"
     },
     {
       "file": "server/tests/org-team-member-removal.routes.test.ts",
@@ -1088,7 +1088,7 @@
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
-      "sha256": "6a7f7bbb56f3753f9efb6275e80c876ad26170b985ac9ccd6bdb892b50ea0d43"
+      "sha256": "e35e6ec6809d671622a3b99c88724f4aa859b86fc2e3065741288ecdad19414d"
     },
     {
       "file": "test/integration/invite-and-webhook.test.ts",
@@ -1112,11 +1112,15 @@
     },
     {
       "file": "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
-      "sha256": "97499298ed331153e24051ec682d48b0dac583ec7c070f331d25836bca88b7d9"
+      "sha256": "a4381e0924016dff7a424f433b2641c88cc7955692ef4329661413ea7a50e9ad"
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "eabd171f33206f7fb7f6385d1f14d6bdb82463b0e0fbaa1b22793104eefea5d4"
+      "sha256": "b752c71acf3f29d491c13f780dee6533d25a7b52ee38ac8b755a8916177f55cb"
+    },
+    {
+      "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
+      "sha256": "526ae7a9546f763b219e291c8d60b388620f8eb619c4bf7ca90dd5b8385282ef"
     }
   ],
   "frozen_route_blocks": [
