@@ -4,12 +4,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../../schema-control/runner";
+import { loadManifest } from "../../schema-control/manifest";
 import { provisionRuntimeRole } from "../../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-object-authorization-test-target";
 
 type WorkflowModule = typeof import("../applicationWorkflowAuthorization");
@@ -211,7 +213,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
         },
         connect: connectMigration,
       });
-      if (rebuilt.applied.length !== 8 || rebuilt.applied.at(-1) !== "0007") {
+      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0008") {
         throw new Error("Disposable workflow per-test schema rebuild refused.");
       }
       await provisionRuntimeRole({
@@ -234,7 +236,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("installs ledger 8 and the exact additive assessment schema", async () => {
+  it("installs the current ledger and the exact additive assessment schema", async () => {
     const result = await owner!.query(`
       SELECT
         (SELECT COUNT(*)::integer FROM schema_control.applied) AS ledger,
@@ -246,7 +248,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
           WHERE schemaname='public' AND tablename IN ('application_reviewer_notes','application_reviewer_ratings')) AS indexes
     `);
     expect(result.rows[0]).toMatchObject({
-      ledger: 8,
+      ledger: currentLedger,
       notes_relation: "application_reviewer_notes",
       ratings_relation: "application_reviewer_ratings",
       indexes: 7,
@@ -277,6 +279,36 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
     expect(state.rows[0]).toEqual({ current_stage: 2, stage_changed_by: 101 });
     const history = await owner!.query("SELECT from_stage,to_stage,changed_by,notes FROM application_stage_history WHERE application_id=2001");
     expect(history.rows).toEqual([{ from_stage: 1, to_stage: 2, changed_by: 101, notes: "Advance" }]);
+    const evidence = await owner!.query(`SELECT e.event_id,o.event_id intent_event_id,
+      e.event_sequence,o.source_event_sequence,o.subject_id,o.destination
+      FROM decision_events e JOIN decision_projection_outbox o USING(event_id)`);
+    expect(evidence.rows).toHaveLength(1);
+    expect(evidence.rows[0]).toMatchObject({
+      event_id: evidence.rows[0]?.intent_event_id,
+      event_sequence: evidence.rows[0]?.source_event_sequence,
+      subject_id: 2001,
+      destination: "memory.organization_decision_inbox.v1",
+    });
+  });
+
+  it("rolls stage, history, event and intent back when the outbox insert refuses", async () => {
+    await owner!.query(`CREATE FUNCTION public.flow_test_reject_workflow_intent() RETURNS trigger LANGUAGE plpgsql AS $$
+      BEGIN RAISE EXCEPTION USING ERRCODE='55000',MESSAGE='TEST_INTENT_REFUSED'; END $$;
+      CREATE TRIGGER flow_test_reject_workflow_intent BEFORE INSERT ON decision_projection_outbox
+      FOR EACH ROW EXECUTE FUNCTION public.flow_test_reject_workflow_intent()`);
+    try {
+      await expect(workflow.moveAuthorizedApplicationStage(
+        101, 2001, 2, "Advance", "30000000-0000-4000-8000-000000000010", { allowPlatformAdmin: true },
+      )).resolves.toEqual({ ok: false, reason: "unavailable" });
+      expect((await owner!.query("SELECT current_stage FROM applications WHERE id=2001")).rows[0]?.current_stage).toBe(1);
+      expect((await owner!.query(`SELECT
+        (SELECT COUNT(*)::integer FROM application_stage_history) history,
+        (SELECT COUNT(*)::integer FROM decision_events) events,
+        (SELECT COUNT(*)::integer FROM decision_projection_outbox) intents`)).rows[0])
+        .toEqual({ history: 0, events: 0, intents: 0 });
+    } finally {
+      await owner!.query("DROP TRIGGER flow_test_reject_workflow_intent ON decision_projection_outbox; DROP FUNCTION flow_test_reject_workflow_intent()");
+    }
   });
 
   it("allows the global default stage and refuses foreign/nondefault stages with zero writes", async () => {

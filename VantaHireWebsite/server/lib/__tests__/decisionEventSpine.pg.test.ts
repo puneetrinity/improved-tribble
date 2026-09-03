@@ -18,6 +18,7 @@ const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-decision-event-spine-test-target";
 
 type WorkflowModule = typeof import("../applicationWorkflowAuthorization");
@@ -116,7 +117,9 @@ async function counts(): Promise<Record<string, number>> {
     SELECT
       (SELECT COUNT(*)::integer FROM application_stage_history) AS history,
       (SELECT COUNT(*)::integer FROM decision_events) AS events,
-      (SELECT last_value::integer FROM decision_event_sequence) AS sequence
+      (SELECT COUNT(*)::integer FROM decision_projection_outbox) AS intents,
+      (SELECT last_value::integer FROM decision_event_sequence) AS sequence,
+      (SELECT last_value::integer FROM decision_projection_outbox_sequence) AS delivery_sequence
   `)).rows[0];
 }
 
@@ -188,7 +191,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    if (upgrade.applied.join(",") !== "0007") throw new Error("Disposable 3A migration isolation refused.");
+    if (upgrade.applied.join(",") !== "0007,0008") throw new Error("Disposable 3A/3B migration isolation refused.");
 
     // The release-first window is intentionally not runtime-ready until the
     // provisioner removes default table/sequence grants and applies the exact exception.
@@ -201,7 +204,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       connectMigration,
       connectRuntime,
     });
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0007", applied: 8 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
     process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     workflow = await import("../applicationWorkflowAuthorization");
@@ -231,7 +234,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
         },
         connect: connectMigration,
       });
-      if (rebuilt.applied.length !== 8 || rebuilt.applied.at(-1) !== "0007") {
+      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0008") {
         throw new Error("Disposable 3A per-test schema rebuild refused.");
       }
       await provisionRuntimeRole({
@@ -255,7 +258,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     if (pre0007Dir) rmSync(pre0007Dir, { recursive: true, force: true });
   });
 
-  it("installs the exact ledger-8 relation, constraints, indexes, and append-only guards", async () => {
+  it("installs the current ledger while preserving the exact 3A relation", async () => {
     const facts = (await owner!.query(`SELECT
       (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
       to_regclass('public.decision_events')::text relation,
@@ -265,7 +268,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       (SELECT COUNT(*)::integer FROM pg_trigger WHERE tgrelid='public.decision_events'::regclass
         AND NOT tgisinternal AND tgenabled<>'D') triggers,
       (SELECT COUNT(*)::integer FROM decision_events) inferred_rows`)).rows[0];
-    expect(facts).toEqual({ ledger: 8, relation: "decision_events", sequence: "decision_event_sequence",
+    expect(facts).toEqual({ ledger: currentLedger, relation: "decision_events", sequence: "decision_event_sequence",
       constraints: 26, indexes: 8, triggers: 2, inferred_rows: 0 });
   });
 
@@ -284,7 +287,9 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       e.idempotency_key,e.before_state,e.after_state,e.occurred_at,e.event_sequence,e.aggregate_sequence,
       e::text event_text
       FROM applications a JOIN application_stage_history h ON h.application_id=a.id
-      JOIN decision_events e ON e.aggregate_id=a.id WHERE a.id=2001`)).rows[0];
+      JOIN decision_events e ON e.aggregate_id=a.id
+      JOIN decision_projection_outbox o ON o.event_id=e.event_id
+      WHERE a.id=2001`)).rows[0];
     expect(row).toMatchObject({
       current_stage: 2, stage_changed_by: 101, event_id: eventId, organization_id: 1,
       aggregate_type: "application", aggregate_id: 2001, job_id: 1001, actor_user_id: 101,
@@ -343,6 +348,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     // PostgreSQL sequences are intentionally non-transactional; failed event
     // attempts may leave a harmless global-order gap, which the v1 contract allows.
     expect(afterCounts.sequence).toBe(beforeCounts.sequence + 1);
+    expect(afterCounts.delivery_sequence).toBe(beforeCounts.delivery_sequence + 1);
   });
 
   it("rolls application and event back when history insertion fails", async () => {
@@ -356,8 +362,8 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
         .resolves.toEqual({ ok: false, reason: "unavailable" });
       expect((await owner!.query("SELECT current_stage,stage_changed_at,stage_changed_by FROM applications WHERE id=2001")).rows[0])
         .toEqual(before);
-      expect((await owner!.query("SELECT COUNT(*)::integer history,(SELECT COUNT(*)::integer FROM decision_events) events FROM application_stage_history")).rows[0])
-        .toEqual({ history: 0, events: 0 });
+      expect((await owner!.query("SELECT COUNT(*)::integer history,(SELECT COUNT(*)::integer FROM decision_events) events,(SELECT COUNT(*)::integer FROM decision_projection_outbox) intents FROM application_stage_history")).rows[0])
+        .toEqual({ history: 0, events: 0, intents: 0 });
     } finally {
       await owner!.query("DROP TRIGGER flow_test_reject_history ON application_stage_history; DROP FUNCTION flow_test_reject_history()");
     }
@@ -373,6 +379,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     const events = (await owner!.query("SELECT before_state,after_state,event_sequence FROM decision_events ORDER BY event_sequence")).rows;
     const history = (await owner!.query("SELECT from_stage,to_stage FROM application_stage_history ORDER BY changed_at,id")).rows;
     expect(events).toHaveLength(2);
+    expect((await owner!.query("SELECT COUNT(*)::integer n FROM decision_projection_outbox")).rows[0]?.n).toBe(2);
     expect(history).toHaveLength(2);
     expect(events[0].before_state).toEqual({ stage_id: 1 });
     expect(events[1].before_state).toEqual(events[0].after_state);
@@ -393,26 +400,43 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
         has_table_privilege($1,'public.decision_events','TRUNCATE') can_truncate,
         has_sequence_privilege($1,'public.decision_event_sequence','USAGE') can_use,
         has_sequence_privilege($1,'public.decision_event_sequence','SELECT') can_read_sequence,
-        has_sequence_privilege($1,'public.decision_event_sequence','UPDATE') can_set_sequence`,
+        has_sequence_privilege($1,'public.decision_event_sequence','UPDATE') can_set_sequence,
+        has_table_privilege($1,'public.decision_projection_outbox','INSERT') can_insert_intent,
+        has_table_privilege($1,'public.decision_projection_outbox','SELECT') can_select_intent,
+        has_sequence_privilege($1,'public.decision_projection_outbox_sequence','USAGE') can_use_delivery_sequence,
+        has_sequence_privilege($1,'public.decision_projection_outbox_sequence','UPDATE') can_set_delivery_sequence`,
         [new URL(runtimeUrl).username])).rows[0];
       expect(acl).toEqual({ can_insert: true, can_select: false, can_update: false, can_delete: false,
-        can_truncate: false, can_use: true, can_read_sequence: false, can_set_sequence: false });
+        can_truncate: false, can_use: true, can_read_sequence: false, can_set_sequence: false,
+        can_insert_intent: true, can_select_intent: false, can_use_delivery_sequence: true,
+        can_set_delivery_sequence: false });
       for (const sql of [
         "SELECT * FROM decision_events", "UPDATE decision_events SET action_code=action_code",
         "DELETE FROM decision_events", "TRUNCATE decision_events", "SELECT setval('decision_event_sequence',1)",
+        "SELECT * FROM decision_projection_outbox", "UPDATE decision_projection_outbox SET action_code=action_code",
+        "DELETE FROM decision_projection_outbox", "TRUNCATE decision_projection_outbox",
+        "SELECT setval('decision_projection_outbox_sequence',1)",
       ]) await expect(runtime.query(sql)).rejects.toMatchObject({ code: "42501" });
     } finally {
       await runtime.end();
     }
-    await expect(owner!.query("TRUNCATE decision_events")).resolves.toBeDefined();
+    await expect(owner!.query("TRUNCATE decision_projection_outbox, decision_events")).resolves.toBeDefined();
     await workflow.moveAuthorizedApplicationStage(101, 2001, 2, null, randomUUID(), { allowPlatformAdmin: true });
     for (const sql of [
-      "UPDATE decision_events SET action_code=action_code", "DELETE FROM decision_events", "TRUNCATE decision_events",
+      "UPDATE decision_events SET action_code=action_code", "DELETE FROM decision_events",
+      "UPDATE decision_projection_outbox SET action_code=action_code",
+      "DELETE FROM decision_projection_outbox", "TRUNCATE decision_projection_outbox",
     ]) {
       await owner!.query("BEGIN");
-      await expect(owner!.query(sql)).rejects.toMatchObject({ code: "55000", message: "DECISION_EVENT_APPEND_ONLY" });
+      await expect(owner!.query(sql)).rejects.toMatchObject({
+        code: "55000",
+        message: sql.includes("projection_outbox") ? "DECISION_OUTBOX_APPEND_ONLY" : "DECISION_EVENT_APPEND_ONLY",
+      });
       await owner!.query("ROLLBACK");
     }
+    await expect(owner!.query("TRUNCATE decision_events")).rejects.toMatchObject({ code: "0A000" });
+    await expect(owner!.query("TRUNCATE decision_projection_outbox, decision_events"))
+      .rejects.toMatchObject({ code: "55000" });
   });
 
   it("lets minimized evidence outlive mutable rows but anchors organization deletion", async () => {
@@ -422,12 +446,13 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     await owner!.query("DELETE FROM jobs WHERE id=1001");
     await owner!.query("DELETE FROM organization_members WHERE organization_id=1");
     await owner!.query("DELETE FROM users WHERE id IN (101,301)");
-    expect((await owner!.query("SELECT COUNT(*)::integer n FROM decision_events")).rows[0]?.n).toBe(1);
+    expect((await owner!.query("SELECT COUNT(*)::integer events,(SELECT COUNT(*)::integer FROM decision_projection_outbox) intents FROM decision_events")).rows[0])
+      .toEqual({ events: 1, intents: 1 });
     await expect(owner!.query("DELETE FROM organizations WHERE id=1")).rejects.toMatchObject({ code: "23503" });
   });
 
   it("fails readiness on drift and converges migrations/provisioning without duplicates", async () => {
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0007", applied: 8 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
     const cases: Array<{ breakSql: string; restoreSql: string }> = [
       { breakSql: `GRANT SELECT ON decision_events TO ${new URL(runtimeUrl).username}`,
         restoreSql: `REVOKE SELECT ON decision_events FROM ${new URL(runtimeUrl).username}` },
@@ -437,12 +462,18 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
         restoreSql: "ALTER TABLE decision_events_missing RENAME TO decision_events" },
       { breakSql: "ALTER SEQUENCE decision_event_sequence RENAME TO decision_event_sequence_missing",
         restoreSql: "ALTER SEQUENCE decision_event_sequence_missing RENAME TO decision_event_sequence" },
+      { breakSql: "ALTER TABLE decision_projection_outbox DISABLE TRIGGER decision_projection_outbox_append_only",
+        restoreSql: "ALTER TABLE decision_projection_outbox ENABLE TRIGGER decision_projection_outbox_append_only" },
+      { breakSql: "ALTER TABLE decision_projection_outbox RENAME TO decision_projection_outbox_missing",
+        restoreSql: "ALTER TABLE decision_projection_outbox_missing RENAME TO decision_projection_outbox" },
+      { breakSql: "ALTER SEQUENCE decision_projection_outbox_sequence RENAME TO decision_projection_outbox_sequence_missing",
+        restoreSql: "ALTER SEQUENCE decision_projection_outbox_sequence_missing RENAME TO decision_projection_outbox_sequence" },
     ];
     for (const item of cases) {
       await owner!.query(item.breakSql);
       await expect(readinessAsRuntime()).rejects.toThrow();
       await owner!.query(item.restoreSql);
-      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0007", applied: 8 });
+      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
     }
     const noOp = await runReleaseMigration({
       migrationsDir,
@@ -454,7 +485,8 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       migrateUrl: migrationUrl, runtimeUrl, runtimeRole: new URL(runtimeUrl).username,
       expectedTargetId: targetId, connectMigration, connectRuntime,
     });
-    expect((await owner!.query("SELECT COUNT(*)::integer ledger FROM schema_control.applied")).rows[0]?.ledger).toBe(8);
+    expect((await owner!.query("SELECT COUNT(*)::integer ledger FROM schema_control.applied")).rows[0]?.ledger).toBe(currentLedger);
     expect((await owner!.query("SELECT COUNT(*)::integer n FROM decision_events")).rows[0]?.n).toBe(0);
+    expect((await owner!.query("SELECT COUNT(*)::integer n FROM decision_projection_outbox")).rows[0]?.n).toBe(0);
   });
 });

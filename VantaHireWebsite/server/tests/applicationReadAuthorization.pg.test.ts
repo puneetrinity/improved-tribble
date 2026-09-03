@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../schema-control/runner";
+import { loadManifest } from "../schema-control/manifest";
 import { provisionRuntimeRole } from "../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
@@ -12,6 +13,7 @@ const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1"
   && Boolean(migrationUrl)
   && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-object-authorization-test-target";
 
 type AuthorizationModule = typeof import("../lib/applicationReadAuthorization");
@@ -376,7 +378,7 @@ describe.skipIf(!enabled)("application read authorization exact-schema PostgreSQ
              to_regclass('public.resume_access_attempts')::text AS resume_audit
     `)).rows[0];
     expect(state).toEqual({
-      applied: 8,
+      applied: currentLedger,
       interview_type: "timestamp without time zone",
       privacy_columns: 10,
       resume_audit: "resume_access_attempts",

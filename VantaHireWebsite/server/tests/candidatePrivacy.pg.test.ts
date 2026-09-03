@@ -13,6 +13,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../schema-control/runner";
+import { loadManifest } from "../schema-control/manifest";
 import { sha256 } from "../schema-control/manifest";
 import { provisionRuntimeRole } from "../schema-control/runtimeRole";
 
@@ -22,6 +23,7 @@ const enabled = process.env.FLOW_SCHEMA_TEST_DISPOSABLE === "1"
   && Boolean(migrationUrl)
   && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-candidate-privacy-test-target";
 
 type Repository = typeof import("../candidate-privacy/repository");
@@ -241,7 +243,7 @@ describe.skipIf(!enabled)("candidate privacy disposable PostgreSQL", () => {
       expect(after.rows[0]).toEqual(before.rows[0]);
       expect((await migration.query(
         "SELECT COUNT(*)::integer AS applied FROM schema_control.applied",
-      )).rows[0]?.applied).toBe(8);
+      )).rows[0]?.applied).toBe(currentLedger);
     } finally {
       await migration.end();
       await runtime.end();

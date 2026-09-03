@@ -5,6 +5,7 @@ import {
   applications,
   applicationStageHistory,
   decisionEvents,
+  decisionProjectionOutbox,
   jobRecruiters,
   jobs,
   organizationMembers,
@@ -297,7 +298,8 @@ export async function moveAuthorizedApplicationStage(
                authorized_stage.stage_id,
                authorized_stage.stage_name,
                now() AS changed_at,
-               nextval('public.decision_event_sequence') AS event_sequence
+               nextval('public.decision_event_sequence') AS event_sequence,
+               nextval('public.decision_projection_outbox_sequence') AS delivery_sequence
           FROM locked_application
           INNER JOIN authorized_stage ON TRUE
          WHERE locked_application.current_stage IS DISTINCT FROM authorized_stage.stage_id
@@ -408,6 +410,59 @@ export async function moveAuthorizedApplicationStage(
             ON updated_application.application_id = transition.application_id
           INNER JOIN inserted_history ON inserted_history.inserted = 1
         RETURNING 1 AS inserted
+      ),
+      inserted_intent AS (
+        INSERT INTO ${decisionProjectionOutbox} (
+          event_id,
+          delivery_sequence,
+          source_event_sequence,
+          organization_id,
+          destination,
+          payload_schema_version,
+          source_system,
+          subject_type,
+          subject_id,
+          job_id,
+          action_code,
+          taxonomy_version,
+          rubric_id,
+          rubric_version,
+          rubric_approval_mode,
+          jd_digest_version,
+          recommendation_action,
+          reason_code,
+          before_state,
+          after_state,
+          occurred_at
+        )
+        SELECT ${eventId}::uuid,
+               transition.delivery_sequence,
+               transition.event_sequence,
+               transition.organization_id,
+               'memory.organization_decision_inbox.v1',
+               1,
+               'flow',
+               'application',
+               transition.application_id,
+               transition.job_id,
+               'application_stage_moved',
+               1,
+               NULL,
+               NULL,
+               NULL,
+               transition.jd_digest_version,
+               CASE
+                 WHEN transition.recommendation_action IN ('advance', 'hold', 'reject')
+                   THEN transition.recommendation_action
+                 ELSE NULL
+               END,
+               NULL,
+               jsonb_build_object('stage_id', transition.current_stage),
+               jsonb_build_object('stage_id', transition.stage_id),
+               transition.changed_at
+          FROM inserted_event
+          INNER JOIN transition ON inserted_event.inserted = 1
+        RETURNING 1 AS inserted
       )
       SELECT locked_application.application_id AS "applicationId",
              authorized_stage.stage_id AS "stageId",
@@ -422,8 +477,10 @@ export async function moveAuthorizedApplicationStage(
           ON updated_application.application_id IS NOT NULL
         LEFT JOIN inserted_event
           ON updated_application.application_id IS NOT NULL
+        LEFT JOIN inserted_intent
+          ON updated_application.application_id IS NOT NULL
        WHERE updated_application.application_id IS NULL
-          OR (inserted_history.inserted = 1 AND inserted_event.inserted = 1)
+          OR (inserted_history.inserted = 1 AND inserted_intent.inserted = 1)
     `);
     const rows = rowsFrom(result);
     if (rows.length === 0) return { ok: false, reason: "not_found" };

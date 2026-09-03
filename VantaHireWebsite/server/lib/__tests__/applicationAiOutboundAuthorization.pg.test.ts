@@ -4,12 +4,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../../schema-control/runner";
+import { loadManifest } from "../../schema-control/manifest";
 import { provisionRuntimeRole } from "../../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-object-authorization-test-target";
 
 type Module = typeof import("../applicationAiOutboundAuthorization");
@@ -196,13 +198,13 @@ describe.skipIf(!enabled)("application AI/outbound exact-schema PostgreSQL", () 
     if (safeTargetProven) await resetDatabase();
   });
 
-  it("keeps the shipped seven-migration schema unchanged", async () => {
+  it("keeps the shipped current-ledger schema unchanged", async () => {
     const row = (await owner!.query(`
       SELECT (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
              to_regclass('public.application_reviewer_notes')::text notes_relation,
              to_regclass('public.resume_access_attempts')::text resume_relation
     `)).rows[0];
-    expect(row).toEqual({ ledger: 7, notes_relation: "application_reviewer_notes", resume_relation: "resume_access_attempts" });
+    expect(row).toEqual({ ledger: currentLedger, notes_relation: "application_reviewer_notes", resume_relation: "resume_access_attempts" });
   });
 
   it("allows primary/co/admin summary context and collapses every unsafe boundary", async () => {

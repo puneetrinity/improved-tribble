@@ -346,6 +346,51 @@ export const decisionEvents = pgTable("decision_events", {
   stateChanged: check("decision_events_state_changed", sql`${table.beforeState}->'stage_id' IS DISTINCT FROM ${table.afterState}->'stage_id'`),
 }));
 
+// Wave 3B: independently ordered, append-only Memory projection intents.
+// Runtime receives INSERT/USAGE only; delivery state belongs to Wave 3C.
+export const decisionProjectionOutboxSequence = pgSequence("decision_projection_outbox_sequence", {
+  startWith: 1,
+  minValue: 1,
+});
+
+export const decisionProjectionOutbox = pgTable("decision_projection_outbox", {
+  eventId: uuid("event_id").primaryKey().references(() => decisionEvents.eventId, { onDelete: "restrict" }),
+  deliverySequence: bigint("delivery_sequence", { mode: "number" }).notNull(),
+  sourceEventSequence: bigint("source_event_sequence", { mode: "number" }).notNull(),
+  organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  destination: text("destination").notNull(),
+  payloadSchemaVersion: integer("payload_schema_version").notNull(),
+  sourceSystem: text("source_system").notNull(),
+  subjectType: text("subject_type").notNull(),
+  subjectId: integer("subject_id").notNull(),
+  jobId: integer("job_id").notNull(),
+  actionCode: text("action_code").notNull(),
+  taxonomyVersion: integer("taxonomy_version").notNull(),
+  rubricId: uuid("rubric_id"),
+  rubricVersion: integer("rubric_version"),
+  rubricApprovalMode: text("rubric_approval_mode"),
+  jdDigestVersion: integer("jd_digest_version"),
+  recommendationAction: text("recommendation_action"),
+  reasonCode: text("reason_code"),
+  beforeState: jsonb("before_state").notNull(),
+  afterState: jsonb("after_state").notNull(),
+  occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  deliverySequenceUnique: uniqueIndex("decision_projection_outbox_delivery_sequence_unique")
+    .on(table.deliverySequence),
+  sourceEventSequenceUnique: uniqueIndex("decision_projection_outbox_source_event_sequence_unique")
+    .on(table.sourceEventSequence),
+  organizationSequenceIdx: index("decision_projection_outbox_organization_sequence_idx")
+    .on(table.organizationId, table.deliverySequence),
+  destinationSequenceIdx: index("decision_projection_outbox_destination_sequence_idx")
+    .on(table.destination, table.deliverySequence),
+  stateChanged: check(
+    "decision_projection_outbox_state_changed",
+    sql`${table.beforeState}->'stage_id' IS DISTINCT FROM ${table.afterState}->'stage_id'`,
+  ),
+}));
+
 // ATS: Application feedback (for hiring managers)
 export const applicationFeedback = pgTable("application_feedback", {
   id: serial("id").primaryKey(),

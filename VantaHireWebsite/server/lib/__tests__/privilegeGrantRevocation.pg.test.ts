@@ -6,12 +6,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 
 import { runReleaseMigration, type MigrationClient } from "../../schema-control/runner";
+import { loadManifest } from "../../schema-control/manifest";
 import { provisionRuntimeRole } from "../../schema-control/runtimeRole";
 
 const migrationUrl = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
+const currentLedger = loadManifest(migrationsDir).length;
 const targetId = "flow-privilege-grant-revocation-test-target";
 
 type AuthorizationModule = typeof import("../privilegeGrantRevocation");
@@ -230,9 +232,9 @@ describe.skipIf(!enabled)("privilege grant/revocation exact-schema PostgreSQL", 
     if (preMigrationDir) rmSync(preMigrationDir, { recursive: true, force: true });
   });
 
-  it("applies ledger 7 and preserves the 2L-A classification without invented provenance", () => {
+  it("applies the current ledger and preserves the 2L-A classification without invented provenance", () => {
     expect(migrationEvidence).toEqual({
-      ledger: 7,
+      ledger: currentLedger,
       auth_version: 1,
       authority_origin: "legacy_unknown",
       self_created_by_user_id: null,

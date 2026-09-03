@@ -53,17 +53,20 @@ describe("runtime-role provisioning controls", () => {
     expect(safe).not.toContain("password=clear");
   });
 
-  it("keeps the decision-event exception exact and bounded", () => {
-    expect(runtimeRoleSource).toContain("c.relname='decision_events'");
+  it("keeps both immutable decision-write exceptions exact and bounded", () => {
+    expect(runtimeRoleSource).toContain("c.relname IN ('decision_events','decision_projection_outbox')");
     expect(runtimeRoleSource).toContain("has_table_privilege($1,c.oid,'INSERT')");
     for (const privilege of ["SELECT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
       expect(runtimeRoleSource).toContain(`NOT has_table_privilege($1,c.oid,'${privilege}')`);
     }
-    expect(runtimeRoleSource).toContain("c.relname='decision_event_sequence'");
+    expect(runtimeRoleSource).toContain("c.relname IN ('decision_event_sequence','decision_projection_outbox_sequence')");
     expect(runtimeRoleSource).toContain("has_sequence_privilege($1,c.oid,'USAGE')");
     expect(runtimeRoleSource).toContain("NOT has_sequence_privilege($1,c.oid,'SELECT')");
     expect(runtimeRoleSource).toContain("NOT has_sequence_privilege($1,c.oid,'UPDATE')");
     expect(runtimeRoleSource).toContain(`GRANT INSERT ON TABLE ${"${DECISION_EVENT_TABLE}"} TO ${"${ident}"}`);
     expect(runtimeRoleSource).toContain(`GRANT USAGE ON SEQUENCE ${"${DECISION_EVENT_SEQUENCE}"} TO ${"${ident}"}`);
+    expect(runtimeRoleSource).toContain(`GRANT INSERT ON TABLE ${"${DECISION_OUTBOX_TABLE}"} TO ${"${ident}"}`);
+    expect(runtimeRoleSource).toContain(`GRANT USAGE ON SEQUENCE ${"${DECISION_OUTBOX_SEQUENCE}"} TO ${"${ident}"}`);
+    expect(runtimeRoleSource).toContain("Decision-outbox table/sequence presence is inconsistent.");
   });
 });
