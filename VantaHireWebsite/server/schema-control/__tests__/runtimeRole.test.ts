@@ -53,7 +53,7 @@ describe("runtime-role provisioning controls", () => {
     expect(safe).not.toContain("password=clear");
   });
 
-  it("keeps both immutable decision-write exceptions exact and bounded", () => {
+  it("keeps immutable writes and mutable delivery functions exact and bounded", () => {
     expect(runtimeRoleSource).toContain("c.relname IN ('decision_events','decision_projection_outbox')");
     expect(runtimeRoleSource).toContain("has_table_privilege($1,c.oid,'INSERT')");
     for (const privilege of ["SELECT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]) {
@@ -68,5 +68,15 @@ describe("runtime-role provisioning controls", () => {
     expect(runtimeRoleSource).toContain(`GRANT INSERT ON TABLE ${"${DECISION_OUTBOX_TABLE}"} TO ${"${ident}"}`);
     expect(runtimeRoleSource).toContain(`GRANT USAGE ON SEQUENCE ${"${DECISION_OUTBOX_SEQUENCE}"} TO ${"${ident}"}`);
     expect(runtimeRoleSource).toContain("Decision-outbox table/sequence presence is inconsistent.");
+    expect(runtimeRoleSource).toContain("c.relname = 'decision_projection_delivery_state'");
+    expect(runtimeRoleSource).toContain(`REVOKE ALL PRIVILEGES ON TABLE ${"${DECISION_DELIVERY_TABLE}"} FROM ${"${ident}"}`);
+    for (const signature of [
+      "claim_decision_projection_delivery(integer,integer)",
+      "ack_decision_projection_delivery(uuid,uuid,bigint,bigint,text)",
+      "fail_decision_projection_delivery(uuid,uuid,bigint,text,boolean,integer)",
+    ]) {
+      expect(runtimeRoleSource).toContain(signature);
+    }
+    expect(runtimeRoleSource).toContain("Decision-delivery table/function presence is inconsistent.");
   });
 });

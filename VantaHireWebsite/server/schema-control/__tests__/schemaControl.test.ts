@@ -255,6 +255,7 @@ describe("read-only readiness", () => {
     expect(observedSql).toContain("NOT has_schema_privilege(current_user, 'public', 'CREATE')");
     expect(observedSql).toContain("pg_has_role");
     expect(observedSql).toContain("c.relname IN ('decision_events','decision_projection_outbox')");
+    expect(observedSql).toContain("c.relname = 'decision_projection_delivery_state'");
     expect(observedSql).toContain("c.relname IN ('decision_event_sequence','decision_projection_outbox_sequence')");
     expect(observedSql).toContain("NOT has_table_privilege(current_user, c.oid, 'SELECT')");
     expect(observedSql).toContain("NOT has_sequence_privilege(current_user, c.oid, 'UPDATE')");
@@ -306,6 +307,26 @@ describe("read-only readiness", () => {
     expect(observedSql).toContain("decision_projection_outbox_truncate_append_only");
     expect(observedSql.trimStart()).toMatch(/^SELECT\b/i);
     await expect(check({ query: async () => ({ rows: [{ ok: false }] }) })).resolves.toBe(false);
+  });
+
+  it("checks the delivery relation, three fenced functions, and exact runtime ACL read-only", async () => {
+    const check = FLOW_CRITICAL_POSTCONDITIONS.find(
+      (postcondition) => postcondition.name === "Decision-projection delivery functions and runtime boundary are exact",
+    )!.check;
+    let observedSql = "";
+    const pg: PgLike = {
+      async query(text: string) {
+        observedSql = text;
+        return { rows: [{ ok: true }] };
+      },
+    };
+    await expect(check(pg)).resolves.toBe(true);
+    expect(observedSql).toContain("to_regclass('public.decision_projection_delivery_state')");
+    expect(observedSql).toContain("claim_decision_projection_delivery(integer,integer)");
+    expect(observedSql).toContain("ack_decision_projection_delivery(uuid,uuid,bigint,bigint,text)");
+    expect(observedSql).toContain("fail_decision_projection_delivery(uuid,uuid,bigint,text,boolean,integer)");
+    expect(observedSql).toContain("NOT has_table_privilege(current_user,'public.decision_projection_delivery_state','SELECT')");
+    expect(observedSql).toContain("p.prosecdef");
   });
 
   function fakePg(rows: {

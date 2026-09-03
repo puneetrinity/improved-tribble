@@ -213,7 +213,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
         },
         connect: connectMigration,
       });
-      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0008") {
+      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0009") {
         throw new Error("Disposable workflow per-test schema rebuild refused.");
       }
       await provisionRuntimeRole({

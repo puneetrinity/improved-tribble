@@ -43,6 +43,7 @@ const FLOW_CORE_RELATIONS = [
   "public.talent_pool_membership_events",
   "public.decision_events",
   "public.decision_projection_outbox",
+  "public.decision_projection_delivery_state",
 ] as const;
 
 /** Minimum catalog facts every Flow web/worker process requires to start. */
@@ -162,6 +163,47 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
     },
   },
   {
+    name: "Decision-projection delivery functions and runtime boundary are exact",
+    async check(pg) {
+      const result = await pg.query(`
+        SELECT
+          to_regclass('public.decision_projection_delivery_state') IS NOT NULL
+          AND (
+            SELECT COUNT(*)=3
+              FROM unnest(ARRAY[
+                'public.claim_decision_projection_delivery(integer,integer)',
+                'public.ack_decision_projection_delivery(uuid,uuid,bigint,bigint,text)',
+                'public.fail_decision_projection_delivery(uuid,uuid,bigint,text,boolean,integer)'
+              ]::text[]) AS expected(signature)
+             WHERE to_regprocedure(expected.signature) IS NOT NULL
+          )
+          AND NOT has_table_privilege(current_user,'public.decision_projection_delivery_state','SELECT')
+          AND NOT has_table_privilege(current_user,'public.decision_projection_delivery_state','INSERT')
+          AND NOT has_table_privilege(current_user,'public.decision_projection_delivery_state','UPDATE')
+          AND NOT has_table_privilege(current_user,'public.decision_projection_delivery_state','DELETE')
+          AND NOT has_table_privilege(current_user,'public.decision_projection_delivery_state','TRUNCATE')
+          AND has_function_privilege(current_user,'public.claim_decision_projection_delivery(integer,integer)','EXECUTE')
+          AND has_function_privilege(current_user,'public.ack_decision_projection_delivery(uuid,uuid,bigint,bigint,text)','EXECUTE')
+          AND has_function_privilege(current_user,'public.fail_decision_projection_delivery(uuid,uuid,bigint,text,boolean,integer)','EXECUTE')
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+             WHERE n.nspname='public'
+               AND p.proname IN (
+                 'claim_decision_projection_delivery',
+                 'ack_decision_projection_delivery',
+                 'fail_decision_projection_delivery'
+               )
+               AND (
+                 NOT p.prosecdef
+                 OR p.proconfig <> ARRAY['search_path=pg_catalog, public']::text[]
+                 OR pg_has_role(current_user, pg_get_userbyid(p.proowner), 'MEMBER')
+               )
+          ) AS ok
+      `);
+      return result.rows[0]?.ok === true;
+    },
+  },
+  {
     name: "Runtime role has application rights without DDL or ownership authority",
     async check(pg) {
       // ACL/owner names are environment-owned and intentionally excluded from
@@ -233,7 +275,18 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  )
                  OR
                  (
-                   c.relname NOT IN ('decision_events','decision_projection_outbox')
+                   c.relname = 'decision_projection_delivery_state'
+                   AND NOT has_table_privilege(current_user, c.oid, 'SELECT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'INSERT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'UPDATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'DELETE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'REFERENCES')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
+                 )
+                 OR
+                 (
+                   c.relname NOT IN ('decision_events','decision_projection_outbox','decision_projection_delivery_state')
                    AND has_table_privilege(current_user, c.oid, 'SELECT')
                    AND has_table_privilege(current_user, c.oid, 'INSERT')
                    AND has_table_privilege(current_user, c.oid, 'UPDATE')

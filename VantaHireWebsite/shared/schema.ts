@@ -391,6 +391,40 @@ export const decisionProjectionOutbox = pgTable("decision_projection_outbox", {
   ),
 }));
 
+// Wave 3C: mutable delivery state is deliberately separate from immutable
+// projection intents. Absence means never claimed/pending; runtime access is
+// exclusively through generation-fenced SECURITY DEFINER functions.
+export const decisionProjectionDeliveryState = pgTable("decision_projection_delivery_state", {
+  eventId: uuid("event_id").primaryKey()
+    .references(() => decisionProjectionOutbox.eventId, { onDelete: "restrict" }),
+  state: text("state").notNull(),
+  attemptCount: integer("attempt_count").notNull(),
+  leaseGeneration: bigint("lease_generation", { mode: "number" }).notNull(),
+  leaseToken: uuid("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  availableAt: timestamp("available_at", { withTimezone: true }).notNull(),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  terminalAt: timestamp("terminal_at", { withTimezone: true }),
+  lastErrorCode: text("last_error_code"),
+  receiverStatus: text("receiver_status"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+}, (table) => ({
+  eligibilityIdx: index("decision_projection_delivery_state_eligibility_idx")
+    .on(table.state, table.availableAt),
+  stateCheck: check(
+    "decision_projection_delivery_state_state_check",
+    sql`${table.state} IN ('leased','retry','acknowledged','terminal')`,
+  ),
+  attemptCountCheck: check(
+    "decision_projection_delivery_state_attempt_count_check",
+    sql`${table.attemptCount} BETWEEN 1 AND 20`,
+  ),
+  generationCheck: check(
+    "decision_projection_delivery_state_generation_check",
+    sql`${table.leaseGeneration} > 0`,
+  ),
+}));
+
 // ATS: Application feedback (for hiring managers)
 export const applicationFeedback = pgTable("application_feedback", {
   id: serial("id").primaryKey(),
