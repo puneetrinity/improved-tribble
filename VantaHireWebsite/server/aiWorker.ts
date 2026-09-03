@@ -48,6 +48,11 @@ import {
   requireCandidatePrivacyAllowed,
 } from './candidate-privacy/decision';
 import { assertCandidatePrivacyRuntimeConfig } from './candidate-privacy/config';
+import { assertDecisionProjectionDeliveryRuntimeConfig } from './decision-projection/config';
+import {
+  startDecisionProjectionProcessor,
+  stopDecisionProjectionProcessor,
+} from './decision-projection/processor';
 
 // Summary batch result types
 interface SummaryBatchResultItem {
@@ -867,6 +872,7 @@ async function processSummaryBatchJob(job: Job<SummaryBatchJobData>): Promise<Su
 async function shutdown(signal: string): Promise<void> {
   console.log(`[AI Worker] Received ${signal}, shutting down...`);
 
+  await stopDecisionProjectionProcessor();
   // Workers will be closed via aiQueue.closeQueues() SIGTERM handler
   await pool?.end?.();
   process.exit(0);
@@ -881,6 +887,7 @@ const REDIS_NAMESPACE = process.env.NODE_ENV || 'development';
 // Main entry
 async function main(): Promise<void> {
   assertCandidatePrivacyRuntimeConfig();
+  assertDecisionProjectionDeliveryRuntimeConfig();
   console.log('[AI Worker] Starting AI worker...');
   console.log(`[AI Worker] Interactive concurrency: ${INTERACTIVE_CONCURRENCY}`);
   console.log(`[AI Worker] Batch concurrency: ${BATCH_CONCURRENCY}`);
@@ -995,6 +1002,8 @@ async function main(): Promise<void> {
   } else {
     console.log('[AI Worker] Sourcing refresh worker disabled');
   }
+
+  startDecisionProjectionProcessor();
 
   console.log('[AI Worker] Workers started, waiting for jobs...');
 }

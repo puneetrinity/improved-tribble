@@ -941,7 +941,7 @@ function validateKernel(root, problems) {
   } else if (sha256(migration) !== migrationLock.migrations["0002"]) {
     problems.push("resume audit migration checksum does not match migration 0002.");
   }
-  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0009_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]'])
+  for (const anchor of ["0002_resume_access_attempts.sql", 'const file = `0010_${name}.sql`', 'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009"]'])
     requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2E anchor: ${anchor}`);
   requireAnchor(problems, schemaGuardTest, "0002_resume_access_attempts.sql", "schema guard no longer freezes migration 0002.");
 
@@ -1148,8 +1148,8 @@ function validateReviewerShareAuthority(root, problems) {
   ]) requireAnchor(problems, schema, anchor, `reviewer/share Drizzle schema anchor is missing: ${anchor}`);
 
   for (const anchor of [
-    'const file = `0009_${name}.sql`', '"0004_reviewer_share_authority.sql"',
-    'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]',
+    'const file = `0010_${name}.sql`', '"0004_reviewer_share_authority.sql"',
+    'applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009"]',
   ]) requireAnchor(problems, schemaControlTest, anchor, `schema-control integration lost 2I anchor: ${anchor}`);
 
   requireAnchor(problems, formsClient, "return template.canManage", "forms UI does not consume server-derived canManage.");
@@ -1994,6 +1994,9 @@ function validateDecisionEventSpine(root, problems) {
     "NOT has_sequence_privilege($1,c.oid,'SELECT')", "NOT has_sequence_privilege($1,c.oid,'UPDATE')",
     "GRANT INSERT ON TABLE ${DECISION_EVENT_TABLE}", "GRANT USAGE ON SEQUENCE ${DECISION_EVENT_SEQUENCE}",
   ]) requireAnchor(problems, runtimeRole, anchor, `decision-event runtime-role anchor is missing: ${anchor}`);
+  if (count(runtimeRole, "NOT has_table_privilege($1,c.oid,'SELECT')") !== 2) {
+    problems.push("decision-event runtime-role anchor is missing: NOT has_table_privilege($1,c.oid,'SELECT')");
+  }
   for (const anchor of [
     '"public.decision_events"', "to_regclass('public.decision_event_sequence')",
     "decision_events_append_only", "decision_events_truncate_append_only",
@@ -2011,7 +2014,7 @@ function validateDecisionEventSpine(root, problems) {
     requireAnchor(problems, ci, `npm run ${script}`, `decision-event CI step is missing: ${script}`);
   }
   for (const anchor of [
-    "pre0007Manifest", "upgrade.applied.join(\",\") !== \"0007,0008\"", "readinessAsRuntime",
+    "pre0007Manifest", "upgrade.applied.join(\",\") !== \"0007,0008,0009\"", "readinessAsRuntime",
     "same-stage a zero-write", "event insert fails", "history insertion fails", "concurrent moves",
     "runtime insert-only ACL", "evidence-preserving owner guards", "minimized evidence outlive mutable rows",
   ]) requireAnchor(problems, pgTest, anchor, `decision-event PostgreSQL lifecycle anchor is missing: ${anchor}`);
@@ -2120,6 +2123,112 @@ function validateDecisionProjectionOutbox(root, problems) {
   ]) requireAnchor(problems, pgTest, anchor, `decision-projection PostgreSQL lifecycle anchor is missing: ${anchor}`);
 }
 
+function validateDecisionProjectionDelivery(root, problems) {
+  const migration = read(root, "server/schema-migrations/0009_decision_projection_delivery_state.sql");
+  const lock = JSON.parse(read(root, "server/schema-migrations/checksums.lock"));
+  const schema = read(root, "shared/schema.ts");
+  const runtimeRole = read(root, "server/schema-control/runtimeRole.ts");
+  const readiness = read(root, "server/schema-control/readiness.ts");
+  const aiWorker = read(root, "server/aiWorker.ts");
+  const web = read(root, "server/index.ts");
+  const worker = read(root, "server/worker.ts");
+  const config = read(root, "server/decision-projection/config.ts");
+  const models = read(root, "server/decision-projection/models.ts");
+  const repository = read(root, "server/decision-projection/repository.ts");
+  const client = read(root, "server/decision-projection/memory-client.ts");
+  const processor = read(root, "server/decision-projection/processor.ts");
+  const packageJson = read(root, "package.json");
+  const ci = read(root, "../.github/workflows/ci.yml");
+  const pgTest = read(root, "server/lib/__tests__/decisionProjectionDelivery.pg.test.ts");
+
+  for (const anchor of [
+    "CREATE TABLE public.decision_projection_delivery_state",
+    "REFERENCES public.decision_projection_outbox(event_id) ON DELETE RESTRICT",
+    "claim_decision_projection_delivery", "ack_decision_projection_delivery",
+    "fail_decision_projection_delivery", "FOR UPDATE OF candidate SKIP LOCKED",
+    "earlier.organization_id = candidate.organization_id",
+    "COALESCE(earlier_state.state, 'pending') <> 'acknowledged'",
+    "SECURITY DEFINER", "SET search_path = pg_catalog, public",
+    "REVOKE ALL ON FUNCTION public.claim_decision_projection_delivery",
+  ]) requireAnchor(problems, migration, anchor, `decision-delivery migration anchor is missing: ${anchor}`);
+  if (count(migration, "CREATE FUNCTION public.") !== 3) {
+    problems.push("decision delivery must define exactly three database functions.");
+  }
+  if (!/^[a-f0-9]{64}$/.test(lock?.migrations?.["0009"] ?? "")
+      || sha256(migration) !== lock.migrations["0009"]) {
+    problems.push("decision-delivery migration checksum does not match migration 0009.");
+  }
+  if (/\b(?:candidate_name|canonical_candidate|signal_candidate|email|phone|resume|notes|narrative|free_text|response_body|error_text)\b/i.test(
+    migration.replace(/COMMENT ON[\s\S]*$/m, ""),
+  )) problems.push("decision delivery state persists payload, identity, free text, or raw errors.");
+
+  for (const anchor of [
+    'pgTable("decision_projection_delivery_state"', 'eventId: uuid("event_id").primaryKey()',
+    'state: text("state").notNull()', "decision_projection_delivery_state_eligibility_idx",
+  ]) requireAnchor(problems, schema, anchor, `decision-delivery schema mapping is missing: ${anchor}`);
+  for (const anchor of [
+    "DECISION_DELIVERY_TABLE", "DECISION_DELIVERY_FUNCTIONS",
+    "REVOKE ALL PRIVILEGES ON TABLE ${DECISION_DELIVERY_TABLE}",
+    "GRANT EXECUTE ON FUNCTION ${signature}",
+  ]) requireAnchor(problems, runtimeRole, anchor, `decision-delivery runtime-role anchor is missing: ${anchor}`);
+  for (const anchor of [
+    '"public.decision_projection_delivery_state"',
+    "Decision-projection delivery functions and runtime boundary are exact",
+    "NOT has_table_privilege(current_user,'public.decision_projection_delivery_state','SELECT')",
+    "p.prosecdef",
+  ]) requireAnchor(problems, readiness, anchor, `decision-delivery readiness anchor is missing: ${anchor}`);
+
+  for (const anchor of [
+    "DECISION_PROJECTION_DELIVERY_ENABLED", "batchSize", "concurrency", "maxAttempts",
+  ]) requireAnchor(problems, config, anchor, `decision-delivery config anchor is missing: ${anchor}`);
+  for (const anchor of [
+    ".strict()", "payload_schema_version", "application_stage_moved", "rubric reference must be complete",
+  ]) requireAnchor(problems, models, anchor, `decision-delivery model anchor is missing: ${anchor}`);
+  for (const anchor of [
+    "claim_decision_projection_delivery($1,$2)", "ack_decision_projection_delivery($1,$2,$3,$4,$5)",
+    "fail_decision_projection_delivery($1,$2,$3,$4,$5,$6)",
+  ]) requireAnchor(problems, repository, anchor, `decision-delivery repository anchor is missing: ${anchor}`);
+  if (/\b(?:select|insert|update|delete)\s+[^\n]*decision_projection_(?:outbox|delivery_state)/i.test(repository)) {
+    problems.push("decision-delivery repository bypasses the three-function capability boundary.");
+  }
+  for (const anchor of [
+    'scopes: "decision-history:write"', "tenantId: `org_${claim.envelope.organization_id}`",
+    'redirect: "error"', "AbortSignal.timeout(timeoutMs)", "MAX_RESPONSE_BYTES",
+  ]) requireAnchor(problems, client, anchor, `decision-delivery Memory client anchor is missing: ${anchor}`);
+  for (const anchor of [
+    "if (!config.enabled) return", "config.batchSize", "config.concurrency",
+    "setInterval(tick, config.pollMs)", "stopDecisionProjectionProcessor",
+  ]) requireAnchor(problems, processor, anchor, `decision-delivery processor anchor is missing: ${anchor}`);
+  if (count(processor, "if (!config.enabled) return") !== 2) {
+    problems.push("decision-delivery processor anchor is missing: if (!config.enabled) return");
+  }
+
+  for (const source of [config, models, repository, client, processor]) {
+    if (/(?:from\s+|import\s*)["'][^"']*(?:provider|email|whatsapp|queue|cashfree|candidate-privacy|global-memory)/i.test(source)) {
+      problems.push("decision-delivery module imports a forbidden provider, queue, candidate, or legacy path.");
+    }
+  }
+  for (const source of [web, worker]) {
+    if (/decision-projection|DECISION_PROJECTION_DELIVERY_ENABLED/.test(source)) {
+      problems.push("decision delivery is wired outside the AI-worker entrypoint.");
+    }
+  }
+  for (const anchor of [
+    'from \'./decision-projection/processor\'', "startDecisionProjectionProcessor()",
+    "await stopDecisionProjectionProcessor()",
+  ]) requireAnchor(problems, aiWorker, anchor, `AI-worker delivery wiring is missing: ${anchor}`);
+
+  for (const anchor of [
+    '"test:decision-projection-delivery:pg"', "decisionProjectionDelivery.pg.test.ts",
+  ]) requireAnchor(problems, packageJson, anchor, `decision-delivery package script is missing: ${anchor}`);
+  requireAnchor(problems, ci, "npm run test:decision-projection-delivery:pg",
+    "decision-delivery CI step is missing.");
+  for (const anchor of [
+    "pre0009Manifest", "without any direct delivery-relation privilege", "same-org order",
+    "fences every stale generation", "bounded retry and terminal truth", "ACL drift",
+  ]) requireAnchor(problems, pgTest, anchor, `decision-delivery PostgreSQL lifecycle anchor is missing: ${anchor}`);
+}
+
 function manifestFrozenRouteBlocks(root) {
   const manifest = JSON.parse(readFileSync(join(root, "server/object-authorization/surfaces.json"), "utf8"));
   return Array.isArray(manifest.frozen_route_blocks) ? manifest.frozen_route_blocks : [];
@@ -2150,8 +2259,8 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 10) {
     problems.push("exactly ten resume/application/consultant/attribution registrations must be retired.");
   }
-  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 97) {
-    problems.push("exactly ninety-seven authorization files must be governed.");
+  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 102) {
+    problems.push("exactly one hundred two authorization files must be governed.");
   }
 
   for (const [path, reader] of [
@@ -2331,6 +2440,9 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
     "server/lib/__tests__/decisionEventSpine.pg.test.ts",
     "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
+    "server/decision-projection/config.ts", "server/decision-projection/models.ts",
+    "server/decision-projection/repository.ts", "server/decision-projection/memory-client.ts",
+    "server/decision-projection/processor.ts",
   ]) {
     if (!governedPaths.has(file)) problems.push(`membership-scoped governed file is missing: ${file}`);
   }
@@ -2362,6 +2474,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
     validateUnsafeOrgAttributionRetirement(root, problems);
     validateDecisionEventSpine(root, problems);
     validateDecisionProjectionOutbox(root, problems);
+    validateDecisionProjectionDelivery(root, problems);
   } catch (error) {
     problems.push(`object authorization static contract could not be checked: ${error.constructor.name}`);
   }

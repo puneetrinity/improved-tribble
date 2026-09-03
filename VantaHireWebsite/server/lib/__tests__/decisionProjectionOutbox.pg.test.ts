@@ -126,7 +126,7 @@ async function rebuildCurrent(): Promise<void> {
     creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
     connect: connectMigration,
   });
-  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0008") {
+  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0009") {
     throw new Error("Disposable 3B current-ledger rebuild refused.");
   }
   await provision();
@@ -207,14 +207,14 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    expect(upgraded.applied).toEqual(["0008"]);
+    expect(upgraded.applied).toEqual(["0008", "0009"]);
     pre0008EventStayedUnprojected = (await owner.query(
       "SELECT COUNT(*)::integer events,(SELECT COUNT(*)::integer FROM decision_projection_outbox) intents FROM decision_events",
     )).rows[0]?.events === 1 && (await owner.query("SELECT COUNT(*)::integer n FROM decision_projection_outbox")).rows[0]?.n === 0;
 
-    await expect(readinessAsRuntime()).rejects.toThrow(/Runtime role has application rights/);
+    await expect(readinessAsRuntime()).rejects.toThrow(/Decision-projection delivery functions and runtime boundary/);
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
     process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     workflow = await import("../applicationWorkflowAuthorization");
@@ -235,7 +235,7 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
     if (pre0008Dir) rmSync(pre0008Dir, { recursive: true, force: true });
   });
 
-  it("installs ledger 9 exactly and never backfills pre-0008 events", async () => {
+  it("installs ledger 10 exactly and never backfills pre-0008 events", async () => {
     expect(pre0008EventStayedUnprojected).toBe(true);
     const facts = (await owner!.query(`SELECT
       (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
@@ -375,10 +375,13 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
     } finally {
       await runtime.end();
     }
-    await expect(owner!.query("TRUNCATE decision_projection_outbox")).resolves.toBeDefined();
+    await expect(owner!.query(
+      "TRUNCATE decision_projection_delivery_state, decision_projection_outbox",
+    )).resolves.toBeDefined();
     await workflow.moveAuthorizedApplicationStage(101, 2001, 2, null, randomUUID(), { allowPlatformAdmin: true });
     for (const statement of ["UPDATE decision_projection_outbox SET action_code=action_code",
-      "DELETE FROM decision_projection_outbox", "TRUNCATE decision_projection_outbox"]) {
+      "DELETE FROM decision_projection_outbox",
+      "TRUNCATE decision_projection_delivery_state, decision_projection_outbox"]) {
       await owner!.query("BEGIN");
       await expect(owner!.query(statement)).rejects.toMatchObject({ code: "55000", message: "DECISION_OUTBOX_APPEND_ONLY" });
       await owner!.query("ROLLBACK");
@@ -398,7 +401,7 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
   });
 
   it("fails readiness on every outbox drift and converges without duplicates", async () => {
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
     const role = new URL(runtimeUrl).username;
     const cases = [
       { breakSql: `GRANT SELECT ON decision_projection_outbox TO ${role}`,
@@ -414,7 +417,7 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
       await owner!.query(item.breakSql);
       await expect(readinessAsRuntime()).rejects.toThrow();
       await owner!.query(item.restoreSql);
-      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
+      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
     }
     const migration = await runReleaseMigration({
       migrationsDir,

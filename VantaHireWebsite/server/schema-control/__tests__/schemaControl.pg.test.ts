@@ -92,11 +92,12 @@ function withForwardMigration(name: string, sql: string): string {
     "0006_versioned_invitation_grants.sql",
     "0007_decision_event_spine.sql",
     "0008_decision_projection_outbox.sql",
+    "0009_decision_projection_delivery_state.sql",
     "catalog.lock.json",
   ]) {
     copyFileSync(join(migrationsDir, file), join(dir, file));
   }
-  const file = `0009_${name}.sql`;
+  const file = `0010_${name}.sql`;
   writeFileSync(join(dir, file), sql);
   const catalogBytes = readFileSync(join(dir, "catalog.lock.json"));
   const currentLock = JSON.parse(readFileSync(join(migrationsDir, "checksums.lock"), "utf8")) as {
@@ -117,7 +118,8 @@ function withForwardMigration(name: string, sql: string): string {
         "0006": currentLock.migrations["0006"],
         "0007": currentLock.migrations["0007"],
         "0008": currentLock.migrations["0008"],
-        "0009": sha256(sql),
+        "0009": currentLock.migrations["0009"],
+        "0010": sha256(sql),
       },
     }, null, 2)}\n`,
   );
@@ -250,7 +252,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
 
   it("installs the exact baseline once and repeats as a no-op", async () => {
     const first = await runReleaseMigration({ migrationsDir, creds: credentials(), connect });
-    expect(first).toEqual({ identityMode: "fresh", applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"] });
+    expect(first).toEqual({ identityMode: "fresh", applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009"] });
 
     const second = await runReleaseMigration({ migrationsDir, creds: credentials(), connect });
     expect(second).toEqual({ identityMode: "adopted", applied: [] });
@@ -270,6 +272,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0006", apply_mode: "adopted" },
         { version: "0007", apply_mode: "adopted" },
         { version: "0008", apply_mode: "adopted" },
+        { version: "0009", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +
@@ -458,7 +461,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       creds: credentials(),
       connect,
     });
-    expect(upgraded.applied).toEqual(["0009"]);
+    expect(upgraded.applied).toEqual(["0010"]);
     const repeat = await runReleaseMigration({
       migrationsDir: upgradeDir,
       creds: credentials(),
@@ -472,11 +475,11 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       runReleaseMigration({ migrationsDir, creds: credentials(), connect, lockWaitMs: 120_000 }),
       runReleaseMigration({ migrationsDir, creds: credentials(), connect, lockWaitMs: 120_000 }),
     ]);
-    expect([...a.applied, ...b.applied]).toEqual(["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]);
+    expect([...a.applied, ...b.applied]).toEqual(["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009"]);
     const client = await directClient();
     try {
       const applied = await client.query("SELECT COUNT(*)::integer AS n FROM schema_control.applied");
-      expect(applied.rows[0]?.n).toBe(9);
+      expect(applied.rows[0]?.n).toBe(10);
       const runs = await client.query(
         "SELECT COUNT(*)::integer AS n, COUNT(*) FILTER (WHERE outcome='success')::integer AS success FROM schema_control.run",
       );
@@ -502,7 +505,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         "SELECT to_regclass('public.should_rollback') AS leaked, " +
           "(SELECT COUNT(*)::integer FROM schema_control.applied) AS applied",
       );
-      expect(state.rows[0]).toEqual({ leaked: null, applied: 9 });
+      expect(state.rows[0]).toEqual({ leaked: null, applied: 10 });
       await expect(
         assertSchemaReady({
           pg: { query: (text, params) => client.query(text, params as any) },
@@ -656,7 +659,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         },
         connect,
       });
-      expect(privacyUpgrade).toEqual({ identityMode: "adopted", applied: ["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"] });
+      expect(privacyUpgrade).toEqual({ identityMode: "adopted", applied: ["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009"] });
       const preReconciliationRuntime = await runtimeClient();
       try {
         await preReconciliationRuntime.query("BEGIN READ ONLY");
@@ -666,7 +669,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
           environment: "production",
           expectedTargetId: adoptedTarget,
           criticalPostconditions: FLOW_CRITICAL_POSTCONDITIONS,
-        })).rejects.toThrow(/Runtime role has application rights/);
+        })).rejects.toThrow(/Decision-projection delivery functions and runtime boundary/);
         await preReconciliationRuntime.query("ROLLBACK");
       } finally {
         await preReconciliationRuntime.end();
@@ -705,7 +708,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         },
         connect,
       });
-      expect(forward).toEqual({ identityMode: "adopted", applied: ["0009"] });
+      expect(forward).toEqual({ identityMode: "adopted", applied: ["0010"] });
 
       const runtime = await runtimeClient();
       try {
@@ -717,7 +720,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
           expectedTargetId: adoptedTarget,
           criticalPostconditions: FLOW_CRITICAL_POSTCONDITIONS,
         });
-        expect(ready).toEqual({ version: "0009", applied: 10 });
+        expect(ready).toEqual({ version: "0010", applied: 11 });
         await runtime.query("ROLLBACK");
 
         // Readiness proves privileges catalogically. Positive execution proves

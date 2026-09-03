@@ -47,6 +47,12 @@ const DECISION_EVENT_TABLE = "public.decision_events";
 const DECISION_EVENT_SEQUENCE = "public.decision_event_sequence";
 const DECISION_OUTBOX_TABLE = "public.decision_projection_outbox";
 const DECISION_OUTBOX_SEQUENCE = "public.decision_projection_outbox_sequence";
+const DECISION_DELIVERY_TABLE = "public.decision_projection_delivery_state";
+const DECISION_DELIVERY_FUNCTIONS = [
+  "public.claim_decision_projection_delivery(integer,integer)",
+  "public.ack_decision_projection_delivery(uuid,uuid,bigint,bigint,text)",
+  "public.fail_decision_projection_delivery(uuid,uuid,bigint,text,boolean,integer)",
+] as const;
 
 function connectionTarget(raw: string): ConnectionTarget {
   try {
@@ -216,7 +222,18 @@ export async function assertRuntimeRoleContract(
               )
               OR
               (
-                c.relname NOT IN ('decision_events','decision_projection_outbox')
+                c.relname = 'decision_projection_delivery_state'
+                AND NOT has_table_privilege($1,c.oid,'SELECT')
+                AND NOT has_table_privilege($1,c.oid,'INSERT')
+                AND NOT has_table_privilege($1,c.oid,'UPDATE')
+                AND NOT has_table_privilege($1,c.oid,'DELETE')
+                AND NOT has_table_privilege($1,c.oid,'TRUNCATE')
+                AND NOT has_table_privilege($1,c.oid,'REFERENCES')
+                AND NOT has_table_privilege($1,c.oid,'TRIGGER')
+              )
+              OR
+              (
+                c.relname NOT IN ('decision_events','decision_projection_outbox','decision_projection_delivery_state')
                 AND has_table_privilege($1,c.oid,'SELECT')
                 AND has_table_privilege($1,c.oid,'INSERT')
                 AND has_table_privilege($1,c.oid,'UPDATE')
@@ -245,6 +262,14 @@ export async function assertRuntimeRoleContract(
                 AND has_sequence_privilege($1,c.oid,'UPDATE')
               )
             )
+       )
+       AND (
+         to_regclass('public.decision_projection_delivery_state') IS NULL
+         OR (
+           has_function_privilege($1,'public.claim_decision_projection_delivery(integer,integer)','EXECUTE')
+           AND has_function_privilege($1,'public.ack_decision_projection_delivery(uuid,uuid,bigint,bigint,text)','EXECUTE')
+           AND has_function_privilege($1,'public.fail_decision_projection_delivery(uuid,uuid,bigint,text,boolean,integer)','EXECUTE')
+         )
        )
        AND NOT EXISTS (
          SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
@@ -395,6 +420,30 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
         await migration.query(`GRANT INSERT ON TABLE ${DECISION_OUTBOX_TABLE} TO ${ident}`);
         await migration.query(`REVOKE ALL PRIVILEGES ON SEQUENCE ${DECISION_OUTBOX_SEQUENCE} FROM ${ident}`);
         await migration.query(`GRANT USAGE ON SEQUENCE ${DECISION_OUTBOX_SEQUENCE} TO ${ident}`);
+      }
+
+      // Wave 3C keeps mutable delivery state inaccessible as a relation. Only
+      // the three fenced routines may read or mutate it for the runtime role.
+      const decisionDelivery = await migration.query(
+        `SELECT to_regclass($1) AS delivery_table,
+                to_regprocedure($2) AS claim_function,
+                to_regprocedure($3) AS ack_function,
+                to_regprocedure($4) AS fail_function`,
+        [DECISION_DELIVERY_TABLE, ...DECISION_DELIVERY_FUNCTIONS],
+      );
+      const deliveryTablePresent = Boolean(decisionDelivery.rows[0]?.delivery_table);
+      const deliveryFunctionCount = ["claim_function", "ack_function", "fail_function"]
+        .filter((key) => Boolean(decisionDelivery.rows[0]?.[key])).length;
+      if ((deliveryTablePresent && deliveryFunctionCount !== 3)
+          || (!deliveryTablePresent && deliveryFunctionCount !== 0)) {
+        throw new RuntimeRoleProvisionError("Decision-delivery table/function presence is inconsistent.");
+      }
+      if (deliveryTablePresent) {
+        await migration.query(`REVOKE ALL PRIVILEGES ON TABLE ${DECISION_DELIVERY_TABLE} FROM ${ident}`);
+        for (const signature of DECISION_DELIVERY_FUNCTIONS) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${signature} FROM ${ident}`);
+          await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
+        }
       }
 
       controlPlanePresent = Boolean(

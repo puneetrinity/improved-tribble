@@ -260,6 +260,7 @@ for (const path of [
   "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
   "server/lib/__tests__/decisionEventSpine.pg.test.ts",
   "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
+  "server/lib/__tests__/decisionProjectionDelivery.pg.test.ts",
   "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
   "server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
   "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",

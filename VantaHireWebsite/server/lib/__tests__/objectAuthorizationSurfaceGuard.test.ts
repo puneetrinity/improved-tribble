@@ -14,6 +14,12 @@ import { afterEach, describe, expect, it } from "vitest";
 // @ts-expect-error Plain ESM guard intentionally runs before TypeScript compilation.
 import { checkObjectAuthorization } from "../../../scripts/check-object-authorization.mjs";
 
+// These colocated module suites are intentionally registered through an
+// already-governed server test entrypoint; vitest.server.config.ts is frozen.
+import "../../decision-projection/__tests__/config.test";
+import "../../decision-projection/__tests__/memory-client.test";
+import "../../decision-projection/__tests__/processor.test";
+
 const APP_ROOT = join(dirname(new URL(import.meta.url).pathname), "../../..");
 const MANIFEST = "server/object-authorization/surfaces.json";
 const scratch: string[] = [];
@@ -1765,5 +1771,50 @@ describe("object authorization surface guard", () => {
     expect(problems).toContain(
       "2M retirement test contacts a production, provider or customer surface: server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
     );
+  });
+
+  it("rejects decision delivery wired into the web runtime", () => {
+    const problems = mutate(fixture(), "server/index.ts", (source) =>
+      `${source}\nimport "./decision-projection/processor";\n`,
+    );
+    expect(problems).toContain("decision delivery is wired outside the AI-worker entrypoint.");
+  });
+
+  it("rejects direct delivery-state reads outside the fenced functions", () => {
+    const problems = mutate(fixture(), "server/decision-projection/repository.ts", (source) =>
+      source.replace(
+        '"SELECT * FROM public.claim_decision_projection_delivery($1,$2)"',
+        '"SELECT * FROM public.decision_projection_delivery_state"',
+      ),
+    );
+    expect(problems).toContain("decision-delivery repository bypasses the three-function capability boundary.");
+  });
+
+  it("rejects redirect following in the Memory client", () => {
+    const problems = mutate(fixture(), "server/decision-projection/memory-client.ts", (source) =>
+      source.replace('redirect: "error"', 'redirect: "follow"'),
+    );
+    expect(problems).toContain('decision-delivery Memory client anchor is missing: redirect: "error"');
+  });
+
+  it("rejects a provider import in the delivery consumer", () => {
+    const problems = mutate(fixture(), "server/decision-projection/processor.ts", (source) =>
+      `import "../providers/crustdata";\n${source}`,
+    );
+    expect(problems).toContain("decision-delivery module imports a forbidden provider, queue, candidate, or legacy path.");
+  });
+
+  it("rejects loss of the disabled-by-default processor fence", () => {
+    const problems = mutate(fixture(), "server/decision-projection/processor.ts", (source) =>
+      source.replace("if (!config.enabled) return;", "if (false) return;"),
+    );
+    expect(problems).toContain("decision-delivery processor anchor is missing: if (!config.enabled) return");
+  });
+
+  it("rejects a fourth decision-delivery database function", () => {
+    const problems = mutate(fixture(), "server/schema-migrations/0009_decision_projection_delivery_state.sql", (source) =>
+      `${source}\nCREATE FUNCTION public.extra_decision_projection_delivery() RETURNS void LANGUAGE sql AS 'SELECT';\n`,
+    );
+    expect(problems).toContain("decision delivery must define exactly three database functions.");
   });
 });

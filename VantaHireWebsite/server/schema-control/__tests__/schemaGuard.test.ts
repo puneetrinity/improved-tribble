@@ -42,11 +42,13 @@ const fixtureFiles = [
   "VantaHireWebsite/server/schema-migrations/0006_versioned_invitation_grants.sql",
   "VantaHireWebsite/server/schema-migrations/0007_decision_event_spine.sql",
   "VantaHireWebsite/server/schema-migrations/0008_decision_projection_outbox.sql",
+  "VantaHireWebsite/server/schema-migrations/0009_decision_projection_delivery_state.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
   "VantaHireWebsite/server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
   "VantaHireWebsite/server/lib/__tests__/decisionEventSpine.pg.test.ts",
   "VantaHireWebsite/server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
+  "VantaHireWebsite/server/lib/__tests__/decisionProjectionDelivery.pg.test.ts",
   "VantaHireWebsite/server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
   "VantaHireWebsite/server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
   "VantaHireWebsite/server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
@@ -237,6 +239,23 @@ const mutations: Array<{
     apply(root) {
       mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
         delete lock.migrations["0008"];
+      });
+    },
+  },
+  {
+    name: "decision-projection delivery migration edited after checksum",
+    expected: /applied migration 0009 .* was edited/,
+    apply(root) {
+      const relative = "VantaHireWebsite/server/schema-migrations/0009_decision_projection_delivery_state.sql";
+      write(root, relative, `${readFileSync(join(root, relative), "utf8")}\n-- forbidden drift\n`);
+    },
+  },
+  {
+    name: "decision-projection delivery migration omitted from checksum lock",
+    expected: /checksums\.lock versions do not exactly match migration files/,
+    apply(root) {
+      mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
+        delete lock.migrations["0009"];
       });
     },
   },

@@ -28,6 +28,7 @@
     "test:unsafe-org-attribution-retirement:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
     "test:decision-event-spine:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionEventSpine.pg.test.ts",
     "test:decision-projection-outbox:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
+    "test:decision-projection-delivery:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionProjectionDelivery.pg.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:bulk-import:integration": "vitest run server/tests/bulkResumeImport.finalize.integration.test.ts",

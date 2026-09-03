@@ -191,11 +191,11 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    if (upgrade.applied.join(",") !== "0007,0008") throw new Error("Disposable 3A/3B migration isolation refused.");
+    if (upgrade.applied.join(",") !== "0007,0008,0009") throw new Error("Disposable 3A/3B/3C migration isolation refused.");
 
     // The release-first window is intentionally not runtime-ready until the
     // provisioner removes default table/sequence grants and applies the exact exception.
-    await expect(readinessAsRuntime()).rejects.toThrow(/Runtime role has application rights/);
+    await expect(readinessAsRuntime()).rejects.toThrow(/Decision-projection delivery functions and runtime boundary/);
     await provisionRuntimeRole({
       migrateUrl: migrationUrl,
       runtimeUrl,
@@ -204,7 +204,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       connectMigration,
       connectRuntime,
     });
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
     process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     workflow = await import("../applicationWorkflowAuthorization");
@@ -234,7 +234,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
         },
         connect: connectMigration,
       });
-      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0008") {
+      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0009") {
         throw new Error("Disposable 3A per-test schema rebuild refused.");
       }
       await provisionRuntimeRole({
@@ -420,12 +420,15 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     } finally {
       await runtime.end();
     }
-    await expect(owner!.query("TRUNCATE decision_projection_outbox, decision_events")).resolves.toBeDefined();
+    await expect(owner!.query(
+      "TRUNCATE decision_projection_delivery_state, decision_projection_outbox, decision_events",
+    )).resolves.toBeDefined();
     await workflow.moveAuthorizedApplicationStage(101, 2001, 2, null, randomUUID(), { allowPlatformAdmin: true });
     for (const sql of [
       "UPDATE decision_events SET action_code=action_code", "DELETE FROM decision_events",
       "UPDATE decision_projection_outbox SET action_code=action_code",
-      "DELETE FROM decision_projection_outbox", "TRUNCATE decision_projection_outbox",
+      "DELETE FROM decision_projection_outbox",
+      "TRUNCATE decision_projection_delivery_state, decision_projection_outbox",
     ]) {
       await owner!.query("BEGIN");
       await expect(owner!.query(sql)).rejects.toMatchObject({
@@ -435,7 +438,9 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       await owner!.query("ROLLBACK");
     }
     await expect(owner!.query("TRUNCATE decision_events")).rejects.toMatchObject({ code: "0A000" });
-    await expect(owner!.query("TRUNCATE decision_projection_outbox, decision_events"))
+    await expect(owner!.query(
+      "TRUNCATE decision_projection_delivery_state, decision_projection_outbox, decision_events",
+    ))
       .rejects.toMatchObject({ code: "55000" });
   });
 
@@ -452,7 +457,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
   });
 
   it("fails readiness on drift and converges migrations/provisioning without duplicates", async () => {
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
     const cases: Array<{ breakSql: string; restoreSql: string }> = [
       { breakSql: `GRANT SELECT ON decision_events TO ${new URL(runtimeUrl).username}`,
         restoreSql: `REVOKE SELECT ON decision_events FROM ${new URL(runtimeUrl).username}` },
@@ -473,7 +478,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       await owner!.query(item.breakSql);
       await expect(readinessAsRuntime()).rejects.toThrow();
       await owner!.query(item.restoreSql);
-      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0008", applied: 9 });
+      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
     }
     const noOp = await runReleaseMigration({
       migrationsDir,
