@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import { ArrowLeft, Save, AlertCircle, IndianRupee, GraduationCap, Sparkles, Briefcase, Tag, Plus, X, Info } from "lucide-react";
+import { Save, AlertCircle, IndianRupee, GraduationCap, Sparkles, Briefcase, Tag, Plus, X, Info, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import { Client, Job } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PageHeaderSkeleton } from "@/components/skeletons";
 import { CoRecruiterManagement } from "@/components/CoRecruiterManagement";
 import { jobEditPageCopy } from "@/lib/internal-copy";
@@ -178,8 +179,8 @@ export default function JobEditPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto space-y-6 pt-8">
+        <div className="container mx-auto px-4 pb-10 pt-5">
+          <div className="max-w-4xl mx-auto space-y-4">
             <PageHeaderSkeleton />
           </div>
         </div>
@@ -204,23 +205,31 @@ export default function JobEditPage() {
 
   return (
     <Layout>
-      <div className={`container mx-auto px-4 py-8 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`container mx-auto px-4 pb-10 pt-5 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         <div className="max-w-4xl mx-auto">
-          {/* Back Button */}
-          <div className="flex items-center gap-3 pt-8 mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation(`/jobs/${jobId}/applications`)}
-              className="text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {jobEditPageCopy.empty.back}
-            </Button>
-          </div>
-
-          {/* Job-Level Sub Navigation */}
-          <JobSubNav jobId={jobId!} jobTitle={job.title} className="mb-6" />
+          {/* Compact header: breadcrumb back-context + job title; the single job navigation follows */}
+          <PageHeader
+            title={job.title}
+            description={jobEditPageCopy.form.description}
+            breadcrumbs={[
+              { label: "My jobs", href: "/my-jobs" },
+              { label: "Applications", href: `/jobs/${jobId}/applications` },
+              { label: job.title },
+            ]}
+            actions={
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation(`/jobs/${jobId}/applications`)}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
+                {jobEditPageCopy.empty.back}
+              </Button>
+            }
+            className="mb-3"
+          />
+          <JobSubNav jobId={jobId!} className="mb-4" />
 
           {/* Edit Form */}
           <Card className="shadow-sm">

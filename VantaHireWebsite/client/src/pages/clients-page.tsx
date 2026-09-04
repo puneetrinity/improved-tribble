@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { INTERNAL_PRIMARY_BUTTON } from "@/lib/internal-page-theme";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
@@ -214,7 +216,7 @@ export default function ClientsPage() {
           <Button
             onClick={openCreateDialog}
             data-tour="add-client-button"
-            className="h-11 rounded-2xl bg-[#4B8EF0] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
+            className={cn("h-11 rounded-2xl px-5 font-semibold shadow-[0_10px_22px_rgba(75,142,240,0.22)]", INTERNAL_PRIMARY_BUTTON)}
           >
             <Plus className="mr-2 h-4 w-4" />
             {clientsPageCopy.header.addClient}
@@ -248,7 +250,7 @@ export default function ClientsPage() {
           title={clientsPageCopy.list.title}
           description={clientsPageCopy.list.description}
         />
-        <div className="mt-5">
+        <div className="mt-4">
           {isLoading ? (
             <InternalEmptyState
               icon={Loader2}

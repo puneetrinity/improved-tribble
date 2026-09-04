@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { cn } from "@/lib/utils";
+import { INTERNAL_PRIMARY_BUTTON } from "@/lib/internal-page-theme";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -126,7 +128,7 @@ export default function MyJobsPage() {
           <Button
             onClick={() => setLocation("/jobs/post")}
             data-tour="post-job-button"
-            className="h-11 rounded-2xl bg-[#4B8EF0] px-5 font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
+            className={cn("h-11 rounded-2xl px-5 font-semibold shadow-[0_10px_22px_rgba(75,142,240,0.22)]", INTERNAL_PRIMARY_BUTTON)}
           >
             <Plus className="mr-2 h-4 w-4" />
             {myJobsPageCopy.header.primaryAction}
@@ -163,7 +165,7 @@ export default function MyJobsPage() {
           title={`${myJobsPageCopy.list.title} (${filteredJobs.length})`}
           description={myJobsPageCopy.list.description}
         />
-        <div className="mt-5 space-y-4">
+        <div className="mt-4 space-y-3">
           {filteredJobs.length === 0 ? (
             <>
               {pendingCount > 0 && activeTab !== "pending" && !searchQuery ? (

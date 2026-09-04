@@ -796,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "5eaf0da1a92ed9fa001f3e3f7655bcadb155d5ca2bc5460cdc04d251910b507f"
+      "sha256": "86773e74ed59c5e0f26c0d1d8a89d57e7de45bc0feeaad31953217485e49ea18"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -912,11 +912,11 @@
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
-      "sha256": "94a944e1543310d76db639b421490eb51f7e4388304527f6d92a807743f611ea"
+      "sha256": "6763a477ba086cecd6a7fe93a7e857ace4e08c52042e368aa465bc5d186fd846"
     },
     {
       "file": "client/src/pages/application-management-page.tsx",
-      "sha256": "eeffcc55702106ed7eee26b340455bbd542767d7c1bbf4318d1236bcf4f65156"
+      "sha256": "8d3a815f6dea98119b0aa70a7c490fe8baa142ee4dfd41c31ff51683160e4e68"
     },
     {
       "file": "client/src/pages/admin-forms-page.tsx",
@@ -928,11 +928,11 @@
     },
     {
       "file": "client/src/pages/applications-page.tsx",
-      "sha256": "d4a9481cf12817c9999f311443af55e7dcfd50c1eb8fd1e499b34620ccde559e"
+      "sha256": "054c34c73bb211832e11b167fdf75a628f1833101676a20086af8e1b9154886b"
     },
     {
       "file": "client/src/lib/internal-copy.ts",
-      "sha256": "1b7103a38504f5fb405518e7e803b37edbbc37a03c50bd71ea6dd5ee7dae2885"
+      "sha256": "0626fd138f044a0b0e94a59b869d315ad2623be3c06688e9f7552e282323a422"
     },
     {
       "file": "shared/schema.ts",
@@ -1239,7 +1239,7 @@
     },
     {
       "file": "client/src/pages/job-edit-page.tsx",
-      "sha256": "d9a3f983bd32d0088e27c3ee501d1f0c3619044c194b9f5dbb437144403b4f38"
+      "sha256": "89dbf4dc2a49d816d4e611e38372559a497c414293eb07bbff821c6e6edeae9f"
     },
     {
       "file": "client/src/components/JobPostingStepper.tsx",

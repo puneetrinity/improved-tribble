@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { DASHBOARD_EYEBROW, DASHBOARD_PAGE_BACKGROUND, DASHBOARD_SHELL_PANEL, DASHBOARD_TITLE } from "@/lib/dashboard-theme";
 import { recruiterDashboardCopy } from "@/lib/internal-copy";
 import { cn } from "@/lib/utils";
+import { INTERNAL_ACCENT_TEXT, INTERNAL_PRIMARY_BUTTON } from "@/lib/internal-page-theme";
 import { Mail, Send, Loader2, ChevronDown, Plus } from "lucide-react";
 import { RecruiterKpiRibbon } from "@/components/recruiter/RecruiterKpiRibbon";
 import type { RecruiterDashboardKpiResponse } from "@/components/recruiter/RecruiterKpiRibbon";
@@ -276,7 +277,8 @@ export default function RecruiterDashboard() {
   if (jobsLoading || applicationsLoading) {
     return (
       <Layout>
-        <div className={cn(DASHBOARD_PAGE_BACKGROUND, "min-h-screen px-4 py-16 md:px-8")}>
+        {/* Same content origin as the loaded dashboard so the page does not jump when data lands. */}
+        <div className={cn(DASHBOARD_PAGE_BACKGROUND, "min-h-screen px-4 pb-10 pt-4 md:px-8 md:pt-5")}>
           <BrandedLoadingScreen label="Loading your Flow dashboard..." />
         </div>
       </Layout>
@@ -285,26 +287,26 @@ export default function RecruiterDashboard() {
 
   return (
     <Layout>
-      <div className="recruiter-dashboard min-h-screen overflow-x-hidden bg-white px-4 pb-10 pt-6 md:px-8">
-        <div className="mx-auto max-w-[1500px] space-y-5">
-          {/* Header + filters + KPIs */}
-          <div className="mt-0 space-y-4 pt-0">
+      <div className="recruiter-dashboard min-h-screen overflow-x-hidden bg-white px-4 pb-10 pt-4 md:px-8 md:pt-5">
+        <div className="mx-auto max-w-[1500px] space-y-4">
+          {/* Header + filters + KPIs — the toolbar is the page header; no separate hero */}
+          <div className="mt-0 space-y-3 pt-0">
             <div className={cn(DASHBOARD_SHELL_PANEL, "relative px-4 py-4 sm:px-5 sm:py-4")} data-tour="dashboard-metrics">
               <div className="relative space-y-3">
-                {/* Toolbar: page identity left, filters + actions right */}
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                {/* Toolbar: page identity left, filters + actions right — this row is the page header */}
+                <div data-internal-header="dashboard" className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="min-w-0">
                     <p className={DASHBOARD_EYEBROW}>{recruiterDashboardCopy.header.eyebrow}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-2.5">
                       <h1 className={DASHBOARD_TITLE}>{recruiterDashboardCopy.header.title}</h1>
-                      <Badge variant="outline" className="rounded-full border-[#D8DBE6] bg-white/80 px-2.5 py-0.5 text-xs font-semibold text-[#4B8EF0]">
+                      <Badge variant="outline" className={cn("rounded-full border-[#D8DBE6] bg-white/80 px-2.5 py-0.5 text-xs font-semibold", INTERNAL_ACCENT_TEXT)}>
                         {planName} Plan
                       </Badge>
                     </div>
                   </div>
                   <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center xl:w-auto xl:justify-end">
                     <Select value={rangePreset} onValueChange={(val) => setRangePreset(val as keyof typeof RANGE_PRESETS)}>
-                      <SelectTrigger className="h-9 w-full min-w-0 rounded-[9px] border-[#E5E7EB] bg-[#FAFAFB] px-3.5 text-[13px] font-semibold text-[#111827] sm:w-[136px] [&>svg]:hidden">
+                      <SelectTrigger aria-label="Date range" className="h-9 w-full min-w-0 rounded-[9px] border-[#E5E7EB] bg-[#FAFAFB] px-3.5 text-[13px] font-semibold text-[#111827] sm:w-[136px] [&>svg]:hidden">
                         <SelectValue placeholder={recruiterDashboardCopy.filters.dateRangePlaceholder} />
                         <ChevronDown className="h-4 w-4 text-[#4B5563]" />
                       </SelectTrigger>
@@ -318,7 +320,7 @@ export default function RecruiterDashboard() {
                       value={selectedJobId === "all" ? "all" : String(selectedJobId)}
                       onValueChange={(val) => setSelectedJobId(val === "all" ? "all" : Number(val))}
                     >
-                      <SelectTrigger className="h-9 w-full min-w-0 rounded-[9px] border-[#E5E7EB] bg-[#FAFAFB] px-3.5 text-[13px] font-semibold text-[#111827] sm:w-[148px] [&>svg]:hidden">
+                      <SelectTrigger aria-label="Job filter" className="h-9 w-full min-w-0 rounded-[9px] border-[#E5E7EB] bg-[#FAFAFB] px-3.5 text-[13px] font-semibold text-[#111827] sm:w-[148px] [&>svg]:hidden">
                         <SelectValue placeholder={recruiterDashboardCopy.filters.allJobsPlaceholder} />
                         <ChevronDown className="h-4 w-4 text-[#4B5563]" />
                       </SelectTrigger>
@@ -344,7 +346,7 @@ export default function RecruiterDashboard() {
                     <Button
                       size="sm"
                       onClick={() => setLocation("/jobs/post")}
-                      className="h-9 rounded-[9px] bg-[#4B8EF0] px-3.5 text-[13px] font-semibold text-white shadow-[0_2px_8px_rgba(75,142,240,0.20)] hover:bg-[#3679DB]"
+                      className={cn("h-9 rounded-[9px] px-3.5 text-[13px] font-semibold shadow-[0_2px_8px_rgba(75,142,240,0.20)]", INTERNAL_PRIMARY_BUTTON)}
                     >
                       <Plus className="mr-2 h-4 w-4" />
                       Post New Job

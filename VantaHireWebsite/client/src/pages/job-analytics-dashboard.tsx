@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Layout from "@/components/Layout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Eye, MousePointer, TrendingUp, Briefcase, Calendar, MapPin, Search, Filter, Sparkles, Users, Activity } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from "recharts";
 import { format } from "date-fns";
@@ -298,15 +299,16 @@ export default function JobAnalyticsDashboard() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto p-8">
-        {/* Header */}
-        <div className="mb-8 pt-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Job Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Track performance metrics and insights for your job listings</p>
-        </div>
+      <div className="mx-auto max-w-7xl px-4 pb-10 pt-5 sm:px-6 md:px-8">
+        {/* Header — shared compact page header */}
+        <PageHeader
+          title="Job Analytics Dashboard"
+          description="Track performance metrics and insights for your job listings"
+          breadcrumbs={[{ label: "My jobs", href: "/my-jobs" }, { label: "Analytics" }]}
+        />
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           <Card className="shadow-sm">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -357,7 +359,7 @@ export default function JobAnalyticsDashboard() {
         </div>
 
           {/* Filters */}
-          <Card className="mb-8 shadow-sm">
+          <Card className="mb-6 shadow-sm">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">

@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import { ArrowLeft, Eye, MousePointer, TrendingUp, Users, Clock, CheckCircle, XCircle, Sparkles, Calendar, AlertTriangle, Bell, ExternalLink, Send, ThumbsUp, Pause, ThumbsDown } from "lucide-react";
+import { Eye, MousePointer, TrendingUp, Users, Clock, CheckCircle, XCircle, Sparkles, Calendar, AlertTriangle, Bell, ExternalLink, Send, ThumbsUp, Pause, ThumbsDown, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Job, Application, PipelineStage } from "@shared/schema";
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PageHeaderSkeleton } from "@/components/skeletons";
 import { jobAnalyticsPageCopy } from "@/lib/internal-copy";
 import {
@@ -217,8 +218,8 @@ export default function JobAnalyticsPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-6xl mx-auto space-y-6 pt-8">
+        <div className="container mx-auto px-4 pb-10 pt-5">
+          <div className="max-w-6xl mx-auto space-y-4">
             <PageHeaderSkeleton />
           </div>
         </div>
@@ -243,23 +244,30 @@ export default function JobAnalyticsPage() {
 
   return (
     <Layout>
-      <div className={`container mx-auto px-4 py-8 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`container mx-auto px-4 pb-10 pt-5 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         <div className="max-w-6xl mx-auto">
-          {/* Back Button */}
-          <div className="flex items-center gap-3 pt-8 mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation(`/jobs/${jobId}/applications`)}
-              className="text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {jobAnalyticsPageCopy.header.backToJob}
-            </Button>
-          </div>
-
-          {/* Job-Level Sub Navigation */}
-          <JobSubNav jobId={jobId!} jobTitle={job.title} className="mb-6" />
+          {/* Compact header: breadcrumb back-context + job title; the single job navigation follows */}
+          <PageHeader
+            title={job.title}
+            breadcrumbs={[
+              { label: "My jobs", href: "/my-jobs" },
+              { label: "Applications", href: `/jobs/${jobId}/applications` },
+              { label: job.title },
+            ]}
+            actions={
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation(`/jobs/${jobId}/applications`)}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
+                {jobAnalyticsPageCopy.header.backToJob}
+              </Button>
+            }
+            className="mb-3"
+          />
+          <JobSubNav jobId={jobId!} className="mb-4" />
 
           {/* Overview Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
