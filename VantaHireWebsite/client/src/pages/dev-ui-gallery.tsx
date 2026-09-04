@@ -9,6 +9,9 @@
 
 import { useState } from "react";
 import { PageShell, PageHeader, Container, Section } from "@/components/layout/index";
+import { InternalHero } from "@/components/internal/InternalHero";
+import { InternalEmptyState } from "@/components/internal/InternalEmptyState";
+import { JobSubNav } from "@/components/JobSubNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
@@ -261,6 +264,44 @@ export default function DevUIGallery() {
             icon={Briefcase}
             title="Job Title Here"
             description="Company Name • Location • Full-time"
+          />
+        </div>
+      </Section>
+
+      <Separator className="my-8" />
+
+      {/* Workspace density (Wave 3.5B) */}
+      <Section>
+        <h2 className="text-xl font-semibold text-foreground mb-4">Workspace Density</h2>
+        <p className="mb-4 text-sm text-muted-foreground">
+          Compact internal header and job navigation. At 1440×900 the header stays within 176px (120px without
+          actions/stats) and the first work surface begins above 360px; at 390×844 nothing overflows horizontally.
+        </p>
+        <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
+          <InternalHero
+            eyebrow="Job Workspace"
+            title="Senior Backend Engineer"
+            subtitle="Compact hero: eyebrow, title, subtitle and actions on one row; stats as chips."
+            badge="Active"
+            tone="green"
+            actions={
+              <>
+                <Button variant="outline" size="sm">Edit</Button>
+                <Button size="sm">Find candidates</Button>
+              </>
+            }
+            stats={[
+              { label: "Applications", value: 42 },
+              { label: "Shortlisted", value: 7, accentClassName: "text-[#16A34A]" },
+              { label: "To review", value: 12, accentClassName: "text-[#D97706]" },
+            ]}
+          />
+          <JobSubNav jobId={0} />
+          <InternalEmptyState
+            icon={Users}
+            title="No candidates yet"
+            description="Compact empty state: same shell and origin as loaded content."
+            actions={<Button size="sm">Find candidates</Button>}
           />
         </div>
       </Section>

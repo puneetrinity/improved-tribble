@@ -484,13 +484,14 @@ export default function JobSourcingPage() {
 
   return (
     <Layout>
-      <JobSubNav jobId={jobId ?? 0} />
+      <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
+        {/* Single job navigation, same placement as every other job page */}
+        <JobSubNav jobId={jobId ?? 0} className="mb-4" />
 
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-semibold">
+              <h1 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.02em] md:text-[26px]">
                 <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[#4B8EF0] align-middle" aria-hidden="true" />
                 {jobSourcingPageCopy.header.title}
               </h1>
@@ -907,6 +908,10 @@ export default function JobSourcingPage() {
         open={modalOpen}
         progress={progress}
         onClose={closeModal}
+        onRunAgain={() => {
+          closeModal();
+          findCandidates({});
+        }}
       />
     </Layout>
   );

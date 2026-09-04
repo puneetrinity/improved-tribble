@@ -62,6 +62,7 @@ import { ApplicationDetailModal } from "@/components/kanban/ApplicationDetailMod
 import type { EmailSendPayload } from "@/components/kanban/ApplicationDetailPanel";
 import { PageHeaderSkeleton, FilterBarSkeleton, KanbanBoardSkeleton } from "@/components/skeletons";
 import { JobSubNav } from "@/components/JobSubNav";
+import { InternalHero } from "@/components/internal/InternalHero";
 import { UploadDialog } from "@/components/bulk-import/UploadDialog";
 import { describeBulkFailures, type BulkFailureDetail } from "@/lib/bulk-action-failures";
 import { applicationManagementCopy } from "@/lib/internal-copy";
@@ -1305,45 +1306,25 @@ export default function ApplicationManagementPage() {
             <span className="font-medium text-foreground">Application Management</span>
           </div>
 
-          <section className="border border-border/70 bg-[linear-gradient(180deg,#ffffff_0%,#f8f8ff_100%)] px-5 py-4 shadow-[0_20px_60px_rgba(15,23,42,0.06)] md:px-6">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div className="space-y-1.5">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-                  Application Management
-                </p>
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-                    {job.title}
-                  </h1>
-                  <Badge className={`rounded-none ${jobStatusBadge.className}`}>{jobStatusBadge.label}</Badge>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm text-muted-foreground">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5" />
-                    {job.location || "Location unavailable"}
-                  </span>
-                  <span className="hidden text-border md:inline">|</span>
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {applicationManagementCopy.header.postedPrefix} {formatDate(job.createdAt)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="grid gap-2 sm:grid-cols-3 xl:min-w-[420px] xl:max-w-[480px] xl:flex-1">
-                {heroStats.map((stat) => (
-                  <Card key={stat.label} className="rounded-none border border-border/80 bg-white/95 shadow-sm">
-                    <CardContent className="space-y-1 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                        {stat.label}
-                      </p>
-                      <p className={`text-3xl font-semibold leading-none ${stat.accent}`}>{stat.value}</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          </section>
+          <InternalHero
+            eyebrow="Application Management"
+            title={job.title}
+            badge={jobStatusBadge.label}
+            tone={jobStatusBadge.className.includes("green") ? "green" : jobStatusBadge.className.includes("amber") || jobStatusBadge.className.includes("yellow") ? "yellow" : "blue"}
+            subtitle={
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                  {job.location || "Location unavailable"}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" aria-hidden="true" />
+                  {applicationManagementCopy.header.postedPrefix} {formatDate(job.createdAt)}
+                </span>
+              </span>
+            }
+            stats={heroStats.map((stat) => ({ label: stat.label, value: stat.value, accentClassName: stat.accent }))}
+          />
 
           <div data-tour="job-context">
             <JobSubNav jobId={jobId!} variant="inline" className="mb-0" />

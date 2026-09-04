@@ -59,16 +59,18 @@ export function PageShell({
   className,
   noLayout = false
 }: PageShellProps) {
-  // App pages get container wrapping and consistent padding
+  // App pages get container wrapping and consistent, compact padding
+  // (Wave 3.5B: 20 px top so the page header and first action sit above the
+  // fold; the global navigation already reserves its own height).
   const content = variant === "minimal" ? (
-    <div className={cn("pt-8", className)}>
+    <div className={cn("pt-5", className)}>
       {children}
     </div>
   ) : (
     <Container
       size={containerSize}
       className={cn(
-        "pt-8 pb-12",
+        "pt-5 pb-10",
         // Add transition for loading states
         "transition-opacity duration-200",
         className

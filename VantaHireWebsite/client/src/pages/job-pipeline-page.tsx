@@ -20,7 +20,7 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, Plus, GripVertical, Trash2, Edit2, Check, X, AlertTriangle, Users } from "lucide-react";
+import { Plus, GripVertical, Trash2, Edit2, Check, X, AlertTriangle, Users, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,7 @@ import { Job, PipelineStage, Application } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { PageHeaderSkeleton } from "@/components/skeletons";
 import {
   AlertDialog,
@@ -364,8 +365,8 @@ export default function JobPipelinePage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto space-y-6 pt-8">
+        <div className="container mx-auto px-4 pb-10 pt-5">
+          <div className="max-w-4xl mx-auto space-y-4">
             <PageHeaderSkeleton />
           </div>
         </div>
@@ -390,23 +391,30 @@ export default function JobPipelinePage() {
 
   return (
     <Layout>
-      <div className={`container mx-auto px-4 py-8 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+      <div className={`container mx-auto px-4 pb-10 pt-5 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
         <div className="max-w-4xl mx-auto">
-          {/* Back Button */}
-          <div className="flex items-center gap-3 pt-8 mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLocation(`/jobs/${jobId}/applications`)}
-              className="text-muted-foreground hover:text-foreground hover:bg-muted"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {jobPipelinePageCopy.back}
-            </Button>
-          </div>
-
-          {/* Job-Level Sub Navigation */}
-          <JobSubNav jobId={jobId!} jobTitle={job.title} className="mb-6" />
+          {/* Compact header: breadcrumb back-context + job title; the single job navigation follows */}
+          <PageHeader
+            title={job.title}
+            breadcrumbs={[
+              { label: "My jobs", href: "/my-jobs" },
+              { label: "Applications", href: `/jobs/${jobId}/applications` },
+              { label: job.title },
+            ]}
+            actions={
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setLocation(`/jobs/${jobId}/applications`)}
+                className="text-muted-foreground hover:text-foreground hover:bg-muted"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" aria-hidden="true" />
+                {jobPipelinePageCopy.back}
+              </Button>
+            }
+            className="mb-3"
+          />
+          <JobSubNav jobId={jobId!} className="mb-4" />
 
           {/* Pipeline Stages */}
           <Card className="shadow-sm mb-6">

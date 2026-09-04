@@ -299,7 +299,8 @@ export const myJobsPageCopy = {
 export const talentSearchPageCopy = {
   header: {
     title: "Memory",
-    subtitle: "Every candidate your team has already met, searchable in plain language — your next hire starts smarter than your last.",
+    subtitle:
+      "Every candidate your team has already met, searchable in plain language.",
   },
   search: {
     placeholder: "Describe the candidate you're looking for, e.g. 'React developer with 3+ years experience'...",

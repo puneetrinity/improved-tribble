@@ -1,5 +1,6 @@
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { INTERNAL_ACCENT_TEXT } from "@/lib/internal-page-theme";
 import { FileText, Users, GitBranch, BarChart3, Search } from "lucide-react";
 
 export interface JobSubNavProps {
@@ -17,6 +18,12 @@ type NavItem = {
   badge?: string;
 };
 
+/**
+ * The single job-workspace navigation (Wave 3.5B): Details · Applications ·
+ * Discover · Pipeline · Analytics. Rendered identically on every job page,
+ * marks the active page with `aria-current`, scrolls horizontally on narrow
+ * screens without clipping, and keeps a 44 px touch target on mobile.
+ */
 export function JobSubNav({
   jobId,
   jobTitle,
@@ -30,31 +37,31 @@ export function JobSubNav({
       id: "details",
       label: "Details",
       path: `/jobs/${jobId}/edit`,
-      icon: <FileText className="h-4 w-4" />,
+      icon: <FileText className="h-4 w-4" aria-hidden="true" />,
     },
     {
       id: "applications",
       label: "Applications",
       path: `/jobs/${jobId}/applications`,
-      icon: <Users className="h-4 w-4" />,
+      icon: <Users className="h-4 w-4" aria-hidden="true" />,
     },
     {
       id: "sourcing",
       label: "Discover",
       path: `/jobs/${jobId}/sourcing`,
-      icon: <Search className="h-4 w-4" />,
+      icon: <Search className="h-4 w-4" aria-hidden="true" />,
     },
     {
       id: "pipeline",
       label: "Pipeline",
       path: `/jobs/${jobId}/pipeline`,
-      icon: <GitBranch className="h-4 w-4" />,
+      icon: <GitBranch className="h-4 w-4" aria-hidden="true" />,
     },
     {
       id: "analytics",
       label: "Analytics",
       path: `/jobs/${jobId}/analytics`,
-      icon: <BarChart3 className="h-4 w-4" />,
+      icon: <BarChart3 className="h-4 w-4" aria-hidden="true" />,
     },
   ];
 
@@ -72,35 +79,37 @@ export function JobSubNav({
 
   return (
     <div
+      data-job-subnav=""
       className={cn(
         variant === "inline"
           ? "border-b border-border/70 bg-transparent"
-          : "rounded-t-lg border-b border-border bg-white",
+          : "rounded-[12px] border border-border bg-white",
         className,
       )}
     >
       {jobTitle && (
-        <div className={cn(variant === "inline" ? "px-0 pb-2" : "px-4 pt-3 pb-1")}>
-          <h2 className="text-lg font-semibold text-foreground truncate">{jobTitle}</h2>
+        <div className={cn(variant === "inline" ? "px-0 pb-1" : "px-4 pt-2.5")}>
+          <h2 className="truncate text-sm font-semibold text-foreground">{jobTitle}</h2>
         </div>
       )}
       <nav
         className={cn(
-          "flex gap-1 overflow-x-auto",
-          variant === "inline" ? "-mb-px px-0" : "-mb-px px-2",
+          "flex gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          variant === "inline" ? "-mb-px px-0" : "px-2",
         )}
         aria-label="Job navigation"
       >
         {navItems.map((item) => (
           <button
             key={item.id}
+            type="button"
             onClick={() => setLocation(item.path)}
-          className={cn(
-              "flex items-center gap-2 whitespace-nowrap border-b-2 text-sm font-medium transition-colors rounded-none",
-              variant === "inline" ? "px-3 py-3 md:px-4" : "px-4 py-2.5",
+            className={cn(
+              "flex min-h-11 items-center gap-2 whitespace-nowrap rounded-none border-b-2 px-3 text-sm font-medium transition-colors duration-200 sm:min-h-10 md:px-4",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-inset",
               activeId === item.id
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
+                ? cn("border-primary", INTERNAL_ACCENT_TEXT)
+                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
             )}
             aria-current={activeId === item.id ? "page" : undefined}
           >
@@ -111,7 +120,7 @@ export function JobSubNav({
                 className={cn(
                   "rounded-full border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em]",
                   activeId === item.id
-                    ? "border-primary/40 bg-primary/10 text-primary"
+                    ? cn("border-primary/40 bg-primary/10", INTERNAL_ACCENT_TEXT)
                     : "border-amber-300 bg-amber-50 text-amber-700",
                 )}
               >

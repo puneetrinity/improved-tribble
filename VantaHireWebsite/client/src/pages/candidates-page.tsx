@@ -213,7 +213,7 @@ export default function CandidatesPage() {
         </div>
 
         {submittedQuery && semanticSearchQuery.isSuccess && (
-          <div className="mt-3 space-y-1 rounded-[18px] border border-[#EEF0F4] bg-[#F8F8FA] px-4 py-3">
+          <div className="mt-2 space-y-1 rounded-[14px] border border-[#EEF0F4] bg-[#F8F8FA] px-4 py-2.5">
             <p className="font-dm text-sm text-[#687182]">
               {semanticResults.length} result{semanticResults.length !== 1 ? "s" : ""} for "{submittedQuery}"
             </p>
