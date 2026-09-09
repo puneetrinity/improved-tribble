@@ -112,6 +112,17 @@ describe('candidate privacy surface guard', () => {
     expect(problems).toContain('AI worker load/provider/publication privacy rechecks are incomplete.');
   });
 
+  it('rejects organization-private delivery changed to global-use privacy', () => {
+    const problems = mutate(
+      fixture(),
+      'server/organization-candidates/application-intake.ts',
+      (source) => source.replaceAll('globalUse: false', 'globalUse: true'),
+    );
+    expect(problems.some((problem) => problem.includes(
+      'surface enforcement anchor is missing: server/organization-candidates/application-intake.ts::globalUse: false',
+    ))).toBe(true);
+  });
+
   it('rejects recruiter authority over a global directive', () => {
     const problems = mutate(fixture(), 'server/candidate-privacy/routes.ts', (source) =>
       source.replace('requireRole(["super_admin"])', 'requireRole(["recruiter"])'),

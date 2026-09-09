@@ -425,6 +425,85 @@ export const decisionProjectionDeliveryState = pgTable("decision_projection_deli
   ),
 }));
 
+// Wave 4B: immutable organization-private application/resume evidence and a
+// payload-free, generation-fenced Memory delivery intent.
+export const organizationCandidateReferences = pgTable("organization_candidate_references", {
+  referenceId: uuid("reference_id").primaryKey(),
+  organizationId: integer("organization_id").notNull()
+    .references(() => organizations.id, { onDelete: "restrict" }),
+  applicationId: integer("application_id").notNull(),
+  jobId: integer("job_id").notNull(),
+  originCode: text("origin_code").notNull(),
+  schemaVersion: integer("schema_version").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => ({
+  applicationUnique: uniqueIndex("organization_candidate_references_application_unique")
+    .on(table.organizationId, table.applicationId),
+  jobIdx: index("organization_candidate_references_job_idx")
+    .on(table.organizationId, table.jobId, table.createdAt),
+}));
+
+export const applicationResumeVersions = pgTable("application_resume_versions", {
+  resumeVersionId: uuid("resume_version_id").primaryKey(),
+  referenceId: uuid("reference_id").notNull()
+    .references(() => organizationCandidateReferences.referenceId, { onDelete: "restrict" }),
+  organizationId: integer("organization_id").notNull(),
+  applicationId: integer("application_id").notNull(),
+  jobId: integer("job_id").notNull(),
+  version: integer("version").notNull(),
+  sourceKind: text("source_kind").notNull(),
+  sourceResumeId: integer("source_resume_id"),
+  sourceObservedAt: timestamp("source_observed_at", { withTimezone: true }).notNull(),
+  gcsLocator: text("gcs_locator").notNull(),
+  contentSha256: text("content_sha256").notNull(),
+  byteCount: integer("byte_count").notNull(),
+  mediaType: text("media_type").notNull(),
+  extractedText: text("extracted_text"),
+  extractedTextSha256: text("extracted_text_sha256"),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+}, (table) => ({
+  applicationVersionUnique: uniqueIndex("application_resume_versions_application_version_unique")
+    .on(table.organizationId, table.applicationId, table.version),
+  referenceUnique: uniqueIndex("application_resume_versions_reference_unique")
+    .on(table.referenceId),
+  jobIdx: index("application_resume_versions_job_idx")
+    .on(table.organizationId, table.jobId, table.createdAt),
+}));
+
+export const organizationCandidateMemoryOutbox = pgTable("organization_candidate_memory_outbox", {
+  outboxId: uuid("outbox_id").primaryKey(),
+  referenceId: uuid("reference_id").notNull()
+    .references(() => organizationCandidateReferences.referenceId, { onDelete: "restrict" }),
+  resumeVersionId: uuid("resume_version_id").notNull()
+    .references(() => applicationResumeVersions.resumeVersionId, { onDelete: "restrict" }),
+  organizationId: integer("organization_id").notNull(),
+  applicationId: integer("application_id").notNull(),
+  jobId: integer("job_id").notNull(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  state: text("state").notNull().default("pending"),
+  attempts: integer("attempts").notNull().default(0),
+  generation: integer("generation").notNull().default(0),
+  leaseOwner: text("lease_owner"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
+  lastErrorCode: text("last_error_code"),
+  terminalCode: text("terminal_code"),
+  memoryCandidateId: uuid("memory_candidate_id"),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+}, (table) => ({
+  referenceUnique: uniqueIndex("organization_candidate_memory_outbox_reference_unique")
+    .on(table.referenceId),
+  resumeUnique: uniqueIndex("organization_candidate_memory_outbox_resume_unique")
+    .on(table.resumeVersionId),
+  readyIdx: index("organization_candidate_memory_outbox_ready_idx")
+    .on(table.state, table.nextAttemptAt, table.createdAt),
+  orgOrderIdx: index("organization_candidate_memory_outbox_org_order_idx")
+    .on(table.organizationId, table.createdAt, table.outboxId),
+}));
+
 // ATS: Application feedback (for hiring managers)
 export const applicationFeedback = pgTable("application_feedback", {
   id: serial("id").primaryKey(),

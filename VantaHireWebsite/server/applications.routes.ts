@@ -47,6 +47,7 @@ import {
 } from '@shared/schema';
 import {
   uploadToGCS,
+  deleteFromGCS,
   downloadFromGCS,
   downloadBoundApplicationResumeFromGCS,
 } from './gcs-storage';
@@ -100,6 +101,12 @@ import {
   readAuthorizedApplicationAiSummaryContext,
   readAuthorizedSimilarCandidates,
 } from './lib/applicationAiOutboundAuthorization';
+import {
+  appendOrganizationCandidateApplicationEvidence,
+  pinPrivateResumeEvidence,
+  requireOrganizationCandidateApplicationAllowed,
+  type PinnedResumeEvidence,
+} from './organization-candidates/application-intake';
 
 // Base URL for email links
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
@@ -192,7 +199,12 @@ async function requireApplicationIngestAllowed(input: {
   userId?: number;
   email: string;
   phone?: string | null;
+  privateUse?: boolean;
 }): Promise<void> {
+  if (input.privateUse) {
+    await requireOrganizationCandidateApplicationAllowed(input);
+    return;
+  }
   if (input.userId) {
     await requireCandidatePrivacyAllowed(
       { type: 'candidate_user', id: input.userId },
@@ -551,6 +563,7 @@ export function registerApplicationsRoutes(
         ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
         email: applicationData.email,
         phone: applicationData.phone,
+        privateUse: true,
       });
 
       let resumeUrl = '';
@@ -558,6 +571,9 @@ export function registerApplicationsRoutes(
       let resumeCountForCompletion: number | null = null;
       let extractedResumeText: string | null = null;
       let resumeFilename: string | null = null;
+      let resumeBytes: Buffer | null = null;
+      let pinnedResumeEvidence: PinnedResumeEvidence | null = null;
+      let savedResumeUpdatedAt: Date | null = null;
 
       if (requestedResumeId !== null && verifiedCandidate) {
         const storedResume = await db.query.candidateResumes.findFirst({
@@ -576,6 +592,7 @@ export function registerApplicationsRoutes(
         resumeRecordId = storedResume.id;
         extractedResumeText = storedResume.extractedText;
         resumeFilename = storedResume.label;
+        savedResumeUpdatedAt = storedResume.updatedAt;
       }
 
       // Duplicate detection (case-insensitive email check)
@@ -598,6 +615,18 @@ export function registerApplicationsRoutes(
         return;
       }
 
+      if (requestedResumeId !== null) {
+        try {
+          resumeBytes = await downloadFromGCS(resumeUrl);
+        } catch {
+          res.status(503).json({
+            error: 'Saved resume is temporarily unavailable',
+            code: 'SAVED_RESUME_UNAVAILABLE',
+          });
+          return;
+        }
+      }
+
       // Increment apply click count for analytics (after duplicate check)
       await storage.incrementApplyClicks(jobId);
 
@@ -609,30 +638,67 @@ export function registerApplicationsRoutes(
             ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
             email: applicationData.email,
             phone: applicationData.phone,
+            privateUse: true,
           });
           resumeUrl = await uploadToGCS(req.file.buffer, req.file.originalname);
+          resumeBytes = req.file.buffer;
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          console.error('[APPLICATION_SUBMIT] Resume upload failed (skipping):', {
-            filename: req.file.originalname,
-            mimetype: req.file.mimetype,
-            size: req.file.size,
-            error: message,
+          console.error('[APPLICATION_SUBMIT] Resume upload failed', {
+            errorType: error instanceof Error ? error.constructor.name : 'UnknownError',
           });
           if (message.toLowerCase().includes('invalid file format')) {
             res.status(400).json({ error: message });
             return;
           }
-          // GCS not configured or unavailable — continue without resume URL
+          res.status(503).json({
+            error: 'Resume upload is temporarily unavailable',
+            code: 'RESUME_UPLOAD_UNAVAILABLE',
+          });
+          return;
         }
         const extraction = await extractResumeForOrdinaryIngest(req.file.buffer, {
           beforeOcr: () => requireApplicationIngestAllowed({
             ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
             email: applicationData.email,
             phone: applicationData.phone,
+            privateUse: true,
           }),
         });
         extractedResumeText = extraction.success ? extraction.text : null;
+      }
+
+      const now = new Date();
+      if (!resumeBytes || !resumeFilename || !job.organizationId) {
+        res.status(503).json({
+          error: 'Application intake is temporarily unavailable',
+          code: 'APPLICATION_INTAKE_UNAVAILABLE',
+        });
+        return;
+      }
+      const organizationId = job.organizationId;
+      try {
+        pinnedResumeEvidence = pinPrivateResumeEvidence({
+          bytes: resumeBytes,
+          filename: requestedResumeId === null ? resumeFilename : resumeUrl,
+          gcsLocator: resumeUrl,
+          sourceKind: requestedResumeId === null ? 'direct_upload' : 'saved_resume',
+          sourceResumeId: requestedResumeId,
+          sourceObservedAt: savedResumeUpdatedAt ?? now,
+          extractedText: extractedResumeText,
+          capturedAt: now,
+        });
+      } catch {
+        if (requestedResumeId === null && resumeUrl) {
+          void deleteFromGCS(resumeUrl).catch(() => {
+            console.warn('[APPLICATION_SUBMIT] Orphaned uploaded resume after evidence refusal');
+          });
+        }
+        res.status(400).json({
+          error: 'Resume evidence could not be verified',
+          code: 'RESUME_EVIDENCE_REFUSED',
+        });
+        return;
       }
 
       // If candidate is authenticated, persist resume + extracted text for AI
@@ -687,17 +753,16 @@ export function registerApplicationsRoutes(
         console.error("Failed to load pipeline stages for default assignment:", stageError);
       }
 
-      const now = new Date();
-
       // Application persistence and drip cancellation are one commit. A real
       // applicant can never be stored while their remaining outreach stays live.
       await requireApplicationIngestAllowed({
         ...(verifiedCandidate ? { userId: verifiedCandidate.id } : {}),
         email: applicationData.email,
         phone: applicationData.phone,
+        privateUse: true,
       });
       const application = await db.transaction(async (tx: any) => {
-        const created = await storage.createApplication({
+          const created = await storage.createApplication({
           ...applicationData,
           status: 'submitted',
           jobId,
@@ -712,18 +777,38 @@ export function registerApplicationsRoutes(
             stageChangedBy: job.postedBy,
           }),
           ...(job.organizationId != null && { organizationId: job.organizationId }),
-        }, tx);
-        await matchApplicationToSourcedCandidate({
-          applicationId: created.id,
-          applicationEmail: created.email,
-          jobId,
-          organizationId: job.organizationId,
-          appliedAt: created.appliedAt ?? now,
-          outreachAttributionToken,
-          executor: tx,
+          }, tx);
+          await matchApplicationToSourcedCandidate({
+            applicationId: created.id,
+            applicationEmail: created.email,
+            jobId,
+            organizationId: job.organizationId,
+            appliedAt: created.appliedAt ?? now,
+            outreachAttributionToken,
+            executor: tx,
+          });
+          await appendOrganizationCandidateApplicationEvidence({
+            executor: tx,
+            organizationId,
+            applicationId: created.id,
+            jobId,
+            evidence: pinnedResumeEvidence,
+            expectedSavedResumeUpdatedAt: savedResumeUpdatedAt,
+          });
+          return created;
+        }).catch(async (error: unknown) => {
+        if (requestedResumeId === null && resumeUrl) {
+          try {
+            await deleteFromGCS(resumeUrl);
+          } catch (cleanupError) {
+            console.warn('[APPLICATION_SUBMIT] Uploaded resume cleanup failed', {
+              errorType: cleanupError instanceof Error
+                ? cleanupError.constructor.name : 'UnknownError',
+            });
+          }
+        }
+        throw error;
         });
-        return created;
-      });
 
       if (verifiedCandidate && resumeCountForCompletion !== null) {
         await syncProfileCompletionStatus(verifiedCandidate, { resumeCount: resumeCountForCompletion });
@@ -778,37 +863,6 @@ export function registerApplicationsRoutes(
         }
       } catch (emailError) {
         console.error('Failed to send recruiter notification:', emailError);
-      }
-
-      // Enqueue ActiveKG graph sync job (non-blocking) — only if resume text is valid
-      if (process.env.ACTIVEKG_SYNC_ENABLED === 'true' && application.organizationId) {
-        const hasValidResumeText = extractedResumeText && extractedResumeText.trim().length >= MIN_RESUME_TEXT_LENGTH;
-        if (hasValidResumeText) {
-          try {
-            const effectiveRecruiterId = job.postedBy;
-            const tenantId = resolveActiveKGTenantId(application.organizationId);
-            await storage.enqueueApplicationGraphSyncJob({
-              applicationId: application.id,
-              organizationId: application.organizationId,
-              jobId: application.jobId,
-              effectiveRecruiterId,
-              activekgTenantId: tenantId,
-            });
-          } catch (syncErr) {
-            console.error('[ACTIVEKG_SYNC] Failed to enqueue graph sync job (non-blocking):', {
-              applicationId: application.id,
-              jobId: application.jobId,
-              organizationId: application.organizationId,
-              error: syncErr instanceof Error ? syncErr.message : String(syncErr),
-            });
-          }
-        } else {
-          // Record why sync was skipped so it can be requeued after backfill
-          storage.updateApplicationSyncSkippedReason(
-            application.id,
-            !extractedResumeText ? 'resume_text_missing' : 'resume_text_below_threshold'
-          ).catch(err => console.error('[ACTIVEKG_SYNC] Failed to record skip reason:', err));
-        }
       }
 
       res.status(201).json({

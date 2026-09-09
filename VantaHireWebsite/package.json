@@ -29,6 +29,8 @@
     "test:decision-event-spine:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionEventSpine.pg.test.ts",
     "test:decision-projection-outbox:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
     "test:decision-projection-delivery:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionProjectionDelivery.pg.test.ts",
+    "test:organization-candidate-intake": "vitest run --config vitest.server.config.ts server/lib/__tests__/candidatePortalResumeApplyContracts.test.ts",
+    "test:organization-candidate-intake:pg": "cross-env FLOW_ORGANIZATION_CANDIDATE_TEST=1 vitest run --config vitest.server.config.ts server/schema-control/__tests__/schemaControl.pg.test.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:bulk-import:integration": "vitest run server/tests/bulkResumeImport.finalize.integration.test.ts",
@@ -50,6 +52,7 @@
     "check:schema-control": "node scripts/check-schema-control.mjs",
     "check:candidate-privacy-surfaces": "node scripts/check-candidate-privacy-surfaces.mjs",
     "check:object-authorization": "node scripts/check-object-authorization.mjs",
+    "check:organization-candidate-intake": "node scripts/check-organization-candidate-intake.mjs",
     "schema:catalog:lint": "node scripts/normalize-schema-catalog.mjs --lint-sql server/schema-control/catalog-census.sql",
     "schema:catalog:normalize": "node scripts/normalize-schema-catalog.mjs",
     "schema:catalog:compare": "node scripts/compare-schema-catalog.mjs"

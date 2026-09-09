@@ -164,7 +164,7 @@ async function rebuildCurrent(): Promise<void> {
     creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
     connect: connectMigration,
   });
-  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0009") {
+  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0010") {
     throw new Error("Disposable 3C current-ledger rebuild refused.");
   }
   await provision();
@@ -211,11 +211,11 @@ describe.skipIf(!enabled)("decision-projection delivery exact-schema PostgreSQL"
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    expect(upgrade.applied).toEqual(["0009"]);
+    expect(upgrade.applied).toEqual(["0009", "0010"]);
     expect((await owner.query("SELECT COUNT(*)::integer n FROM decision_projection_delivery_state")).rows[0]?.n).toBe(0);
     await expect(readinessAsRuntime()).rejects.toThrow();
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
   }, 180_000);
 
   beforeEach(async () => {
@@ -229,7 +229,7 @@ describe.skipIf(!enabled)("decision-projection delivery exact-schema PostgreSQL"
     if (pre0009Dir) rmSync(pre0009Dir, { recursive: true, force: true });
   });
 
-  it("installs ledger 10 without backfilling a pre-0009 intent", async () => {
+  it("installs ledger 11 without backfilling a pre-0009 intent", async () => {
     expect(legacyIntentId).toMatch(/^[0-9a-f-]{36}$/);
     const facts = (await owner!.query(`SELECT
       (SELECT COUNT(*)::integer FROM schema_control.applied) ledger,
@@ -326,6 +326,6 @@ describe.skipIf(!enabled)("decision-projection delivery exact-schema PostgreSQL"
     await owner!.query(`REVOKE EXECUTE ON FUNCTION claim_decision_projection_delivery(integer,integer) FROM "${role}"`);
     await expect(readinessAsRuntime()).rejects.toThrow(/Decision-projection delivery/);
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0009", applied: 10 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
   });
 });

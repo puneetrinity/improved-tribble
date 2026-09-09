@@ -736,11 +736,11 @@
   "governed_files": [
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "99d80e17279c983dee72f315fc9001f693185db1acccebe4fd8308719fe11309"
+      "sha256": "097e9fa759d54d9f0a8b6756352966428b2a6fefee1976b9167701339591af0a"
     },
     {
       "file": "package.json",
-      "sha256": "360af2259d6b4e5468367cd55339131bd37223aefef47e22fab48c3ab76013df"
+      "sha256": "248c7c6d2d5caa618cf9e0ddb2c0789f5076520375d02e2c6bbec4400e0e6448"
     },
     {
       "file": "vitest.server.config.ts",
@@ -748,7 +748,7 @@
     },
     {
       "file": "server/applications.routes.ts",
-      "sha256": "b90aa87a9ff2da60e5ab8baf480ad0f2526afcabdf8ba7be519e469246e9dc45"
+      "sha256": "01bfa9ca6394c9cbb561047ffd6f282b1cfe0159e7ad7d40195100401eeed5ed"
     },
     {
       "file": "server/communications.routes.ts",
@@ -796,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "86773e74ed59c5e0f26c0d1d8a89d57e7de45bc0feeaad31953217485e49ea18"
+      "sha256": "e5a961a88400abfd40d06ae7b34ad0918701d281d374356f79417f8ae4b202f5"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -804,7 +804,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "cee52657dfcd2a173e322b6540e3cf95c1af6c24bd397b48477117cd5b4acbb9"
+      "sha256": "a2bd170bd95cfaed68efb4b85433335346a0167ec832d914e2eaea086afd3168"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -936,7 +936,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "bcefd2a7e22463104ad155a0dacbbe831989794849fd326fd0f3ca4e68d505ed"
+      "sha256": "03a377f5fa86f0b6b6f35733b151fb542aca7da0e229c9f871a6360085ae635d"
     },
     {
       "file": "shared/forms.types.ts",
@@ -956,15 +956,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "55184face62cb99faa031580cca85365eac783b46cf7ac76176191b30fc4b2a5"
+      "sha256": "08ff07739eacf7140401506d72f5a15fb1a2c7f8a8ccbdfec29f48611c438eab"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "3e8955bcc53bbcfdf0668fc5b556ca1c386e97bb52c952a102322d8f1f0648aa"
+      "sha256": "436385a86d5ebe85243d1bb2c20dc543d226204470b46ae7f137f4b6cf4b948c"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "43bebe6b6e378015dcd1e071300043371246468e5faea896711685f1abedd3b2"
+      "sha256": "b2237c052ac1564a3a77b2c9a2070848003151d5942665daa90364ffae2698ed"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1116,11 +1116,11 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "7d2887aeca5611d857edfe752fdc407afe122db051446156010c1505a8050e02"
+      "sha256": "b9006bc8b398cd12cda6ba3b1a7d59864fded52e9ea9aac261d5dc417ad27273"
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
-      "sha256": "7c6c43464bc0c162617cd497b18665f979398e2827981f784a1593b210d38143"
+      "sha256": "7252e774876d146586bcf147058a6abbe367deffac4327c978b983bc70976778"
     },
     {
       "file": "server/decision-projection/config.ts",
@@ -1227,7 +1227,7 @@
     },
     {
       "file": "server/index.ts",
-      "sha256": "caf52020b4c3105cda43ed3fbacde6960dc3b23aef55263a352fa249a84e3447"
+      "sha256": "c1accca831416fedabe9c336b5eff40d18979d3f0271a29ded0d101bd038b124"
     },
     {
       "file": "server/aiWorker.ts",

@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "8c714cf14b3c8e9dc07ea76887689b33511dcd167c38a4a65edf69ef2586b5b8",
+  "source_census_sha256": "496709f6d04ea45de5ee722cf27527eb1d2e6215cc3d6c3fa8671bd943c5ab8e",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/storage.ts",
@@ -56,6 +56,8 @@
     { "file": "server/candidate-privacy/repository.ts", "classification": "fenced" },
     { "file": "server/candidate-privacy/processor.ts", "classification": "fenced" },
     { "file": "server/candidate-privacy/routes.ts", "classification": "fenced" },
+    { "file": "server/organization-candidates/application-intake.ts", "classification": "fenced" },
+    { "file": "server/organization-candidates/processor.ts", "classification": "fenced" },
     { "file": "server/auth.ts", "classification": "fenced" },
     { "file": "server/index.ts", "classification": "fenced" },
     { "file": "server/routes.ts", "classification": "fenced" },
@@ -278,15 +280,37 @@
       "anchors": ["WITH authorized_application AS", "applicationPrivacyAllowed(false)", "readAuthorizedApplicationEmailHistory", "readAuthorizedApplicationInterviewInvite"]
     },
     {
+      "id": "organization-private-application-intake",
+      "file": "server/organization-candidates/application-intake.ts",
+      "symbol": "requireOrganizationCandidateApplicationAllowed",
+      "models": ["applications", "candidate_resumes", "organization_candidate_references", "application_resume_versions", "organization_candidate_memory_outbox"],
+      "direction": "read_write",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "application_owning_org",
+      "enforcement": "Private-use privacy authority precedes exact resume evidence construction; one statement appends only the PII-free reference, immutable version, and body-free intent.",
+      "anchors": ["requireCandidatePrivacyAllowed", "globalUse: false", "pinPrivateResumeEvidence", "appendOrganizationCandidateApplicationEvidence"]
+    },
+    {
+      "id": "organization-private-memory-delivery",
+      "file": "server/organization-candidates/processor.ts",
+      "symbol": "runOrganizationCandidateProcessorOnce",
+      "models": ["applications", "application_resume_versions", "organization_candidate_memory_outbox"],
+      "direction": "read_write_provider",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "application_owning_org",
+      "enforcement": "A generation-fenced claim reloads exact local evidence and rechecks private-use privacy immediately before the PII-minimized authenticated Memory call.",
+      "anchors": ["claim_organization_candidate_memory_intents", "requireOrganizationCandidateApplicationAllowed", "deliverOrganizationCandidate", "ack_organization_candidate_memory_intent"]
+    },
+    {
       "id": "application-intake-and-workflow",
       "file": "server/applications.routes.ts",
       "symbol": "registerApplicationsRoutes",
-      "models": ["applications", "candidate_resumes", "application_graph_sync_jobs"],
+      "models": ["applications", "candidate_resumes", "organization_candidate_references", "application_resume_versions", "organization_candidate_memory_outbox", "application_graph_sync_jobs"],
       "direction": "read_write_queue_provider",
       "privacy_action": ["withdraw_global_matching", "request_erasure"],
       "organization_scope": "self_or_owning_org",
-      "enforcement": "Raw identity checks precede persistence/GCS; application anchors recheck before notifications and graph sync; AI summary and similarity use statement-bound object/privacy grants before candidate reads and provider publication.",
-      "anchors": ["requireNewCandidateIdentityAllowed", "runPrivacyCheckedApplicationSideEffect", "requireCandidatePrivacyAllowed", "readAuthorizedApplicationAiSummaryContext", "readAuthorizedSimilarCandidates"]
+      "enforcement": "Raw identity checks precede persistence/GCS; the public application path rechecks private-use authority before exact resume pinning and the atomic application/reference/version/outbox commit; application anchors recheck before notifications; AI summary and similarity use statement-bound object/privacy grants before candidate reads and provider publication.",
+      "anchors": ["requireOrganizationCandidateApplicationAllowed", "appendOrganizationCandidateApplicationEvidence", "runPrivacyCheckedApplicationSideEffect", "requireCandidatePrivacyAllowed", "readAuthorizedApplicationAiSummaryContext", "readAuthorizedSimilarCandidates"]
     },
     {
       "id": "candidate-self-readers",

@@ -162,6 +162,22 @@ describe("candidate authentication response", () => {
 });
 
 describe("candidate application privacy boundary", () => {
+  it("rechecks private-use authority before the public application commit and Memory delivery", () => {
+    const routeSource = read("../../applications.routes.ts");
+    const routeStart = routeSource.indexOf('app.post("/api/jobs/:id/apply"');
+    const routeEnd = routeSource.indexOf("// Recruiter adds candidate on behalf", routeStart);
+    const route = routeSource.slice(routeStart, routeEnd);
+    expect(route.match(/requireApplicationIngestAllowed\(/g)?.length)
+      .toBeGreaterThanOrEqual(3);
+    expect(route.match(/privateUse: true/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(route.indexOf("requireApplicationIngestAllowed({"))
+      .toBeLessThan(route.indexOf("uploadToGCS("));
+
+    const processor = read("../../organization-candidates/processor.ts");
+    expect(processor.indexOf("requireOrganizationCandidateApplicationAllowed({"))
+      .toBeLessThan(processor.indexOf("deliver(claim"));
+  });
+
   it("maps the candidate response through an explicit public allowlist", () => {
     const routeSource = read("../../applications.routes.ts");
     const viewMapper = routeSource.slice(

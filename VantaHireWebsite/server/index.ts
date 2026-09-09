@@ -24,6 +24,11 @@ import {
   stopCandidatePrivacyProcessor,
 } from "./candidate-privacy/processor";
 import { assertCandidatePrivacyRuntimeConfig } from "./candidate-privacy/config";
+import {
+  assertOrganizationCandidateSyncRuntimeConfig,
+  startOrganizationCandidateProcessor,
+  stopOrganizationCandidateProcessor,
+} from "./organization-candidates/processor";
 import { captureServerException, initServerMonitoring, isExpectedDisconnectError, monitoringRequestContext } from "./monitoring";
 initServerMonitoring();
 const app = express();
@@ -116,6 +121,7 @@ import { initWebSocketServer } from "./websocket";
 (async () => {
   const server = await registerRoutes(app);
   assertCandidatePrivacyRuntimeConfig();
+  assertOrganizationCandidateSyncRuntimeConfig();
   initWebSocketServer(server);
 
   if (process.env.SENTRY_DSN) {
@@ -187,6 +193,10 @@ import { initWebSocketServer } from "./websocket";
     // the freshest local restrictive projection available for this runtime.
     startCandidatePrivacyProcessor();
 
+    // The schema-ready launch command has completed before this process starts;
+    // configuration is asserted above before any 4B delivery timer is armed.
+    startOrganizationCandidateProcessor();
+
     // Start job scheduler for automatic job expiration
     startJobScheduler();
 
@@ -220,6 +230,7 @@ import { initWebSocketServer } from "./websocket";
     stopContactResolutionProcessor();
     stopOutreachHygieneProcessor();
     stopCandidatePrivacyProcessor();
+    void stopOrganizationCandidateProcessor();
     server.close(() => {
       process.exit(0);
     });
