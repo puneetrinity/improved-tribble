@@ -3,6 +3,14 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { insertApplicationSchema } from '@shared/schema';
 
+// The server Vitest allowlist is a frozen governance surface. These Wave 4B
+// suites are imported through this already-governed candidate-apply contract.
+import '../../organization-candidates/__tests__/contracts.test';
+import '../../organization-candidates/__tests__/guard.test';
+import '../../organization-candidates/__tests__/memory-client.test';
+import '../../organization-candidates/__tests__/processor.test';
+import '../../organization-candidates/__tests__/public-apply.routes.test';
+
 function read(relativeUrl: string): string {
   return readFileSync(new URL(relativeUrl, import.meta.url), 'utf8');
 }
@@ -33,6 +41,8 @@ describe('candidate resume-backed application contracts', () => {
     expect(source).toContain('resumeRecordId = storedResume.id');
     expect(source).toContain('extractedResumeText = storedResume.extractedText');
     expect(source).toContain('resumeFilename = storedResume.label');
+    expect(source).toContain('resumeBytes = await downloadFromGCS(resumeUrl)');
+    expect(source).toContain('savedResumeUpdatedAt = storedResume.updatedAt');
     expect(source).toContain(
       'submittedEmail = verifiedCandidate.username.trim().toLowerCase()'
     );
@@ -40,6 +50,19 @@ describe('candidate resume-backed application contracts', () => {
     expect(source).toContain('...(verifiedCandidate && { userId: verifiedCandidate.id })');
     expect(source).toContain('if (verifiedCandidate && req.file?.buffer)');
     expect(source).not.toContain('...(req.user?.id !== undefined && { userId: req.user.id })');
+  });
+
+  it('pins the exact resume version in the same transaction as the application', () => {
+    const source = read('../../applications.routes.ts');
+    const routeStart = source.indexOf('app.post("/api/jobs/:id/apply"');
+    const transactionStart = source.indexOf('application = await db.transaction', routeStart);
+    const transactionEnd = source.indexOf('return created;', transactionStart);
+    const transaction = source.slice(transactionStart, transactionEnd);
+
+    expect(transaction).toContain('storage.createApplication({');
+    expect(transaction).toContain('matchApplicationToSourcedCandidate({');
+    expect(transaction).toContain('appendOrganizationCandidateApplicationEvidence({');
+    expect(transaction.match(/executor: tx/g)).toHaveLength(2);
   });
 
   it('preserves anonymous file upload while keeping application claiming verified-candidate only', () => {

@@ -84,6 +84,11 @@ import { computeResumeImportBatchStatus } from "./lib/resumeImportFieldExtractio
 
 export type JobHealthStatus = 'green' | 'amber' | 'red';
 
+// Server-owned call-site authority, never an applicant field or a persisted value.
+export interface ApplicationAdmissionOptions {
+  admission: 'global' | 'organization_private';
+}
+
 export type ResumeAccessActorRole = 'recruiter' | 'hiring_manager' | 'candidate' | 'super_admin';
 export type ResumeAccessDeliveryMode = 'gcs_stream' | 'http_redirect' | 'stored_text' | 'missing' | 'unsupported';
 export type ResumeAccessTerminalStatus = 'completed' | 'failed' | 'redirected';
@@ -270,7 +275,7 @@ export interface IStorage {
     stageChangedAt?: Date;
     stageChangedBy?: number;
     organizationId?: number;
-  }, executor?: any): Promise<Application>;
+  }, executor?: any, options?: ApplicationAdmissionOptions): Promise<Application>;
   getApplicationsByJob(jobId: number): Promise<Application[]>;
   getApplicationsByUser(email: string): Promise<Application[]>;
   getApplication(id: number): Promise<Application | undefined>;
@@ -1615,15 +1620,22 @@ export class DatabaseStorage implements IStorage {
     stageChangedAt?: Date;
     stageChangedBy?: number;
     organizationId?: number;
-  }, executor: any = db): Promise<Application> {
+  }, executor: any = db, options: ApplicationAdmissionOptions = { admission: 'global' }): Promise<Application> {
     const {
+      CandidatePrivacyRestrictedError,
       requireCandidatePrivacyAllowed,
       requireNewCandidateIdentityAllowed,
     } = await import('./candidate-privacy/decision');
+    const privateUse = options.admission === 'organization_private';
+    if ((options.admission !== 'global' && !privateUse)
+        || (privateUse && (!Number.isSafeInteger(application.organizationId)
+          || Number(application.organizationId) <= 0))) {
+      throw new CandidatePrivacyRestrictedError('candidate_privacy_restricted');
+    }
     if (application.userId) {
       await requireCandidatePrivacyAllowed(
         { type: 'candidate_user', id: application.userId },
-        { globalUse: true, newGlobalOperation: true },
+        { globalUse: !privateUse, newGlobalOperation: true },
       );
     } else {
       const identifiers: Array<{ identifier_type: 'email' | 'phone'; value: string }> = [
@@ -1632,7 +1644,7 @@ export class DatabaseStorage implements IStorage {
       if (application.phone?.trim()) {
         identifiers.push({ identifier_type: 'phone', value: application.phone.trim() });
       }
-      await requireNewCandidateIdentityAllowed(identifiers);
+      await requireNewCandidateIdentityAllowed(identifiers, { globalUse: !privateUse });
     }
     const [result] = await executor
       .insert(applications)

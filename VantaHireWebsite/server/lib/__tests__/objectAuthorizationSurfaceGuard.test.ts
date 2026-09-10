@@ -130,6 +130,13 @@ describe("object authorization surface guard", () => {
     expect(checkObjectAuthorization(fixture())).toEqual([]);
   });
 
+  it("keeps the organization-candidate outbox body-free and routine-only at runtime", () => {
+    const runtimeRole = readFileSync(join(APP_ROOT, "server/schema-control/runtimeRole.ts"), "utf8");
+    expect(runtimeRole).toContain("c.relname = 'organization_candidate_memory_outbox'");
+    expect(runtimeRole).toContain("has_table_privilege($1,c.oid,'SELECT') = FALSE");
+    expect(runtimeRole).toContain("claim_organization_candidate_memory_intents(text,integer,integer)");
+  });
+
   it("rejects loss of the current recruiter role", () => {
     const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
       source.replace("actor.role = 'recruiter'", "actor.role = 'candidate'"),

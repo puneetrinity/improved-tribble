@@ -43,6 +43,7 @@ const fixtureFiles = [
   "VantaHireWebsite/server/schema-migrations/0007_decision_event_spine.sql",
   "VantaHireWebsite/server/schema-migrations/0008_decision_projection_outbox.sql",
   "VantaHireWebsite/server/schema-migrations/0009_decision_projection_delivery_state.sql",
+  "VantaHireWebsite/server/schema-migrations/0010_organization_private_candidate_reference.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
   "VantaHireWebsite/server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
@@ -256,6 +257,23 @@ const mutations: Array<{
     apply(root) {
       mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
         delete lock.migrations["0009"];
+      });
+    },
+  },
+  {
+    name: "organization-candidate migration edited after checksum",
+    expected: /applied migration 0010 .* was edited/,
+    apply(root) {
+      const relative = "VantaHireWebsite/server/schema-migrations/0010_organization_private_candidate_reference.sql";
+      write(root, relative, `${readFileSync(join(root, relative), "utf8")}\n-- forbidden drift\n`);
+    },
+  },
+  {
+    name: "organization-candidate migration omitted from checksum lock",
+    expected: /checksums\.lock versions do not exactly match migration files/,
+    apply(root) {
+      mutateJson(root, "VantaHireWebsite/server/schema-migrations/checksums.lock", (lock) => {
+        delete lock.migrations["0010"];
       });
     },
   },

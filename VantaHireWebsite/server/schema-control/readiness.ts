@@ -44,6 +44,9 @@ const FLOW_CORE_RELATIONS = [
   "public.decision_events",
   "public.decision_projection_outbox",
   "public.decision_projection_delivery_state",
+  "public.organization_candidate_references",
+  "public.application_resume_versions",
+  "public.organization_candidate_memory_outbox",
 ] as const;
 
 /** Minimum catalog facts every Flow web/worker process requires to start. */
@@ -204,6 +207,67 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
     },
   },
   {
+    name: "Organization-candidate evidence and delivery authority are exact",
+    async check(pg) {
+      const result = await pg.query(`
+        SELECT
+          to_regclass('public.organization_candidate_references') IS NOT NULL
+          AND to_regclass('public.application_resume_versions') IS NOT NULL
+          AND to_regclass('public.organization_candidate_memory_outbox') IS NOT NULL
+          AND (
+            SELECT COUNT(*)=3 FROM unnest(ARRAY[
+              'public.claim_organization_candidate_memory_intents(text,integer,integer)',
+              'public.ack_organization_candidate_memory_intent(uuid,integer,uuid)',
+              'public.fail_organization_candidate_memory_intent(uuid,integer,text,timestamp with time zone)'
+            ]::text[]) AS expected(signature)
+            WHERE to_regprocedure(expected.signature) IS NOT NULL
+          )
+          AND (
+            SELECT COUNT(*)=4 FROM pg_trigger t
+             WHERE NOT t.tgisinternal AND t.tgenabled <> 'D'
+               AND (
+                 (t.tgrelid='public.organization_candidate_references'::regclass
+                   AND t.tgname IN ('organization_candidate_references_append_only',
+                     'organization_candidate_references_truncate_append_only'))
+                 OR (t.tgrelid='public.application_resume_versions'::regclass
+                   AND t.tgname IN ('application_resume_versions_append_only',
+                     'application_resume_versions_truncate_append_only'))
+               )
+          )
+          AND has_table_privilege(current_user,'public.organization_candidate_references','SELECT')
+          AND has_table_privilege(current_user,'public.organization_candidate_references','INSERT')
+          AND NOT has_table_privilege(current_user,'public.organization_candidate_references','UPDATE')
+          AND has_table_privilege(current_user,'public.application_resume_versions','SELECT')
+          AND has_table_privilege(current_user,'public.application_resume_versions','INSERT')
+          AND NOT has_table_privilege(current_user,'public.application_resume_versions','UPDATE')
+          AND NOT has_table_privilege(current_user,'public.organization_candidate_memory_outbox','SELECT')
+          AND has_table_privilege(current_user,'public.organization_candidate_memory_outbox','INSERT')
+          AND NOT has_table_privilege(current_user,'public.organization_candidate_memory_outbox','UPDATE')
+          AND has_function_privilege(current_user,
+            'public.claim_organization_candidate_memory_intents(text,integer,integer)','EXECUTE')
+          AND has_function_privilege(current_user,
+            'public.ack_organization_candidate_memory_intent(uuid,integer,uuid)','EXECUTE')
+          AND has_function_privilege(current_user,
+            'public.fail_organization_candidate_memory_intent(uuid,integer,text,timestamp with time zone)','EXECUTE')
+          AND NOT EXISTS (
+            SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+             WHERE n.nspname='public'
+               AND p.proname IN (
+                 'claim_organization_candidate_memory_intents',
+                 'ack_organization_candidate_memory_intent',
+                 'fail_organization_candidate_memory_intent'
+               )
+               AND (
+                 NOT p.prosecdef
+                 OR p.proconfig <> ARRAY['search_path=pg_catalog, public']::text[]
+                 OR pg_has_role(current_user, pg_get_userbyid(p.proowner), 'MEMBER')
+               )
+          ) AS ok
+      `);
+      return result.rows[0]?.ok === true;
+    },
+  },
+  {
     name: "Runtime role has application rights without DDL or ownership authority",
     async check(pg) {
       // ACL/owner names are environment-owned and intentionally excluded from
@@ -286,7 +350,33 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  )
                  OR
                  (
-                   c.relname NOT IN ('decision_events','decision_projection_outbox','decision_projection_delivery_state')
+                   c.relname IN ('organization_candidate_references','application_resume_versions')
+                   AND has_table_privilege(current_user, c.oid, 'SELECT')
+                   AND has_table_privilege(current_user, c.oid, 'INSERT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'UPDATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'DELETE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'REFERENCES')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
+                 )
+                 OR
+                 (
+                   c.relname='organization_candidate_memory_outbox'
+                   AND NOT has_table_privilege(current_user, c.oid, 'SELECT')
+                   AND has_table_privilege(current_user, c.oid, 'INSERT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'UPDATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'DELETE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'REFERENCES')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
+                 )
+                 OR
+                 (
+                   c.relname NOT IN (
+                     'decision_events','decision_projection_outbox','decision_projection_delivery_state',
+                     'organization_candidate_references','application_resume_versions',
+                     'organization_candidate_memory_outbox'
+                   )
                    AND has_table_privilege(current_user, c.oid, 'SELECT')
                    AND has_table_privilege(current_user, c.oid, 'INSERT')
                    AND has_table_privilege(current_user, c.oid, 'UPDATE')

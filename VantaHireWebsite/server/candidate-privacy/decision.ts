@@ -41,6 +41,7 @@ export async function requireCandidatePrivacyAllowed(
 
 export async function requireNewCandidateIdentityAllowed(
   identifiers: PrivacyIdentifier[],
+  options: { globalUse: boolean } = { globalUse: true },
 ): Promise<void> {
   const config = loadCandidatePrivacyConfig();
   let decision: "allow" | "block_global" | "block_all" | "review";
@@ -56,7 +57,9 @@ export async function requireNewCandidateIdentityAllowed(
   if (decision === "review") {
     throw new CandidatePrivacyRestrictedError("candidate_privacy_review_required");
   }
-  if (decision !== "allow") {
+  // Existing callers remain global by default. Only an explicit private-use
+  // caller can admit a global opt-out; unknown decisions still fail closed.
+  if (decision !== "allow" && !(decision === "block_global" && options.globalUse === false)) {
     throw new CandidatePrivacyRestrictedError("candidate_privacy_restricted");
   }
 }

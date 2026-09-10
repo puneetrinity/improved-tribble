@@ -53,6 +53,14 @@ const DECISION_DELIVERY_FUNCTIONS = [
   "public.ack_decision_projection_delivery(uuid,uuid,bigint,bigint,text)",
   "public.fail_decision_projection_delivery(uuid,uuid,bigint,text,boolean,integer)",
 ] as const;
+const ORGANIZATION_CANDIDATE_REFERENCE_TABLE = "public.organization_candidate_references";
+const APPLICATION_RESUME_VERSION_TABLE = "public.application_resume_versions";
+const ORGANIZATION_CANDIDATE_OUTBOX_TABLE = "public.organization_candidate_memory_outbox";
+const ORGANIZATION_CANDIDATE_FUNCTIONS = [
+  "public.claim_organization_candidate_memory_intents(text,integer,integer)",
+  "public.ack_organization_candidate_memory_intent(uuid,integer,uuid)",
+  "public.fail_organization_candidate_memory_intent(uuid,integer,text,timestamp with time zone)",
+] as const;
 
 function connectionTarget(raw: string): ConnectionTarget {
   try {
@@ -233,7 +241,33 @@ export async function assertRuntimeRoleContract(
               )
               OR
               (
-                c.relname NOT IN ('decision_events','decision_projection_outbox','decision_projection_delivery_state')
+                c.relname IN ('organization_candidate_references','application_resume_versions')
+                AND has_table_privilege($1,c.oid,'SELECT')
+                AND has_table_privilege($1,c.oid,'INSERT')
+                AND NOT has_table_privilege($1,c.oid,'UPDATE')
+                AND NOT has_table_privilege($1,c.oid,'DELETE')
+                AND NOT has_table_privilege($1,c.oid,'TRUNCATE')
+                AND NOT has_table_privilege($1,c.oid,'REFERENCES')
+                AND NOT has_table_privilege($1,c.oid,'TRIGGER')
+              )
+              OR
+              (
+                c.relname = 'organization_candidate_memory_outbox'
+                AND has_table_privilege($1,c.oid,'SELECT') = FALSE
+                AND has_table_privilege($1,c.oid,'INSERT')
+                AND NOT has_table_privilege($1,c.oid,'UPDATE')
+                AND NOT has_table_privilege($1,c.oid,'DELETE')
+                AND NOT has_table_privilege($1,c.oid,'TRUNCATE')
+                AND NOT has_table_privilege($1,c.oid,'REFERENCES')
+                AND NOT has_table_privilege($1,c.oid,'TRIGGER')
+              )
+              OR
+              (
+                c.relname NOT IN (
+                  'decision_events','decision_projection_outbox','decision_projection_delivery_state',
+                  'organization_candidate_references','application_resume_versions',
+                  'organization_candidate_memory_outbox'
+                )
                 AND has_table_privilege($1,c.oid,'SELECT')
                 AND has_table_privilege($1,c.oid,'INSERT')
                 AND has_table_privilege($1,c.oid,'UPDATE')
@@ -441,6 +475,49 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
       if (deliveryTablePresent) {
         await migration.query(`REVOKE ALL PRIVILEGES ON TABLE ${DECISION_DELIVERY_TABLE} FROM ${ident}`);
         for (const signature of DECISION_DELIVERY_FUNCTIONS) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${signature} FROM ${ident}`);
+          await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
+        }
+      }
+
+      const organizationCandidate = await migration.query(
+        `SELECT to_regclass($1) AS reference_table, to_regclass($2) AS resume_table,
+                to_regclass($3) AS outbox_table,
+                to_regprocedure($4) AS claim_function,
+                to_regprocedure($5) AS ack_function,
+                to_regprocedure($6) AS fail_function`,
+        [
+          ORGANIZATION_CANDIDATE_REFERENCE_TABLE,
+          APPLICATION_RESUME_VERSION_TABLE,
+          ORGANIZATION_CANDIDATE_OUTBOX_TABLE,
+          ...ORGANIZATION_CANDIDATE_FUNCTIONS,
+        ],
+      );
+      const organizationCandidateTableCount = ["reference_table", "resume_table", "outbox_table"]
+        .filter((key) => Boolean(organizationCandidate.rows[0]?.[key])).length;
+      const organizationCandidateFunctionCount = ["claim_function", "ack_function", "fail_function"]
+        .filter((key) => Boolean(organizationCandidate.rows[0]?.[key])).length;
+      if (!([0, 3].includes(organizationCandidateTableCount))
+          || organizationCandidateTableCount !== organizationCandidateFunctionCount) {
+        throw new RuntimeRoleProvisionError(
+          "Organization-candidate table/function presence is inconsistent.",
+        );
+      }
+      if (organizationCandidateTableCount === 3) {
+        for (const table of [
+          ORGANIZATION_CANDIDATE_REFERENCE_TABLE,
+          APPLICATION_RESUME_VERSION_TABLE,
+        ]) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON TABLE ${table} FROM ${ident}`);
+          await migration.query(`GRANT SELECT,INSERT ON TABLE ${table} TO ${ident}`);
+        }
+        await migration.query(
+          `REVOKE ALL PRIVILEGES ON TABLE ${ORGANIZATION_CANDIDATE_OUTBOX_TABLE} FROM ${ident}`,
+        );
+        await migration.query(
+          `GRANT INSERT ON TABLE ${ORGANIZATION_CANDIDATE_OUTBOX_TABLE} TO ${ident}`,
+        );
+        for (const signature of ORGANIZATION_CANDIDATE_FUNCTIONS) {
           await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${signature} FROM ${ident}`);
           await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
         }

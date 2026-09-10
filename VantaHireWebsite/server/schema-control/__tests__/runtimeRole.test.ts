@@ -78,5 +78,19 @@ describe("runtime-role provisioning controls", () => {
       expect(runtimeRoleSource).toContain(signature);
     }
     expect(runtimeRoleSource).toContain("Decision-delivery table/function presence is inconsistent.");
+    expect(runtimeRoleSource).toContain("c.relname IN ('organization_candidate_references','application_resume_versions')");
+    expect(runtimeRoleSource).toContain("c.relname = 'organization_candidate_memory_outbox'");
+    expect(runtimeRoleSource).toContain("GRANT SELECT,INSERT ON TABLE ${table} TO ${ident}");
+    expect(runtimeRoleSource).toContain(
+      `GRANT INSERT ON TABLE ${"${ORGANIZATION_CANDIDATE_OUTBOX_TABLE}"} TO ${"${ident}"}`,
+    );
+    for (const signature of [
+      "claim_organization_candidate_memory_intents(text,integer,integer)",
+      "ack_organization_candidate_memory_intent(uuid,integer,uuid)",
+      "fail_organization_candidate_memory_intent(uuid,integer,text,timestamp with time zone)",
+    ]) {
+      expect(runtimeRoleSource).toContain(signature);
+    }
+    expect(runtimeRoleSource).toContain("Organization-candidate table/function presence is inconsistent.");
   });
 });
