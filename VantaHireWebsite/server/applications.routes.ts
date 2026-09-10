@@ -777,7 +777,7 @@ export function registerApplicationsRoutes(
             stageChangedBy: job.postedBy,
           }),
           ...(job.organizationId != null && { organizationId: job.organizationId }),
-          }, tx);
+          }, tx, { admission: 'organization_private' });
           await matchApplicationToSourcedCandidate({
             applicationId: created.id,
             applicationEmail: created.email,

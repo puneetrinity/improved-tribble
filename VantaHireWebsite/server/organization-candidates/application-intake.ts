@@ -41,14 +41,16 @@ export async function requireOrganizationCandidateApplicationAllowed(input: {
   if (input.applicationId) {
     await requireCandidatePrivacyAllowed(
       { type: "application", id: input.applicationId },
-      { globalUse: false },
+      // The repository's historical newGlobalOperation flag enforces feed
+      // freshness independently of globalUse; private intake must retain it.
+      { globalUse: false, newGlobalOperation: true },
     );
     return;
   }
   if (input.userId) {
     await requireCandidatePrivacyAllowed(
       { type: "candidate_user", id: input.userId },
-      { globalUse: false },
+      { globalUse: false, newGlobalOperation: true },
     );
     return;
   }

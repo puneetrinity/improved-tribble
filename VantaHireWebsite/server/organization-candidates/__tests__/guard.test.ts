@@ -12,6 +12,7 @@ const files = [
   "package-lock.json", "server/aiWorker.ts", "server/gcs-storage.ts",
   "server/lib/applicationGraphSyncProcessor.ts", "server/lib/services/jwt-signer.ts",
   "server/schema-migrations/0009_decision_projection_delivery_state.sql", "server/storage.ts",
+  "server/candidate-privacy/decision.ts",
   "server/schema-migrations/0010_organization_private_candidate_reference.sql",
   "server/organization-candidates/application-intake.ts",
   "server/organization-candidates/memory-client.ts",
@@ -47,6 +48,12 @@ describe("organization-candidate intake source guard", () => {
       "FOR UPDATE OF candidate SKIP LOCKED", "FOR UPDATE OF candidate"],
     ["server/applications.routes.ts", "resumeBytes = await downloadFromGCS(resumeUrl)",
       "resumeBytes = Buffer.from(resumeUrl)"],
+    ["server/applications.routes.ts", "}, tx, { admission: 'organization_private' });", "}, tx);"],
+    ["server/storage.ts", "options: ApplicationAdmissionOptions = { admission: 'global' }",
+      "options: ApplicationAdmissionOptions = { admission: 'organization_private' }"],
+    ["server/candidate-privacy/decision.ts", "options.globalUse === false", "true"],
+    ["server/organization-candidates/application-intake.ts",
+      "globalUse: false, newGlobalOperation: true", "globalUse: false, newGlobalOperation: false"],
   ])("refuses mutation of %s", (relative, before, after) => {
     const root = fixture();
     try {

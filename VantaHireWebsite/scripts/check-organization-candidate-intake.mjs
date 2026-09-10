@@ -13,7 +13,8 @@ const frozenHashes = {
   "server/lib/applicationGraphSyncProcessor.ts": "ad98b6499dfb667aaa1ed7bda021e54b178a59f521050c08c5930ed8e6c7d0e1",
   "server/lib/services/jwt-signer.ts": "0213eb5984388fba2c3e4bf8893ac94b7fbaecc1f669b12b50519ef0a24cd490",
   "server/schema-migrations/0009_decision_projection_delivery_state.sql": "ce5999cab8bf087b838bdc05e4eca81d6012a1f044e957ff4ab196c41919f348",
-  "server/storage.ts": "8c7a06331d36249ca7e115c85a5193d2ad66949b5f0ad9eb51df1c95d3f06c31",
+  "server/storage.ts": "3fb44fa5515fb8cc0b9ac0556e3f22c62aa1397868cb2353d2c465ad13e60d03",
+  "server/candidate-privacy/decision.ts": "02bd1b412deb3f89f8cd4646dae19a2a0825486acf0c09c109c247da83c38f52",
 };
 
 export class OrganizationCandidateGuardError extends Error {}
@@ -45,12 +46,36 @@ export function checkOrganizationCandidateIntake(root = APP_ROOT) {
   const client = read(root, "server/organization-candidates/memory-client.ts");
   const processor = read(root, "server/organization-candidates/processor.ts");
   const routeSource = read(root, "server/applications.routes.ts");
+  const storage = read(root, "server/storage.ts");
+  const decision = read(root, "server/candidate-privacy/decision.ts");
   const routeStart = routeSource.indexOf('app.post("/api/jobs/:id/apply"');
   const routeEnd = routeSource.indexOf("// Recruiter adds candidate on behalf", routeStart);
   if (routeStart < 0 || routeEnd < routeStart) {
     throw new OrganizationCandidateGuardError("public application route boundary drifted");
   }
   const publicRoute = routeSource.slice(routeStart, routeEnd);
+
+  // A7: private authority is an explicit server-owned writer option. Existing
+  // callers stay global; moving/removing the sole adopted call is a regression.
+  const privateCall = "}, tx, { admission: 'organization_private' });";
+  if (publicRoute.split(privateCall).length !== 2
+      || routeSource.replace(publicRoute, "").includes(privateCall)) {
+    throw new OrganizationCandidateGuardError("private admission must belong only to the public adopter");
+  }
+  requireTokens(storage, [
+    "options: ApplicationAdmissionOptions = { admission: 'global' }",
+    "const privateUse = options.admission === 'organization_private'",
+    "Number.isSafeInteger(application.organizationId)",
+    "{ globalUse: !privateUse, newGlobalOperation: true }",
+    "requireNewCandidateIdentityAllowed(identifiers, { globalUse: !privateUse })",
+  ], "application writer admission authority is incomplete");
+  requireTokens(decision, [
+    "options: { globalUse: boolean } = { globalUse: true }",
+    'decision !== "allow" && !(decision === "block_global" && options.globalUse === false)',
+  ], "new identity default-global admission drifted");
+  if ((intake.match(/globalUse: false, newGlobalOperation: true/g) ?? []).length !== 2) {
+    throw new OrganizationCandidateGuardError("private bound-subject freshness fence drifted");
+  }
 
   requireTokens(migration, [
     "CREATE TABLE public.organization_candidate_references",
