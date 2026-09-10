@@ -748,7 +748,7 @@
     },
     {
       "file": "server/applications.routes.ts",
-      "sha256": "a046a5c08b6e3eed03e91881dcd35c5fc2dfc1ef7cc985e59ef599dea0de5fcd"
+      "sha256": "a2599e3f62a251f9a3fc857ab60b4c040d28197399bc22a1d89b8a4f40e6d974"
     },
     {
       "file": "server/communications.routes.ts",
@@ -796,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "5e3bb338078aa7d938b46a2e577d389d8b489a808e1d974a3b8ea900bd11aa02"
+      "sha256": "2122e1c168dcea5cd1765ffac57d3b059085b0c17cf06220537a4be1e25253f9"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",

@@ -865,6 +865,34 @@ export function registerApplicationsRoutes(
         console.error('Failed to send recruiter notification:', emailError);
       }
 
+      // A8: preserve legacy indexing after the private application commit.
+      // The real enqueue and processor retain their global-use privacy fences.
+      if (process.env.ACTIVEKG_SYNC_ENABLED === 'true' && application.organizationId) {
+        const hasValidResumeText = extractedResumeText && extractedResumeText.trim().length >= MIN_RESUME_TEXT_LENGTH;
+        if (hasValidResumeText) {
+          try {
+            const effectiveRecruiterId = job.postedBy;
+            const tenantId = resolveActiveKGTenantId(application.organizationId);
+            await storage.enqueueApplicationGraphSyncJob({
+              applicationId: application.id,
+              organizationId: application.organizationId,
+              jobId: application.jobId,
+              effectiveRecruiterId,
+              activekgTenantId: tenantId,
+            });
+          } catch {
+            // Privacy refusal or queue failure never reverses committed success.
+            console.warn('[ACTIVEKG_SYNC] Legacy enqueue unavailable (non-blocking)');
+          }
+        } else {
+          storage.updateApplicationSyncSkippedReason(
+            application.id,
+            !extractedResumeText ? 'resume_text_missing' : 'resume_text_below_threshold'
+          ).catch(() => console.warn('[ACTIVEKG_SYNC] Skip-reason update unavailable (non-blocking)'));
+        }
+      }
+      // End A8 legacy indexing bridge.
+
       res.status(201).json({
         success: true,
         message: 'Application submitted successfully',

@@ -122,8 +122,26 @@ export function checkOrganizationCandidateIntake(root = APP_ROOT) {
     "application = await db.transaction", "appendOrganizationCandidateApplicationEvidence({",
     "await deleteFromGCS(resumeUrl)",
   ], "public application 4B adopter is incomplete");
-  if (publicRoute.includes("enqueueApplicationGraphSyncJob")) {
-    throw new OrganizationCandidateGuardError("public application retained duplicate graph enqueue");
+  const bridgeStart = publicRoute.indexOf("// A8: preserve legacy indexing");
+  const bridgeEnd = publicRoute.indexOf("// End A8 legacy indexing bridge.", bridgeStart);
+  if (bridgeStart < publicRoute.indexOf("return created;") || bridgeEnd <= bridgeStart
+      || bridgeEnd >= publicRoute.indexOf("res.status(201).json({")
+      || (publicRoute.match(/enqueueApplicationGraphSyncJob/g) ?? []).length !== 1) {
+    throw new OrganizationCandidateGuardError("public application legacy bridge order/count drifted");
+  }
+  const bridge = publicRoute.slice(bridgeStart, bridgeEnd);
+  requireTokens(bridge, [
+    "process.env.ACTIVEKG_SYNC_ENABLED === 'true' && application.organizationId",
+    "extractedResumeText.trim().length >= MIN_RESUME_TEXT_LENGTH", "if (hasValidResumeText)",
+    "try {", "} catch {", "const effectiveRecruiterId = job.postedBy;",
+    "resolveActiveKGTenantId(application.organizationId)", "await storage.enqueueApplicationGraphSyncJob({",
+    "applicationId: application.id", "organizationId: application.organizationId",
+    "jobId: application.jobId", "activekgTenantId: tenantId",
+    "storage.updateApplicationSyncSkippedReason(", "'resume_text_missing'", "'resume_text_below_threshold'",
+    ").catch(() => console.warn(",
+  ], "public application legacy bridge gates/binding drifted");
+  if (/\bthrow\b|\bsendPrivacyRestriction\b|\bnext\s*\(/.test(bridge)) {
+    throw new OrganizationCandidateGuardError("legacy enqueue failure must preserve committed success");
   }
   if (!routeSource.slice(routeEnd).includes("enqueueApplicationGraphSyncJob")) {
     throw new OrganizationCandidateGuardError("non-adopted graph enqueue was removed");

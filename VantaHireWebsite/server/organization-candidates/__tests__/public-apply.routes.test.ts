@@ -28,10 +28,11 @@ describe("public application organization-private evidence adopter", () => {
     expect(transaction.match(/executor: tx/g)).toHaveLength(2);
   });
 
-  it("preserves the 201 contract and removes only this route's legacy graph enqueue", () => {
+  it("preserves the 201 contract and one post-commit legacy enqueue with other ingresses unchanged", () => {
     expect(route).toContain("res.status(201).json({");
     expect(route).toContain("applicationId: application.id");
-    expect(route).not.toContain("enqueueApplicationGraphSyncJob");
+    expect(route.match(/enqueueApplicationGraphSyncJob/g)).toHaveLength(1);
+    expect(route.indexOf("await storage.enqueueApplicationGraphSyncJob({")).toBeGreaterThan(route.indexOf("return created;"));
     expect(source.slice(routeEnd)).toContain("enqueueApplicationGraphSyncJob");
   });
 
@@ -49,15 +50,18 @@ describe("A7 public-apply private admission through the real writer", () => {
   type Decision = "allow" | "block_global" | "block_all" | "review" | "unavailable" | "stale";
   let decision: Decision;
   let transactionDecision: Decision | undefined;
+  let postCommitDecision: Decision | undefined;
+  let committed: boolean;
   let applicationValues: Record<string, unknown>;
   let realStorage: typeof import("../../storage")["storage"];
+  let applicationGraphSyncJobs: typeof import("@shared/schema")["applicationGraphSyncJobs"];
   let requireNewIdentity: typeof import("../../candidate-privacy/decision")["requireNewCandidateIdentityAllowed"];
   let handler: any;
   const pass = (_req: unknown, _res: unknown, next: () => void) => next();
   const pdf = Buffer.from("%PDF-1.4\n% synthetic A7 resume\n%%EOF");
   const recorded = { id: 101, jobId: 51, organizationId: 41, appliedAt: new Date() };
   const saved = {
-    id: 71, userId: 7, gcsPath: "gs://fixture.invalid/a7.pdf", extractedText: null,
+    id: 71, userId: 7, gcsPath: "gs://fixture.invalid/a7.pdf", extractedText: null as string | null,
     label: "a7.pdf", updatedAt: new Date("2026-09-10T00:00:00Z"),
   };
   const insert = vi.fn();
@@ -69,6 +73,7 @@ describe("A7 public-apply private admission through the real writer", () => {
   const download = vi.fn();
   const removeObject = vi.fn();
   const notification = vi.fn();
+  const queueValues = vi.fn();
   const extract = vi.fn();
   const tx = {
     insert,
@@ -131,8 +136,9 @@ describe("A7 public-apply private admission through the real writer", () => {
     vi.doMock("../../lib/aiQueue", () => ({
       isQueueAvailable: vi.fn(), enqueueSummaryBatch: vi.fn(), removeJob: vi.fn(), QUEUES: {},
     }));
-    vi.doMock("../../lib/activekgTenant", () => ({ resolveActiveKGTenantId: vi.fn() }));
-    vi.doMock("../../lib/applicationGraphSyncProcessor", () => ({ MIN_RESUME_TEXT_LENGTH: 100 }));
+    vi.doUnmock("../../lib/activekgTenant");
+    vi.doMock("../../lib/applicationGraphSyncProcessor", () => ({ MIN_RESUME_TEXT_LENGTH: 50 }));
+    applicationGraphSyncJobs = (await import("@shared/schema")).applicationGraphSyncJobs;
     realStorage = (await import("../../storage")).storage;
     requireNewIdentity = (await import("../../candidate-privacy/decision")).requireNewCandidateIdentityAllowed;
     vi.spyOn(realStorage, "getJob").mockResolvedValue({
@@ -144,6 +150,8 @@ describe("A7 public-apply private admission through the real writer", () => {
     vi.spyOn(realStorage, "getPipelineStages").mockResolvedValue([]);
     vi.spyOn(realStorage, "isAutomationEnabled").mockResolvedValue(false);
     vi.spyOn(realStorage, "createApplication"); // call-through, never replaces the writer
+    vi.spyOn(realStorage, "enqueueApplicationGraphSyncJob"); // real global-use admission and queue upsert
+    vi.spyOn(realStorage, "updateApplicationSyncSkippedReason").mockResolvedValue(undefined);
     const app = express();
     const { registerApplicationsRoutes } = await import("../../applications.routes");
     registerApplicationsRoutes(app, pass as any, { single: () => pass } as any);
@@ -156,9 +164,15 @@ describe("A7 public-apply private admission through the real writer", () => {
     vi.clearAllMocks();
     decision = "allow";
     transactionDecision = undefined;
+    postCommitDecision = undefined;
+    committed = false;
+    saved.extractedText = null;
     applicationValues = {};
     vi.stubEnv("EMAIL_AUTOMATION_ENABLED", "false");
     vi.stubEnv("NOTIFICATION_AUTOMATION_ENABLED", "false");
+    vi.stubEnv("ACTIVEKG_SYNC_ENABLED", "false");
+    vi.stubEnv("ACTIVEKG_TENANT_STRATEGY", "org_scoped");
+    vi.stubEnv("ACTIVEKG_TENANT_PREFIX", "org");
     vi.stubEnv("FLOW_CANDIDATE_PRIVACY_STALE_MS", "120000");
     vi.stubGlobal("fetch", vi.fn(() => { throw new Error("NETWORK_REFUSED"); }));
     insert.mockImplementation(() => ({ values: (values: Record<string, unknown>) => {
@@ -168,8 +182,18 @@ describe("A7 public-apply private admission through the real writer", () => {
     execute.mockResolvedValue({ rows: [{ references: 1, versions: 1, intents: 1 }] });
     transaction.mockImplementation(async (run: (executor: typeof tx) => Promise<unknown>) => {
       if (transactionDecision) decision = transactionDecision;
-      return run(tx);
+      const result = await run(tx);
+      committed = true;
+      if (postCommitDecision) decision = postCommitDecision;
+      return result;
     });
+    db.insert.mockImplementation(() => {
+      expect(committed).toBe(true);
+      return { values: queueValues } as never;
+    });
+    queueValues.mockImplementation((values) => ({
+      onConflictDoUpdate: () => ({ returning: async () => [{ id: 201, ...values }] }),
+    }));
     eligibility.mockImplementation(async () => {
       if (decision === "unavailable" || decision === "stale") throw new Error("UNAVAILABLE");
       return decision;
@@ -189,6 +213,8 @@ describe("A7 public-apply private admission through the real writer", () => {
     download.mockResolvedValue(pdf);
     removeObject.mockResolvedValue(undefined);
     extract.mockResolvedValue({ success: false, text: null });
+    db.query.candidateResumes.findMany.mockResolvedValue([]);
+    vi.mocked(realStorage.updateApplicationSyncSkippedReason).mockResolvedValue(undefined);
   });
 
   afterAll(() => {
@@ -286,6 +312,118 @@ describe("A7 public-apply private admission through the real writer", () => {
       },
     );
   }
+
+  function indexingResume(text: string | null = "Synthetic professional experience ".repeat(5)) {
+    vi.stubEnv("ACTIVEKG_SYNC_ENABLED", "true");
+    saved.extractedText = text;
+    extract.mockResolvedValue({ success: text !== null, text });
+    // Avoid the separately frozen optional library-save branch; exercise the
+    // actual queue upsert rather than a mock of enqueueApplicationGraphSyncJob.
+    db.query.candidateResumes.findMany.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }] as never);
+  }
+
+  for (const kind of ["anonymous", "bound", "saved"] as const) {
+    it.each(["allow", "block_global"] as const)(`A8 ${kind} %s keeps committed success with the real legacy fence`, async (value) => {
+      indexingResume(); decision = value;
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      try {
+        const result = await invoke(kind);
+        expect(result).toMatchObject({ status: 201, body: { success: true, applicationId: 101 }, failure: undefined });
+        expect(committed).toBe(true);
+        expect(insert).toHaveBeenCalledTimes(1);
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(realStorage.enqueueApplicationGraphSyncJob).toHaveBeenCalledExactlyOnceWith({
+          applicationId: 101, organizationId: 41, jobId: 51, effectiveRecruiterId: 11, activekgTenantId: "org_41",
+        });
+        if (value === "allow") {
+          expect(db.insert).toHaveBeenCalledExactlyOnceWith(applicationGraphSyncJobs);
+          expect(queueValues).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({
+            applicationId: 101, organizationId: 41, jobId: 51, activekgTenantId: "org_41", status: "pending",
+          }));
+        } else {
+          expect(db.insert).not.toHaveBeenCalled();
+          expect(queueValues).not.toHaveBeenCalled();
+        }
+        expect(notification).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+        expect(removeObject).not.toHaveBeenCalled();
+      } finally { warn.mockRestore(); error.mockRestore(); }
+    });
+  }
+
+  it.each(["block_global", "block_all", "review", "unavailable", "stale"] as const)(
+    "A8 a post-commit %s refusal prevents the queue write without failing the application", async (value) => {
+      indexingResume(); postCommitDecision = value;
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      try {
+        expect(await invoke("anonymous")).toMatchObject({ status: 201, failure: undefined });
+        expect(committed).toBe(true); expect(execute).toHaveBeenCalledTimes(1);
+        expect(realStorage.enqueueApplicationGraphSyncJob).toHaveBeenCalledTimes(1);
+        expect(db.insert).not.toHaveBeenCalled(); expect(removeObject).not.toHaveBeenCalled();
+        expect(fetch).not.toHaveBeenCalled();
+      } finally { warn.mockRestore(); }
+    },
+  );
+
+  it("A8 queue failure leaves private evidence committed, returns 201 and never logs the exception message", async () => {
+    indexingResume();
+    const sentinel = "private-error-sentinel@example.invalid";
+    queueValues.mockImplementation(() => { throw new Error(sentinel); });
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await invoke("anonymous")).toMatchObject({ status: 201, failure: undefined });
+      expect(committed).toBe(true); expect(execute).toHaveBeenCalledTimes(1);
+      expect(db.insert).toHaveBeenCalledExactlyOnceWith(applicationGraphSyncJobs);
+      expect(warn).toHaveBeenCalledExactlyOnceWith("[ACTIVEKG_SYNC] Legacy enqueue unavailable (non-blocking)");
+      expect(JSON.stringify(warn.mock.calls)).not.toContain(sentinel);
+      expect(removeObject).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); }
+  });
+
+  it.each(["false", "1", ""])("A8 flag %s creates no legacy job", async (flag) => {
+    indexingResume(); vi.stubEnv("ACTIVEKG_SYNC_ENABLED", flag);
+    expect(await invoke("anonymous")).toMatchObject({ status: 201, failure: undefined });
+    expect(realStorage.enqueueApplicationGraphSyncJob).not.toHaveBeenCalled();
+    expect(realStorage.updateApplicationSyncSkippedReason).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it.each([null, " ".repeat(60), "x".repeat(49)])("A8 missing/short text records a skip without enqueue", async (text) => {
+    indexingResume(text);
+    expect(await invoke("anonymous")).toMatchObject({ status: 201, failure: undefined });
+    expect(realStorage.enqueueApplicationGraphSyncJob).not.toHaveBeenCalled();
+    expect(realStorage.updateApplicationSyncSkippedReason).toHaveBeenCalledExactlyOnceWith(
+      101, !text ? "resume_text_missing" : "resume_text_below_threshold",
+    );
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
+  it("A8 admits the actual frozen worker's 50-character threshold", async () => {
+    expect(readFileSync(new URL("../../lib/applicationGraphSyncProcessor.ts", import.meta.url), "utf8"))
+      .toContain("export const MIN_RESUME_TEXT_LENGTH = 50;");
+    indexingResume("x".repeat(50));
+    expect(await invoke("saved")).toMatchObject({ status: 201, failure: undefined });
+    expect(queueValues).toHaveBeenCalledTimes(1);
+  });
+
+  it("A8 skip-reason failure is non-blocking and logs no exception payload", async () => {
+    indexingResume(null);
+    vi.mocked(realStorage.updateApplicationSyncSkippedReason).mockRejectedValueOnce(new Error("private skip sentinel"));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await invoke("anonymous")).toMatchObject({ status: 201, failure: undefined });
+      expect(warn).toHaveBeenCalledExactlyOnceWith("[ACTIVEKG_SYNC] Skip-reason update unavailable (non-blocking)");
+      expect(db.insert).not.toHaveBeenCalled();
+    } finally { warn.mockRestore(); }
+  });
+
+  it("A8 a failed private transaction never enqueues legacy work", async () => {
+    indexingResume(); execute.mockRejectedValueOnce(new Error("rollback fixture"));
+    expect((await invoke("anonymous")).failure).toBeInstanceOf(Error);
+    expect(committed).toBe(false);
+    expect(realStorage.enqueueApplicationGraphSyncJob).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled(); expect(removeObject).toHaveBeenCalledTimes(1);
+  });
 
   it("unknown remote decisions never become private admission", async () => {
     eligibility.mockResolvedValue("unknown-decision");

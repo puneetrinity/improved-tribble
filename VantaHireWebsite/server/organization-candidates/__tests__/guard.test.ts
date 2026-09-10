@@ -54,6 +54,11 @@ describe("organization-candidate intake source guard", () => {
     ["server/candidate-privacy/decision.ts", "options.globalUse === false", "true"],
     ["server/organization-candidates/application-intake.ts",
       "globalUse: false, newGlobalOperation: true", "globalUse: false, newGlobalOperation: false"],
+    ["server/applications.routes.ts", "process.env.ACTIVEKG_SYNC_ENABLED === 'true' && application.organizationId", "application.organizationId"],
+    ["server/applications.routes.ts", "extractedResumeText.trim().length >= MIN_RESUME_TEXT_LENGTH", "extractedResumeText.trim().length >= 0"],
+    ["server/applications.routes.ts", "activekgTenantId: tenantId,", "activekgTenantId: 'default',"],
+    ["server/applications.routes.ts", "await storage.enqueueApplicationGraphSyncJob({", "await storage.removedEnqueue({"],
+    ["server/applications.routes.ts", "// End A8 legacy indexing bridge.", "throw new Error('sync'); // End A8 legacy indexing bridge."],
   ])("refuses mutation of %s", (relative, before, after) => {
     const root = fixture();
     try {
@@ -73,5 +78,20 @@ describe("organization-candidate intake source guard", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it.each(["duplicate", "before-commit"])("refuses a %s legacy bridge", (kind) => {
+    const root = fixture();
+    try {
+      const path = join(root, "server/applications.routes.ts");
+      const source = readFileSync(path, "utf8");
+      const start = source.indexOf("// A8: preserve legacy indexing");
+      const end = source.indexOf("// End A8 legacy indexing bridge.", start) + "// End A8 legacy indexing bridge.".length;
+      const bridge = source.slice(start, end);
+      const changed = kind === "duplicate" ? source.replace(bridge, bridge + bridge)
+        : source.replace(bridge, "").replace("const application = await db.transaction", bridge + "\nconst application = await db.transaction");
+      writeFileSync(path, changed);
+      expect(() => checkOrganizationCandidateIntake(root)).toThrow(/order\/count/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 });
