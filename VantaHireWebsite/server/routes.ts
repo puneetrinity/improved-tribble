@@ -41,6 +41,7 @@ import { registerRecruiterDashboardRoutes } from "./recruiterDashboard.routes";
 import { registerCandidatePortalRoutes } from "./candidatePortal.routes";
 import { registerOutreachComplianceRoutes } from "./outreachCompliance.routes";
 import { registerCandidatePrivacyRoutes } from "./candidate-privacy/routes";
+import { registerCandidateConsentRoutes } from "./candidate-consent/routes";
 import { isExpectedDisconnectError } from "./monitoring";
 import {
   parseHiringManagerRoleFilter,
@@ -378,6 +379,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register candidate portal routes (saved jobs)
   registerCandidatePortalRoutes(app, doubleCsrfProtection);
   registerCandidatePrivacyRoutes(app, doubleCsrfProtection);
+  registerCandidateConsentRoutes(app, doubleCsrfProtection);
   registerOutreachComplianceRoutes(app);
 
   // Register bulk resume import routes (staging/review/finalize flow)

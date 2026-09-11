@@ -57,6 +57,7 @@ import {
   type CandidateApplicationSummary,
 } from "@/hooks/use-candidate-job-state";
 import { CandidatePrivacyPanel } from "@/components/candidate-privacy/CandidatePrivacyPanel";
+import { CandidateConsentPanel } from "@/components/candidate/CandidateConsentPanel";
 
 export default function CandidateDashboard() {
   const { user } = useAuth();
@@ -1233,7 +1234,8 @@ function CandidateDashboardContent({ user }: { user: AuthUser }) {
                 </CardContent>
               </Card>
             </TabsContent>
-            <TabsContent value="privacy" className="mt-6">
+            <TabsContent value="privacy" className="mt-6 space-y-6">
+              <CandidateConsentPanel />
               <CandidatePrivacyPanel />
             </TabsContent>
           </Tabs>

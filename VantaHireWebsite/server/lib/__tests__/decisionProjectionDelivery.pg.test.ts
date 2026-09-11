@@ -164,7 +164,7 @@ async function rebuildCurrent(): Promise<void> {
     creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
     connect: connectMigration,
   });
-  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0010") {
+  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0011") {
     throw new Error("Disposable 3C current-ledger rebuild refused.");
   }
   await provision();
@@ -211,11 +211,11 @@ describe.skipIf(!enabled)("decision-projection delivery exact-schema PostgreSQL"
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    expect(upgrade.applied).toEqual(["0009", "0010"]);
+    expect(upgrade.applied).toEqual(["0009", "0010", "0011"]);
     expect((await owner.query("SELECT COUNT(*)::integer n FROM decision_projection_delivery_state")).rows[0]?.n).toBe(0);
     await expect(readinessAsRuntime()).rejects.toThrow();
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
   }, 180_000);
 
   beforeEach(async () => {
@@ -326,6 +326,6 @@ describe.skipIf(!enabled)("decision-projection delivery exact-schema PostgreSQL"
     await owner!.query(`REVOKE EXECUTE ON FUNCTION claim_decision_projection_delivery(integer,integer) FROM "${role}"`);
     await expect(readinessAsRuntime()).rejects.toThrow(/Decision-projection delivery/);
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
   });
 });

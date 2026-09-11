@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 316,
+  "route_registration_census": 320,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
     {
@@ -736,11 +736,11 @@
   "governed_files": [
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "097e9fa759d54d9f0a8b6756352966428b2a6fefee1976b9167701339591af0a"
+      "sha256": "17c1aff4da2d9e3578135f6cbda4f81ce3d843584a35c0b3fb47e2d021cc5c25"
     },
     {
       "file": "package.json",
-      "sha256": "248c7c6d2d5caa618cf9e0ddb2c0789f5076520375d02e2c6bbec4400e0e6448"
+      "sha256": "de798a429e12f92fdf5cd771cb044bdf96ed3639f7a341ae7fefd5d1caaf5025"
     },
     {
       "file": "vitest.server.config.ts",
@@ -776,7 +776,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "1d92983c81b063e82915f7b7ef2a588a81ff6d61ab5be1da1fe75b391ca51ab9"
+      "sha256": "61ab200403a9ff2038e818668987f2c97c14b8f869baeb7f31b94690d88c11d3"
     },
     {
       "file": "server/resume.routes.ts",
@@ -796,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "2122e1c168dcea5cd1765ffac57d3b059085b0c17cf06220537a4be1e25253f9"
+      "sha256": "24e9d29349fe6bdb47f38b735a4dc0121602af5523460887b54ddef6d928fb21"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -804,7 +804,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "a2bd170bd95cfaed68efb4b85433335346a0167ec832d914e2eaea086afd3168"
+      "sha256": "3294529b069c44d061ebfa6c44620d8085b47a14ec108398597513dde6540aab"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -880,7 +880,7 @@
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
-      "sha256": "38a0f1f10f0e1f0316c1c2bae8c50beb59b9b0868b12a2d89f095c011c6718a2"
+      "sha256": "f06993388d3ff7fe0414d67ca256a2d005df954e3d1022c86aea84433dca2774"
     },
     {
       "file": "server/storage.ts",
@@ -908,7 +908,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "d9ecf1ed30194a6953fc81f4020173f03a9e106a2a1400b542b24b376f5d07b5"
+      "sha256": "102d42f99fce3c51564c5441eef3597391dd630256623bd9804c974e0e08e880"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -936,7 +936,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "03a377f5fa86f0b6b6f35733b151fb542aca7da0e229c9f871a6360085ae635d"
+      "sha256": "359cdb0bc5a8d7114200a1fef23a7518619477c0df920c6d2cdd23e8442d0e51"
     },
     {
       "file": "shared/forms.types.ts",
@@ -956,15 +956,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "08ff07739eacf7140401506d72f5a15fb1a2c7f8a8ccbdfec29f48611c438eab"
+      "sha256": "0bded77d998c48a6c0448c337f792d3225c27d0b05f58067991eeb3d98cf7754"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "436385a86d5ebe85243d1bb2c20dc543d226204470b46ae7f137f4b6cf4b948c"
+      "sha256": "225f49d88c74b7c8ae1f16fe974f929be286b84df542b5e4f0075bdd652d0039"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "b2237c052ac1564a3a77b2c9a2070848003151d5942665daa90364ffae2698ed"
+      "sha256": "cf02ab86312d17137b1cb42667e64951b2bf0abe273afb8df8b35d3fdb5e4458"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1116,11 +1116,11 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "b9006bc8b398cd12cda6ba3b1a7d59864fded52e9ea9aac261d5dc417ad27273"
+      "sha256": "c0c83200588d12891fcf022ff38c6065b2658ee47ac7d9b05e674653153e53ef"
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
-      "sha256": "7252e774876d146586bcf147058a6abbe367deffac4327c978b983bc70976778"
+      "sha256": "4869324adf16412e2c875c6bb4b14da6e3b84553aa8957e7003607850d72486c"
     },
     {
       "file": "server/decision-projection/config.ts",
@@ -1227,7 +1227,7 @@
     },
     {
       "file": "server/index.ts",
-      "sha256": "c1accca831416fedabe9c336b5eff40d18979d3f0271a29ded0d101bd038b124"
+      "sha256": "0812951cc1c7955ee811b3371101cd368149d90ead30360734a1e10ae3b1fdcd"
     },
     {
       "file": "server/aiWorker.ts",

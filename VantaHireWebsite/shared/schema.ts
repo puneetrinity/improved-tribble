@@ -1,4 +1,4 @@
-import { pgTable, pgSequence, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, decimal, check, foreignKey, uuid, bigint, primaryKey } from "drizzle-orm/pg-core";
+import { pgTable, pgSequence, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, unique, char, decimal, check, foreignKey, uuid, bigint, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -503,6 +503,81 @@ export const organizationCandidateMemoryOutbox = pgTable("organization_candidate
   orgOrderIdx: index("organization_candidate_memory_outbox_org_order_idx")
     .on(table.organizationId, table.createdAt, table.outboxId),
 }));
+
+// Wave 4C: candidate-approved snapshots are personal data, never inferred from application consent fields.
+export const candidateConsentSubjects = pgTable("candidate_consent_subjects", {
+  subjectId: uuid("subject_id").primaryKey(),
+  userId: integer("user_id").notNull().unique("candidate_consent_subjects_user_id_key"),
+  version: bigint("version", { mode: "number" }).notNull().default(0),
+  desiredAction: text("desired_action"),
+  acknowledgedVersion: bigint("acknowledged_version", { mode: "number" }).notNull().default(0),
+  acknowledgedAction: text("acknowledged_action"),
+  currentSourceId: uuid("current_source_id"),
+  effectiveSourceId: uuid("effective_source_id"),
+  deliveryStatus: text("delivery_status").notNull().default("none"),
+  lastErrorCode: text("last_error_code"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+});
+export const candidateConsentSources = pgTable("candidate_consent_sources", {
+  sourceId: uuid("source_id").primaryKey(),
+  subjectId: uuid("subject_id").notNull().references(() => candidateConsentSubjects.subjectId, { onDelete: "restrict" }),
+  sourceVersion: bigint("source_version", { mode: "number" }).notNull(),
+  profile: jsonb("profile").notNull(),
+  profileSha256: char("profile_sha256", { length: 64 }).notNull(),
+  resume: jsonb("resume"),
+  resumeSha256: char("resume_sha256", { length: 64 }),
+  resumeVersionId: uuid("resume_version_id").references(() => applicationResumeVersions.resumeVersionId, { onDelete: "restrict" }),
+  approvedAt: timestamp("approved_at", { withTimezone: true }).notNull(),
+}, table => ({
+  versionUnique: unique("candidate_consent_sources_subject_id_source_version_key").on(table.subjectId, table.sourceVersion),
+  identityUnique: unique("candidate_consent_sources_subject_id_source_id_key").on(table.subjectId, table.sourceId),
+  versionIdentityUnique: unique("candidate_consent_sources_subject_id_source_version_source__key")
+    .on(table.subjectId, table.sourceVersion, table.sourceId),
+}));
+export const candidateConsentEvents = pgTable("candidate_consent_events", {
+  eventId: uuid("event_id").primaryKey(),
+  subjectId: uuid("subject_id").notNull().references(() => candidateConsentSubjects.subjectId, { onDelete: "restrict" }),
+  version: bigint("version", { mode: "number" }).notNull(),
+  action: text("action").notNull(),
+  sourceId: uuid("source_id"),
+  purpose: text("purpose").notNull(), schemaVersion: integer("schema_version").notNull(),
+  purposeVersion: integer("purpose_version").notNull(), copyVersion: integer("copy_version").notNull(),
+  copySha256: char("copy_sha256", { length: 64 }).notNull(), userId: integer("user_id").notNull(),
+  verifiedEmailSha256: char("verified_email_sha256", { length: 64 }), accountAuthVersion: integer("account_auth_version"),
+  requestId: uuid("request_id").notNull(), requestSha256: char("request_sha256", { length: 64 }).notNull(),
+  commandSha256: char("command_sha256", { length: 64 }).notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+}, table => ({
+  requestUnique: unique("candidate_consent_events_subject_id_request_id_key").on(table.subjectId, table.requestId),
+  versionUnique: unique("candidate_consent_events_subject_id_version_key").on(table.subjectId, table.version),
+  identityUnique: unique("candidate_consent_events_event_id_subject_id_version_key").on(table.eventId, table.subjectId, table.version),
+  sourceFk: foreignKey({ name: "candidate_consent_events_subject_id_version_source_id_fkey",
+    columns: [table.subjectId, table.version, table.sourceId],
+    foreignColumns: [candidateConsentSources.subjectId, candidateConsentSources.sourceVersion, candidateConsentSources.sourceId],
+  }).onDelete("restrict"),
+}));
+export const candidateConsentOutbox = pgTable("candidate_consent_outbox", {
+  outboxId: uuid("outbox_id").primaryKey(),
+  eventId: uuid("event_id").notNull().unique("candidate_consent_outbox_event_id_key"),
+  subjectId: uuid("subject_id").notNull(), version: bigint("version", { mode: "number" }).notNull(),
+  idempotencyKey: char("idempotency_key", { length: 64 }).notNull().unique("candidate_consent_outbox_idempotency_key_key"),
+  commandSha256: char("command_sha256", { length: 64 }).notNull(),
+  state: text("state").notNull().default("pending"), attempts: integer("attempts").notNull().default(0),
+  generation: integer("generation").notNull().default(0), leaseOwner: text("lease_owner"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull(),
+  lastErrorCode: text("last_error_code"), receipt: jsonb("receipt"),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+}, table => ({
+  eventFk: foreignKey({ name: "candidate_consent_outbox_event_id_subject_id_version_fkey",
+    columns: [table.eventId, table.subjectId, table.version],
+    foreignColumns: [candidateConsentEvents.eventId, candidateConsentEvents.subjectId, candidateConsentEvents.version],
+  }).onDelete("restrict"),
+  readyIdx: index("consent_outbox_ready_idx").on(table.state, table.nextAttemptAt, table.createdAt),
+  subjectIdx: index("consent_outbox_subject_idx").on(table.subjectId, table.version) }));
 
 // ATS: Application feedback (for hiring managers)
 export const applicationFeedback = pgTable("application_feedback", {

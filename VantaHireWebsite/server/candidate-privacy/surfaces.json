@@ -1,9 +1,14 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "f1f1b942d24cb7f165f4b135ec397026c3dbe57c71e2617ea8e67a2b1df07659",
+  "source_census_sha256": "f2db41d9f463317aa70a07e1813f9c3c9404133c673713ff60128b35abfb40c1",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
+    "server/candidate-consent/contracts.ts",
+    "server/candidate-consent/repository.ts",
+    "server/candidate-consent/routes.ts",
+    "server/candidate-consent/processor.ts",
+    "server/candidate-consent/memory-client.ts",
     "server/storage.ts",
     "server/lib/applicationReadAuthorization.ts",
     "server/applications.routes.ts",
@@ -56,6 +61,11 @@
     { "file": "server/candidate-privacy/repository.ts", "classification": "fenced" },
     { "file": "server/candidate-privacy/processor.ts", "classification": "fenced" },
     { "file": "server/candidate-privacy/routes.ts", "classification": "fenced" },
+    { "file": "server/candidate-consent/contracts.ts", "classification": "fenced" },
+    { "file": "server/candidate-consent/repository.ts", "classification": "fenced" },
+    { "file": "server/candidate-consent/routes.ts", "classification": "fenced" },
+    { "file": "server/candidate-consent/processor.ts", "classification": "fenced" },
+    { "file": "server/candidate-consent/memory-client.ts", "classification": "fenced" },
     { "file": "server/organization-candidates/application-intake.ts", "classification": "fenced" },
     { "file": "server/organization-candidates/processor.ts", "classification": "fenced" },
     { "file": "server/auth.ts", "classification": "fenced" },
@@ -119,6 +129,8 @@
     { "file": "client/src/components/FeedbackPanel.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/ResumePreviewModal.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/candidate-privacy/CandidatePrivacyPanel.tsx", "classification": "ui_consumer" },
+    { "file": "client/src/components/candidate/CandidateConsentPanel.tsx", "classification": "ui_consumer" },
+    { "file": "client/src/components/candidate/CandidateConsentPanel.test.tsx", "classification": "excluded" },
     { "file": "client/src/components/kanban/ApplicationDetailModal.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/kanban/ApplicationDetailPanel.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/recruiter/MoveCandidateToJobDialog.tsx", "classification": "ui_consumer" },
@@ -136,6 +148,61 @@
     { "file": "client/src/pages/terms-of-service-page.tsx", "classification": "excluded" }
   ],
   "surfaces": [
+    {
+      "id": "consent-contracts",
+      "file": "server/candidate-consent/contracts.ts",
+      "symbol": "consentProfileSchema",
+      "models": ["candidate_consent_subjects", "candidate_consent_sources", "candidate_consent_events", "candidate_consent_outbox"],
+      "direction": "candidate_consent_authority",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "verified_candidate_self",
+      "enforcement": "Bounded candidate-approved fields and versioned authority; no provider or application copying.",
+      "anchors": [".strict()", "32 * 1024", "CONSENT_COPY_SHA256"]
+    },
+    {
+      "id": "consent-repository",
+      "file": "server/candidate-consent/repository.ts",
+      "symbol": "captureConsent",
+      "models": ["candidate_consent_subjects", "candidate_consent_sources", "candidate_consent_events", "candidate_consent_outbox"],
+      "direction": "candidate_consent_authority",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "verified_candidate_self",
+      "enforcement": "Verified account and exact owned acknowledged resume, global admission before transactional capture.",
+      "anchors": ["requireCandidatePrivacyAllowed", "globalUse: true, newGlobalOperation: true", "FOR UPDATE", "flow_candidate_consent_resume_ready", "recentConsentAuth"]
+    },
+    {
+      "id": "consent-routes",
+      "file": "server/candidate-consent/routes.ts",
+      "symbol": "registerCandidateConsentRoutes",
+      "models": ["candidate_consent_subjects", "candidate_consent_sources", "candidate_consent_events", "candidate_consent_outbox"],
+      "direction": "candidate_consent_authority",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "verified_candidate_self",
+      "enforcement": "Only verified candidates can capture their own permission; stale privacy authority remains unavailable.",
+      "anchors": ["requireVerifiedCandidate", "csrfProtection, requireRecentConsentAuth", "candidate_consent_temporarily_unavailable"]
+    },
+    {
+      "id": "consent-processor",
+      "file": "server/candidate-consent/processor.ts",
+      "symbol": "runConsentProcessorOnce",
+      "models": ["candidate_consent_subjects", "candidate_consent_sources", "candidate_consent_events", "candidate_consent_outbox"],
+      "direction": "candidate_consent_authority",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "verified_candidate_self",
+      "enforcement": "Account/source/privacy rechecked before grant delivery; withdrawal independent of global admission.",
+      "anchors": ["requireCandidatePrivacyAllowed", "globalUse: true, newGlobalOperation: true", "account.auth_version !== loaded.authVersion", "ownedResume", "flow_ack_candidate_consent_outbox"]
+    },
+    {
+      "id": "consent-memory-client",
+      "file": "server/candidate-consent/memory-client.ts",
+      "symbol": "deliverConsent",
+      "models": ["candidate_consent_subjects", "candidate_consent_sources", "candidate_consent_events", "candidate_consent_outbox"],
+      "direction": "candidate_consent_authority",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "verified_candidate_self",
+      "enforcement": "Subject-scoped signed HTTPS delivery with bounded, identity-matched receipt; no raw logging.",
+      "anchors": ["candidate-consent:write", "candidate_${command.subject_id}", "redirect: \"error\"", "AbortSignal.timeout(timeoutMs)"]
+    },
     {
       "id": "privacy-authority-config-models",
       "file": "server/candidate-privacy/config.ts",
@@ -850,6 +917,17 @@
       "organization_scope": "owning_org",
       "enforcement": "Panel receives only server-filtered application data and calls fenced application endpoints.",
       "anchors": ["application", "/api/applications"]
+    },
+    {
+      "id": "candidate-consent-ui",
+      "file": "client/src/components/candidate/CandidateConsentPanel.tsx",
+      "symbol": "CandidateConsentPanel",
+      "models": ["ConsentStatus", "ConsentSource"],
+      "direction": "read_write_render",
+      "privacy_action": [],
+      "organization_scope": "candidate_self",
+      "enforcement": "Server-returned status/version gates controls; approval is unchecked by default, no resume is preselected; reauth and a stable request UUID precede one grant/withdraw attempt; 202 renders pending, never effective.",
+      "anchors": ["/api/candidate/consent", "/api/candidate/consent/sources", "/api/candidate/privacy/reauth", "/api/candidate/consent/grant", "/api/candidate/consent/withdraw"]
     }
   ],
   "exclusions": [
@@ -992,6 +1070,13 @@
       "symbol": "HiringManagerReviewPage",
       "reason": "Presentation-only consumer of owning-organization application review endpoints.",
       "anchors": ["/api/applications", "application"]
+    },
+    {
+      "id": "candidate-consent-ui-test",
+      "file": "client/src/components/candidate/CandidateConsentPanel.test.tsx",
+      "symbol": "CandidateConsentPanel",
+      "reason": "Component contract test: URL-routed fetch stub only, synthetic fixture profile, no production transport or candidate data; asserts unchecked default, no resume preselection, exact request bodies and 202-as-pending truth.",
+      "anchors": ["/api/candidate/consent", "/api/candidate/consent/grant", "/api/candidate/consent/withdraw"]
     }
   ]
 }
