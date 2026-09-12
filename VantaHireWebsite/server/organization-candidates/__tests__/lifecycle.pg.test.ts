@@ -144,7 +144,7 @@ async function rebuildCurrent(): Promise<void> {
     connect: connectMigration,
   });
   expect(result.applied).toHaveLength(currentLedger);
-  expect(result.applied.at(-1)).toBe("0010");
+  expect(result.applied.at(-1)).toBe("0011");
   await provision();
   owner = await clientFor(migrationUrl);
   await installActors();
@@ -243,7 +243,7 @@ describe.skipIf(!enabled)("organization-private application evidence PostgreSQL 
         environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    expect(upgraded.applied).toEqual(["0010"]);
+    expect(upgraded.applied).toEqual(["0010", "0011"]);
     const counts = (await owner.query(`SELECT
       (SELECT count(*)::integer FROM organization_candidate_references) references,
       (SELECT count(*)::integer FROM application_resume_versions) versions,
@@ -251,7 +251,7 @@ describe.skipIf(!enabled)("organization-private application evidence PostgreSQL 
     expect(counts).toEqual({ references: 0, versions: 0, outbox: 0 });
     await expect(readinessAsRuntime()).rejects.toThrow();
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
   }, 180_000);
 
   it("commits all four writes together and rolls every write back on either failure direction", async () => {
@@ -364,7 +364,7 @@ describe.skipIf(!enabled)("organization-private application evidence PostgreSQL 
         .rejects.toMatchObject({ code: "55000" });
     }
     await expect(owner!.query(
-      "TRUNCATE organization_candidate_memory_outbox,application_resume_versions,organization_candidate_references",
+      "TRUNCATE organization_candidate_memory_outbox,application_resume_versions,organization_candidate_references,candidate_consent_subjects,candidate_consent_sources,candidate_consent_events,candidate_consent_outbox",
     )).rejects.toMatchObject({ code: "55000" });
   }, 180_000);
 });

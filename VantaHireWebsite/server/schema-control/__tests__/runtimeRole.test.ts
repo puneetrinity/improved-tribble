@@ -53,6 +53,49 @@ describe("runtime-role provisioning controls", () => {
     expect(safe).not.toContain("password=clear");
   });
 
+  async function probeExistingRole(prior: Record<string, unknown> | null, denied = false) {
+    const statements: string[] = [];
+    const client = { query: async (statement: string) => {
+      statements.push(statement);
+      if (statement.includes("current_database() AS database")) return { rows: [{ database: "local_test", database_oid: "1", address: null, port: null }] };
+      if (statement.includes("current_user AS role, r.rolsuper")) return { rows: [{ role: "local_owner", rolsuper: false, rolcreaterole: true }] };
+      if (statement.includes("r.oid::text AS oid")) return { rows: prior ? [prior] : [] };
+      if (denied && statement.startsWith("ALTER ROLE")) throw new Error("permission denied to alter role");
+      if (statement.includes("set_config('flow.runtime_role_name'")) throw new Error("bounded_probe_stop");
+      return { rows: [] };
+    }, end: async () => {} };
+    await expect(provisionRuntimeRole({ migrateUrl: "postgresql://local_owner:test@127.0.0.1/local_test",
+      runtimeUrl: "postgresql://local_runtime:test@127.0.0.1/local_test", runtimeRole: "local_runtime", expectedTargetId: "local-test",
+      connectMigration: async () => client, connectRuntime: async () => { throw new Error("must_not_connect"); },
+    })).rejects.toThrow();
+    expect(statements).toContain("ROLLBACK");
+    expect(statements).not.toContain("COMMIT");
+    return statements;
+  }
+
+  it("A2 reconciles an already-safe role without reasserting superuser-only attributes", async () => {
+    const statements = await probeExistingRole({ rolcanlogin: true });
+    expect(statements.filter(s => s.startsWith("ALTER ROLE"))).toEqual(['ALTER ROLE "local_runtime" LOGIN NOINHERIT']);
+    expect(statements.some(s => s.includes("set_config('flow.runtime_role_name'"))).toBe(true);
+  });
+
+  it("A2 keeps every restricted attribute on fresh role creation", async () => {
+    const statements = await probeExistingRole(null);
+    expect(statements).toContain('CREATE ROLE "local_runtime" LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS');
+  });
+
+  it.each(["rolsuper", "rolcreatedb", "rolcreaterole", "rolreplication", "rolbypassrls", "has_membership",
+    "owns_database", "owns_schema", "owns_relation", "owns_routine"])("A2 still refuses hostile %s before alteration", async flag => {
+    const statements = await probeExistingRole({ rolcanlogin: true, [flag]: true });
+    expect(statements.some(s => /^(ALTER ROLE|CREATE ROLE)/.test(s))).toBe(false);
+  });
+
+  it("A2 propagates missing role administration authority without issuing grants", async () => {
+    const statements = await probeExistingRole({ rolcanlogin: true }, true);
+    expect(statements.some(s => s.startsWith("GRANT "))).toBe(false);
+    expect(statements.some(s => s.includes("set_config('flow.runtime_role_name'"))).toBe(false);
+  });
+
   it("keeps immutable writes and mutable delivery functions exact and bounded", () => {
     expect(runtimeRoleSource).toContain("c.relname IN ('decision_events','decision_projection_outbox')");
     expect(runtimeRoleSource).toContain("has_table_privilege($1,c.oid,'INSERT')");

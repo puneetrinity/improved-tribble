@@ -12,6 +12,8 @@ const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").tri
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
 const currentLedger = loadManifest(migrationsDir).length;
+// loadManifest enforces four-digit, contiguous versions starting at 0000.
+const currentTail = String(currentLedger - 1).padStart(4, "0");
 const targetId = "flow-object-authorization-test-target";
 
 type WorkflowModule = typeof import("../applicationWorkflowAuthorization");
@@ -213,7 +215,7 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
         },
         connect: connectMigration,
       });
-      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0009") {
+      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== currentTail) {
         throw new Error("Disposable workflow per-test schema rebuild refused.");
       }
       await provisionRuntimeRole({

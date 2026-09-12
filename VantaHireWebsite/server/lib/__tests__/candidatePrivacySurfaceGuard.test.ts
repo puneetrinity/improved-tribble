@@ -69,6 +69,20 @@ afterEach(() => {
 });
 
 describe('candidate privacy surface guard', () => {
+  it.each(['repository.ts', 'processor.ts'])(
+    'rejects a consent grant changed to private-use admission in %s', (file) => {
+      const path = `server/candidate-consent/${file}`;
+      const problems = mutate(fixture(), path, source => source.replace('globalUse: true, newGlobalOperation: true', 'globalUse: false, newGlobalOperation: false'));
+      expect(problems).toContain(`surface enforcement anchor is missing: ${path}::globalUse: true, newGlobalOperation: true`);
+    },
+  );
+
+  it('rejects a consent route losing recent-auth middleware', () => {
+    const path = 'server/candidate-consent/routes.ts';
+    const problems = mutate(fixture(), path, source => source.replaceAll('csrfProtection, requireRecentConsentAuth', 'csrfProtection'));
+    expect(problems).toContain(`surface enforcement anchor is missing: ${path}::csrfProtection, requireRecentConsentAuth`);
+  });
+
   it('accepts the checked-in complete census', () => {
     expect(checkCandidatePrivacySurfaces(fixture())).toEqual([]);
   });

@@ -24,6 +24,18 @@ const APP_ROOT = join(dirname(new URL(import.meta.url).pathname), "../../..");
 const MANIFEST = "server/object-authorization/surfaces.json";
 const scratch: string[] = [];
 
+describe("4C route census amendment", () => {
+  it("refuses the pre-consent route census without relaxing prior authorization contracts", () => {
+    const root = fixture();
+    const path = join(root, MANIFEST);
+    const manifest = JSON.parse(readFileSync(path, "utf8"));
+    expect(manifest.route_registration_census).toBe(320);
+    manifest.route_registration_census = 316;
+    writeFileSync(path, JSON.stringify(manifest));
+    expect(checkObjectAuthorization(root)).toContain("object authorization route census contract is invalid.");
+  });
+});
+
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }

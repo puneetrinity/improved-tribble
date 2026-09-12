@@ -12,6 +12,26 @@ function read(relativeUrl: string): string {
   return readFileSync(new URL(relativeUrl, import.meta.url), "utf8");
 }
 
+describe("candidate consent presentation contract", () => {
+  it("keeps desired permission separate from acknowledged authority and unpublished search", () => {
+    const repository = read("../../candidate-consent/repository.ts");
+    expect(repository).toContain("publication_active: false");
+    expect(repository).toContain("desired_profile");
+    expect(repository).toContain("effective_profile");
+    expect(repository).toContain("acknowledged_version");
+    expect(repository).not.toContain("platformDiscoveryConsent");
+    expect(repository).not.toContain("consentCapturedAt");
+  });
+  it("labels pending withdrawal honestly and never treats approval as active matching", () => {
+    const routes = read("../../candidate-consent/routes.ts");
+    const contracts = read("../../candidate-consent/contracts.ts");
+    expect(routes).toContain("status.effective?.version === status.version");
+    expect(routes).toContain('res.status(complete ? 200 : 202)');
+    expect(routes).toContain('"withdrawal_pending"');
+    expect(contracts).toContain("matching from this approved copy is not active yet");
+  });
+});
+
 describe("candidate account cache isolation", () => {
   it("uses different private query keys for different candidate accounts", () => {
     const candidateA = candidatePrivateQueryKey("/api/my-applications", 101);

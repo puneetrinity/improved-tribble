@@ -117,11 +117,14 @@ app.use((req, res, next) => {
 });
 
 import { initWebSocketServer } from "./websocket";
+import { consentDeliveryConfig, startConsentProcessor } from "./candidate-consent/processor";
+let stopConsentProcessor: (() => void) | undefined;
 
 (async () => {
   const server = await registerRoutes(app);
   assertCandidatePrivacyRuntimeConfig();
   assertOrganizationCandidateSyncRuntimeConfig();
+  const consentConfig = consentDeliveryConfig();
   initWebSocketServer(server);
 
   if (process.env.SENTRY_DSN) {
@@ -196,6 +199,7 @@ import { initWebSocketServer } from "./websocket";
     // The schema-ready launch command has completed before this process starts;
     // configuration is asserted above before any 4B delivery timer is armed.
     startOrganizationCandidateProcessor();
+    stopConsentProcessor = startConsentProcessor(consentConfig);
 
     // Start job scheduler for automatic job expiration
     startJobScheduler();
@@ -231,6 +235,7 @@ import { initWebSocketServer } from "./websocket";
     stopOutreachHygieneProcessor();
     stopCandidatePrivacyProcessor();
     void stopOrganizationCandidateProcessor();
+    stopConsentProcessor?.();
     server.close(() => {
       process.exit(0);
     });

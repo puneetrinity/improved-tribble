@@ -6,6 +6,8 @@
 // attributes before reconciling the bounded application privileges.
 
 import type { PgLike } from "./ledger";
+import { CANDIDATE_CONSENT_TABLES, CANDIDATE_CONSENT_FUNCTIONS, CANDIDATE_CONSENT_UPDATE_COLUMNS,
+  candidateConsentPrivilegesReady } from "./readiness";
 import { DEFAULT_LOCK_KEY, type MigrationClient } from "./runner";
 import { assertRoleName, quoteIdentifier } from "./sqlIdentifier";
 import {
@@ -266,7 +268,8 @@ export async function assertRuntimeRoleContract(
                 c.relname NOT IN (
                   'decision_events','decision_projection_outbox','decision_projection_delivery_state',
                   'organization_candidate_references','application_resume_versions',
-                  'organization_candidate_memory_outbox'
+                  'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
+                  'candidate_consent_events','candidate_consent_outbox'
                 )
                 AND has_table_privilege($1,c.oid,'SELECT')
                 AND has_table_privilege($1,c.oid,'INSERT')
@@ -276,6 +279,9 @@ export async function assertRuntimeRoleContract(
                 AND NOT has_table_privilege($1,c.oid,'REFERENCES')
                 AND NOT has_table_privilege($1,c.oid,'TRIGGER')
               )
+              OR c.relname IN ('candidate_consent_subjects','candidate_consent_sources',
+                'candidate_consent_events','candidate_consent_outbox')
+              -- Separately asserted below, including effective per-column rights.
             )
        )
        AND NOT EXISTS (
@@ -341,6 +347,9 @@ export async function assertRuntimeRoleContract(
   if (result.rows[0]?.ok !== true) {
     throw new RuntimeRoleProvisionError("Runtime effective-privilege contract is incomplete or excessive.");
   }
+  if (!(await candidateConsentPrivilegesReady(pg, role, false))) {
+    throw new RuntimeRoleProvisionError("Candidate consent runtime authority is incomplete or excessive.");
+  }
   await assertDefaultPrivileges(pg, role, controlPlaneRequired);
 }
 
@@ -379,8 +388,11 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
           `CREATE ROLE ${ident} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`,
         );
       } else {
+        // A2: assertSafeExistingRole already proved every privileged attribute false.
+        // PostgreSQL requires SUPERUSER even to redundantly specify NOSUPERUSER on ALTER.
+        // Keep CREATEROLE + ADMIN OPTION usable without granting any elevated attribute.
         await migration.query(
-          `ALTER ROLE ${ident} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`,
+          `ALTER ROLE ${ident} LOGIN NOINHERIT`,
         );
       }
       // Keep the password out of SQL text. The one transaction-local custom
@@ -518,6 +530,35 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
           `GRANT INSERT ON TABLE ${ORGANIZATION_CANDIDATE_OUTBOX_TABLE} TO ${ident}`,
         );
         for (const signature of ORGANIZATION_CANDIDATE_FUNCTIONS) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${signature} FROM ${ident}`);
+          await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
+        }
+      }
+
+      const consentPresence = await migration.query(`SELECT
+        (SELECT count(*)::int FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) AS tables,
+        (SELECT count(*)::int FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) AS functions`,
+      [[...CANDIDATE_CONSENT_TABLES], [...CANDIDATE_CONSENT_FUNCTIONS]]);
+      const consent = consentPresence.rows[0];
+      if (!consent || !((consent.tables === 0 && consent.functions === 0)
+          || (consent.tables === 4 && consent.functions === 4))) {
+        throw new RuntimeRoleProvisionError("Candidate consent table/function presence is inconsistent.");
+      }
+      if (consent.tables === 4) {
+        for (const table of CANDIDATE_CONSENT_TABLES) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON TABLE public.${table} FROM ${ident}`);
+          // REVOKE table-wide UPDATE does not remove old explicit column grants.
+          const columns = await migration.query(`SELECT attname FROM pg_attribute
+            WHERE attrelid=to_regclass($1) AND attnum>0 AND NOT attisdropped`, [`public.${table}`]);
+          const columnList = columns.rows.map((row: any) => quoteIdentifier(row.attname)).join(",");
+          await migration.query(`REVOKE SELECT(${columnList}),INSERT(${columnList}),UPDATE(${columnList}),
+            REFERENCES(${columnList}) ON TABLE public.${table} FROM ${ident}`);
+          await migration.query(`GRANT ${table === "candidate_consent_outbox" ? "INSERT" : "SELECT,INSERT"}
+            ON TABLE public.${table} TO ${ident}`);
+        }
+        await migration.query(`GRANT UPDATE(${CANDIDATE_CONSENT_UPDATE_COLUMNS.map(quoteIdentifier).join(",")})
+          ON TABLE public.candidate_consent_subjects TO ${ident}`);
+        for (const signature of CANDIDATE_CONSENT_FUNCTIONS) {
           await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${signature} FROM ${ident}`);
           await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
         }

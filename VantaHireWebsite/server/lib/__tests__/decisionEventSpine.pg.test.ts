@@ -193,14 +193,14 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
     });
     const upgrade = { applied: fullUpgrade.applied.slice(0, 3) };
     if (upgrade.applied.join(",") !== "0007,0008,0009"
-        || fullUpgrade.applied.length !== 4
-        || fullUpgrade.applied[3] !== "0010") {
-      throw new Error("Disposable 3A/3B/3C/4B migration isolation refused.");
+        || fullUpgrade.applied.length !== 5
+        || fullUpgrade.applied[3] !== "0010" || fullUpgrade.applied[4] !== "0011") {
+      throw new Error("Disposable 3A/3B/3C/4B/4C migration isolation refused.");
     }
 
     // The release-first window is intentionally not runtime-ready until the
     // provisioner removes default table/sequence grants and applies the exact exception.
-    await expect(readinessAsRuntime()).rejects.toThrow(/Decision-projection delivery functions and runtime boundary/);
+    await expect(readinessAsRuntime()).rejects.toThrow(/Candidate consent tables, column privileges and four routines are exact/);
     await provisionRuntimeRole({
       migrateUrl: migrationUrl,
       runtimeUrl,
@@ -209,7 +209,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       connectMigration,
       connectRuntime,
     });
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
     process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     workflow = await import("../applicationWorkflowAuthorization");
@@ -239,7 +239,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
         },
         connect: connectMigration,
       });
-      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0010") {
+      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== "0011") {
         throw new Error("Disposable 3A per-test schema rebuild refused.");
       }
       await provisionRuntimeRole({
@@ -462,7 +462,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
   });
 
   it("fails readiness on drift and converges migrations/provisioning without duplicates", async () => {
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
     const cases: Array<{ breakSql: string; restoreSql: string }> = [
       { breakSql: `GRANT SELECT ON decision_events TO ${new URL(runtimeUrl).username}`,
         restoreSql: `REVOKE SELECT ON decision_events FROM ${new URL(runtimeUrl).username}` },
@@ -483,7 +483,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
       await owner!.query(item.breakSql);
       await expect(readinessAsRuntime()).rejects.toThrow();
       await owner!.query(item.restoreSql);
-      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0010", applied: 11 });
+      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
     }
     const noOp = await runReleaseMigration({
       migrationsDir,
