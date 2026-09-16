@@ -13,6 +13,7 @@
  */
 
 import { storage } from '../storage';
+import { CandidateIndexLegacyFenceError, withLegacyCandidateIndexFence } from '../candidate-index/processor';
 import {
   createNode,
   createEdge,
@@ -58,6 +59,7 @@ function computeNextAttemptAt(attempt: number): Date {
 }
 
 function isRetryableError(error: unknown): boolean {
+  if (error instanceof CandidateIndexLegacyFenceError) return error.code === 'unavailable';
   if (error instanceof ActiveKGClientError) {
     return error.retryable;
   }
@@ -112,6 +114,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
     return;
   }
 
+  return withLegacyCandidateIndexFence(application.organizationId, application.id, async (checkIndexOwnership) => {
   try {
     await requireCandidatePrivacyAllowed(
       { type: 'application', id: application.id },
@@ -168,6 +171,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
       { type: 'application', id: application.id },
       { globalUse: true, newGlobalOperation: true },
     );
+    await checkIndexOwnership();
     try {
       const buffer = await downloadFromGCS(application.resumeUrl);
       resumeLinks = await extractResumeLinksFromBuffer(buffer, application.extractedResumeText);
@@ -190,6 +194,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
     { type: 'application', id: application.id },
     { globalUse: true, newGlobalOperation: true },
   );
+  await checkIndexOwnership();
   const existingParent = await getNodeByExternalId(tenantId, parentExternalId);
 
   if (existingParent) {
@@ -199,6 +204,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
       { type: 'application', id: application.id },
       { globalUse: true, newGlobalOperation: true },
     );
+    await checkIndexOwnership();
     const parentResponse = await createNode(
       tenantId,
       {
@@ -265,6 +271,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
       { type: 'application', id: application.id },
       { globalUse: true, newGlobalOperation: true },
     );
+    await checkIndexOwnership();
     const existingChunk = await getNodeByExternalId(tenantId, chunk.externalId);
     let chunkNodeId: string;
 
@@ -275,6 +282,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
         { type: 'application', id: application.id },
         { globalUse: true, newGlobalOperation: true },
       );
+      await checkIndexOwnership();
       const chunkResponse = await createNode(
         tenantId,
         {
@@ -325,6 +333,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
         { type: 'application', id: application.id },
         { globalUse: true, newGlobalOperation: true },
       );
+      await checkIndexOwnership();
       await createEdge(
         tenantId,
         {
@@ -354,6 +363,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
   }
 
   // Step 8: Mark success
+  await checkIndexOwnership();
   await storage.markApplicationGraphSyncJobSucceeded(
     job.id,
     parentNodeId,
@@ -366,6 +376,7 @@ export async function processJob(job: ApplicationGraphSyncJob): Promise<void> {
     parentNodeId,
     chunkCount: chunks.length,
   });
+  });
 }
 
 /**
@@ -375,6 +386,15 @@ async function handleJobFailure(
   job: ApplicationGraphSyncJob,
   error: unknown
 ): Promise<void> {
+  if (error instanceof CandidateIndexLegacyFenceError) {
+    // A peer still owns the claim. Never turn its processing row into a retry
+    // or terminal row while its HTTP request may still be in flight.
+    if (error.code === 'busy') return;
+    if (error.code === 'managed') {
+      await storage.markApplicationGraphSyncJobDeadLetter(job.id, 'candidate_index_managed');
+      return;
+    }
+  }
   if (error instanceof CandidatePrivacyRestrictedError) {
     await storage.markApplicationGraphSyncJobPrivacyRestricted(job.id);
     return;

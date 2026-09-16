@@ -19,6 +19,7 @@ const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").tri
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
 const currentLedger = loadManifest(migrationsDir).length;
+const currentTail = loadManifest(migrationsDir).at(-1)!.version;
 const targetId = "flow-decision-projection-delivery-test-target";
 
 let owner: Client | undefined;
@@ -164,7 +165,7 @@ async function rebuildCurrent(): Promise<void> {
     creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
     connect: connectMigration,
   });
-  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0011") {
+  if (result.applied.length !== currentLedger || result.applied.at(-1) !== currentTail) {
     throw new Error("Disposable 3C current-ledger rebuild refused.");
   }
   await provision();
@@ -211,11 +212,11 @@ describe.skipIf(!enabled)("decision-projection delivery exact-schema PostgreSQL"
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    expect(upgrade.applied).toEqual(["0009", "0010", "0011"]);
+    expect(upgrade.applied).toEqual(loadManifest(migrationsDir).filter(entry => Number(entry.version) >= 9).map(entry => entry.version));
     expect((await owner.query("SELECT COUNT(*)::integer n FROM decision_projection_delivery_state")).rows[0]?.n).toBe(0);
     await expect(readinessAsRuntime()).rejects.toThrow();
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: currentTail, applied: currentLedger });
   }, 180_000);
 
   beforeEach(async () => {
@@ -326,6 +327,6 @@ describe.skipIf(!enabled)("decision-projection delivery exact-schema PostgreSQL"
     await owner!.query(`REVOKE EXECUTE ON FUNCTION claim_decision_projection_delivery(integer,integer) FROM "${role}"`);
     await expect(readinessAsRuntime()).rejects.toThrow(/Decision-projection delivery/);
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: currentTail, applied: currentLedger });
   });
 });

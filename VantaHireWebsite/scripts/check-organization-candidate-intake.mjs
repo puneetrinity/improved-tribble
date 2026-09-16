@@ -8,9 +8,9 @@ const APP_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const frozenHashes = {
   "package-lock.json": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539",
-  "server/aiWorker.ts": "d735b459861d97c56386f825664039ecc8a77a3f02f5337a58779553c6a52738",
+  "server/aiWorker.ts": "33005db9323727ba10abf08944f8dc6651aeef48549eb9195c222e7c4eb6a94f",
   "server/gcs-storage.ts": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802",
-  "server/lib/applicationGraphSyncProcessor.ts": "ad98b6499dfb667aaa1ed7bda021e54b178a59f521050c08c5930ed8e6c7d0e1",
+  "server/lib/applicationGraphSyncProcessor.ts": "c014dab9d22d4d5686b9611b986a080c7e65b1f2bad664059d22cbcc195b2f56",
   "server/lib/services/jwt-signer.ts": "0213eb5984388fba2c3e4bf8893ac94b7fbaecc1f669b12b50519ef0a24cd490",
   "server/schema-migrations/0009_decision_projection_delivery_state.sql": "ce5999cab8bf087b838bdc05e4eca81d6012a1f044e957ff4ab196c41919f348",
   "server/storage.ts": "3fb44fa5515fb8cc0b9ac0556e3f22c62aa1397868cb2353d2c465ad13e60d03",

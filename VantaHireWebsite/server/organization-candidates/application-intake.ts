@@ -10,6 +10,7 @@ import {
 } from "../candidate-privacy/decision";
 import { loadCandidatePrivacyConfig } from "../candidate-privacy/config";
 import { checkMemoryEligibility } from "../candidate-privacy/memory-client";
+import { candidateIndexCommandKey } from "../candidate-index/contracts";
 
 export const MAX_PRIVATE_RESUME_BYTES = 5 * 1024 * 1024;
 export const MAX_PRIVATE_EXTRACTED_TEXT_BYTES = 2 * 1024 * 1024;
@@ -141,10 +142,17 @@ export async function appendOrganizationCandidateApplicationEvidence(input: {
   jobId: number;
   evidence: PinnedResumeEvidence;
   expectedSavedResumeUpdatedAt: Date | null;
-}): Promise<{ referenceId: string; resumeVersionId: string; outboxId: string }> {
+}): Promise<{ referenceId: string; resumeVersionId: string; outboxId: string; indexOutboxId: string }> {
   const referenceId = randomUUID();
   const resumeVersionId = randomUUID();
   const outboxId = randomUUID();
+  const indexOutboxId = randomUUID();
+  const contentKind = input.evidence.extractedTextSha256 === null ? "original_bytes" : "pinned_text";
+  const payloadSha256 = input.evidence.extractedTextSha256 ?? input.evidence.contentSha256;
+  const indexKey = candidateIndexCommandKey({
+    tenant: `org_${input.organizationId}`, referenceId, resumeVersionId, sourceVersion: 1,
+    contentSha256: input.evidence.contentSha256, contentKind, payloadSha256,
+  });
   const idempotencyKey = computeOrganizationCandidateIdempotencyKey({
     organizationId: input.organizationId,
     referenceId,
@@ -196,17 +204,28 @@ export async function appendOrganizationCandidateApplicationEvidence(input: {
              ${input.applicationId},${input.jobId},${idempotencyKey},'pending',0,0,${now},${now},${now}
       FROM resume_insert
       RETURNING 1 AS inserted
+    ), index_insert AS (
+      INSERT INTO candidate_index_outbox (
+        outbox_id,organization_id,application_id,job_id,reference_id,resume_version_id,
+        source_version,content_sha256,content_kind,payload_sha256,idempotency_key,captured_at
+      )
+      SELECT ${indexOutboxId}::uuid,${input.organizationId},${input.applicationId},${input.jobId},
+             r.reference_id,r.resume_version_id,1,${input.evidence.contentSha256},${contentKind},
+             ${payloadSha256},${indexKey},${now}
+      FROM resume_insert r CROSS JOIN outbox_insert
+      RETURNING 1 AS inserted
     )
     SELECT
       (SELECT count(*)::integer FROM reference_insert) AS references,
       (SELECT count(*)::integer FROM resume_insert) AS versions,
-      (SELECT count(*)::integer FROM outbox_insert) AS intents
+      (SELECT count(*)::integer FROM outbox_insert) AS intents,
+      (SELECT count(*)::integer FROM index_insert) AS index_intents
   `);
   const rows = (result as { rows?: Array<Record<string, unknown>> }).rows ?? [];
   const row = rows[0];
   if (!row || Number(row.references) !== 1 || Number(row.versions) !== 1
-      || Number(row.intents) !== 1) {
+      || Number(row.intents) !== 1 || Number(row.index_intents) !== 1) {
     throw new Error("ORGANIZATION_CANDIDATE_EVIDENCE_NOT_WRITTEN");
   }
-  return { referenceId, resumeVersionId, outboxId };
+  return { referenceId, resumeVersionId, outboxId, indexOutboxId };
 }

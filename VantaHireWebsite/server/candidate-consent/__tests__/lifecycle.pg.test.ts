@@ -97,7 +97,7 @@ describe.skipIf(!enabled)("candidate consent restricted PostgreSQL lifecycle", (
       creds: { migrateUrl: ownerUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: () => connect(ownerUrl) });
     expect(result.applied).toHaveLength(loadManifest(directory).length);
-    expect(result.applied.at(-1)).toBe("0011");
+    expect(result.applied.at(-1)).toBe(loadManifest(directory).at(-1)!.version);
     if(process.env.FLOW_CONSENT_REQUIRE_FRESH_RUNTIME==="1") {
       expect((await owner.query("SELECT 1 FROM pg_roles WHERE rolname=$1",[new URL(runtimeUrl).username])).rows).toHaveLength(0);
       await expect(candidateConsentPrivilegesReady(owner,new URL(runtimeUrl).username,true)).rejects.toMatchObject({code:"42704"});

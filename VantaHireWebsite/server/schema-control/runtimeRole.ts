@@ -7,7 +7,9 @@
 
 import type { PgLike } from "./ledger";
 import { CANDIDATE_CONSENT_TABLES, CANDIDATE_CONSENT_FUNCTIONS, CANDIDATE_CONSENT_UPDATE_COLUMNS,
-  candidateConsentPrivilegesReady } from "./readiness";
+  candidateConsentPrivilegesReady, candidateIndexPrivilegesReady } from "./readiness";
+import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
+  CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
 import { DEFAULT_LOCK_KEY, type MigrationClient } from "./runner";
 import { assertRoleName, quoteIdentifier } from "./sqlIdentifier";
 import {
@@ -269,7 +271,8 @@ export async function assertRuntimeRoleContract(
                   'decision_events','decision_projection_outbox','decision_projection_delivery_state',
                   'organization_candidate_references','application_resume_versions',
                   'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
-                  'candidate_consent_events','candidate_consent_outbox'
+                  'candidate_consent_events','candidate_consent_outbox',
+                  'candidate_index_outbox','candidate_index_delivery_state'
                 )
                 AND has_table_privilege($1,c.oid,'SELECT')
                 AND has_table_privilege($1,c.oid,'INSERT')
@@ -280,7 +283,8 @@ export async function assertRuntimeRoleContract(
                 AND NOT has_table_privilege($1,c.oid,'TRIGGER')
               )
               OR c.relname IN ('candidate_consent_subjects','candidate_consent_sources',
-                'candidate_consent_events','candidate_consent_outbox')
+                'candidate_consent_events','candidate_consent_outbox',
+                'candidate_index_outbox','candidate_index_delivery_state')
               -- Separately asserted below, including effective per-column rights.
             )
        )
@@ -313,7 +317,8 @@ export async function assertRuntimeRoleContract(
        )
        AND NOT EXISTS (
          SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
-          WHERE n.nspname='public' AND NOT has_function_privilege($1,p.oid,'EXECUTE')
+          WHERE n.nspname='public' AND p.proname<>'flow_candidate_index_evidence_guard'
+            AND NOT has_function_privilege($1,p.oid,'EXECUTE')
        )
        AND (
          NOT $2::boolean OR (
@@ -349,6 +354,9 @@ export async function assertRuntimeRoleContract(
   }
   if (!(await candidateConsentPrivilegesReady(pg, role, false))) {
     throw new RuntimeRoleProvisionError("Candidate consent runtime authority is incomplete or excessive.");
+  }
+  if (!(await candidateIndexPrivilegesReady(pg, role, false))) {
+    throw new RuntimeRoleProvisionError("Candidate index runtime authority is incomplete or excessive.");
   }
   await assertDefaultPrivileges(pg, role, controlPlaneRequired);
 }
@@ -560,6 +568,33 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
           ON TABLE public.candidate_consent_subjects TO ${ident}`);
         for (const signature of CANDIDATE_CONSENT_FUNCTIONS) {
           await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${signature} FROM ${ident}`);
+          await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
+        }
+      }
+
+      const indexPresence = await migration.query(`SELECT
+        (SELECT count(*)::int FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) AS tables,
+        (SELECT count(*)::int FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) AS functions`,
+      [[...CANDIDATE_INDEX_TABLES], [...CANDIDATE_INDEX_FUNCTIONS, CANDIDATE_INDEX_TRIGGER_FUNCTION]]);
+      const index = indexPresence.rows[0];
+      if (!index || !((index.tables === 0 && index.functions === 0)
+          || (index.tables === 2 && index.functions === 6))) {
+        throw new RuntimeRoleProvisionError("Candidate index table/function presence is inconsistent.");
+      }
+      if (index.tables === 2) {
+        for (const table of CANDIDATE_INDEX_TABLES) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON TABLE public.${table} FROM ${ident},PUBLIC`);
+          const columns = await migration.query(`SELECT attname FROM pg_catalog.pg_attribute
+            WHERE attrelid=to_regclass($1) AND attnum>0 AND NOT attisdropped`, [`public.${table}`]);
+          const columnList = columns.rows.map((row: any) => quoteIdentifier(row.attname)).join(",");
+          await migration.query(`REVOKE SELECT(${columnList}),INSERT(${columnList}),UPDATE(${columnList}),
+            REFERENCES(${columnList}) ON TABLE public.${table} FROM ${ident},PUBLIC`);
+        }
+        await migration.query(`GRANT INSERT ON TABLE public.candidate_index_outbox TO ${ident}`);
+        for (const signature of [...CANDIDATE_INDEX_FUNCTIONS, CANDIDATE_INDEX_TRIGGER_FUNCTION]) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${signature} FROM ${ident},PUBLIC`);
+        }
+        for (const signature of CANDIDATE_INDEX_FUNCTIONS) {
           await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
         }
       }

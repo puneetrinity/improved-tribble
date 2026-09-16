@@ -118,9 +118,12 @@ app.use((req, res, next) => {
 
 import { initWebSocketServer } from "./websocket";
 import { consentDeliveryConfig, startConsentProcessor } from "./candidate-consent/processor";
+import { candidateIndexProcessorConfig, startCandidateIndexProcessor } from "./candidate-index/processor";
 let stopConsentProcessor: (() => void) | undefined;
+let stopCandidateIndexProcessor: (() => Promise<void>) | undefined;
 
 (async () => {
+  const indexConfig = candidateIndexProcessorConfig();
   const server = await registerRoutes(app);
   assertCandidatePrivacyRuntimeConfig();
   assertOrganizationCandidateSyncRuntimeConfig();
@@ -200,6 +203,7 @@ let stopConsentProcessor: (() => void) | undefined;
     // configuration is asserted above before any 4B delivery timer is armed.
     startOrganizationCandidateProcessor();
     stopConsentProcessor = startConsentProcessor(consentConfig);
+    stopCandidateIndexProcessor = startCandidateIndexProcessor(indexConfig);
 
     // Start job scheduler for automatic job expiration
     startJobScheduler();
@@ -236,8 +240,9 @@ let stopConsentProcessor: (() => void) | undefined;
     stopCandidatePrivacyProcessor();
     void stopOrganizationCandidateProcessor();
     stopConsentProcessor?.();
+    const indexStopped = stopCandidateIndexProcessor?.();
     server.close(() => {
-      process.exit(0);
+      void Promise.resolve(indexStopped).then(() => process.exit(0), () => process.exit(1));
     });
   };
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

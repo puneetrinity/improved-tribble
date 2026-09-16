@@ -32,6 +32,8 @@ const enabled =
   Boolean(runtimeDatabaseUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
 const targetId = "disposable-integration-target";
+const shippedVersions = loadManifest(migrationsDir).map(entry => entry.version);
+const forwardVersion = String(Number(shippedVersions.at(-1)) + 1).padStart(4, "0");
 const scratch: string[] = [];
 let safeTargetProven = false;
 
@@ -95,24 +97,10 @@ function credentials(expectedTargetId = targetId) {
 function withForwardMigration(name: string, sql: string): string {
   const dir = mkdtempSync(join(tmpdir(), "flow-schema-control-upgrade-"));
   scratch.push(dir);
-  for (const file of [
-    "0000_baseline.sql",
-    "0001_candidate_privacy_flow.sql",
-    "0002_resume_access_attempts.sql",
-    "0003_application_workflow_assessments.sql",
-    "0004_reviewer_share_authority.sql",
-    "0005_privilege_authorization_version.sql",
-    "0006_versioned_invitation_grants.sql",
-    "0007_decision_event_spine.sql",
-    "0008_decision_projection_outbox.sql",
-    "0009_decision_projection_delivery_state.sql",
-    "0010_organization_private_candidate_reference.sql",
-    "0011_candidate_consent.sql",
-    "catalog.lock.json",
-  ]) {
+  for (const file of [...loadManifest(migrationsDir).map(entry => entry.file), "catalog.lock.json"]) {
     copyFileSync(join(migrationsDir, file), join(dir, file));
   }
-  const file = `0012_${name}.sql`;
+  const file = `${forwardVersion}_${name}.sql`;
   writeFileSync(join(dir, file), sql);
   const catalogBytes = readFileSync(join(dir, "catalog.lock.json"));
   const currentLock = JSON.parse(readFileSync(join(migrationsDir, "checksums.lock"), "utf8")) as {
@@ -123,21 +111,7 @@ function withForwardMigration(name: string, sql: string): string {
     `${JSON.stringify({
       format_version: 1,
       catalog_lock_sha256: sha256(catalogBytes),
-      migrations: {
-        "0000": currentLock.migrations["0000"],
-        "0001": currentLock.migrations["0001"],
-        "0002": currentLock.migrations["0002"],
-        "0003": currentLock.migrations["0003"],
-        "0004": currentLock.migrations["0004"],
-        "0005": currentLock.migrations["0005"],
-        "0006": currentLock.migrations["0006"],
-        "0007": currentLock.migrations["0007"],
-        "0008": currentLock.migrations["0008"],
-        "0009": currentLock.migrations["0009"],
-        "0010": currentLock.migrations["0010"],
-        "0011": currentLock.migrations["0011"],
-        "0012": sha256(sql),
-      },
+      migrations: { ...currentLock.migrations, [forwardVersion]: sha256(sql) },
     }, null, 2)}\n`,
   );
   return dir;
@@ -268,10 +242,13 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
   });
 
   it("installs the exact baseline once and repeats as a no-op", async () => {
+    expect(loadManifest(migrationsDir).map(entry => entry.file)).toEqual(expect.arrayContaining([
+      "0002_resume_access_attempts.sql", "0004_reviewer_share_authority.sql",
+    ]));
     const first = await runReleaseMigration({ migrationsDir, creds: credentials(), connect });
     expect({ applied: first.applied.filter(version => Number(version) < 10) }).toEqual(PRE_4B_APPLIED_RESULT);
     expect(pre4BForwardMigrationName("historical_probe")).toBe("0010_historical_probe.sql");
-    expect(first).toEqual({ identityMode: "fresh", applied: ["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011"] });
+    expect(first).toEqual({ identityMode: "fresh", applied: shippedVersions });
 
     const second = await runReleaseMigration({ migrationsDir, creds: credentials(), connect });
     expect(second).toEqual({ identityMode: "adopted", applied: [] });
@@ -294,6 +271,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0009", apply_mode: "adopted" },
         { version: "0010", apply_mode: "adopted" },
         { version: "0011", apply_mode: "adopted" },
+        { version: "0012", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +
@@ -482,7 +460,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       creds: credentials(),
       connect,
     });
-    expect(upgraded.applied).toEqual(["0012"]);
+    expect(upgraded.applied).toEqual([forwardVersion]);
     const repeat = await runReleaseMigration({
       migrationsDir: upgradeDir,
       creds: credentials(),
@@ -496,7 +474,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       runReleaseMigration({ migrationsDir, creds: credentials(), connect, lockWaitMs: 120_000 }),
       runReleaseMigration({ migrationsDir, creds: credentials(), connect, lockWaitMs: 120_000 }),
     ]);
-    expect([...a.applied, ...b.applied]).toEqual(["0000", "0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011"]);
+    expect([...a.applied, ...b.applied]).toEqual(shippedVersions);
     const client = await directClient();
     try {
       const applied = await client.query("SELECT COUNT(*)::integer AS n FROM schema_control.applied");
@@ -526,7 +504,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         "SELECT to_regclass('public.should_rollback') AS leaked, " +
           "(SELECT COUNT(*)::integer FROM schema_control.applied) AS applied",
       );
-      expect(state.rows[0]).toEqual({ leaked: null, applied: 12 });
+      expect(state.rows[0]).toEqual({ leaked: null, applied: shippedVersions.length });
       await expect(
         assertSchemaReady({
           pg: { query: (text, params) => client.query(text, params as any) },
@@ -680,7 +658,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         },
         connect,
       });
-      expect(privacyUpgrade).toEqual({ identityMode: "adopted", applied: ["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008", "0009", "0010", "0011"] });
+      expect(privacyUpgrade).toEqual({ identityMode: "adopted", applied: shippedVersions.slice(1) });
       const preReconciliationRuntime = await runtimeClient();
       try {
         await preReconciliationRuntime.query("BEGIN READ ONLY");
@@ -690,7 +668,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
           environment: "production",
           expectedTargetId: adoptedTarget,
           criticalPostconditions: FLOW_CRITICAL_POSTCONDITIONS,
-        })).rejects.toThrow(/Candidate consent tables, column privileges and four routines are exact/);
+        })).rejects.toThrow(/Candidate index catalog, insert-only intent and five fenced routines are exact/);
         await preReconciliationRuntime.query("ROLLBACK");
       } finally {
         await preReconciliationRuntime.end();
@@ -729,7 +707,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         },
         connect,
       });
-      expect(forward).toEqual({ identityMode: "adopted", applied: ["0012"] });
+      expect(forward).toEqual({ identityMode: "adopted", applied: [forwardVersion] });
 
       const runtime = await runtimeClient();
       try {
@@ -741,7 +719,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
           expectedTargetId: adoptedTarget,
           criticalPostconditions: FLOW_CRITICAL_POSTCONDITIONS,
         });
-        expect(ready).toEqual({ version: "0012", applied: 13 });
+        expect(ready).toEqual({ version: forwardVersion, applied: shippedVersions.length + 1 });
         await runtime.query("ROLLBACK");
 
         // Readiness proves privileges catalogically. Positive execution proves

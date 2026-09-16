@@ -13,6 +13,7 @@
  */
 
 import './lib/aiModelStartupGuard';
+import { assertCandidateIndexWorkerConfig } from './candidate-index/contracts';
 import { Worker, Job, UnrecoverableError } from 'bullmq';
 import { pool } from './db';
 import { storage } from './storage';
@@ -886,6 +887,7 @@ const REDIS_NAMESPACE = process.env.NODE_ENV || 'development';
 
 // Main entry
 async function main(): Promise<void> {
+  assertCandidateIndexWorkerConfig();
   assertCandidatePrivacyRuntimeConfig();
   assertDecisionProjectionDeliveryRuntimeConfig();
   console.log('[AI Worker] Starting AI worker...');

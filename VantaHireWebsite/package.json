@@ -10,7 +10,8 @@
     "dev": "cross-env NODE_ENV=development tsx --env-file=.env server/index.ts",
     "build": "vite build && npm run build:ssr && npm run build:server",
     "build:ssr": "vite build --ssr src/entry-server.tsx --outDir ../dist/server",
-    "build:server": "esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/worker.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/schema-ready.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/migrate-release.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/adopt-existing.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/provision-runtime-role.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/aiWorker.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:server": "npm run build:candidate-index-storage && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/worker.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/schema-ready.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/migrate-release.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/adopt-existing.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/provision-runtime-role.ts --platform=node --packages=external --bundle --format=esm --outdir=dist && esbuild server/aiWorker.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",
+    "build:candidate-index-storage": "esbuild server/gcs-storage.ts --platform=node --packages=external --bundle --format=cjs --outfile=dist/candidate-index-gcs.cjs",
     "start": "npm run start:web",
     "start:web": "cross-env NODE_ENV=production node dist/schema-ready.js && cross-env NODE_ENV=production node dist/index.js",
     "start:worker": "cross-env NODE_ENV=production node dist/schema-ready.js && cross-env NODE_ENV=production node dist/worker.js",
@@ -59,7 +60,11 @@
     "check:candidate-consent": "node scripts/check-candidate-consent.mjs",
     "schema:catalog:lint": "node scripts/normalize-schema-catalog.mjs --lint-sql server/schema-control/catalog-census.sql",
     "schema:catalog:normalize": "node scripts/normalize-schema-catalog.mjs",
-    "schema:catalog:compare": "node scripts/compare-schema-catalog.mjs"
+    "schema:catalog:compare": "node scripts/compare-schema-catalog.mjs",
+    "check:candidate-index": "node scripts/check-candidate-index.mjs",
+    "test:candidate-index": "vitest run --config vitest.candidate-index.config.ts --exclude **/*.pg.test.ts",
+    "test:candidate-index:client": "cross-env FLOW_INDEX_CLIENT_TEST=1 vitest run --config vitest.candidate-index.config.ts",
+    "test:candidate-index:pg": "vitest run --config vitest.candidate-index.config.ts server/candidate-index/__tests__/lifecycle.pg.test.ts"
   },
   "dependencies": {
     "@axe-core/playwright": "^4.10.2",

@@ -736,11 +736,11 @@
   "governed_files": [
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "17c1aff4da2d9e3578135f6cbda4f81ce3d843584a35c0b3fb47e2d021cc5c25"
+      "sha256": "f491c18f298f8bdb11062f9367e4973e2071de19189f2a725789030981e8578f"
     },
     {
       "file": "package.json",
-      "sha256": "de798a429e12f92fdf5cd771cb044bdf96ed3639f7a341ae7fefd5d1caaf5025"
+      "sha256": "d93ba3e0cbef275347a589e00d7c6ef4394ef925d2ef0a1d92c0742f895d0226"
     },
     {
       "file": "vitest.server.config.ts",
@@ -748,7 +748,7 @@
     },
     {
       "file": "server/applications.routes.ts",
-      "sha256": "a2599e3f62a251f9a3fc857ab60b4c040d28197399bc22a1d89b8a4f40e6d974"
+      "sha256": "fc0775fd0affef38c3ac487d10a631eb949d96c80d89c8c85938d6cbf671613b"
     },
     {
       "file": "server/communications.routes.ts",
@@ -784,7 +784,7 @@
     },
     {
       "file": "server/candidates.semantic.routes.ts",
-      "sha256": "9116127419c1f515d11d504786408ef1f2622e9365a74ec55f0fb93b70059a4a"
+      "sha256": "ae18a0151c5b8a0bc603ec1232cb32ea1b7b5c96c9f98e09ac688393a05055c5"
     },
     {
       "file": "server/gcs-storage.ts",
@@ -796,7 +796,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "24e9d29349fe6bdb47f38b735a4dc0121602af5523460887b54ddef6d928fb21"
+      "sha256": "c33ebbfd48a4473fb3f329f8d5267be30d6b3e19b1ddc7a2466231c2193fef59"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -912,7 +912,7 @@
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
-      "sha256": "6763a477ba086cecd6a7fe93a7e857ace4e08c52042e368aa465bc5d186fd846"
+      "sha256": "b04c23d1b6836009bd2ab592d8e22a4ec83c99e288c4875c879aee805d0f2af7"
     },
     {
       "file": "client/src/pages/application-management-page.tsx",
@@ -936,7 +936,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "359cdb0bc5a8d7114200a1fef23a7518619477c0df920c6d2cdd23e8442d0e51"
+      "sha256": "e514459c92a8381b10e786ea392a2b3371b612a342810bbea1a4df4fbe53010b"
     },
     {
       "file": "shared/forms.types.ts",
@@ -956,15 +956,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "0bded77d998c48a6c0448c337f792d3225c27d0b05f58067991eeb3d98cf7754"
+      "sha256": "dcd87d99d3dc7686656d722fbbf696ad002ec92cc0a90c9d7483fd7b88a70560"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "225f49d88c74b7c8ae1f16fe974f929be286b84df542b5e4f0075bdd652d0039"
+      "sha256": "a122470540104280ad643b6b9438d634ee254232b3a3a184289580d10d4f4eec"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "cf02ab86312d17137b1cb42667e64951b2bf0abe273afb8df8b35d3fdb5e4458"
+      "sha256": "761487aca48c2ddd53b702b957bdd06df8b92cdd353b209af18641693cec5425"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1116,11 +1116,11 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "c0c83200588d12891fcf022ff38c6065b2658ee47ac7d9b05e674653153e53ef"
+      "sha256": "c2559a3542c8984d3a56dac8acb43df94baf50d894fa8e55b4cc8a6df0334b90"
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
-      "sha256": "4869324adf16412e2c875c6bb4b14da6e3b84553aa8957e7003607850d72486c"
+      "sha256": "16d35fcda60572e627fd87f2c2a4c061c72331475f796bd599a40f1534c346a9"
     },
     {
       "file": "server/decision-projection/config.ts",
@@ -1227,11 +1227,11 @@
     },
     {
       "file": "server/index.ts",
-      "sha256": "0812951cc1c7955ee811b3371101cd368149d90ead30360734a1e10ae3b1fdcd"
+      "sha256": "0c065af0bf6a941fecf3e67988e5dc11dfd285311eaac5470b7ac0ae7a469580"
     },
     {
       "file": "server/aiWorker.ts",
-      "sha256": "d735b459861d97c56386f825664039ecc8a77a3f02f5337a58779553c6a52738"
+      "sha256": "33005db9323727ba10abf08944f8dc6651aeef48549eb9195c222e7c4eb6a94f"
     },
     {
       "file": "scripts/check-candidate-privacy-surfaces.mjs",

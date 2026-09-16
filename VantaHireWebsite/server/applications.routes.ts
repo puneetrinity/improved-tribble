@@ -16,6 +16,7 @@ import type { Multer } from 'multer';
 import { sql, eq, and, inArray, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
+import { shouldEnqueueLegacyApplication } from './candidate-index/processor';
 import {
   storage,
   type ResumeAccessActorRole,
@@ -867,7 +868,8 @@ export function registerApplicationsRoutes(
 
       // A8: preserve legacy indexing after the private application commit.
       // The real enqueue and processor retain their global-use privacy fences.
-      if (process.env.ACTIVEKG_SYNC_ENABLED === 'true' && application.organizationId) {
+      if (process.env.ACTIVEKG_SYNC_ENABLED === 'true' && application.organizationId
+          && await shouldEnqueueLegacyApplication(application.organizationId, application.id)) {
         const hasValidResumeText = extractedResumeText && extractedResumeText.trim().length >= MIN_RESUME_TEXT_LENGTH;
         if (hasValidResumeText) {
           try {

@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "f2db41d9f463317aa70a07e1813f9c3c9404133c673713ff60128b35abfb40c1",
+  "source_census_sha256": "da39b837736978dae5d360961d7eaa9ba535ba39d7ebd612493574be36140577",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/candidate-consent/contracts.ts",
@@ -9,6 +9,9 @@
     "server/candidate-consent/routes.ts",
     "server/candidate-consent/processor.ts",
     "server/candidate-consent/memory-client.ts",
+    "server/candidate-index/processor.ts",
+    "server/candidate-index/search.ts",
+    "server/candidate-index/catchup.ts",
     "server/storage.ts",
     "server/lib/applicationReadAuthorization.ts",
     "server/applications.routes.ts",
@@ -66,6 +69,10 @@
     { "file": "server/candidate-consent/routes.ts", "classification": "fenced" },
     { "file": "server/candidate-consent/processor.ts", "classification": "fenced" },
     { "file": "server/candidate-consent/memory-client.ts", "classification": "fenced" },
+    { "file": "server/candidate-index/memory-client.ts", "classification": "fenced" },
+    { "file": "server/candidate-index/processor.ts", "classification": "fenced" },
+    { "file": "server/candidate-index/search.ts", "classification": "fenced" },
+    { "file": "server/candidate-index/catchup.ts", "classification": "fenced" },
     { "file": "server/organization-candidates/application-intake.ts", "classification": "fenced" },
     { "file": "server/organization-candidates/processor.ts", "classification": "fenced" },
     { "file": "server/auth.ts", "classification": "fenced" },
@@ -131,6 +138,7 @@
     { "file": "client/src/components/candidate-privacy/CandidatePrivacyPanel.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/candidate/CandidateConsentPanel.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/candidate/CandidateConsentPanel.test.tsx", "classification": "excluded" },
+    { "file": "client/src/pages/candidates-page.test.tsx", "classification": "excluded" },
     { "file": "client/src/components/kanban/ApplicationDetailModal.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/kanban/ApplicationDetailPanel.tsx", "classification": "ui_consumer" },
     { "file": "client/src/components/recruiter/MoveCandidateToJobDialog.tsx", "classification": "ui_consumer" },
@@ -191,6 +199,50 @@
       "organization_scope": "verified_candidate_self",
       "enforcement": "Account/source/privacy rechecked before grant delivery; withdrawal independent of global admission.",
       "anchors": ["requireCandidatePrivacyAllowed", "globalUse: true, newGlobalOperation: true", "account.auth_version !== loaded.authVersion", "ownedResume", "flow_ack_candidate_consent_outbox"]
+    },
+    {
+      "id": "candidate-index-catchup",
+      "file": "server/candidate-index/catchup.ts",
+      "symbol": "executeApplicationCatchup",
+      "models": ["applications", "application_resume_versions", "organization_candidate_memory_outbox", "candidate_index_outbox"],
+      "direction": "private_source_catchup",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "exact_live_application_organization",
+      "enforcement": "Explicit sealed bounded plan, exact acknowledged immutable substrate, private-use privacy before storage and again before capture, running-worker fence, fixed skip outcomes and durable resume; never a startup sweep or provider adopter.",
+      "anchors": ["requireOrganizationCandidateApplicationAllowed", "downloadCandidateIndexOriginal", "flow_capture_candidate_index_catchup", "JSON.stringify(identity(current[0])) !== JSON.stringify(entry)", "candidateIndexMode() !== \"private_primary\"", "row.intake_state !== \"acknowledged\""]
+    },
+    {
+      "id": "candidate-index-processor",
+      "file": "server/candidate-index/processor.ts",
+      "symbol": "runCandidateIndexProcessorOnce",
+      "models": ["applications", "application_resume_versions", "organization_candidate_memory_outbox", "candidate_index_outbox", "candidate_index_delivery_state"],
+      "direction": "private_source_delivery",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "verified_application_organization",
+      "enforcement": "Exact live application/evidence/4B-ack tuple; frozen private-use admission before bounded storage and immediately before HTTP; global opt-out alone allowed, stale/erasure authority refused, lease-fenced settlement.",
+      "anchors": ["await sourceForClaim(claim, db)", "await admit({ applicationId: claim.application_id, email: evidence.email, phone: evidence.phone })", "beforeAttempt: async () =>", "await admit({ applicationId: claim.application_id, email: current.email, phone: current.phone })", "flow_ack_candidate_index_delivery", "claim.lease_token, claim.generation"]
+    },
+    {
+      "id": "candidate-index-memory-client",
+      "file": "server/candidate-index/memory-client.ts",
+      "symbol": "deliverCandidateIndex",
+      "models": ["application_resume_versions", "candidate_index_outbox"],
+      "direction": "private_source_delivery",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "verified_application_organization",
+      "enforcement": "Immediate caller-provided private privacy proof before the single signed request; bounded cancellable transport and exact receipt identity, no locator or raw error logging.",
+      "anchors": ["await input.beforeAttempt()", "signal.throwIfAborted()", "organization-candidate-source:write", "redirect: \"error\"", "candidateIndexCommandDigest(command, tenant)"]
+    },
+    {
+      "id": "candidate-index-search-client",
+      "file": "server/candidate-index/search.ts",
+      "symbol": "searchCandidateIndex",
+      "models": ["applications", "application_resume_versions"],
+      "direction": "read_provider",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "owning_org",
+      "enforcement": "Exact tenant read scope, bounded response and explicit filter refusal; Memory publication binds the immutable 4B receipt, then Flow checks the exact immutable resume tuple and live ownership followed by private SQL hydration before caller-visible limit. No outbox SELECT or generation-only access grant.",
+      "anchors": ["organization-candidate-index:read", "candidateIndexSearchFilters(input.organizationId", "verifyCandidateIndexHitTuples", "a.organization_id=r.organization_id", "r.resume_version_id=ANY($2::uuid[])", "row.reference_id === hit.reference_id", "row.resume_version_id === hit.resume_version_id"]
     },
     {
       "id": "consent-memory-client",
@@ -464,8 +516,8 @@
       "direction": "read_provider",
       "privacy_action": ["request_erasure"],
       "organization_scope": "owning_org",
-      "enforcement": "Application SQL fence is inside the ranked query before limit; filtered IDs are never returned.",
-      "anchors": ["privacyAllowedSql('application'", "privacyFilteredResults.slice(0, requestedTopK)", "droppedApplicationCount"]
+      "enforcement": "Application SQL fence precedes visible limit; private generation results also bind live org/job and the acknowledged immutable resume tuple. No-org global remains on the old globally fenced branch; filtered IDs are never returned.",
+      "anchors": ["privacyAllowedSql('application'", "privacyFilteredResults.slice(0, requestedTopK)", "droppedApplicationCount", "!isSuperAdminGlobalSearch && candidateIndexMode() !== null", "getApplicationsByIdsForOrg(appIds, orgId!)", "verifyCandidateIndexHitTuples(orgId!, indexResponse.results)"]
     },
     {
       "id": "recruiter-dashboard-reader",
@@ -1077,6 +1129,13 @@
       "symbol": "CandidateConsentPanel",
       "reason": "Component contract test: URL-routed fetch stub only, synthetic fixture profile, no production transport or candidate data; asserts unchecked default, no resume preselection, exact request bodies and 202-as-pending truth.",
       "anchors": ["/api/candidate/consent", "/api/candidate/consent/grant", "/api/candidate/consent/withdraw"]
+    },
+    {
+      "id": "candidate-index-ui-test",
+      "file": "client/src/pages/candidates-page.test.tsx",
+      "symbol": "CandidatesPage",
+      "reason": "Wave 4D reserved ReactDOM harness for the candidates page index adoption; test-only, no candidate data leaves the test process.",
+      "anchors": ["/api/candidates/semantic-search"]
     }
   ]
 }

@@ -20,6 +20,9 @@ import { applicationStageHistory, applications, organizations, type Application 
 import { and, inArray, sql } from 'drizzle-orm';
 import { pickInitialPipelineStage } from './lib/pipelineStageSelection';
 import { privacyAllowedSql } from './candidate-privacy/decision';
+import { candidateIndexMode } from './candidate-index/contracts';
+import { CandidateIndexSearchError, searchCandidateIndex, verifyCandidateIndexHitTuples,
+  type CandidateIndexSearchResponse } from './candidate-index/search';
 
 // ── Validation schemas ─────────────────────────────────────────────
 
@@ -52,7 +55,7 @@ interface GroupedResult {
   highlights: string[];
 }
 
-type SemanticScoreType = 'rrf_fused' | 'weighted_fusion' | 'cosine' | 'unknown';
+type SemanticScoreType = 'rrf_fused' | 'weighted_fusion' | 'cosine' | 'cross_encoder' | 'unknown';
 
 interface SearchDiagnostics {
   mode: 'org_private' | 'super_admin_global';
@@ -221,6 +224,7 @@ export function registerCandidateSemanticRoutes(
     requireSeat({ allowNoOrg: true }),
     csrfProtection,
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      let privateIndexRead = false;
       try {
         // ── Auth & org ─────────────────────────────────────────
         const orgResult = await getUserOrganization(req.user!.id);
@@ -282,6 +286,10 @@ export function registerCandidateSemanticRoutes(
         let scoreType: SemanticScoreType = inferScoreType(searchPayloadBase.use_hybrid);
         const strategy = getTenantStrategy();
         const searchedTenants: string[] = [];
+        let indexResponse: CandidateIndexSearchResponse | undefined;
+        // The no-org global branch remains wholly legacy. A failed private read
+        // must never fall through to that branch or the old unscoped API.
+        privateIndexRead = !isSuperAdminGlobalSearch && candidateIndexMode() !== null;
         if (isSuperAdminGlobalSearch) {
           if (strategy === 'org_scoped') {
             const orgRows = await db.select({ id: organizations.id }).from(organizations) as Array<{ id: number }>;
@@ -321,6 +329,13 @@ export function registerCandidateSemanticRoutes(
             activekgResults = response.results;
             providerResultSaturated = response.results.length >= privacyCandidateFetchLimit;
           }
+        } else if (privateIndexRead) {
+          searchedTenants.push(`org_${orgId!}`);
+          indexResponse = await searchCandidateIndex({ organizationId: orgId!, query,
+            useHybrid: searchPayloadBase.use_hybrid, useReranker: searchPayloadBase.use_reranker,
+            ...(metadata_filters ? { metadataFilters: metadata_filters } : {}) });
+          scoreType = indexResponse.score_type;
+          providerResultSaturated = indexResponse.saturated;
         } else {
           searchedTenants.push(tenantId);
           const response = await activekgSearch(tenantId, {
@@ -339,11 +354,20 @@ export function registerCandidateSemanticRoutes(
         }
 
         // ── Group by application ───────────────────────────────
-        const grouped = groupByApplication(activekgResults);
+        const grouped: GroupedResult[] = indexResponse
+          ? indexResponse.results.map(hit => ({ applicationId: hit.application_id,
+              bestScore: hit.ranking_score, bestVectorScore: normalizeUnitScore(hit.cosine_score),
+              matchedChunks: hit.matched_chunks, highlights: hit.highlights }))
+          : groupByApplication(activekgResults);
+        const indexByApplication = new Map(indexResponse?.results.map(hit => [hit.application_id, hit]));
+        const indexDiagnostics = indexResponse ? {
+          indexProcessing: indexResponse.processing, indexReranker: indexResponse.reranker,
+          indexSaturated: indexResponse.saturated,
+        } : {};
         const searchDiagnostics: SearchDiagnostics = {
           mode: isSuperAdminGlobalSearch ? 'super_admin_global' : 'org_private',
           tenantIds: searchedTenants,
-          activekgRawCount: activekgResults.length,
+          activekgRawCount: indexResponse?.results.length ?? activekgResults.length,
           groupedApplicationCount: grouped.length,
           hydratedApplicationCount: 0,
           droppedApplicationCount: 0,
@@ -354,7 +378,8 @@ export function registerCandidateSemanticRoutes(
             query,
             count: 0,
             scoreType,
-            displayScoreType: scoreType,
+            displayScoreType: indexResponse ? 'cosine' : scoreType,
+            ...indexDiagnostics,
             searchDiagnostics,
             scoreDiagnostics: {
               topRawScore: null,
@@ -383,6 +408,14 @@ export function registerCandidateSemanticRoutes(
               ))
             : await storage.getApplicationsByIdsForOrg(appIds, orgId!);
         }
+        if (indexResponse) {
+          const bound = await verifyCandidateIndexHitTuples(orgId!, indexResponse.results);
+          apps = apps.filter(application => {
+            const hit = indexByApplication.get(application.id);
+            return application.organizationId === orgId && hit?.job_id === application.jobId
+              && (hit.state === 'legacy' || bound.has(application.id));
+          });
+        }
         const appMap = new Map(apps.map((a) => [a.id, a]));
         const droppedApplicationIds = grouped
           .map((g) => g.applicationId)
@@ -399,7 +432,7 @@ export function registerCandidateSemanticRoutes(
             organizationId: orgId ?? null,
             mode: searchDiagnostics.mode,
             tenantIds: searchedTenants,
-            rawResultCount: activekgResults.length,
+            rawResultCount: indexResponse?.results.length ?? activekgResults.length,
             groupedApplicationCount: grouped.length,
             hydratedApplicationCount: apps.length,
             droppedApplicationCount: droppedApplicationIds.length,
@@ -433,9 +466,10 @@ export function registerCandidateSemanticRoutes(
 
           const stage = app.currentStage ? stageMap.get(app.currentStage) : undefined;
           const job = jobMap.get(app.jobId);
-          const useVectorDisplay = scoreType === 'rrf_fused' && g.bestVectorScore != null;
+          const useVectorDisplay = (Boolean(indexResponse) || scoreType === 'rrf_fused') && g.bestVectorScore != null;
           if (useVectorDisplay) usedVectorDisplayForRrf = true;
-          const displayScoreRaw = useVectorDisplay ? g.bestVectorScore! : g.bestScore;
+          const displayScoreRaw = indexResponse ? g.bestVectorScore : useVectorDisplay ? g.bestVectorScore! : g.bestScore;
+          const indexed = indexByApplication.get(app.id);
 
           results.push({
             applicationId: app.id,
@@ -447,10 +481,12 @@ export function registerCandidateSemanticRoutes(
             currentStageId: app.currentStage ?? null,
             currentStageName: stage?.name ?? null,
             rankingScoreRaw: Number(g.bestScore.toFixed(6)),
-            matchScoreRaw: Number(displayScoreRaw.toFixed(6)),
-            matchScore: Math.round(displayScoreRaw * 100),
+            matchScoreRaw: displayScoreRaw == null ? null : Number(displayScoreRaw.toFixed(6)),
+            matchScore: displayScoreRaw == null ? null : Math.round(displayScoreRaw * 100),
             matchedChunks: g.matchedChunks,
             highlights: g.highlights,
+            ...(indexed ? { indexGeneration: indexed.generation, sourceObservedAt: indexed.source_observed_at,
+              indexState: indexed.state } : {}),
               resume: {
                 resumeFilename: app.resumeFilename ?? null,
                 previewUrl: null,
@@ -576,7 +612,7 @@ export function registerCandidateSemanticRoutes(
           }
         }
 
-        const displayScoreType: SemanticScoreType = (
+        const displayScoreType: SemanticScoreType = indexResponse ? 'cosine' : (
           scoreType === 'rrf_fused' && usedVectorDisplayForRrf
         ) ? 'cosine' : scoreType;
 
@@ -613,6 +649,7 @@ export function registerCandidateSemanticRoutes(
         const finalResults = privacyFilteredResults.slice(0, requestedTopK);
 
         const rawScores = finalResults
+          .filter((r) => r.matchScoreRaw != null)
           .map((r) => Number(r.matchScoreRaw))
           .filter((value) => Number.isFinite(value));
         const topRawScore = rawScores.length > 0 ? Math.max(...rawScores) : null;
@@ -635,6 +672,7 @@ export function registerCandidateSemanticRoutes(
           count: finalResults.length,
           scoreType,
           displayScoreType,
+          ...indexDiagnostics,
           searchDiagnostics: {
             ...searchDiagnostics,
             dedupedCandidateCount: finalResults.length,
@@ -654,6 +692,11 @@ export function registerCandidateSemanticRoutes(
         });
         return;
       } catch (error) {
+        if (privateIndexRead) {
+          const code = error instanceof CandidateIndexSearchError ? error.code : 'candidate_index_search_unavailable';
+          res.status(code === 'candidate_index_search_unavailable' ? 503 : 422).json({ code });
+          return;
+        }
         console.error('[SEMANTIC_SEARCH] Error:', error);
         next(error);
       }

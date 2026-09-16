@@ -579,6 +579,55 @@ export const candidateConsentOutbox = pgTable("candidate_consent_outbox", {
   readyIdx: index("consent_outbox_ready_idx").on(table.state, table.nextAttemptAt, table.createdAt),
   subjectIdx: index("consent_outbox_subject_idx").on(table.subjectId, table.version) }));
 
+// Wave 4D: immutable source-content delivery; accepted is not index-ready.
+export const candidateIndexOutbox = pgTable("candidate_index_outbox", {
+  outboxId: uuid("outbox_id").primaryKey(),
+  organizationId: integer("organization_id").notNull(),
+  applicationId: integer("application_id").notNull(),
+  jobId: integer("job_id").notNull(),
+  referenceId: uuid("reference_id").notNull(),
+  resumeVersionId: uuid("resume_version_id").notNull(),
+  sourceVersion: integer("source_version").notNull(),
+  contentSha256: char("content_sha256", { length: 64 }).notNull(),
+  contentKind: text("content_kind").notNull(),
+  payloadSha256: char("payload_sha256", { length: 64 }).notNull(),
+  idempotencyKey: char("idempotency_key", { length: 64 }).notNull(),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+}, table => ({
+  referenceFk: foreignKey({ name: "candidate_index_outbox_reference_fk",
+    columns: [table.referenceId, table.organizationId, table.applicationId, table.jobId],
+    foreignColumns: [organizationCandidateReferences.referenceId, organizationCandidateReferences.organizationId,
+      organizationCandidateReferences.applicationId, organizationCandidateReferences.jobId],
+  }).onDelete("restrict"),
+  resumeFk: foreignKey({ name: "candidate_index_outbox_resume_fk",
+    columns: [table.resumeVersionId, table.referenceId, table.organizationId, table.applicationId, table.jobId],
+    foreignColumns: [applicationResumeVersions.resumeVersionId, applicationResumeVersions.referenceId,
+      applicationResumeVersions.organizationId, applicationResumeVersions.applicationId, applicationResumeVersions.jobId],
+  }).onDelete("restrict"),
+  sourceUnique: unique("candidate_index_outbox_resume_unique").on(table.referenceId, table.resumeVersionId, table.sourceVersion),
+  keyUnique: unique("candidate_index_outbox_key_unique").on(table.idempotencyKey),
+  dueIdx: index("candidate_index_outbox_due_idx").on(table.createdAt, table.outboxId),
+  applicationIdx: index("candidate_index_outbox_application_idx").on(table.organizationId, table.applicationId),
+}));
+export const candidateIndexDeliveryState = pgTable("candidate_index_delivery_state", {
+  outboxId: uuid("outbox_id").primaryKey().references(() => candidateIndexOutbox.outboxId, { onDelete: "restrict" }),
+  state: text("state").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  generation: bigint("generation", { mode: "number" }).notNull().default(0),
+  leaseToken: uuid("lease_token"),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+  acceptedSourceId: uuid("accepted_source_id"),
+  acceptedCommandDigest: char("accepted_command_digest", { length: 64 }),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+  errorCode: text("error_code"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().default(sql`clock_timestamp()`),
+}, table => ({
+  dueIdx: index("candidate_index_delivery_state_due_idx").on(table.nextAttemptAt, table.outboxId)
+    .where(sql`${table.state} IN ('leased','retry_wait')`),
+}));
+
 // ATS: Application feedback (for hiring managers)
 export const applicationFeedback = pgTable("application_feedback", {
   id: serial("id").primaryKey(),

@@ -55,11 +55,14 @@ jobs:
       - run: npm run check:object-authorization
       - run: npm run check:organization-candidate-intake
       - run: npm run check:candidate-consent
+      - run: npm run check:candidate-index
       - run: npm run check:server
       - run: npm run check:client
       - run: npm run test:server
       - run: npm run test:candidate-consent
+      - run: npm run test:candidate-index
       - run: npm run test:candidate-consent:client
+      - run: npm run test:candidate-index:client
       - name: Run disposable schema-control matrix
         env:
           NODE_ENV: test
@@ -130,3 +133,22 @@ jobs:
           FLOW_SCHEMA_TEST_DATABASE_URL: postgresql://flow_schema_control_test_runner:runner-test-only@127.0.0.1:5432/flow_schema_control_test_ci
           FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL: postgresql://flow_schema_control_test_runtime:runtime-test-only@127.0.0.1:5432/flow_schema_control_test_ci
         run: npm run test:candidate-consent:pg
+      - name: Run candidate-index schema and release proof with fresh restricted identities
+        env:
+          NODE_ENV: test
+          FLOW_INDEX_TEST_DISPOSABLE: '1'
+          FLOW_INDEX_TEST_OWNER_URL: postgresql://flow_4d_test_owner:index-owner-fixture@127.0.0.1:5432/flow_4d_test_fresh
+          FLOW_INDEX_TEST_RUNTIME_URL: postgresql://flow_4d_test_runtime:index-runtime-fixture@127.0.0.1:5432/flow_4d_test_fresh
+          FLOW_INDEX_TEST_READONLY_URL: postgresql://flow_4d_test_readonly:index-readonly-fixture@127.0.0.1:5432/flow_4d_test_fresh
+        run: |
+          sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE flow_4d_test_owner LOGIN CREATEROLE NOINHERIT PASSWORD 'index-owner-fixture';
+          CREATE ROLE flow_4d_test_runtime LOGIN NOINHERIT PASSWORD 'index-runtime-fixture';
+          CREATE ROLE flow_4d_test_readonly LOGIN NOINHERIT PASSWORD 'index-readonly-fixture';
+          GRANT flow_4d_test_runtime TO flow_4d_test_owner WITH ADMIN TRUE, INHERIT FALSE, SET FALSE;
+          CREATE DATABASE flow_4d_test_fresh OWNER flow_4d_test_owner;
+          REVOKE TEMPORARY ON DATABASE flow_4d_test_fresh FROM PUBLIC;
+          GRANT TEMPORARY ON DATABASE flow_4d_test_fresh TO flow_4d_test_owner,flow_4d_test_runtime;
+          ALTER ROLE flow_4d_test_readonly SET default_transaction_read_only=on;
+          SQL
+          npm run test:candidate-index:pg

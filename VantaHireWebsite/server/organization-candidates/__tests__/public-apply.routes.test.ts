@@ -51,6 +51,7 @@ describe("A7 public-apply private admission through the real writer", () => {
   let decision: Decision;
   let transactionDecision: Decision | undefined;
   let postCommitDecision: Decision | undefined;
+  let managed: boolean | Error;
   let committed: boolean;
   let applicationValues: Record<string, unknown>;
   let realStorage: typeof import("../../storage")["storage"];
@@ -166,11 +167,13 @@ describe("A7 public-apply private admission through the real writer", () => {
     transactionDecision = undefined;
     postCommitDecision = undefined;
     committed = false;
+    managed = true;
     saved.extractedText = null;
     applicationValues = {};
     vi.stubEnv("EMAIL_AUTOMATION_ENABLED", "false");
     vi.stubEnv("NOTIFICATION_AUTOMATION_ENABLED", "false");
     vi.stubEnv("ACTIVEKG_SYNC_ENABLED", "false");
+    vi.stubEnv("FLOW_CANDIDATE_INDEX_MODE", undefined);
     vi.stubEnv("ACTIVEKG_TENANT_STRATEGY", "org_scoped");
     vi.stubEnv("ACTIVEKG_TENANT_PREFIX", "org");
     vi.stubEnv("FLOW_CANDIDATE_PRIVACY_STALE_MS", "120000");
@@ -179,7 +182,7 @@ describe("A7 public-apply private admission through the real writer", () => {
       applicationValues = values;
       return { returning: async () => [{ ...values, ...recorded }] };
     } }));
-    execute.mockResolvedValue({ rows: [{ references: 1, versions: 1, intents: 1 }] });
+    execute.mockResolvedValue({ rows: [{ references: 1, versions: 1, intents: 1, index_intents: 1 }] });
     transaction.mockImplementation(async (run: (executor: typeof tx) => Promise<unknown>) => {
       if (transactionDecision) decision = transactionDecision;
       const result = await run(tx);
@@ -199,6 +202,11 @@ describe("A7 public-apply private admission through the real writer", () => {
       return decision;
     });
     privacyQuery.mockImplementation(async (query: string) => {
+      if (query.includes("flow_candidate_index_managed_application")) {
+        expect(committed).toBe(true);
+        if (managed instanceof Error) throw managed;
+        return { rows: [{ managed }] };
+      }
       if (decision === "unavailable") throw new Error("UNAVAILABLE");
       if (query.includes("candidate_privacy_sync_state")) return { rows: [{
         status: "healthy", last_success_at: new Date(Date.now() - (decision === "stale" ? 180_000 : 0)),
@@ -350,6 +358,40 @@ describe("A7 public-apply private admission through the real writer", () => {
       } finally { warn.mockRestore(); error.mockRestore(); }
     });
   }
+
+  for (const kind of ["anonymous", "bound", "saved"] as const) {
+    it.each(["dual", "private_primary"])(`4D ${kind} %s uses the exact post-commit adoption gate`, async mode => {
+      indexingResume(); vi.stubEnv("FLOW_CANDIDATE_INDEX_MODE", mode);
+      expect(await invoke(kind)).toMatchObject({ status: 201, failure: undefined });
+      expect(committed).toBe(true); expect(execute).toHaveBeenCalledTimes(1);
+      expect(realStorage.enqueueApplicationGraphSyncJob).toHaveBeenCalledTimes(mode === "dual" ? 1 : 0);
+      expect(queueValues).toHaveBeenCalledTimes(mode === "dual" ? 1 : 0);
+      const reads = privacyQuery.mock.calls.filter(([query]) => query.includes("flow_candidate_index_managed_application"));
+      expect(reads).toEqual(mode === "dual" ? [] : [[
+        "SELECT public.flow_candidate_index_managed_application($1,$2) AS managed", [41, 101],
+      ]]);
+      expect(removeObject).not.toHaveBeenCalled(); expect(fetch).not.toHaveBeenCalled();
+    });
+  }
+
+  it("4D does not use mode alone as adoption evidence", async () => {
+    indexingResume(); vi.stubEnv("FLOW_CANDIDATE_INDEX_MODE", "private_primary"); managed = false;
+    expect(await invoke("anonymous")).toMatchObject({ status: 201, failure: undefined });
+    expect(queueValues).toHaveBeenCalledTimes(1);
+  });
+
+  it("4D uncertain post-commit adoption skips only the legacy write, not the committed application", async () => {
+    indexingResume(); vi.stubEnv("FLOW_CANDIDATE_INDEX_MODE", "private_primary");
+    managed = new Error("private-db-sentinel@example.invalid");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await invoke("saved")).toMatchObject({ status: 201, failure: undefined });
+      expect(committed).toBe(true); expect(execute).toHaveBeenCalledTimes(1);
+      expect(realStorage.enqueueApplicationGraphSyncJob).not.toHaveBeenCalled();
+      expect(removeObject).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledExactlyOnceWith("[ACTIVEKG_SYNC] Legacy adoption check unavailable (non-blocking)");
+    } finally { warn.mockRestore(); }
+  });
 
   it.each(["block_global", "block_all", "review", "unavailable", "stale"] as const)(
     "A8 a post-commit %s refusal prevents the queue write without failing the application", async (value) => {

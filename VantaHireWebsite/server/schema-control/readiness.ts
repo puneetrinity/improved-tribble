@@ -9,6 +9,8 @@
 import { loadManifest, type MigrationEntry } from "./manifest";
 import { readApplied, readIdentity, readRunHealth, type PgLike } from "./ledger";
 import { SYSTEM, safeTargetFingerprint, type ResolvedEnvironment } from "./targetIdentity";
+import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
+  CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
 
 export class SchemaNotReadyError extends Error {}
 
@@ -51,7 +53,96 @@ const FLOW_CORE_RELATIONS = [
   "public.candidate_consent_sources",
   "public.candidate_consent_events",
   "public.candidate_consent_outbox",
+  "public.candidate_index_outbox",
+  "public.candidate_index_delivery_state",
 ] as const;
+
+// Generated from the exercised PostgreSQL 16 migration; ACLs are checked separately.
+export const CANDIDATE_INDEX_CATALOG_SHA256 = "f75235ac3066f21632519e2b6a241acd307d09873891b4c68a1337fa0e568c34";
+export const CANDIDATE_INDEX_CATALOG_SQL = `WITH relations AS (
+  SELECT c.oid,c.relname,c.relkind,c.relrowsecurity,c.relforcerowsecurity
+  FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
+  WHERE n.nspname='public' AND c.relkind IN ('r','p') AND c.relname LIKE 'candidate_index_%'
+), facts AS (
+  SELECT jsonb_build_object(
+    'relations',(SELECT jsonb_agg(jsonb_build_array(relname,relkind,relrowsecurity,relforcerowsecurity)
+      ORDER BY relname) FROM relations),
+    'columns',(SELECT jsonb_agg(jsonb_build_array(c.relname,a.attname,a.attnum,
+      pg_catalog.format_type(a.atttypid,a.atttypmod),a.attnotnull,a.attidentity,a.attgenerated,
+      pg_catalog.pg_get_expr(d.adbin,d.adrelid)) ORDER BY c.relname,a.attnum)
+      FROM relations c JOIN pg_catalog.pg_attribute a ON a.attrelid=c.oid
+      LEFT JOIN pg_catalog.pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum
+      WHERE a.attnum>0 AND NOT a.attisdropped),
+    'constraints',(SELECT jsonb_agg(jsonb_build_array(c.relname,k.conname,k.contype,
+      pg_catalog.pg_get_constraintdef(k.oid,false),k.convalidated,k.condeferrable,k.condeferred)
+      ORDER BY c.relname,k.conname) FROM relations c JOIN pg_catalog.pg_constraint k ON k.conrelid=c.oid),
+    'indexes',(SELECT jsonb_agg(jsonb_build_array(c.relname,pg_catalog.pg_get_indexdef(i.indexrelid),
+      i.indisvalid,i.indisready) ORDER BY c.relname,pg_catalog.pg_get_indexdef(i.indexrelid))
+      FROM relations c JOIN pg_catalog.pg_index i ON i.indrelid=c.oid),
+    'triggers',(SELECT jsonb_agg(jsonb_build_array(c.relname,t.tgname,t.tgenabled,t.tgtype,
+      pg_catalog.pg_get_triggerdef(t.oid,false)) ORDER BY c.relname,t.tgname)
+      FROM relations c JOIN pg_catalog.pg_trigger t ON t.tgrelid=c.oid WHERE NOT t.tgisinternal),
+    'policies',(SELECT jsonb_agg(jsonb_build_array(c.relname,p.polname,p.polcmd,p.polpermissive,
+      pg_catalog.pg_get_expr(p.polqual,p.polrelid),pg_catalog.pg_get_expr(p.polwithcheck,p.polrelid))
+      ORDER BY c.relname,p.polname) FROM relations c JOIN pg_catalog.pg_policy p ON p.polrelid=c.oid),
+    'functions',(SELECT jsonb_agg(jsonb_build_array(p.proname,pg_catalog.pg_get_function_identity_arguments(p.oid),
+      pg_catalog.pg_get_function_result(p.oid),l.lanname,p.proconfig,p.prosecdef,p.proleakproof,
+      p.provolatile,p.proparallel,p.proisstrict,p.proretset,p.prosrc) ORDER BY p.proname,p.oid::regprocedure::text)
+      FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
+      JOIN pg_catalog.pg_language l ON l.oid=p.prolang
+      WHERE n.nspname='public' AND p.proname LIKE 'flow_%candidate_index%')
+  ) AS catalog
+) SELECT encode(sha256(convert_to(catalog::text,'UTF8')),'hex') AS digest FROM facts`;
+
+export async function candidateIndexPrivilegesReady(pg: PgLike, role: string, required: boolean): Promise<boolean> {
+  const presence = await pg.query(`SELECT
+    (SELECT count(*)::int FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) AS tables,
+    (SELECT count(*)::int FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) AS functions`,
+  [[...CANDIDATE_INDEX_TABLES], [...CANDIDATE_INDEX_FUNCTIONS, CANDIDATE_INDEX_TRIGGER_FUNCTION]]);
+  const count = presence.rows[0];
+  if (!required && count?.tables === 0 && count?.functions === 0) return true;
+  if (count?.tables !== 2 || count?.functions !== 6) return false;
+  const catalog = await pg.query(CANDIDATE_INDEX_CATALOG_SQL);
+  if (catalog.rows[0]?.digest !== CANDIDATE_INDEX_CATALOG_SHA256) return false;
+  const privileges = await pg.query(`SELECT
+    NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class c
+      CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) v(privilege)
+      WHERE c.oid=ANY(ARRAY['public.candidate_index_outbox'::regclass,'public.candidate_index_delivery_state'::regclass])
+        AND has_table_privilege($1,c.oid,v.privilege) IS DISTINCT FROM
+          (c.relname='candidate_index_outbox' AND v.privilege='INSERT')
+    ) AND NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_attribute a JOIN pg_catalog.pg_class c ON c.oid=a.attrelid
+      CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) v(privilege)
+      WHERE c.oid=ANY(ARRAY['public.candidate_index_outbox'::regclass,'public.candidate_index_delivery_state'::regclass])
+        AND a.attnum>0 AND NOT a.attisdropped AND has_column_privilege($1,c.oid,a.attnum,v.privilege)
+          IS DISTINCT FROM (c.relname='candidate_index_outbox' AND v.privilege='INSERT')
+    ) AND NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_class c
+      CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) acl
+      WHERE c.oid=ANY(ARRAY['public.candidate_index_outbox'::regclass,'public.candidate_index_delivery_state'::regclass])
+        AND (acl.grantee=0 OR (acl.grantee=to_regrole($1) AND acl.is_grantable))
+    ) AND NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_attribute a CROSS JOIN LATERAL aclexplode(a.attacl) acl
+      WHERE a.attrelid=ANY(ARRAY['public.candidate_index_outbox'::regclass,'public.candidate_index_delivery_state'::regclass])
+        AND (acl.grantee=0 OR (acl.grantee=to_regrole($1) AND acl.is_grantable))
+    ) AND NOT EXISTS (
+      SELECT 1 FROM unnest($2::text[]) sig
+      JOIN pg_catalog.pg_proc p ON p.oid=to_regprocedure(sig)
+      WHERE NOT p.prosecdef OR p.proconfig IS DISTINCT FROM CASE
+        WHEN p.proname='flow_candidate_index_managed_application' THEN ARRAY['search_path=pg_catalog, public']
+        ELSE ARRAY['search_path=pg_catalog, public','lock_timeout=1500ms','statement_timeout=3s'] END
+        OR NOT has_function_privilege($1,p.oid,'EXECUTE')
+    ) AND NOT has_function_privilege($1,to_regprocedure($3),'EXECUTE')
+    AND NOT EXISTS (
+      SELECT 1 FROM pg_catalog.pg_proc p
+      CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl
+      WHERE p.oid IN (SELECT to_regprocedure(sig) FROM unnest($2::text[] || ARRAY[$3]) sig)
+        AND (acl.grantee=0 OR acl.grantee NOT IN (p.proowner,to_regrole($1))
+          OR (acl.grantee=to_regrole($1) AND acl.is_grantable))
+    ) AS ok`, [role, [...CANDIDATE_INDEX_FUNCTIONS], CANDIDATE_INDEX_TRIGGER_FUNCTION]);
+  return privileges.rows[0]?.ok === true;
+}
 
 export const CANDIDATE_CONSENT_TABLES = ["candidate_consent_subjects", "candidate_consent_sources",
   "candidate_consent_events", "candidate_consent_outbox"] as const;
@@ -184,6 +275,13 @@ export async function candidateConsentPrivilegesReady(pg: PgLike, role: string, 
 export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
   ReadinessInput["criticalPostconditions"]
 > = [
+  {
+    name: "Candidate index catalog, insert-only intent and five fenced routines are exact",
+    async check(pg) {
+      const who = await pg.query("SELECT current_user AS role");
+      return candidateIndexPrivilegesReady(pg, who.rows[0]?.role, true);
+    },
+  },
   {
     name: "Candidate consent tables, column privileges and four routines are exact",
     async check(pg) {
@@ -514,7 +612,8 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                      'decision_events','decision_projection_outbox','decision_projection_delivery_state',
                      'organization_candidate_references','application_resume_versions',
                      'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
-                     'candidate_consent_events','candidate_consent_outbox'
+                     'candidate_consent_events','candidate_consent_outbox',
+                     'candidate_index_outbox','candidate_index_delivery_state'
                    )
                    AND has_table_privilege(current_user, c.oid, 'SELECT')
                    AND has_table_privilege(current_user, c.oid, 'INSERT')
@@ -525,7 +624,8 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                    AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
                  )
                  OR c.relname IN ('candidate_consent_subjects','candidate_consent_sources',
-                   'candidate_consent_events','candidate_consent_outbox')
+                   'candidate_consent_events','candidate_consent_outbox',
+                   'candidate_index_outbox','candidate_index_delivery_state')
                  -- Exact consent table/column privileges are a separate mandatory postcondition above.
                )
           )
@@ -555,7 +655,8 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
              WHERE n.nspname = 'public'
                AND (
                  pg_has_role(current_user, pg_get_userbyid(p.proowner), 'MEMBER')
-                 OR NOT has_function_privilege(current_user, p.oid, 'EXECUTE')
+                 OR (p.proname<>'flow_candidate_index_evidence_guard'
+                   AND NOT has_function_privilege(current_user, p.oid, 'EXECUTE'))
                )
           ) AS ok
       `);

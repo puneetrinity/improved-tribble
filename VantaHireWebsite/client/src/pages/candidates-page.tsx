@@ -15,6 +15,13 @@ import {
   Loader2,
   AlertCircle,
   Info,
+  CheckCircle2,
+  RefreshCw,
+  AlertTriangle,
+  History,
+  Clock,
+  XCircle,
+  Eye,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +37,12 @@ import {
   InternalPanel,
   InternalSectionHeader,
 } from "@/components/internal";
+
+// ── Wave 4D private index adoption (reserved UI path) ─────────────────────────────────────────────────────────────
+export type IndexState = "legacy" | "ready" | "updating" | "refresh_failed";
+export type IndexCountKey = "ready" | "updating" | "refresh_failed" | "pending" | "needs_review" | "failed";
+export interface IndexProcessing { counts: Record<IndexCountKey, number>; bounded: boolean; limit: number }
+export type IndexReranker = "not_requested" | "not_needed" | "applied" | "fallback";
 
 interface SemanticResult {
   applicationId: number;
@@ -55,13 +68,16 @@ interface SemanticResult {
   isExternal?: boolean;
   canMoveToJob?: boolean;
   canOpenResume?: boolean;
+  indexState?: IndexState;
+  indexGeneration?: number | null;
+  sourceObservedAt?: string | null;
 }
 
 interface SemanticSearchResponse {
   query: string;
   count: number;
-  scoreType?: "rrf_fused" | "weighted_fusion" | "cosine" | "unknown";
-  displayScoreType?: "rrf_fused" | "weighted_fusion" | "cosine" | "unknown";
+  scoreType?: "rrf_fused" | "weighted_fusion" | "cosine" | "cross_encoder" | "unknown";
+  displayScoreType?: "rrf_fused" | "weighted_fusion" | "cosine" | "cross_encoder" | "unknown";
   scoreDiagnostics?: {
     topRawScore: number | null;
     bottomRawScore: number | null;
@@ -73,6 +89,133 @@ interface SemanticSearchResponse {
   };
   results: SemanticResult[];
   candidates: SemanticResult[];
+  indexProcessing?: IndexProcessing;
+  indexReranker?: IndexReranker;
+  indexSaturated?: boolean;
+}
+
+// Copy for the index states lives here because the shared copy module is outside the Wave 4D UI allowance.
+// Every string states what is true now; none claims that every applicant is indexed or that matching is complete.
+export const indexCopy = {
+  states: {
+    ready: { label: "Indexed", helper: "searchable from this resume" },
+    updating: { label: "Updating", helper: "a newer resume is being processed" },
+    refresh_failed: { label: "Refresh failed", helper: "the newer resume could not be processed" },
+    legacy: { label: "Legacy match", helper: "from the previous search index" },
+  },
+  counts: {
+    ready: "indexed", updating: "updating", refresh_failed: "refresh failed", pending: "pending",
+    needs_review: "needs review", failed: "failed",
+  },
+  processingTitle: "Index status for your applicants",
+  notAllSearchable: "Some applicants are still being processed and are not searchable yet.",
+  bounded: "Counts are capped at 1,000.",
+  saturated: "Showing the first 100 matches. Refine the query to see others.",
+  rerankFallback: "Reranking was unavailable for this search. Results are ordered by retrieval.",
+  rerankApplied: "Ordered by the reranker. The percentage is resume similarity.",
+  unavailable: "Search is temporarily unavailable. Try again.",
+  unsupportedFilter: "This search used a filter that is not supported.",
+  filterConflict: "Those filters conflict with each other. Remove one and search again.",
+  queryTooLong: "That search is too long. Shorten it and try again.",
+  privacyReconciling: "Privacy settings are being updated. Try again in a moment.",
+  failed: "Search failed. Try again.",
+} as const;
+
+export function formatObservedDate(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+export function indexStateBadge(
+  result: Pick<SemanticResult, "indexState" | "indexGeneration" | "sourceObservedAt">,
+): { state: IndexState; label: string; detail: string | null; helper: string } | null {
+  const state = result.indexState;
+  if (!state) return null;
+  const copy = indexCopy.states[state];
+  if (state === "legacy") return { state, label: copy.label, detail: null, helper: copy.helper };
+  const version = typeof result.indexGeneration === "number" ? `v${result.indexGeneration}` : null;
+  const observed = formatObservedDate(result.sourceObservedAt);
+  const parts = [version, observed].filter((value): value is string => Boolean(value));
+  const detail = parts.length === 0 ? null : (state === "ready" ? parts.join(" · ") : `showing ${parts.join(" · ")}`);
+  return { state, label: copy.label, detail, helper: copy.helper };
+}
+
+const INDEX_COUNT_ORDER: IndexCountKey[] = ["ready", "updating", "refresh_failed", "pending", "needs_review", "failed"];
+export function processingSummary(processing: IndexProcessing | undefined):
+  { rows: { key: IndexCountKey; label: string; count: number }[]; notAllSearchable: boolean } | null {
+  if (!processing) return null;
+  const rows = INDEX_COUNT_ORDER.filter(key => processing.counts[key] > 0)
+    .map(key => ({ key, label: indexCopy.counts[key], count: processing.counts[key] }));
+  const notAllSearchable = processing.counts.pending + processing.counts.needs_review + processing.counts.failed > 0;
+  return { rows, notAllSearchable };
+}
+
+export function searchErrorCopy(message: string | undefined): string {
+  // Closed copy only: every closed code the server can answer with maps to a sentence, and anything else (raw
+  // JSON, vendor/transport text, legacy-mode error bodies) collapses to one closed fallback. No server text is echoed.
+  if (message?.includes("candidate_index_search_unavailable")) return indexCopy.unavailable;
+  if (message?.includes("candidate_index_filter_unsupported")) return indexCopy.unsupportedFilter;
+  if (message?.includes("candidate_index_filter_conflict")) return indexCopy.filterConflict;
+  if (message?.includes("candidate_index_query_too_long")) return indexCopy.queryTooLong;
+  if (message?.includes("candidate_privacy_reconciliation_required")) return indexCopy.privacyReconciling;
+  return indexCopy.failed;
+}
+
+const STATE_ICONS = { ready: CheckCircle2, updating: RefreshCw, refresh_failed: AlertTriangle, legacy: History } as const;
+const STATE_ICON_CLASS = { ready: "text-[#15803D]", updating: "text-[#4B8EF0]", refresh_failed: "text-[#B45309]", legacy: "text-[#5F6675]" } as const;
+const COUNT_ICONS = { ready: CheckCircle2, updating: RefreshCw, refresh_failed: AlertTriangle, pending: Clock, needs_review: Eye, failed: XCircle } as const;
+
+function IndexStateBadge({ result }: { result: SemanticResult }) {
+  const badge = indexStateBadge(result);
+  if (!badge) return null;
+  const Icon = STATE_ICONS[badge.state];
+  return (
+    <Badge
+      variant="outline"
+      data-testid="index-state"
+      data-state={badge.state}
+      title={badge.helper}
+      className="inline-flex max-w-full shrink-0 items-center gap-1 rounded-full font-dm text-xs font-medium text-[#1F2937]"
+    >
+      <Icon aria-hidden="true" className={`h-3.5 w-3.5 shrink-0 ${STATE_ICON_CLASS[badge.state]}`} />
+      <span className="break-words">{badge.label}{badge.detail ? <span className="text-[#5F6675]"> · {badge.detail}</span> : null}</span>
+      <span className="sr-only">. {badge.helper}</span>
+    </Badge>
+  );
+}
+
+function IndexProcessingSummary({ processing, saturated }: { processing: IndexProcessing | undefined; saturated?: boolean }) {
+  const summary = processingSummary(processing);
+  if (!summary) return null;
+  return (
+    <div
+      data-testid="index-processing"
+      role="status"
+      className="min-w-0 rounded-[16px] border border-[#EEF0F4] bg-[#F8F8FA] px-3 py-2"
+    >
+      <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5F6675]">{indexCopy.processingTitle}</p>
+      {summary.rows.length > 0 && (
+        <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-dm text-sm text-[#5F6675]">
+          {summary.rows.map(row => {
+            const Icon = COUNT_ICONS[row.key];
+            return (
+              <li key={row.key} className="inline-flex items-center gap-1">
+                <Icon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-[#5F6675]" />
+                <span>{row.count} {row.label}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {(summary.notAllSearchable || processing?.bounded || saturated) && (
+        <p className="mt-1 font-dm text-xs text-[#5F6675]">
+          {[summary.notAllSearchable ? indexCopy.notAllSearchable : null, processing?.bounded ? indexCopy.bounded : null,
+            saturated ? indexCopy.saturated : null].filter(Boolean).join(" ")}
+        </p>
+      )}
+    </div>
+  );
 }
 
 export default function CandidatesPage() {
@@ -186,7 +329,7 @@ export default function CandidatesPage() {
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <div className="min-w-0 flex-1">
             <div className="relative">
-              <Sparkles className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7B8191]" />
+              <Sparkles className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#5F6675]" />
               <Input
                 placeholder={talentSearchPageCopy.search.placeholder}
                 value={semanticQuery}
@@ -201,7 +344,7 @@ export default function CandidatesPage() {
           <Button
             onClick={handleSemanticSearch}
             disabled={!semanticQuery.trim() || semanticSearchQuery.isFetching}
-            className="h-11 rounded-2xl bg-[#4B8EF0] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#3679DB]"
+            className="h-11 rounded-2xl bg-[#2F6EDB] px-5 text-[0.875rem] font-semibold text-white shadow-[0_10px_22px_rgba(75,142,240,0.22)] hover:bg-[#245CBE]"
           >
             {semanticSearchQuery.isFetching ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -218,9 +361,15 @@ export default function CandidatesPage() {
               {semanticResults.length} result{semanticResults.length !== 1 ? "s" : ""} for "{submittedQuery}"
             </p>
             {semanticScoreType === "rrf_fused" && semanticDisplayScoreType === "cosine" && (
-              <p className="font-dm text-xs text-[#7B8191]">
+              <p className="font-dm text-xs text-[#5F6675]">
                 {talentSearchPageCopy.search.hybridScoreHint}
               </p>
+            )}
+            {semanticSearchQuery.data?.indexReranker === "fallback" && (
+              <p className="font-dm text-xs text-[#5F6675]" data-testid="index-rerank-note">{indexCopy.rerankFallback}</p>
+            )}
+            {semanticSearchQuery.data?.indexReranker === "applied" && semanticScoreType === "cross_encoder" && (
+              <p className="font-dm text-xs text-[#5F6675]" data-testid="index-rerank-note">{indexCopy.rerankApplied}</p>
             )}
           </div>
         )}
@@ -238,27 +387,28 @@ export default function CandidatesPage() {
       )}
 
       {semanticSearchQuery.isError && (
-        <InternalPanel>
+        <InternalPanel data-testid="search-error">
           <InternalEmptyState
             icon={AlertCircle}
             title={talentSearchPageCopy.search.errorFallback}
-            description={semanticSearchQuery.error?.message}
+            description={searchErrorCopy(semanticSearchQuery.error?.message)}
           />
         </InternalPanel>
       )}
 
       {semanticSearchQuery.isSuccess && semanticResults.length === 0 && (
-        <InternalPanel>
+        <InternalPanel data-testid="search-empty" className="space-y-3">
           <InternalEmptyState
             icon={Search}
             title={talentSearchPageCopy.search.noResultsTitle}
             description={talentSearchPageCopy.search.noResultsHint}
           />
+          <IndexProcessingSummary processing={semanticSearchQuery.data?.indexProcessing} saturated={false} />
         </InternalPanel>
       )}
 
       {semanticSearchQuery.isSuccess && semanticResults.length > 0 && (
-        <section className="space-y-4" data-tour="talent-search-results">
+        <section className="space-y-4" data-tour="talent-search-results" data-testid="search-results">
           <InternalSectionHeader
             title="Matching Candidates"
             description="Ranked by candidate evidence, resume meaning, and reusable talent intelligence from Memory."
@@ -279,9 +429,14 @@ export default function CandidatesPage() {
             }
           />
 
-          <p className="flex items-center gap-1 font-dm text-xs text-[#7B8191]">
+          <p className="flex items-center gap-1 font-dm text-xs text-[#5F6675]">
             {talentSearchPageCopy.search.rankingHint}
           </p>
+
+          <IndexProcessingSummary
+            processing={semanticSearchQuery.data?.indexProcessing}
+            saturated={semanticSearchQuery.data?.indexSaturated === true}
+          />
 
           <div className="space-y-3">
             {semanticResults.map((result) => (
@@ -302,6 +457,7 @@ export default function CandidatesPage() {
                           ? `${result.matchScore}% match`
                           : `Relevance ${(result.matchScoreRaw ?? (result.matchScore / 100)).toFixed(4)}`}
                       </Badge>
+                      <IndexStateBadge result={result} />
                     </div>
 
                     <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 font-dm text-sm text-[#687182]">
@@ -315,7 +471,7 @@ export default function CandidatesPage() {
                         </Badge>
                       )}
                       {result.matchedChunks > 0 && (
-                        <span className="text-xs text-[#7B8191]">
+                        <span className="text-xs text-[#5F6675]">
                           {result.matchedChunks} {result.matchedChunks > 1 ? talentSearchPageCopy.search.matchingResumeSectionsSuffixPlural : talentSearchPageCopy.search.matchingResumeSectionsSuffixSingle}
                         </span>
                       )}
@@ -334,7 +490,7 @@ export default function CandidatesPage() {
 
                     {result.highlights && result.highlights.length > 0 && (
                       <div className="mt-3 space-y-2">
-                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#7B8191]">
+                        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5F6675]">
                           {talentSearchPageCopy.search.whyMatched}
                         </p>
                         {result.highlights.slice(0, 3).map((highlight: string, idx: number) => (
@@ -355,7 +511,7 @@ export default function CandidatesPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleOpenResume(result)}
-                        className="rounded-2xl border-[#D9DDEA] bg-white font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                        className="min-h-11 rounded-2xl border-[#D9DDEA] bg-white font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
                       >
                         <FileText className="mr-1 h-4 w-4" />
                         {talentSearchPageCopy.search.resume}
@@ -366,7 +522,7 @@ export default function CandidatesPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleMoveClick(result)}
-                        className="rounded-2xl border-[#D9DDEA] bg-white font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
+                        className="min-h-11 rounded-2xl border-[#D9DDEA] bg-white font-semibold text-[#1F2937] shadow-[0_8px_18px_rgba(15,23,42,0.05)] hover:bg-[#F7F8FC]"
                       >
                         <ArrowRightLeft className="mr-1 h-4 w-4" />
                         {talentSearchPageCopy.search.addToJob}

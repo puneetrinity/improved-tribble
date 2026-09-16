@@ -19,6 +19,7 @@ const runtimeUrl = (process.env.FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL ?? "").tri
 const enabled = process.env.FLOW_AUTHZ_TEST_DISPOSABLE === "1" && Boolean(migrationUrl) && Boolean(runtimeUrl);
 const migrationsDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "schema-migrations");
 const currentLedger = loadManifest(migrationsDir).length;
+const currentTail = loadManifest(migrationsDir).at(-1)!.version;
 const targetId = "flow-decision-projection-outbox-test-target";
 
 type WorkflowModule = typeof import("../applicationWorkflowAuthorization");
@@ -126,7 +127,7 @@ async function rebuildCurrent(): Promise<void> {
     creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
     connect: connectMigration,
   });
-  if (result.applied.length !== currentLedger || result.applied.at(-1) !== "0011") {
+  if (result.applied.length !== currentLedger || result.applied.at(-1) !== currentTail) {
     throw new Error("Disposable 3B current-ledger rebuild refused.");
   }
   await provision();
@@ -207,14 +208,14 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    expect(upgraded.applied).toEqual(["0008", "0009", "0010", "0011"]);
+    expect(upgraded.applied).toEqual(loadManifest(migrationsDir).filter(entry => Number(entry.version) >= 8).map(entry => entry.version));
     pre0008EventStayedUnprojected = (await owner.query(
       "SELECT COUNT(*)::integer events,(SELECT COUNT(*)::integer FROM decision_projection_outbox) intents FROM decision_events",
     )).rows[0]?.events === 1 && (await owner.query("SELECT COUNT(*)::integer n FROM decision_projection_outbox")).rows[0]?.n === 0;
 
-    await expect(readinessAsRuntime()).rejects.toThrow(/Candidate consent tables, column privileges and four routines are exact/);
+    await expect(readinessAsRuntime()).rejects.toThrow(/Candidate index catalog, insert-only intent and five fenced routines are exact/);
     await provision();
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: currentTail, applied: currentLedger });
     process.env.DATABASE_URL = runtimeUrl;
     process.env.DATABASE_SSL = "false";
     workflow = await import("../applicationWorkflowAuthorization");
@@ -401,7 +402,7 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
   });
 
   it("fails readiness on every outbox drift and converges without duplicates", async () => {
-    await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
+    await expect(readinessAsRuntime()).resolves.toEqual({ version: currentTail, applied: currentLedger });
     const role = new URL(runtimeUrl).username;
     const cases = [
       { breakSql: `GRANT SELECT ON decision_projection_outbox TO ${role}`,
@@ -417,7 +418,7 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
       await owner!.query(item.breakSql);
       await expect(readinessAsRuntime()).rejects.toThrow();
       await owner!.query(item.restoreSql);
-      await expect(readinessAsRuntime()).resolves.toEqual({ version: "0011", applied: 12 });
+      await expect(readinessAsRuntime()).resolves.toEqual({ version: currentTail, applied: currentLedger });
     }
     const migration = await runReleaseMigration({
       migrationsDir,
