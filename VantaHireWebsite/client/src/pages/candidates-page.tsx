@@ -110,7 +110,7 @@ export const indexCopy = {
   processingTitle: "Index status for your applicants",
   notAllSearchable: "Some applicants are still being processed and are not searchable yet.",
   bounded: "Counts are capped at 1,000.",
-  saturated: "Showing the first 100 matches. Refine the query to see others.",
+  saturated: "Results may be incomplete. Refine your search or try again.",
   rerankFallback: "Reranking was unavailable for this search. Results are ordered by retrieval.",
   rerankApplied: "Ordered by the reranker. The percentage is resume similarity.",
   unavailable: "Search is temporarily unavailable. Try again.",
@@ -403,7 +403,7 @@ export default function CandidatesPage() {
             title={talentSearchPageCopy.search.noResultsTitle}
             description={talentSearchPageCopy.search.noResultsHint}
           />
-          <IndexProcessingSummary processing={semanticSearchQuery.data?.indexProcessing} saturated={false} />
+          <IndexProcessingSummary processing={semanticSearchQuery.data?.indexProcessing} saturated={semanticSearchQuery.data?.indexSaturated === true} />
         </InternalPanel>
       )}
 

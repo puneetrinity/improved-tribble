@@ -134,14 +134,18 @@ describe("candidates-page index adoption", () => {
   });
 
   it("keeps the empty result honest with processing counts and maps unavailability and unsupported filters to closed copy", async () => {
+    // Codex V3 R1: the server's saturation flag must survive an empty visible set (a true flag was previously discarded
+    // by the empty branch), and the sentence must never equate the retrieval bound with the ten results requested.
     install({ ...base(), "/api/candidates/semantic-search": () => ({ status: 200, body: {
-      query: "nothing", count: 0, scoreType: "rrf_fused", displayScoreType: "cosine",
+      query: "nothing", count: 0, scoreType: "rrf_fused", displayScoreType: "cosine", indexSaturated: true,
       indexProcessing: { counts: counts({ pending: 7 }), bounded: false, limit: 1000 }, results: [], candidates: [],
     } }) });
     await mount(); await search("nothing");
     expect(container.querySelector('[data-testid="search-empty"]')).not.toBeNull();
     expect(container.querySelector('[data-testid="index-processing"]')!.textContent).toContain("7 " + indexCopy.counts.pending);
     expect(text()).toContain(indexCopy.notAllSearchable);
+    expect(text()).toContain(indexCopy.saturated);
+    expect(indexCopy.saturated).not.toMatch(/\b(10|100)\b|first/i);
     await act(async () => { root.unmount(); }); container.remove();
     install({ ...base(), "/api/candidates/semantic-search": () => ({ status: 503, body: { code: "candidate_index_search_unavailable" } }) });
     await mount(); await search("later");

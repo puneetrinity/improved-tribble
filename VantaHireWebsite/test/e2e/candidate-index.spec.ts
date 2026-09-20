@@ -124,7 +124,9 @@ test.describe("Wave 4D candidates page index adoption", () => {
     await expect(processing).toContainText("6 pending");
     await expect(processing).toContainText("not searchable yet");
     await expect(processing).toContainText("capped at 1,000");
-    await expect(page.getByText("Showing the first 100 matches", { exact: false })).toBeVisible();
+    // saturated=true with four visible hits: the notice is count-independent (never "first 100", never the requested ten)
+    await expect(processing).toContainText("Results may be incomplete");
+    await expect(page.getByText(/first 100|first 10\b|100 matches/i)).toHaveCount(0);
     await expect(page.getByText(/all applicants|fully indexed|every applicant/i)).toHaveCount(0);
     // retained actions
     await expect(page.getByRole("button", { name: /resume/i })).toHaveCount(4);
@@ -161,15 +163,24 @@ test.describe("Wave 4D candidates page index adoption", () => {
     await expect(dialog).toBeHidden();
   });
 
-  test("empty result keeps the processing counts, claims nothing and is audited", async ({ page }) => {
+  test("empty result keeps the processing counts, shows the server's incompleteness warning only when set, and is audited", async ({ page }) => {
     await login(page);
-    await serveResponse(page, 200, { query: "nobody", count: 0, scoreType: "cosine", displayScoreType: "cosine",
-      indexProcessing: { counts: counts({ ready: 3, pending: 2 }), bounded: false, limit: 1000 }, indexReranker: "skipped", indexSaturated: false, results: [], candidates: [] });
+    const empty = (indexSaturated: boolean) => ({ query: "nobody", count: 0, scoreType: "cosine", displayScoreType: "cosine",
+      indexProcessing: { counts: counts({ ready: 3, pending: 2 }), bounded: false, limit: 1000 }, indexReranker: "skipped", indexSaturated, results: [], candidates: [] });
+    // unsaturated control: no warning
+    await serveResponse(page, 200, empty(false));
     await page.goto("/candidates");
     await page.getByRole("textbox").first().fill("nobody");
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("search-empty")).toBeVisible();
     await expect(page.getByTestId("index-processing")).toContainText("2 pending");
+    await expect(page.getByText("Results may be incomplete")).toHaveCount(0);
+    // saturated with zero visible hits (Codex V3 R1): the warning must survive the empty branch
+    await serveResponse(page, 200, empty(true));
+    await page.getByRole("textbox").first().fill("nobody again");
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("search-empty")).toBeVisible();
+    await expect(page.getByTestId("index-processing")).toContainText("Results may be incomplete");
     await auditPage(page, "empty");
   });
 
@@ -177,6 +188,7 @@ test.describe("Wave 4D candidates page index adoption", () => {
     await login(page);
     await page.goto("/candidates");
     const cases: Array<[string, number, unknown, RegExp]> = [
+      ["unsupported", 422, { code: "candidate_index_filter_unsupported" }, /filter that is not supported/i],
       ["conflict", 422, { code: "candidate_index_filter_conflict" }, /filters conflict/i],
       ["long", 422, { code: "candidate_index_query_too_long" }, /too long/i],
       ["privacy", 503, { code: "candidate_privacy_reconciliation_required" }, /privacy settings are being updated/i],
