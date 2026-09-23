@@ -77,6 +77,13 @@ export const CATCHUP_REQUIRED = [
   "row.previous !== chain", "sameMac(seal, mac(input.key, body))", "client.release(uncertain || broken)",
 ];
 export const PROCESSOR_REQUIRED = [
+  'export const INDEX_FETCH_LIMITS = \'ulimit -t 20 && ulimit -c 0 && exec "$@"\'',
+  'export const INDEX_VALIDATE_CHILD', 'require(\'node:net\').Socket.prototype.connect = refuse',
+  'strict ? INDEX_DOWNLOAD_LIMITS : INDEX_FETCH_LIMITS',
+  'strict ? INDEX_VALIDATE_CHILD : INDEX_DOWNLOAD_CHILD',
+  'strict ? { LANG: "C.UTF-8", NODE_ENV: "production" } : childEnv',
+  'const remaining = deadline - Date.now()',
+  'env.NODE_ENV !== "test"', 'endpoint.hostname !== "127.0.0.1"',
   'ulimit -v 262144 && ulimit -t 20 && ulimit -c 0 && exec "$@"',
   "268435456", "fs.readFileSync('/proc/self/limits'", "bytes.length > 5242880",
   'timeoutMs > 20_000', '"--jitless", "--max-old-space-size=48", "--v8-pool-size=1"',

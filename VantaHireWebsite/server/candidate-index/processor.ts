@@ -143,6 +143,7 @@ export async function shouldEnqueueLegacyApplication(organizationId: number, app
 // This is a fixed program, never generated from an applicant locator or environment value.
 // The shell applies kernel limits before Node or any storage dependency is loaded.
 export const INDEX_DOWNLOAD_LIMITS = 'ulimit -v 262144 && ulimit -t 20 && ulimit -c 0 && exec "$@"';
+export const INDEX_FETCH_LIMITS = 'ulimit -t 20 && ulimit -c 0 && exec "$@"';
 export const INDEX_DOWNLOAD_CHILD = String.raw`
 console.log = console.warn = console.error = console.info = console.debug = () => {};
 const fs = require('node:fs');
@@ -150,8 +151,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 (async () => {
   const limits = fs.readFileSync('/proc/self/limits', 'utf8');
-  if (!/^Max address space\s+268435456\s+268435456\s+bytes[ \t]*$/m.test(limits)
-    || !/^Max cpu time\s+20\s+20\s+seconds[ \t]*$/m.test(limits)
+  if (!/^Max cpu time\s+20\s+20\s+seconds[ \t]*$/m.test(limits)
     || !/^Max core file size\s+0\s+0\s+bytes[ \t]*$/m.test(limits)) process.exit(65);
   let input = Buffer.alloc(0);
   for await (const chunk of process.stdin) {
@@ -168,10 +168,45 @@ const path = require('node:path');
   const bytes = await gcs.downloadBoundApplicationResumeFromGCS(request.locator);
   if (!Buffer.isBuffer(bytes) || bytes.length !== request.byteCount || bytes.length > 5242880
     || crypto.createHash('sha256').update(bytes).digest('hex') !== request.contentSha256) process.exit(65);
-  const fileType = require(require.resolve('file-type', { paths: [path.dirname(artifact)] }));
+  process.stdout.write(bytes);
+})().catch(() => { process.exitCode = 69; });
+`;
+
+// No storage artifact or credentials in this child. Install the network fence
+// before loading the type detector or accepting untrusted bytes.
+export const INDEX_VALIDATE_CHILD = String.raw`
+console.log = console.warn = console.error = console.info = console.debug = () => {};
+const fs = require('node:fs'), crypto = require('node:crypto');
+let forbidden = false;
+const refuse = () => { forbidden = true; throw Error('network_refused'); };
+require('node:net').Socket.prototype.connect = refuse;
+require('node:dgram').createSocket = refuse;
+require('node:tls').connect = refuse;
+require('node:dns').lookup = refuse;
+globalThis.fetch = refuse;
+(async () => {
+  const limits = fs.readFileSync('/proc/self/limits', 'utf8');
+  if (!process.execArgv.includes('--jitless')
+    || !/^Max address space\s+268435456\s+268435456\s+bytes[ \t]*$/m.test(limits)
+    || !/^Max cpu time\s+20\s+20\s+seconds[ \t]*$/m.test(limits)
+    || !/^Max core file size\s+0\s+0\s+bytes[ \t]*$/m.test(limits)) process.exit(65);
+  const fileType = require(process.argv[1]);
+  let input = Buffer.alloc(0);
+  for await (const chunk of process.stdin) {
+    if (input.length + chunk.length > 5242880 + 8193) process.exit(65);
+    input = Buffer.concat([input, chunk]);
+  }
+  const boundary = input.indexOf(10);
+  if (boundary < 1 || boundary > 8192) process.exit(65);
+  const request = JSON.parse(input.subarray(0, boundary).toString('utf8'));
+  const bytes = input.subarray(boundary + 1);
+  if (!Number.isInteger(request.byteCount) || request.byteCount < 1
+    || bytes.length !== request.byteCount || bytes.length > 5242880
+    || crypto.createHash('sha256').update(bytes).digest('hex') !== request.contentSha256) process.exit(65);
   const detected = await fileType.fromBuffer(bytes);
   const ole = bytes.subarray(0, 8).toString('hex') === 'd0cf11e0a1b11ae1';
   if (detected?.mime !== request.mediaType && !(ole && request.mediaType === 'application/msword')) process.exit(65);
+  if (forbidden) process.exit(65);
   process.stdout.write(bytes);
 })().catch(() => { process.exitCode = 69; });
 `;
@@ -193,12 +228,26 @@ export async function downloadCandidateIndexOriginal(input: Original, options: {
     childEnv[name] = env[name];
   }
   const artifact = options.artifact ?? resolve(process.cwd(), "dist/candidate-index-gcs.cjs");
+  // Emulator routing is test-only, loopback-only, and never inherited implicitly.
+  if (env.STORAGE_EMULATOR_HOST) {
+    const endpoint = new URL(env.STORAGE_EMULATOR_HOST);
+    if (env.NODE_ENV !== "test" || endpoint.protocol !== "http:" || endpoint.hostname !== "127.0.0.1"
+      || !endpoint.port || endpoint.username || endpoint.password || endpoint.pathname !== "/"
+      || endpoint.search || endpoint.hash) throw new CandidateIndexMemoryError("network");
+    childEnv.STORAGE_EMULATOR_HOST = endpoint.origin;
+  }
   const launch = options.launch ?? spawn;
-  const child = launch("/bin/sh", ["-c", INDEX_DOWNLOAD_LIMITS, "index-download",
-    process.execPath, "--jitless", "--max-old-space-size=48", "--v8-pool-size=1",
-    "-e", INDEX_DOWNLOAD_CHILD, artifact],
-  { env: childEnv, stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
-  return new Promise<Buffer>((accept, refuse) => {
+  const deadline = Date.now() + timeoutMs;
+  const run = (strict: boolean, stdin: Buffer) => new Promise<Buffer>((accept, refuse) => {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0 || options.signal.aborted) return refuse(new CandidateIndexMemoryError("timeout"));
+    const args = strict ? ["--jitless", "--max-old-space-size=48", "--v8-pool-size=1"]
+      : ["--max-old-space-size=48", "--v8-pool-size=1"];
+    const child = launch("/bin/sh", ["-c", strict ? INDEX_DOWNLOAD_LIMITS : INDEX_FETCH_LIMITS, "index-download",
+      process.execPath, ...args, "-e", strict ? INDEX_VALIDATE_CHILD : INDEX_DOWNLOAD_CHILD,
+      strict ? resolve(process.cwd(), "node_modules/file-type/index.js") : artifact],
+    { env: strict ? { LANG: "C.UTF-8", NODE_ENV: "production" } : childEnv,
+      stdio: ["pipe", "pipe", "ignore"], windowsHide: true });
     let failure: CandidateIndexFailure | null = null;
     let size = 0;
     const chunks: Buffer[] = [];
@@ -207,7 +256,7 @@ export async function downloadCandidateIndexOriginal(input: Original, options: {
       child.kill("SIGKILL");
     };
     const abort = () => stop("timeout");
-    const timer = setTimeout(abort, timeoutMs);
+    const timer = setTimeout(abort, remaining);
     options.signal.addEventListener("abort", abort, { once: true });
     child.on("error", () => { failure ??= "network"; });
     child.stdin.on("error", () => stop("network"));
@@ -230,8 +279,10 @@ export async function downloadCandidateIndexOriginal(input: Original, options: {
       accept(bytes);
     });
     if (options.signal.aborted) abort();
-    else child.stdin.end(request);
+    else child.stdin.end(stdin);
   });
+  const bytes = await run(false, Buffer.from(request));
+  return run(true, Buffer.concat([Buffer.from(request + "\n"), bytes]));
 }
 
 export function candidateIndexProcessorConfig(env: NodeJS.ProcessEnv = process.env): Config {

@@ -2,6 +2,7 @@ import { createHash, generateKeyPairSync } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { appendFileSync, chmodSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -15,6 +16,7 @@ import { candidateIndexCommandKey } from "../contracts";
 import { candidateIndexCommandDigest, CandidateIndexMemoryError, deliverCandidateIndex,
   validateCandidateIndexEnvelope, type CandidateIndexEnvelope } from "../memory-client";
 import { candidateIndexProcessorConfig, downloadCandidateIndexOriginal,
+  INDEX_VALIDATE_CHILD, INDEX_DOWNLOAD_LIMITS,
   runCandidateIndexProcessorOnce, startCandidateIndexProcessor,
   applicationUsesPrivateIndex, shouldEnqueueLegacyApplication, withLegacyCandidateIndexFence } from "../processor";
 import { CandidatePrivacyRestrictedError } from "../../candidate-privacy/decision";
@@ -323,6 +325,65 @@ const response = (body: unknown, status = 201) => new Response(JSON.stringify(bo
 const bytes = Buffer.from("%PDF-1.7\nfixture private source\n%%EOF\n");
 const storageInput = { locator: "gs://index-fixture/resumes/owned.pdf", byteCount: bytes.length,
   contentSha256: sha(bytes.toString()), mediaType: "application/pdf" };
+describe("real HTTP storage child and strict validation child", () => {
+  let scratch: string, artifact: string, endpoint: string;
+  let requests: string[];
+  const server = createServer((req, res) => {
+    requests.push(req.url ?? "");
+    if (req.method !== "GET" || !req.url?.includes("resumes%2Fowned.pdf")) {
+      res.writeHead(404).end(); return;
+    }
+    res.writeHead(200, { "content-type": "application/pdf", "content-length": bytes.length });
+    res.end(bytes);
+  });
+  beforeAll(async () => {
+    scratch = mkdtempSync(join(tmpdir(), "flow-index-real-gcs-"));
+    symlinkSync(resolve("node_modules"), join(scratch, "node_modules"), "dir");
+    artifact = join(scratch, "candidate-index-gcs.cjs");
+    // Exact production build, no SDK alias or download injection.
+    await build({ entryPoints: ["server/gcs-storage.ts"], bundle: true, platform: "node",
+      packages: "external", format: "cjs", outfile: artifact });
+    await new Promise<void>(done => server.listen(0, "127.0.0.1", done));
+    endpoint = `http://127.0.0.1:${(server.address() as any).port}`;
+  });
+  afterAll(async () => {
+    server.closeAllConnections(); await new Promise<void>(done => server.close(() => done()));
+    rmSync(scratch, { recursive: true, force: true });
+  });
+  beforeEach(() => { requests = []; });
+  const environment = () => ({ NODE_ENV: "test", STORAGE_EMULATOR_HOST: endpoint,
+    GCS_PROJECT_ID: "fixture", GCS_BUCKET_NAME: "index-fixture", GCS_SERVICE_ACCOUNT_KEY: "{}" });
+  it("runs both real children over HTTP and preserves the strict process fence", async () => {
+    const launches: any[][] = [];
+    const launch = ((...args: any[]) => { launches.push(args); return (spawn as any)(...args); }) as typeof spawn;
+    expect(await downloadCandidateIndexOriginal(storageInput, {
+      signal: new AbortController().signal, env: environment(), artifact, launch,
+    })).toEqual(bytes);
+    expect(requests).toHaveLength(1); expect(launches).toHaveLength(2);
+    expect(launches[0][1]).not.toContain("--jitless");
+    expect(launches[0][1][1]).not.toContain("ulimit -v");
+    expect(launches[1][1]).toContain("--jitless");
+    expect(launches[1][1][1]).toContain("ulimit -v 262144");
+    expect(launches[1][2].env).toEqual({ LANG: "C.UTF-8", NODE_ENV: "production" });
+    expect(launches[1][1]).not.toContain(artifact);
+  });
+  it.each([{ contentSha256: "0".repeat(64) }, { mediaType: "application/msword" }])(
+    "strict child independently refuses mismatched evidence %j", async delta => {
+      const child = spawn("/bin/sh", ["-c", INDEX_DOWNLOAD_LIMITS, "index-validator", process.execPath,
+        "--jitless", "--max-old-space-size=48", "--v8-pool-size=1", "-e", INDEX_VALIDATE_CHILD,
+        resolve("node_modules/file-type/index.js")], { env: {}, stdio: ["pipe", "pipe", "ignore"] });
+      const output: Buffer[] = []; child.stdout.on("data", part => output.push(part));
+      const closed = new Promise<number | null>(done => child.once("close", done));
+      child.stdin.end(Buffer.concat([Buffer.from(JSON.stringify({ ...storageInput, ...delta }) + "\n"), bytes]));
+      expect(await closed).toBe(65); expect(Buffer.concat(output)).toHaveLength(0);
+    });
+  it("does not admit emulator routing in production", async () => {
+    await expect(downloadCandidateIndexOriginal(storageInput, { signal: new AbortController().signal,
+      env: { ...environment(), NODE_ENV: "production" }, artifact })).rejects.toMatchObject({ code: "network" });
+    expect(requests).toHaveLength(0);
+  });
+});
+
 describe("bounded frozen storage downloader", () => {
   let scratch: string;
   let artifact: string;
@@ -372,7 +433,7 @@ describe("bounded frozen storage downloader", () => {
   it.each(["error", "oom"])("keeps %s failures bounded and source-free", async mode => {
     await expect(downloadCandidateIndexOriginal(storageInput, {
       signal: new AbortController().signal, env: env(mode), artifact,
-    })).rejects.toMatchObject({ message: "network", code: "network" });
+    })).rejects.toMatchObject({ code: mode === "oom" ? "source_mismatch" : "network" });
   });
   it.each([false, true])("kills and reaps a child on timeout/cancellation (cancel=%s)", async cancel => {
     let pid: number | undefined;
