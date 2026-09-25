@@ -1,9 +1,12 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "954d5e9554839d2493e9dcb80a310b54dc5d9a269ac7730aec6827036fa0c166",
+  "source_census_sha256": "5c86f53c7c21efbe902b11b82facec83c8ad4080d1a54e785c51bd7b76ba6567",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
+    "server/candidate-history/contracts.ts",
+    "server/candidate-history/memory-client.ts",
+    "server/candidate-history/routes.ts",
     "server/candidate-consent/contracts.ts",
     "server/candidate-consent/repository.ts",
     "server/candidate-consent/routes.ts",
@@ -57,6 +60,9 @@
     "client/src/components/kanban/ApplicationDetailPanel.tsx"
   ],
   "sources": [
+    { "file": "server/candidate-history/contracts.ts", "classification": "fenced" },
+    { "file": "server/candidate-history/memory-client.ts", "classification": "fenced" },
+    { "file": "server/candidate-history/routes.ts", "classification": "fenced" },
     { "file": "server/candidate-privacy/config.ts", "classification": "fenced" },
     { "file": "server/candidate-privacy/models.ts", "classification": "fenced" },
     { "file": "server/candidate-privacy/decision.ts", "classification": "fenced" },
@@ -156,6 +162,36 @@
     { "file": "client/src/pages/terms-of-service-page.tsx", "classification": "excluded" }
   ],
   "surfaces": [
+    {
+      "id": "organization-private-history-contract",
+      "file": "server/candidate-history/contracts.ts",
+      "symbol": "validateHistoryResponse",
+      "models": ["applications", "decision_events", "organization_candidate_references"],
+      "direction": "read", "privacy_action": ["request_erasure"],
+      "organization_scope": "one authorized application and exact private reference",
+      "enforcement": "Strict closed wire projection with tuple, watermark and authority validation; historical completeness is always false.",
+      "anchors": ["validateHistoryResponse", "historical_complete", "binding_conflict"]
+    },
+    {
+      "id": "organization-private-history-transport",
+      "file": "server/candidate-history/memory-client.ts",
+      "symbol": "readMemoryHistory",
+      "models": ["applications", "organization_candidate_references"],
+      "direction": "read", "privacy_action": ["request_erasure"],
+      "organization_scope": "service JWT tenant and exact private application tuple",
+      "enforcement": "Fixed scoped endpoint, three-second deadline, bounded response and current Memory privacy authority; no vendor error text returned.",
+      "anchors": ["decision-history:read", "validateHistoryResponse", "bytes > 65536"]
+    },
+    {
+      "id": "organization-private-history-read",
+      "file": "server/candidate-history/routes.ts",
+      "symbol": "registerCandidateHistoryRoutes",
+      "models": ["applications", "organization_candidate_references", "decision_events"],
+      "direction": "read", "privacy_action": ["request_erasure"],
+      "organization_scope": "job-authorized application, no platform-admin bypass",
+      "enforcement": "Existing private authorization helper before and after the remote call, including remote refusal; one bounded recapture retry and no-store.",
+      "anchors": ["const before = await readAuthorizedCandidateHistoryContext", "const after = await readAuthorizedCandidateHistoryContext", "private, no-store", "attempt < 2"]
+    },
     {
       "id": "consent-contracts",
       "file": "server/candidate-consent/contracts.ts",

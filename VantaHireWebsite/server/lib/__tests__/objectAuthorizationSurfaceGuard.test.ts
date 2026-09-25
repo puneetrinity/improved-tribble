@@ -29,7 +29,7 @@ describe("4C route census amendment", () => {
     const root = fixture();
     const path = join(root, MANIFEST);
     const manifest = JSON.parse(readFileSync(path, "utf8"));
-    expect(manifest.route_registration_census).toBe(320);
+    expect(manifest.route_registration_census).toBe(321);
     manifest.route_registration_census = 316;
     writeFileSync(path, JSON.stringify(manifest));
     expect(checkObjectAuthorization(root)).toContain("object authorization route census contract is invalid.");
@@ -202,7 +202,7 @@ describe("object authorization surface guard", () => {
     const problems = mutate(fixture(), "server/lib/applicationReadAuthorization.ts", (source) =>
       source.replace("FROM authorized_application", "FROM applications"),
     );
-    expect(problems).toContain("all six protected application readers must read through the authorized CTE.");
+    expect(problems).toContain("all seven protected application readers must read through the authorized CTE.");
   });
 
   it("rejects a raw email subject projection", () => {

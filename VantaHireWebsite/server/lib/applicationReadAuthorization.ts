@@ -14,6 +14,33 @@ import {
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { applicationPrivacyAllowed } from "../storage";
+import { historyContext, type HistoryContext } from "../candidate-history/contracts";
+
+export async function readAuthorizedCandidateHistoryContext(
+  actorId: number, applicationId: number,
+): Promise<{ ok: true; context: HistoryContext } | { ok: false; reason: "not_found" | "unavailable" }> {
+  if (!validInputs(actorId, applicationId, { allowPlatformAdmin: false })) {
+    return { ok: false, reason: "not_found" };
+  }
+  try {
+    const result = await db.execute(sql`
+      WITH authorized_application AS MATERIALIZED (
+        ${authorizedApplicationCte(actorId, applicationId, false,
+          sql`, ${applications.organizationId} AS organization_id, ${jobs.id} AS job_id`)}
+      )
+      SELECT public.flow_read_candidate_history_context(organization_id,application_id,job_id) AS context
+      FROM authorized_application
+    `);
+    const rows = rowsFrom(result);
+    if (rows.length === 0 || (rows.length === 1 && rows[0]!.context === null)) {
+      return { ok: false, reason: "not_found" };
+    }
+    if (rows.length !== 1) throw new Error("history_context_invalid");
+    return { ok: true, context: historyContext.parse(rows[0]!.context) };
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+}
 
 export interface ApplicationStageHistoryProjection {
   fromStage: number | null;

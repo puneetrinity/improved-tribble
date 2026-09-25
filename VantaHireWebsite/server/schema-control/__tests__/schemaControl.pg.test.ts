@@ -272,6 +272,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0010", apply_mode: "adopted" },
         { version: "0011", apply_mode: "adopted" },
         { version: "0012", apply_mode: "adopted" },
+        { version: "0013", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +
@@ -440,7 +441,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         relation: "decision_projection_outbox",
         sequence: "decision_projection_outbox_sequence",
         constraints: 21,
-        indexes: 5,
+        indexes: 6,
         triggers: 2,
         inferred_rows: 0,
       });

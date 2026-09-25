@@ -7,7 +7,8 @@
 
 import type { PgLike } from "./ledger";
 import { CANDIDATE_CONSENT_TABLES, CANDIDATE_CONSENT_FUNCTIONS, CANDIDATE_CONSENT_UPDATE_COLUMNS,
-  candidateConsentPrivilegesReady, candidateIndexPrivilegesReady } from "./readiness";
+  candidateConsentPrivilegesReady, candidateIndexPrivilegesReady,
+  candidateHistoryPrivilegesReady, CANDIDATE_HISTORY_FUNCTION } from "./readiness";
 import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
   CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
 import { DEFAULT_LOCK_KEY, type MigrationClient } from "./runner";
@@ -359,6 +360,9 @@ export async function assertRuntimeRoleContract(
     throw new RuntimeRoleProvisionError("Candidate index runtime authority is incomplete or excessive.");
   }
   await assertDefaultPrivileges(pg, role, controlPlaneRequired);
+  if (!(await candidateHistoryPrivilegesReady(pg, role, false))) {
+    throw new RuntimeRoleProvisionError("Candidate history read authority is incomplete or excessive.");
+  }
 }
 
 export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): Promise<{
@@ -597,6 +601,17 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
         for (const signature of CANDIDATE_INDEX_FUNCTIONS) {
           await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
         }
+      }
+
+      const historyPresence = await migration.query(`SELECT to_regprocedure($1) IS NOT NULL AS routine,
+        to_regclass('public.flow_hist_app_seq_idx') IS NOT NULL AS index`, [CANDIDATE_HISTORY_FUNCTION]);
+      const history = historyPresence.rows[0];
+      if (!history || history.routine !== history.index) {
+        throw new RuntimeRoleProvisionError("Candidate history routine/index presence is inconsistent.");
+      }
+      if (history.routine) {
+        await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${CANDIDATE_HISTORY_FUNCTION} FROM ${ident},PUBLIC`);
+        await migration.query(`GRANT EXECUTE ON FUNCTION ${CANDIDATE_HISTORY_FUNCTION} TO ${ident}`);
       }
 
       controlPlanePresent = Boolean(
