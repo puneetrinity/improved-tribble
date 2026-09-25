@@ -562,8 +562,8 @@ function validateKernel(root, problems) {
   ];
   for (const [anchor, label] of sharedAnchors) requireAnchor(problems, primaryCte, anchor, label);
   requireAnchor(problems, kernel, "FROM authorized_application", "history is no longer selected through the authorized CTE.");
-  if (count(kernel, "FROM authorized_application") !== 6) {
-    problems.push("all six protected application readers must read through the authorized CTE.");
+  if (count(kernel, "FROM authorized_application") !== 7) {
+    problems.push("all seven protected application readers must read through the authorized CTE.");
   }
   if (count(kernel, "LEFT JOIN ${applicationStageHistory}") !== 1
     || count(kernel, "LEFT JOIN ${emailAuditLog}") !== 1
@@ -2247,23 +2247,24 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (manifest.format_version !== 1 || manifest.source_commit !== SOURCE_COMMIT) {
     problems.push("object authorization manifest pin or format is invalid.");
   }
-  if (manifest.route_registration_census !== 320) {
+  if (manifest.route_registration_census !== 321) {
     problems.push("object authorization route census contract is invalid.");
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
     problems.push("exactly five WhatsApp and two talent-pool route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 57) {
-    problems.push("exactly fifty-seven protected authorization routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 58) {
+    problems.push("exactly fifty-eight protected authorization routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 10) {
     problems.push("exactly ten resume/application/consultant/attribution registrations must be retired.");
   }
-  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 102) {
-    problems.push("exactly one hundred two authorization files must be governed.");
+  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 105) {
+    problems.push("exactly one hundred five authorization files must be governed.");
   }
 
   for (const [path, reader] of [
+    ["/api/applications/:id/decision-history", "readAuthorizedCandidateHistoryContext"],
     ["/api/jobs/:id/applications", "requireSeat+isRecruiterOnJob"],
     ["/api/subscription/seats/usage", "requireSeat+getSeatUsage"],
     ["/api/users", "readAuthorizedHiringManagerDirectory"],
@@ -2459,7 +2460,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
 
   const routeCount = routeRegistrationCount(root);
   if (routeCount !== manifest.route_registration_census) {
-    problems.push(`Flow route registration census drifted (expected 320, found ${routeCount}).`);
+    problems.push(`Flow route registration census drifted (expected 321, found ${routeCount}).`);
   }
 
   try {

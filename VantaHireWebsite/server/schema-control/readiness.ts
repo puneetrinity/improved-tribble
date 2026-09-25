@@ -14,6 +14,35 @@ import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
 
 export class SchemaNotReadyError extends Error {}
 
+export const CANDIDATE_HISTORY_CATALOG_SHA256 = "40f0656dbe11f8917d1cdc40163b8411d653744a529515a4bce41a278fa59b19";
+export const CANDIDATE_HISTORY_FUNCTION = "flow_read_candidate_history_context(integer,integer,integer)";
+export const CANDIDATE_HISTORY_CATALOG_SQL = `SELECT encode(sha256(convert_to(jsonb_build_object(
+  'function',pg_get_functiondef(to_regprocedure('public.flow_read_candidate_history_context(integer,integer,integer)')),
+  'index',pg_get_indexdef(to_regclass('public.flow_hist_app_seq_idx')),
+  'index_valid',(SELECT indisvalid AND indisready FROM pg_index WHERE indexrelid=to_regclass('public.flow_hist_app_seq_idx')),
+  'owner_matches',(SELECT p.proowner=c.relowner FROM pg_proc p CROSS JOIN pg_class c
+    WHERE p.oid=to_regprocedure('public.flow_read_candidate_history_context(integer,integer,integer)')
+      AND c.oid='public.decision_projection_outbox'::regclass),
+  'routine_count',(SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.proname='flow_read_candidate_history_context')
+)::text,'UTF8')),'hex') AS digest`;
+
+export async function candidateHistoryPrivilegesReady(pg: PgLike, role: string, required: boolean): Promise<boolean> {
+  const presence = await pg.query(`SELECT to_regprocedure($1) IS NOT NULL AS routine,
+    to_regclass('public.flow_hist_app_seq_idx') IS NOT NULL AS index`, [CANDIDATE_HISTORY_FUNCTION]);
+  const p = presence.rows[0];
+  if (!p) return false;
+  if (!p.routine && !p.index) return !required;
+  if (!p.routine || !p.index) return false;
+  const catalog = await pg.query(CANDIDATE_HISTORY_CATALOG_SQL);
+  if (catalog.rows[0]?.digest !== CANDIDATE_HISTORY_CATALOG_SHA256) return false;
+  const result = await pg.query(`SELECT has_function_privilege($1,p.oid,'EXECUTE')
+    AND NOT EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+      WHERE a.grantee=0 OR (a.grantee<>p.proowner AND a.is_grantable)) AS ok
+    FROM pg_proc p WHERE p.oid=to_regprocedure($2)`, [role, CANDIDATE_HISTORY_FUNCTION]);
+  return result.rows[0]?.ok === true;
+}
+
 export interface ReadinessInput {
   pg: PgLike;
   migrationsDir: string;
@@ -275,6 +304,13 @@ export async function candidateConsentPrivilegesReady(pg: PgLike, role: string, 
 export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
   ReadinessInput["criticalPostconditions"]
 > = [
+  {
+    name: "Candidate history keyed read-only routine and index are exact",
+    async check(pg) {
+      const who = await pg.query("SELECT current_user AS role");
+      return candidateHistoryPrivilegesReady(pg, who.rows[0]?.role, true);
+    },
+  },
   {
     name: "Candidate index catalog, insert-only intent and five fenced routines are exact",
     async check(pg) {

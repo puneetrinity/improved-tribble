@@ -1,9 +1,15 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 320,
+  "route_registration_census": 321,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
+    {
+      "method": "get",
+      "path": "/api/applications/:id/decision-history",
+      "reader": "readAuthorizedCandidateHistoryContext",
+      "projection": ["binding", "authority_status", "coverage", "freshness", "summary"]
+    },
     {
       "method": "get",
       "path": "/api/applications/:id/history",
@@ -735,12 +741,24 @@
   ],
   "governed_files": [
     {
+      "file": "server/candidate-history/contracts.ts",
+      "sha256": "be5d3a44db3c7674253054cbeefee042b186d09bedab16e89d3cfb819696022b"
+    },
+    {
+      "file": "server/candidate-history/memory-client.ts",
+      "sha256": "4a2b98581b293f9448e1813e954ab21d339d6de60135be71f4bbd74e9af58203"
+    },
+    {
+      "file": "server/candidate-history/routes.ts",
+      "sha256": "d79c2375dd4cfc6684d7873838a186ba52c4770c94a6ba6513c0cb342b109b50"
+    },
+    {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "f491c18f298f8bdb11062f9367e4973e2071de19189f2a725789030981e8578f"
+      "sha256": "b6c195c584edd99ec1fc62fb19dd476c44d061125fc85449f9afeeed98fa41a1"
     },
     {
       "file": "package.json",
-      "sha256": "d93ba3e0cbef275347a589e00d7c6ef4394ef925d2ef0a1d92c0742f895d0226"
+      "sha256": "51907c6e5cd174fe5c5e46f7cfa949e1f51323b2360dcb940ec2f80ef742317f"
     },
     {
       "file": "vitest.server.config.ts",
@@ -776,7 +794,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "61ab200403a9ff2038e818668987f2c97c14b8f869baeb7f31b94690d88c11d3"
+      "sha256": "6fc93ba9b36b9e70908b658f068b7d166491c74b968d2d70422705ee329b6a1b"
     },
     {
       "file": "server/resume.routes.ts",
@@ -796,7 +814,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "2e5760a9b28c2cd0eca0ac1c37fc8d9a436e80c34ac767bd4ceed84d659667aa"
+      "sha256": "a1db1c01a45be420ff4184a469b0951d5b3b24f04c05884f50c1431c04b83af2"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -804,7 +822,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "3294529b069c44d061ebfa6c44620d8085b47a14ec108398597513dde6540aab"
+      "sha256": "329197bda0c514e3a767259f025a866cbee0d5e2f7056c75ff915741128e6f2b"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -824,7 +842,7 @@
     },
     {
       "file": "server/lib/applicationReadAuthorization.ts",
-      "sha256": "474ea56028bde0005c404ec9b3c16a2373681e7564ec4f941454719475ea0544"
+      "sha256": "d536b9af7a1dce2349d19d11d97d80a84125643f4ff3c678a149fdaf99dbdd92"
     },
     {
       "file": "server/lib/membershipScopedReadAuthorization.ts",
@@ -908,7 +926,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "102d42f99fce3c51564c5441eef3597391dd630256623bd9804c974e0e08e880"
+      "sha256": "c6d1c68e4b37943d04d0df818df02e209d1eb473791c4750c20b2f1e422745ae"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -956,15 +974,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "dcd87d99d3dc7686656d722fbbf696ad002ec92cc0a90c9d7483fd7b88a70560"
+      "sha256": "5d9e3c68088c721c729d2f77b71c3d1c8c37770c0a095500f5b8df5e22120bf8"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "a122470540104280ad643b6b9438d634ee254232b3a3a184289580d10d4f4eec"
+      "sha256": "8fec04908d614077f2a8eb0c425dccf96a1d61b31be9c6287a32acd9a4757b59"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "761487aca48c2ddd53b702b957bdd06df8b92cdd353b209af18641693cec5425"
+      "sha256": "df9512265fa1414399ec5e2e4f5c0a732b33be03632f927601e0c15fe080d821"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1120,7 +1138,7 @@
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
-      "sha256": "16d35fcda60572e627fd87f2c2a4c061c72331475f796bd599a40f1534c346a9"
+      "sha256": "de0d29134b81e6fd2a64bf74c60448b18654b871de00f88ad5f2befde94555d8"
     },
     {
       "file": "server/decision-projection/config.ts",
@@ -1235,7 +1253,7 @@
     },
     {
       "file": "scripts/check-candidate-privacy-surfaces.mjs",
-      "sha256": "f19ccb484a63b20ba8867001733cffb43ea0520106ea18429cf938607749d784"
+      "sha256": "4c63c92ebda5227df9addee069352a67acdc7505e8fff1c9e8ea9ae887f24f58"
     },
     {
       "file": "client/src/pages/job-edit-page.tsx",

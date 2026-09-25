@@ -247,7 +247,7 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
       (SELECT COUNT(*)::integer FROM pg_trigger WHERE tgrelid='public.decision_projection_outbox'::regclass
         AND NOT tgisinternal AND tgenabled<>'D') triggers`)).rows[0];
     expect(facts).toEqual({ ledger: currentLedger, relation: "decision_projection_outbox",
-      sequence: "decision_projection_outbox_sequence", constraints: 21, indexes: 5, triggers: 2 });
+      sequence: "decision_projection_outbox_sequence", constraints: 21, indexes: 6, triggers: 2 });
   });
 
   it("commits one exact minimized intent with its event and shared decision clock", async () => {

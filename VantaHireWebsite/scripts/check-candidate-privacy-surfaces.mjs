@@ -364,6 +364,15 @@ export function checkCandidatePrivacySurfaces(
 
   try {
     validateStaticContracts(root, problems);
+    const history = read(root, "server/candidate-history/routes.ts");
+    const before = history.indexOf("const before = await readAuthorizedCandidateHistoryContext");
+    const remote = history.indexOf("await readMemoryHistory(");
+    const after = history.indexOf("const after = await readAuthorizedCandidateHistoryContext");
+    if (before < 0 || remote <= before || after <= remote
+      || history.indexOf("if (failure) throw failure") <= after
+      || !history.includes("attempt < 2")) {
+      problems.push("private history lost before/after authorization or bounded retry.");
+    }
   } catch (error) {
     problems.push(`candidate privacy static contract could not be checked: ${error.constructor.name}`);
   }
