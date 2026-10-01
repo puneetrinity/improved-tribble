@@ -1,5 +1,6 @@
 import slugify from 'slugify';
 import { publicJobDescription } from '@shared/jobDescription';
+import { publicJobPagination } from './lib/publicJobPagination';
 import { randomUUID } from 'node:crypto';
 import {
   users,
@@ -1063,11 +1064,13 @@ export class DatabaseStorage implements IStorage {
     status?: string;
     skills?: string[];
   }): Promise<{ jobs: (Job & { postedByName?: string; postedById?: number | string; isRecruiterProfilePublic?: boolean })[]; total: number }> {
-    const page = filters.page || 1;
-    const limit = filters.limit || 10;
-    const offset = (page - 1) * limit;
-
-    let whereConditions = [eq(jobs.isActive, true)];
+    const { limit, offset } = publicJobPagination(filters.page, filters.limit, 'storage');
+    const now = new Date();
+    let whereConditions = [
+      eq(jobs.isActive, true),
+      eq(jobs.status, 'approved'),
+      or(isNull(jobs.expiresAt), gte(jobs.expiresAt, now))!,
+    ];
 
     if (filters.location) {
       whereConditions.push(ilike(jobs.location, `%${filters.location}%`));
@@ -1156,7 +1159,7 @@ export class DatabaseStorage implements IStorage {
         .leftJoin(users, eq(jobs.postedBy, users.id))
         .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
         .where(whereClause)
-        .orderBy(desc(jobs.createdAt))
+        .orderBy(desc(jobs.createdAt), desc(jobs.id))
         .limit(limit)
         .offset(offset),
       db.select({ count: sql<number>`count(*)` }).from(jobs).where(whereClause)
@@ -1522,13 +1525,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPublicJobsByRecruiter(recruiterId: number): Promise<Job[]> {
-    // Get active, approved jobs posted by this recruiter
+    // Use the same expiry boundary as the public collection and job detail.
+    const now = new Date();
     const result = await db.select().from(jobs)
       .where(
         and(
           eq(jobs.postedBy, recruiterId),
           eq(jobs.isActive, true),
-          eq(jobs.status, 'approved')
+          eq(jobs.status, 'approved'),
+          or(isNull(jobs.expiresAt), gte(jobs.expiresAt, now))
         )
       )
       .orderBy(desc(jobs.createdAt));
