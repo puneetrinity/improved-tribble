@@ -814,7 +814,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "a1db1c01a45be420ff4184a469b0951d5b3b24f04c05884f50c1431c04b83af2"
+      "sha256": "38d193b1af591ba12dda250771f59051dac8d012e93532aa26ebe0535ceb3b73"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -902,7 +902,7 @@
     },
     {
       "file": "server/storage.ts",
-      "sha256": "3fb44fa5515fb8cc0b9ac0556e3f22c62aa1397868cb2353d2c465ad13e60d03"
+      "sha256": "4ac21076375c828e4ff641ced53f4be30854d21edbee41ae0299428bdb6d06a2"
     },
     {
       "file": "server/tests/applicationReadAuthorization.pg.test.ts",

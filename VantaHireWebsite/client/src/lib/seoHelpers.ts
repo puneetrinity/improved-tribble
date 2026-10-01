@@ -3,6 +3,7 @@
  */
 
 import { Job } from "@shared/schema";
+import { jobMetaDescription, resolveJobDescription } from '@shared/jobDescription';
 
 export const DEFAULT_SITE_URL = "https://ealana.com";
 
@@ -49,9 +50,7 @@ export function truncateText(text: string, maxLength: number): string {
  * Generate meta description from job description
  */
 export function generateJobMetaDescription(job: Job): string {
-  const plainText = stripHtml(job.description);
-  const description = `Apply for ${job.title} at ${job.location}. ${plainText}`;
-  return truncateText(description, 155); // SEO optimal length
+  return jobMetaDescription(job);
 }
 
 // Extended job type for API response with client data
@@ -179,8 +178,9 @@ export function generateJobPostingJsonLd(job: JobWithClientData, baseUrl: string
   }
 
   // Sanitize description
-  const plainDescription = stripHtml(job.description);
-  const htmlDescription = sanitizeDescriptionHtml(job.description);
+  const description = resolveJobDescription(job).text;
+  if (!description) return null;
+  const htmlDescription = description.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   // Map employment type
   const employmentTypeMap: Record<string, string> = {

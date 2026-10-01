@@ -306,7 +306,7 @@ export default function ShiftShowcase() {
           style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "minmax(0,1fr) minmax(0,1.2fr)", gap: isMobile ? "1.5rem" : "5rem", alignItems: "center" }}
         >
           <div style={{ position: "relative", zIndex: 2 }}>
-            <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#3D4460", letterSpacing: "0.12em" }}>{active.rung}</div>
+            <div style={{ fontFamily: "var(--font-mono, monospace)", fontSize: "0.6rem", color: "#8891AA", letterSpacing: "0.12em" }}>{active.rung}</div>
             <div style={{ fontFamily: "var(--font-display)", fontSize: isMobile ? "2rem" : "2.6rem", color: active.key === "di" ? "#4B8EF0" : "#F4F5FA", lineHeight: 1.05, marginBottom: "0.4rem", marginTop: "0.25rem" }}>{active.title}</div>
             <div style={{ fontFamily: "var(--font-body)", fontSize: "0.9rem", fontStyle: "italic", color: active.key === "di" ? "#4B8EF0" : "#8891AA", opacity: 0.75, marginBottom: "1rem" }}>{active.hook}</div>
             <p style={{ fontFamily: "var(--font-body)", fontSize: "0.98rem", color: active.key === "di" ? "#C7CDDE" : "#8891AA", lineHeight: 1.7, margin: 0 }}>{active.caption}</p>

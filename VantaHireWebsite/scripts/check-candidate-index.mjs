@@ -24,7 +24,7 @@ export const FROZEN = {
   "server/candidate-privacy/memory-client.ts": "0f393868e04898b4091a4057b7f5fd30d92d1458dd30e1844d5fc36e5217e9e5",
   "server/candidate-privacy/repository.ts": "940e5617415a95b1fc1dbc823e48920bfa1031b26b641f29e2537c1786f1358b",
   "server/candidate-privacy/routes.ts": "5c6e77157b839026051716984fffba990057a29cdf8b3b4dd1de98d1014c45d9",
-  "server/candidatePortal.routes.ts": "8b2a708e3910ef547dd7c4825b5e6132408776d21284123e7db2b501a24ba470",
+  "server/candidatePortal.routes.ts": "82e6f6623cf9e2ae9ff98ea6ed5563c5cfca5eafd8f7e4dea149c337d3938f6e",
   "server/db.ts": "25705dad7df8159fc3cac431ab18d87c84686627fff591ac3fead30a67c74ba7",
   "server/gcs-storage.ts": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802",
   "server/lib/resumeExtractor.ts": "217ed1dd5b7c23fa6945d5602c55286cc5655ff8ba481f3b5dbf106fea44c0f2",
@@ -50,7 +50,7 @@ export const FROZEN = {
   "server/schema-migrations/0010_organization_private_candidate_reference.sql": "eaecd7bdc1637aaa314bc0c04c123b1fcfbeb8501d2cc83c8cb58b8a75a30495",
   "server/schema-migrations/0011_candidate_consent.sql": "0d544103c5cacc60861b3916b243d2ae8690b8a470ed7233222eff4c3c7f4b74",
   "server/schema-migrations/catalog.lock.json": "999636b7722cc305b10f71b9a096cc75701400ff49aea91435f839cadf13b90c",
-  "server/storage.ts": "3fb44fa5515fb8cc0b9ac0556e3f22c62aa1397868cb2353d2c465ad13e60d03"
+  "server/storage.ts": "4ac21076375c828e4ff641ced53f4be30854d21edbee41ae0299428bdb6d06a2"
 };
 export const MIGRATION = "server/schema-migrations/0012_candidate_index_delivery.sql";
 export const AUTHORITIES = [MIGRATION, "server/schema-migrations/checksums.lock",

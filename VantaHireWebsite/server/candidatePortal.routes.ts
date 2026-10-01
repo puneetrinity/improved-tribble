@@ -1,4 +1,5 @@
 import type { Express, NextFunction, Request, Response } from "express";
+import { publicJobDescription } from '@shared/jobDescription';
 import { and, desc, eq } from "drizzle-orm";
 
 import { jobs, savedJobs, type Job } from "@shared/schema";
@@ -48,6 +49,7 @@ type PublicJob = Pick<
   | "experienceYearsMax"
 >;
 type SavedJobRow = {
+  originalJD: string | null;
   id: number;
   createdAt: Date;
   job: PublicJob;
@@ -118,6 +120,7 @@ export function registerCandidatePortalRoutes(
           .select({
             id: savedJobs.id,
             createdAt: savedJobs.createdAt,
+            originalJD: jobs.originalJD,
             job: publicJobColumns,
           })
           .from(savedJobs)
@@ -127,8 +130,9 @@ export function registerCandidatePortalRoutes(
 
         const now = new Date();
         res.json({
-          savedJobs: rows.map((row) => ({
+          savedJobs: rows.map(({ originalJD, ...row }) => ({
             ...row,
+            job: { ...row.job, description: publicJobDescription({ ...row.job, originalJD }) },
             canApply: canCandidateApplyToJob(row.job, now),
           })),
         });

@@ -30,11 +30,13 @@ const Home = () => {
         <GridOverlay />
         <div className="relative z-10">
           <HomepageNav />
+          <main>
           <HeroSection />
           <ShiftShowcase />
           <LoopHandoff />
           <Stats />
           <CTA />
+          </main>
           <HomepageFooter />
         </div>
       </div>

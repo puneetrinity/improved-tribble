@@ -44,6 +44,8 @@ export default function CTA() {
           <img
             src={ealanaMoth}
             alt="ealana moth"
+            width={90}
+            height={99}
             style={{ position: "relative", zIndex: 1, width: isMobile ? 68 : 90, height: isMobile ? 74 : 99 }}
           />
         </motion.div>
