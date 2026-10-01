@@ -2,7 +2,7 @@
  * Client-side SEO helper functions
  */
 
-import { Job } from "@shared/schema";
+import type { PublicJob } from '@shared/publicJob';
 import { jobMetaDescription, resolveJobDescription } from '@shared/jobDescription';
 
 export const DEFAULT_SITE_URL = "https://ealana.com";
@@ -49,12 +49,12 @@ export function truncateText(text: string, maxLength: number): string {
 /**
  * Generate meta description from job description
  */
-export function generateJobMetaDescription(job: Job): string {
+export function generateJobMetaDescription(job: Pick<PublicJob, 'title' | 'location' | 'description'>): string {
   return jobMetaDescription(job);
 }
 
 // Extended job type for API response with client data
-interface JobWithClientData extends Job {
+interface JobWithClientData extends Pick<PublicJob, 'id' | 'title' | 'description' | 'location' | 'type' | 'createdAt' | 'slug' | 'expiresAt' | 'deadline' | 'skills'> {
   clientName?: string | null;
   clientDomain?: string | null;
   company?: string | null;
@@ -269,7 +269,7 @@ export function generateJobPostingJsonLd(job: JobWithClientData, baseUrl: string
 /**
  * Generate canonical URL for job with slug support
  */
-export function getJobCanonicalUrl(job: Job, baseUrl: string = DEFAULT_SITE_URL): string {
+export function getJobCanonicalUrl(job: Pick<PublicJob, 'id' | 'slug'>, baseUrl: string = DEFAULT_SITE_URL): string {
   return job.slug
     ? `${baseUrl}/jobs/${job.slug}`
     : `${baseUrl}/jobs/${job.id}`;

@@ -40,7 +40,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAiCreditExhaustionToast } from "@/hooks/use-ai-credit-exhaustion";
-import { Job, Application, PipelineStage, EmailTemplate } from "@shared/schema";
+import { Application, PipelineStage, EmailTemplate } from "@shared/schema";
+import type { ManagementJob } from '@shared/publicJob';
 import { apiRequest, isApiError, queryClient } from "@/lib/queryClient";
 import { formsApi, formsQueryKeys, type FormTemplateDTO, type InvitationQuotaResponse } from "@/lib/formsApi";
 import Layout from "@/components/Layout";
@@ -155,10 +156,10 @@ export default function ApplicationManagementPage() {
     return <Redirect to="/recruiter-auth" />;
   }
 
-  const { data: job, isLoading: jobLoading, error: jobError } = useQuery<Job>({
-    queryKey: ["/api/jobs", jobId],
-    queryFn: async () => {
-      const response = await fetch(`/api/jobs/${jobId}`);
+  const { data: job, isLoading: jobLoading, error: jobError } = useQuery<ManagementJob>({
+    queryKey: ["job-management", user.id, jobId],
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/jobs/${jobId}/management`, { signal, credentials: 'include', cache: 'no-store' });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.error || `Failed to fetch job (${response.status})`);
@@ -166,6 +167,8 @@ export default function ApplicationManagementPage() {
       return response.json();
     },
     enabled: !!jobId,
+    gcTime: 0,
+    staleTime: 0,
   });
 
   const { data: rawShortlists } = useQuery<JobShortlistSummary[]>({

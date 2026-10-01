@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "240c24906e4a76a29e97990b6d6b9032be21fbdf4af5837593d4aa17c0895054",
+  "source_census_sha256": "1d1147d15377e90c543e76acfefd7f9ee53d535ce23149e499234223a19d5a35",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/candidate-history/contracts.ts",
@@ -60,6 +60,7 @@
     "client/src/components/kanban/ApplicationDetailPanel.tsx"
   ],
   "sources": [
+    { "file": "server/lib/jobManagementRead.ts", "classification": "excluded" },
     { "file": "server/candidate-history/contracts.ts", "classification": "fenced" },
     { "file": "server/candidate-history/memory-client.ts", "classification": "fenced" },
     { "file": "server/candidate-history/routes.ts", "classification": "fenced" },
@@ -1019,6 +1020,13 @@
     }
   ],
   "exclusions": [
+    {
+      "id": "job-management-posting-read",
+      "file": "server/lib/jobManagementRead.ts",
+      "symbol": "readManagementJob",
+      "reason": "Organization/job-authorized posting metadata only; no applicant, resume or candidate record read. Public projection is a positive allowlist.",
+      "anchors": ["membership.seat_assigned = TRUE", "toManagementJob"]
+    },
     {
       "id": "restrictive-outreach-unsubscribe",
       "file": "server/outreachCompliance.routes.ts",

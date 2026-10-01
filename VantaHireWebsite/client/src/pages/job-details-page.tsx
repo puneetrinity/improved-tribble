@@ -5,7 +5,8 @@ import { Helmet } from "react-helmet-async";
 import { publicJobDescription, serializeJobJsonLd } from '@shared/jobDescription';
 import { MapPin, Clock, Calendar, Users, FileText, Upload, Briefcase, Star, Share2, Bookmark, Sparkles, AlertTriangle, RotateCcw, History, IndianRupee, GraduationCap, ChevronRight, User, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Job, insertApplicationSchema, type UserProfile } from "@shared/schema";
+import { insertApplicationSchema, type UserProfile } from "@shared/schema";
+import type { PublicJob } from '@shared/publicJob';
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { fetchWithCsrf } from "@/lib/csrf";
 import { z } from "zod";
@@ -111,13 +112,7 @@ export default function JobDetailsPage() {
   const applicationContextKey = `${user?.id ?? "anonymous"}:${jobIdOrSlug ?? "none"}`;
 
   // Extended type for job with client data for JSON-LD
-  interface JobWithExtras extends Job {
-    postedByName?: string;
-    postedById?: number | string;
-    isRecruiterProfilePublic?: boolean;
-    clientName?: string | null;
-    clientDomain?: string | null;
-  }
+  type JobWithExtras = PublicJob;
 
   const { data: job, isLoading, error } = useQuery<JobWithExtras, Error & { status?: number; code?: string; jobInfo?: { title: string; slug: string } }>({
     queryKey: ["/api/jobs", jobIdOrSlug],

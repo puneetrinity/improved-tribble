@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // Never register/apply, upload, contact a provider, or run against a public host.
 const enabled = process.env.SEO_DISPOSABLE_TEST === '1';
 const prose = 'Build reliable systems and collaborate with our engineering team.';
-const internal = /eliteSchools|rejectTitleRegex|roleTitle/;
+const internal = /eliteSchools|rejectTitleRegex|roleTitle|F1_CANARY/;
 
 test.describe('public prose and candidate projections on the built app', () => {
   test.skip(!enabled, 'Requires the isolated SEO fixture database, not production.');
@@ -23,6 +23,7 @@ test.describe('public prose and candidate projections on the built app', () => {
       expect(res.status()).toBe(200);
       expect(await res.text()).toContain(prose);
       expect(await res.text()).not.toMatch(internal);
+      expect(await res.text()).not.toMatch(/reviewComments|jdDigest|organizationId|hiringManagerId|clientId|originalJD|experienceYearsMax/);
     }
     const collection = await request.get('/api/jobs');
     expect(collection.status()).toBe(200);
@@ -112,5 +113,78 @@ test.describe('public prose and candidate projections on the built app', () => {
     const saved = await page.request.get('/api/candidate/saved-jobs');
     expect(saved.status()).toBe(200);
     expect(await saved.json()).toEqual({ restricted: true, savedJobs: [] });
+  });
+});
+
+test.describe('F-1 built public/management contract', () => {
+  test.skip(!enabled || process.env.FLOW_F1_DISPOSABLE !== '1', 'Requires F-1 synthetic additions.');
+  const publicKeys = 'id title location type description skills goodToHaveSkills educationRequirement experienceYears salaryMin salaryMax salaryPeriod deadline createdAt updatedAt slug isActive status expiresAt postedByName postedById isRecruiterProfilePublic clientName clientDomain'.split(' ').sort();
+  test.beforeEach(async ({ page, baseURL }) => {
+    if (!baseURL || new URL(baseURL).hostname !== '127.0.0.1') throw Error('local target required');
+    await page.route('**/*', route => new URL(route.request().url()).origin === new URL(baseURL).origin ? route.continue() : route.abort());
+  });
+  for (const username of [null, 'candidate90002@fixture.invalid', 'recruiter90001@fixture.invalid', 'admin90008@fixture.invalid']) {
+    test(`same exact public DTO for ${username ?? 'anonymous'}`, async ({ page }) => {
+      if (username) expect((await page.request.post('/api/login', { data: { username, password: 'seo-fixture-password' } })).status()).toBe(200);
+      for (const path of ['/api/jobs/90001', '/api/jobs/seo-fixture-90001?admin=true']) {
+        const res = await page.request.get(path);
+        expect(res.status()).toBe(200);
+        expect(Object.keys(await res.json()).sort()).toEqual(publicKeys);
+        expect(await res.text()).not.toMatch(internal);
+      }
+      const list = await (await page.request.get('/api/jobs?limit=1000&admin=true')).json();
+      for (const job of list.jobs) expect(Object.keys(job).sort()).toEqual(publicKeys);
+      // F-2 is deliberately not changed by this field-disclosure fix.
+      expect(list.jobs.map((job: { id: number }) => job.id)).toEqual(expect.arrayContaining([90006, 90007]));
+      expect(list.pagination.limit).toBe(1000);
+      await page.goto('/jobs/90001');
+      await expect(page.getByText(prose, { exact: false }).first()).toBeVisible();
+      expect(await page.content()).not.toMatch(internal);
+    });
+  }
+  test('real authentication and private response headers refuse anonymous/candidate/foreign readers', async ({ page }) => {
+    let res = await page.request.get('/api/jobs/90001/management');
+    expect(res.status()).toBe(401);
+    expect(res.headers()['cache-control']).toBe('private, no-store');
+    for (const [username, status] of [['candidate90002@fixture.invalid', 403], ['recruiter90007@fixture.invalid', 404]] as const) {
+      expect((await page.request.post('/api/login', { data: { username, password: 'seo-fixture-password' } })).status()).toBe(200);
+      res = await page.request.get('/api/jobs/90001/management');
+      expect(res.status()).toBe(status);
+      expect(res.headers()['cache-control']).toBe('private, no-store');
+      expect(await res.text()).not.toMatch(/organizationId|F1_CANARY/);
+    }
+  });
+  test('authorized editor and application management retain HM/client IDs; public reads never inherit them', async ({ page }) => {
+    expect((await page.request.post('/api/login', { data: { username: 'recruiter90001@fixture.invalid', password: 'seo-fixture-password' } })).status()).toBe(200);
+    const management = await page.request.get('/api/jobs/90001/management');
+    expect(management.status()).toBe(200);
+    expect(management.headers()['cache-control']).toBe('private, no-store');
+    expect(Object.keys(await management.json()).sort()).toEqual([...publicKeys, 'organizationId', 'hiringManagerId', 'clientId'].sort());
+    expect(await management.json()).toMatchObject({ organizationId: 90001, hiringManagerId: 90006, clientId: 90001 });
+    // Real directory responses arrive after the job; late options must not clear assignments.
+    await page.route(/\/api\/(?:users\?|clients(?:\?|$))/, async route => {
+      const response = await route.fetch();
+      await new Promise(resolve => setTimeout(resolve, 700));
+      await route.fulfill({ response });
+    });
+    await page.goto('/jobs/90001/edit');
+    await expect(page.locator('#description')).toHaveValue(/Build reliable systems/);
+    await expect(page.getByRole('combobox').filter({ hasText: 'Manager Fixture' })).toBeVisible();
+    await expect(page.getByRole('combobox').filter({ hasText: 'Public Fixture Company' })).toBeVisible();
+    const response = page.waitForResponse(r => r.url().endsWith('/api/jobs/90001/management'));
+    await page.goto('/jobs/90001/applications');
+    expect((await response).status()).toBe(200);
+    await expect(page.getByText('Synthetic engineer', { exact: true }).first()).toBeVisible();
+    expect((await page.request.get('/api/jobs/90004/management')).status()).toBe(404);
+    expect((await page.request.get('/api/jobs/90005/management')).status()).toBe(404);
+    expect((await page.request.get('/api/jobs/not-a-number/management')).status()).toBe(404);
+    expect(Object.keys(await (await page.request.get('/api/jobs/90001')).json()).sort()).toEqual(publicKeys);
+    // Change actor in the same browser context; no former actor's job read is reused.
+    expect((await page.request.post('/api/login', { data: { username: 'recruiter90007@fixture.invalid', password: 'seo-fixture-password' } })).status()).toBe(200);
+    await page.goto('/jobs/90001/edit');
+    await expect(page.locator('#description')).toHaveCount(0);
+    await expect(page.getByText(/Job Not Found/i)).toBeVisible();
+    expect((await page.request.get('/api/jobs/90005/management')).status()).toBe(200);
+    expect(Object.keys(await (await page.request.get('/api/jobs/90001')).json()).sort()).toEqual(publicKeys);
   });
 });

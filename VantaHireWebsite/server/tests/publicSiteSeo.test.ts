@@ -18,7 +18,8 @@ describe('built public job HTML and client projections', () => {
   const prose = 'Build reliable systems and collaborate with the engineering team.';
   const job = { id: 90001, title: 'Synthetic engineer', location: 'Bengaluru', type: 'full-time',
     description: '{"eliteSchools":["private"],"rejectTitleRegex":"secret","roleTitle":"Engineer"}',
-    originalJD: prose, createdAt: new Date('2026-01-01'), status: 'approved', isActive: true, slug: 'synthetic-engineer-90001', skills: [] };
+    originalJD: prose, createdAt: new Date('2026-01-01'), status: 'approved', isActive: true, slug: 'synthetic-engineer-90001', skills: [],
+    reviewComments: 'F1_CANARY_REVIEW', jdDigest: { search: 'F1_CANARY_DIGEST' }, futureColumn: 'F1_CANARY_FUTURE' };
   const app = express();
   let ownedAssetLink = false;
   beforeAll(async () => {
@@ -46,6 +47,7 @@ describe('built public job HTML and client projections', () => {
     }
     expect(res.text).toContain(prose);
     expect(res.text).not.toMatch(/eliteSchools|rejectTitleRegex|roleTitle/);
+    expect(res.text).not.toContain('F1_CANARY');
     expect(res.text).toContain('data-rh="true"');
     expect(generateJobMetaDescription(job as any)).toBe(jobMetaDescription(job));
     expect(generateJobPostingJsonLd(job as any)?.description).toBe(prose);

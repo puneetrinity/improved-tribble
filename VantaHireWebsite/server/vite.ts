@@ -6,7 +6,8 @@ import { type Server } from "http";
 import { nanoid } from "nanoid";
 import { storage } from "./storage";
 import { generateJobPostingSchema, stripHtml } from "./seoUtils";
-import { jobMetaDescription, publicJobDescription, resolveJobDescription, serializeJobJsonLd } from '@shared/jobDescription';
+import { jobMetaDescription, resolveJobDescription, serializeJobJsonLd } from '@shared/jobDescription';
+import { toPublicJob } from '@shared/publicJob';
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -702,7 +703,7 @@ export async function serveStatic(app: Express) {
         try {
           // Pre-populate query cache with the job data we already fetched
           const initialData: Record<string, unknown> = {
-            [JSON.stringify(["/api/jobs", param])]: { ...job, description: publicJobDescription(job) },
+            [JSON.stringify(["/api/jobs", param])]: toPublicJob(job),
           };
           const { html: ssrHtml } = ssrRender(`/jobs/${param}`, initialData);
           if (ssrHtml) {

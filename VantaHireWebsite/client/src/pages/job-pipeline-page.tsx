@@ -26,7 +26,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Job, PipelineStage, Application } from "@shared/schema";
+import { PipelineStage, Application } from "@shared/schema";
+import type { PublicJob } from '@shared/publicJob';
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
@@ -181,7 +182,7 @@ export default function JobPipelinePage() {
     return <Redirect to="/recruiter-auth" />;
   }
 
-  const { data: job, isLoading: jobLoading } = useQuery<Job>({
+  const { data: job, isLoading: jobLoading } = useQuery<PublicJob>({
     queryKey: ["/api/jobs", jobId],
     queryFn: async () => {
       const response = await fetch(`/api/jobs/${jobId}`);

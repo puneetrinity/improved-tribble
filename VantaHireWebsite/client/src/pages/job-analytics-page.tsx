@@ -7,7 +7,8 @@ import { Eye, MousePointer, TrendingUp, Users, Clock, CheckCircle, XCircle, Spar
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Job, Application, PipelineStage } from "@shared/schema";
+import { Application, PipelineStage } from "@shared/schema";
+import type { PublicJob } from '@shared/publicJob';
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -107,7 +108,7 @@ export default function JobAnalyticsPage() {
     return <Redirect to="/recruiter-auth" />;
   }
 
-  const { data: job, isLoading: jobLoading } = useQuery<Job & { analytics?: JobAnalytics }>({
+  const { data: job, isLoading: jobLoading } = useQuery<PublicJob & { analytics?: JobAnalytics }>({
     queryKey: ["/api/jobs", jobId, "with-analytics"],
     queryFn: async () => {
       const response = await fetch(`/api/jobs/${jobId}`);
