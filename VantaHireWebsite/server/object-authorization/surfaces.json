@@ -1,9 +1,15 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 321,
+  "route_registration_census": 322,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
+    {
+      "method": "get",
+      "path": "/api/jobs/:id/management",
+      "reader": "readManagementJob",
+      "projection": ["publicJob", "organizationId", "hiringManagerId", "clientId"]
+    },
     {
       "method": "get",
       "path": "/api/applications/:id/decision-history",
@@ -740,6 +746,10 @@
     }
   ],
   "governed_files": [
+    {"file":"shared/publicJob.ts","sha256":"91e40030ee890aeaa38a18e9a98b8de4de154a0d4274f83076a1e2ea7a095c72"},
+    {"file":"server/lib/jobManagementRead.ts","sha256":"53c37b6b6ae98f1264c56d009841ac100784d6804015bbab19301a61c3270750"},
+    {"file":"server/lib/__tests__/publicJobDto.test.ts","sha256":"bae9764f965d5eceb57824333ace7ce94b3161015a85ac60d919d1aea7577bf4"},
+    {"file":"server/lib/__tests__/publicJobDto.pg.test.ts","sha256":"5e466b9becb8e5825c0c06106da1dfe792da59327a6a44476ae231c016093570"},
     {
       "file": "server/candidate-history/contracts.ts",
       "sha256": "be5d3a44db3c7674253054cbeefee042b186d09bedab16e89d3cfb819696022b"
@@ -814,7 +824,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "38d193b1af591ba12dda250771f59051dac8d012e93532aa26ebe0535ceb3b73"
+      "sha256": "a04c6cebdb4a29a0c1689c44da3bdbefdca9e99c0b695c4efaf1215ad803476e"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -822,7 +832,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "329197bda0c514e3a767259f025a866cbee0d5e2f7056c75ff915741128e6f2b"
+      "sha256": "10085d7fc898c1220010e844b17a038896dfe157a983a9f572a56c4d91dbb697"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -926,7 +936,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "c6d1c68e4b37943d04d0df818df02e209d1eb473791c4750c20b2f1e422745ae"
+      "sha256": "05cab63ae914e4d40c99cd839baa07a662bacc1533dba98b2178530921bd0593"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -934,7 +944,7 @@
     },
     {
       "file": "client/src/pages/application-management-page.tsx",
-      "sha256": "8d3a815f6dea98119b0aa70a7c490fe8baa142ee4dfd41c31ff51683160e4e68"
+      "sha256": "34bcbfd1b81bba4d90e9e32daf86ce915317ff59b81b9939b206d5429451a02d"
     },
     {
       "file": "client/src/pages/admin-forms-page.tsx",
@@ -1257,7 +1267,7 @@
     },
     {
       "file": "client/src/pages/job-edit-page.tsx",
-      "sha256": "89dbf4dc2a49d816d4e611e38372559a497c414293eb07bbff821c6e6edeae9f"
+      "sha256": "9be6cbc4ac625bb1e8ffc2204f12c7bd8c1fbd1a65423c9472ce825e3007fa71"
     },
     {
       "file": "client/src/components/JobPostingStepper.tsx",

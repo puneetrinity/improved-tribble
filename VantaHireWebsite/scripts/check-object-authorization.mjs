@@ -2247,23 +2247,24 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (manifest.format_version !== 1 || manifest.source_commit !== SOURCE_COMMIT) {
     problems.push("object authorization manifest pin or format is invalid.");
   }
-  if (manifest.route_registration_census !== 321) {
+  if (manifest.route_registration_census !== 322) {
     problems.push("object authorization route census contract is invalid.");
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
     problems.push("exactly five WhatsApp and two talent-pool route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 58) {
-    problems.push("exactly fifty-eight protected authorization routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 59) {
+    problems.push("exactly fifty-nine protected authorization routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 10) {
     problems.push("exactly ten resume/application/consultant/attribution registrations must be retired.");
   }
-  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 105) {
-    problems.push("exactly one hundred five authorization files must be governed.");
+  if (!Array.isArray(manifest.governed_files) || manifest.governed_files.length !== 109) {
+    problems.push("exactly one hundred nine authorization files must be governed.");
   }
 
   for (const [path, reader] of [
+    ["/api/jobs/:id/management", "readManagementJob"],
     ["/api/applications/:id/decision-history", "readAuthorizedCandidateHistoryContext"],
     ["/api/jobs/:id/applications", "requireSeat+isRecruiterOnJob"],
     ["/api/subscription/seats/usage", "requireSeat+getSeatUsage"],
@@ -2460,10 +2461,24 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
 
   const routeCount = routeRegistrationCount(root);
   if (routeCount !== manifest.route_registration_census) {
-    problems.push(`Flow route registration census drifted (expected 321, found ${routeCount}).`);
+    problems.push(`Flow route registration census drifted (expected 322, found ${routeCount}).`);
   }
 
   try {
+    const management = read(root, 'server/lib/jobManagementRead.ts');
+    const managementRoute = routeCall(read(root, 'server/jobs.routes.ts'), 'get', '/api/jobs/:id/management').source;
+    for (const anchor of ["actor.role = 'super_admin'", "actor.role = 'recruiter'", 'membership.seat_assigned = TRUE',
+      'membership.organization_id = ${jobs.organizationId}', '${jobs.organizationId} IS NOT NULL',
+      'assignment.job_id = ${jobs.id}', 'assignment.recruiter_id = actor.id', 'toManagementJob(rows[0]']) {
+      if (!management.includes(anchor)) problems.push(`management read authority anchor missing: ${anchor}`);
+    }
+    for (const anchor of ["'private, no-store'", "requireRole(['recruiter', 'super_admin'])", 'requireSeat()',
+      'parseManagementJobId', 'readManagementJob(req.user!.id, id)', "? 404 : 503"]) {
+      if (!managementRoute.includes(anchor)) problems.push(`management route anchor missing: ${anchor}`);
+    }
+    if ((management.match(/\.select\(/g) ?? []).length !== 1 || /storage\.|req\.user|\.select\(\)/.test(management)) {
+      problems.push('management reader lost single-statement explicit projection.');
+    }
     validateKernel(root, problems);
     validateWorkflowAuthority(root, problems);
     validateApplicationAiOutboundAuthority(root, problems);

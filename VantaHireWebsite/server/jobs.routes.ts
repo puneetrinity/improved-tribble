@@ -10,6 +10,8 @@
 
 import type { Express, Request, Response, NextFunction } from 'express';
 import { publicJobDescription } from '@shared/jobDescription';
+import { toPublicJob } from '@shared/publicJob';
+import { parseManagementJobId, readManagementJob } from './lib/jobManagementRead';
 import { z } from 'zod';
 import { storage } from './storage';
 import { requireAuth, requireRole, requireSeat } from './auth';
@@ -218,10 +220,7 @@ export function registerJobsRoutes(
       const result = await storage.getJobs(filters);
 
       res.json({
-        jobs: result.jobs.map((job) => ({
-          ...job,
-          description: publicJobDescription(job),
-        })),
+        jobs: result.jobs.map(toPublicJob),
         pagination: {
           page,
           limit,
@@ -306,35 +305,27 @@ export function registerJobsRoutes(
       // Increment view count for analytics
       await storage.incrementJobViews(job.id);
 
-      // Build recruiter display name (handle missing names gracefully)
-      let postedByName: string | undefined;
-      let isRecruiterProfilePublic = false;
-      let recruiterPublicId: string | null = null;
-      if (job.recruiter) {
-        const { firstName, lastName, isProfilePublic, publicId } = job.recruiter;
-        if (firstName || lastName) {
-          postedByName = [firstName, lastName].filter(Boolean).join(' ');
-        }
-        isRecruiterProfilePublic = isProfilePublic ?? false;
-        recruiterPublicId = publicId;
-      }
-
-      // Return job with recruiter info for profile linking and client data for JSON-LD
-      res.json({
-        ...job,
-        description: publicJobDescription(job),
-        postedByName,
-        postedById: recruiterPublicId || job.postedBy, // Prefer publicId for links
-        isRecruiterProfilePublic, // Only show link if profile is public
-        clientName: job.client?.name || null, // For JSON-LD hiringOrganization
-        clientDomain: job.client?.domain || null, // For JSON-LD sameAs
-        recruiter: undefined, // Don't expose raw recruiter object
-        client: undefined, // Don't expose raw client object
-      });
+      res.json(toPublicJob(job));
       return;
     } catch (error) {
       next(error);
     }
+  });
+
+  // Private reader: never prime a public job cache with management identifiers.
+  app.get("/api/jobs/:id/management", (_req, res, next) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    next();
+  }, requireRole(['recruiter', 'super_admin']), requireSeat(), async (req, res): Promise<void> => {
+    const id = parseManagementJobId(req.params.id ?? '');
+    if (id === null) { res.status(404).json({ error: 'Job not found' }); return; }
+    const result = await readManagementJob(req.user!.id, id);
+    if (!result.ok) {
+      res.status(result.reason === 'not_found' ? 404 : 503)
+        .json({ error: result.reason === 'not_found' ? 'Job not found' : 'Job unavailable' });
+      return;
+    }
+    res.json(result.job);
   });
 
   // Update a job (recruiters can only edit their own jobs)

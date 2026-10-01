@@ -29,7 +29,7 @@ describe("4C route census amendment", () => {
     const root = fixture();
     const path = join(root, MANIFEST);
     const manifest = JSON.parse(readFileSync(path, "utf8"));
-    expect(manifest.route_registration_census).toBe(321);
+    expect(manifest.route_registration_census).toBe(322);
     manifest.route_registration_census = 316;
     writeFileSync(path, JSON.stringify(manifest));
     expect(checkObjectAuthorization(root)).toContain("object authorization route census contract is invalid.");
@@ -39,6 +39,19 @@ describe("4C route census amendment", () => {
 function sha256(value: string | Buffer): string {
   return createHash("sha256").update(value).digest("hex");
 }
+
+describe('public job management authority regression guard', () => {
+  it('rejects seat-check removal even after re-pinning', () => {
+    const problems = mutate(fixture(), 'server/lib/jobManagementRead.ts', source =>
+      source.replace('membership.seat_assigned = TRUE', 'TRUE'));
+    expect(problems).toContain('management read authority anchor missing: membership.seat_assigned = TRUE');
+  });
+  it('rejects management cache disclosure', () => {
+    const problems = mutate(fixture(), 'server/jobs.routes.ts', source =>
+      source.replace("'private, no-store'", "'public, max-age=60'"));
+    expect(problems).toContain("management route anchor missing: 'private, no-store'");
+  });
+});
 
 function updateHashes(root: string): void {
   const path = join(root, MANIFEST);

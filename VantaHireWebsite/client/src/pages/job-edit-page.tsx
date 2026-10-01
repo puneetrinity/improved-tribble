@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { Client, Job } from "@shared/schema";
+import type { ManagementJob } from '@shared/publicJob';
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
@@ -68,14 +69,16 @@ export default function JobEditPage() {
     return <Redirect to="/recruiter-auth" />;
   }
 
-  const { data: job, isLoading } = useQuery<Job>({
-    queryKey: ["/api/jobs", jobId],
-    queryFn: async () => {
-      const response = await fetch(`/api/jobs/${jobId}`);
+  const { data: job, isLoading } = useQuery<ManagementJob>({
+    queryKey: ["job-management", user.id, jobId],
+    queryFn: async ({ signal }) => {
+      const response = await fetch(`/api/jobs/${jobId}/management`, { signal, credentials: 'include', cache: 'no-store' });
       if (!response.ok) throw new Error("Failed to fetch job");
       return response.json();
     },
     enabled: !!jobId,
+    gcTime: 0,
+    staleTime: 0,
   });
 
   const { data: hiringManagers = [] } = useQuery<
@@ -125,6 +128,7 @@ export default function JobEditPage() {
       return await res.json();
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["job-management", user.id, jobId] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-jobs"] });
       toast({
@@ -530,7 +534,9 @@ export default function JobEditPage() {
                     <Label htmlFor="hiringManager">Hiring Manager (Optional)</Label>
                     <Select
                       value={hiringManagerId || "__none__"}
-                      onValueChange={(val) => setHiringManagerId(val === "__none__" ? "" : val)}
+                      // Radix can emit an empty value while async options mount.
+                      // Only the explicit None option clears an existing assignment.
+                      onValueChange={(val) => { if (val) setHiringManagerId(val === "__none__" ? "" : val); }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select a hiring manager..." />
@@ -552,7 +558,7 @@ export default function JobEditPage() {
                     <Label htmlFor="client">Client (Optional)</Label>
                     <Select
                       value={clientId || "__none__"}
-                      onValueChange={(val) => setClientId(val === "__none__" ? "" : val)}
+                      onValueChange={(val) => { if (val) setClientId(val === "__none__" ? "" : val); }}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Internal role / no client" />

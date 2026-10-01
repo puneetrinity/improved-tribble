@@ -4,7 +4,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { Search, MapPin, Clock, Briefcase, X, User, IndianRupee, SlidersHorizontal } from "lucide-react";
 import { DEFAULT_SITE_URL } from "@/lib/seoHelpers";
-import { Job } from "@shared/schema";
+import type { PublicJob } from '@shared/publicJob';
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
 import GridOverlay from "@/components/GridOverlay";
@@ -16,11 +16,7 @@ import { CandidateSaveButton } from "@/components/candidate/CandidateSaveButton"
 const titleCase = (t: string) =>
   t.replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1));
 
-interface JobWithRecruiter extends Job {
-  postedByName?: string;
-  postedById?: number | string;
-  isRecruiterProfilePublic?: boolean;
-}
+type JobWithRecruiter = PublicJob;
 
 interface JobsResponse {
   jobs: JobWithRecruiter[];
