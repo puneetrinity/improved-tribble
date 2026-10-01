@@ -1,4 +1,5 @@
 import slugify from 'slugify';
+import { publicJobDescription } from '@shared/jobDescription';
 import { randomUUID } from 'node:crypto';
 import {
   users,
@@ -1817,6 +1818,7 @@ export class DatabaseStorage implements IStorage {
         id: applications.id,
         jobId: applications.jobId,
         userId: applications.userId,
+        jobDescriptionOriginal: jobs.originalJD,
         aiFitScore: applications.aiFitScore,
         aiFitLabel: applications.aiFitLabel,
         aiFitReasons: applications.aiFitReasons,
@@ -1844,9 +1846,9 @@ export class DatabaseStorage implements IStorage {
       .where(and(whereClause, applicationPrivacyAllowed(false)))
       .orderBy(desc(applications.appliedAt));
 
-    return results.map((result: any) => ({
+    return results.map(({ jobDescriptionOriginal, ...result }: any) => ({
       ...result,
-      job: result.job
+      job: { ...result.job, description: publicJobDescription({ ...result.job, originalJD: jobDescriptionOriginal }) }
     }));
   }
 

@@ -43,7 +43,7 @@ const HomepageFooter = ({
               </div>
             </div>
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
-              <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Product</h5>
+              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Product</h2>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li><Link href="/features" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Features</Link></li>
                 <li><Link href="/solutions" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Solutions</Link></li>
@@ -54,7 +54,7 @@ const HomepageFooter = ({
               </ul>
             </div>
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
-              <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Company</h5>
+              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Company</h2>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li><Link href="/about" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">About</Link></li>
                 {!candidateAudience ? (
@@ -64,14 +64,14 @@ const HomepageFooter = ({
               </ul>
             </div>
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
-              <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Learn</h5>
+              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Learn</h2>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li><Link href="/what-is-decision-intelligence" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">What is Decision Intelligence?</Link></li>
                 <li><Link href="/talent-intelligence-vs-ats" className="text-hr-text-muted no-underline text-[0.82rem] transition-colors duration-200 hover:text-hr-text">Talent Intelligence vs ATS</Link></li>
               </ul>
             </div>
             <div className="rounded-[24px] border border-white/[0.06] bg-white/[0.02] p-5 lg:border-0 lg:bg-transparent lg:p-0">
-              <h5 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Legal</h5>
+              <h2 className="text-[0.7rem] font-semibold uppercase tracking-[0.08em] text-hr-text-secondary mb-3.5">Legal</h2>
               <ul className="list-none flex flex-col gap-[9px] p-0 m-0">
                 <li>
                   <button

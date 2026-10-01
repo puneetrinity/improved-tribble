@@ -2,6 +2,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
+import { publicJobDescription, serializeJobJsonLd } from '@shared/jobDescription';
 import { MapPin, Clock, Calendar, Users, FileText, Upload, Briefcase, Star, Share2, Bookmark, Sparkles, AlertTriangle, RotateCcw, History, IndianRupee, GraduationCap, ChevronRight, User, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Job, insertApplicationSchema, type UserProfile } from "@shared/schema";
@@ -440,9 +441,6 @@ export default function JobDetailsPage() {
   const metaDescription = generateJobMetaDescription(job);
   const canonicalUrl = getJobCanonicalUrl(job);
   const jobPostingJsonLd = generateJobPostingJsonLd(job);
-  const hasServerJobPostingJsonLd = typeof document !== "undefined" &&
-    !!document.querySelector('script[type="application/ld+json"][data-schema="jobposting"]');
-  const shouldRenderJobPostingJsonLd = typeof document === "undefined" || !hasServerJobPostingJsonLd;
 
   return (
     <>
@@ -461,11 +459,11 @@ export default function JobDetailsPage() {
         <meta name="twitter:description" content={metaDescription} />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:image" content={`${DEFAULT_SITE_URL}/twitter-image.jpg`} />
-        {shouldRenderJobPostingJsonLd && jobPostingJsonLd && (
-          <script type="application/ld+json">{JSON.stringify(jobPostingJsonLd)}</script>
+        {jobPostingJsonLd && (
+          <script type="application/ld+json" data-schema="jobposting">{serializeJobJsonLd(jobPostingJsonLd)}</script>
         )}
         <script type="application/ld+json">
-          {JSON.stringify({
+          {serializeJobJsonLd({
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
             "itemListElement": [
@@ -636,7 +634,7 @@ export default function JobDetailsPage() {
                       <FileText /> Job Description
                     </div>
                     <div className={cardBodyCls}>
-                      <p className="text-sm leading-[1.8] text-e-text2 whitespace-pre-wrap">{job.description}</p>
+                      <p className="text-sm leading-[1.8] text-e-text2 whitespace-pre-wrap">{publicJobDescription(job)}</p>
                     </div>
                   </section>
 

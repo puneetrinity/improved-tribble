@@ -1,3 +1,5 @@
+import { resolveJobDescription } from '@shared/jobDescription';
+
 /**
  * Remove script/style tags from job descriptions while preserving HTML.
  */
@@ -323,8 +325,10 @@ export function generateJobPostingSchema(job: {
   // produces double slashes in generated job/logo URLs.
   baseUrl = baseUrl.replace(/\/+$/, '');
 
-  // Preserve HTML in description for Google Jobs
-  const htmlDescription = sanitizeDescription(job.description);
+  const description = resolveJobDescription(job).text;
+  if (!description) return null;
+  // JSON-LD permits text; escape HTML-significant text instead of trusting raw HTML.
+  const htmlDescription = description.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
   // Map employment type
   const employmentType = mapEmploymentType(job.type);

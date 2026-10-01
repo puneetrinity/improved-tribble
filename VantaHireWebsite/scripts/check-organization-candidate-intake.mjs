@@ -13,7 +13,7 @@ const frozenHashes = {
   "server/lib/applicationGraphSyncProcessor.ts": "c014dab9d22d4d5686b9611b986a080c7e65b1f2bad664059d22cbcc195b2f56",
   "server/lib/services/jwt-signer.ts": "0213eb5984388fba2c3e4bf8893ac94b7fbaecc1f669b12b50519ef0a24cd490",
   "server/schema-migrations/0009_decision_projection_delivery_state.sql": "ce5999cab8bf087b838bdc05e4eca81d6012a1f044e957ff4ab196c41919f348",
-  "server/storage.ts": "3fb44fa5515fb8cc0b9ac0556e3f22c62aa1397868cb2353d2c465ad13e60d03",
+  "server/storage.ts": "4ac21076375c828e4ff641ced53f4be30854d21edbee41ae0299428bdb6d06a2",
   "server/candidate-privacy/decision.ts": "02bd1b412deb3f89f8cd4646dae19a2a0825486acf0c09c109c247da83c38f52",
 };
 

@@ -6,6 +6,7 @@ import { type Server } from "http";
 import { nanoid } from "nanoid";
 import { storage } from "./storage";
 import { generateJobPostingSchema, stripHtml } from "./seoUtils";
+import { jobMetaDescription, publicJobDescription, resolveJobDescription, serializeJobJsonLd } from '@shared/jobDescription';
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -317,7 +318,7 @@ export async function setupVite(app: Express, server: Server) {
  */
 function injectJsonLd(html: string, jsonLd: object, schemaType?: string): string {
   const dataAttr = schemaType ? ` data-schema="${schemaType}"` : '';
-  const script = `<script type="application/ld+json"${dataAttr}>${JSON.stringify(jsonLd)}</script>`;
+  const script = `<script type="application/ld+json" data-rh="true"${dataAttr}>${serializeJobJsonLd(jsonLd)}</script>`;
   // Inject before </head> for early discovery by crawlers
   return html.replace('</head>', `${script}\n</head>`);
 }
@@ -340,11 +341,9 @@ function escapeHtmlText(value: string): string {
 
 function upsertMetaTag(html: string, attr: 'name' | 'property', key: string, content: string): string {
   const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`<meta\\s+[^>]*${attr}=["']${escapedKey}["'][^>]*>`, 'i');
-  const tag = `<meta ${attr}="${key}" content="${escapeHtmlAttr(content)}" />`;
-  if (regex.test(html)) {
-    return html.replace(regex, tag);
-  }
+  const regex = new RegExp(`<meta\\s+[^>]*${attr}=["']${escapedKey}["'][^>]*>`, 'gi');
+  const tag = `<meta data-rh="true" ${attr}="${key}" content="${escapeHtmlAttr(content)}" />`;
+  html = html.replace(regex, '');
   return html.replace('</head>', `${tag}\n</head>`);
 }
 
@@ -653,17 +652,14 @@ export async function serveStatic(app: Express) {
       const baseUrl = process.env.BASE_URL || 'https://ealana.com';
       const jobUrl = job.slug ? `${baseUrl}/jobs/${job.slug}` : `${baseUrl}/jobs/${job.id}`;
       const pageTitle = `${job.title} | ealana`;
-      const metaDescription = truncateText(
-        `Apply for ${job.title} at ${job.location}. ${stripHtml(job.description)}`,
-        155
-      );
+      const metaDescription = jobMetaDescription(job);
 
       const jsonLd = generateJobPostingSchema({
         id: job.id,
         title: job.title,
         // Prose JD, never the parsed-requirements JSON (original_jd drift):
         // the raw blob leaked internal scoring config into public schema/metas.
-        description: (job as any).originalJD || job.description,
+        description: resolveJobDescription(job).text,
         location: job.location,
         type: job.type,
         skills: job.skills as string[] | null,
@@ -706,7 +702,7 @@ export async function serveStatic(app: Express) {
         try {
           // Pre-populate query cache with the job data we already fetched
           const initialData: Record<string, unknown> = {
-            [JSON.stringify(["/api/jobs", param])]: job,
+            [JSON.stringify(["/api/jobs", param])]: { ...job, description: publicJobDescription(job) },
           };
           const { html: ssrHtml } = ssrRender(`/jobs/${param}`, initialData);
           if (ssrHtml) {
@@ -765,7 +761,12 @@ export async function serveStatic(app: Express) {
       res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     }
     // Read file and send with explicit status (sendFile overrides status to 200)
-    const html = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
+    let html = await fs.promises.readFile(path.resolve(distPath, "index.html"), "utf-8");
+    if (statusCode === 404) {
+      html = upsertTitle(html, 'Page Not Found | ealana');
+      html = upsertMetaTag(html, 'name', 'description', 'This page does not exist or has moved.');
+      html = upsertMetaTag(html, 'name', 'robots', 'noindex, nofollow');
+    }
     res.status(statusCode).setHeader('Content-Type', 'text/html').send(html);
   });
 }

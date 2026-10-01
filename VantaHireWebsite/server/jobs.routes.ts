@@ -9,6 +9,7 @@
  */
 
 import type { Express, Request, Response, NextFunction } from 'express';
+import { publicJobDescription } from '@shared/jobDescription';
 import { z } from 'zod';
 import { storage } from './storage';
 import { requireAuth, requireRole, requireSeat } from './auth';
@@ -219,7 +220,7 @@ export function registerJobsRoutes(
       res.json({
         jobs: result.jobs.map((job) => ({
           ...job,
-          description: job.originalJD || job.description,
+          description: publicJobDescription(job),
         })),
         pagination: {
           page,
@@ -321,7 +322,7 @@ export function registerJobsRoutes(
       // Return job with recruiter info for profile linking and client data for JSON-LD
       res.json({
         ...job,
-        description: job.originalJD || job.description,
+        description: publicJobDescription(job),
         postedByName,
         postedById: recruiterPublicId || job.postedBy, // Prefer publicId for links
         isRecruiterProfilePublic, // Only show link if profile is public
@@ -623,7 +624,7 @@ export function registerJobsRoutes(
 
       res.json(userJobs.map((job) => ({
         ...job,
-        description: job.originalJD || job.description,
+        description: publicJobDescription(job),
       })));
       return;
     } catch (error) {
