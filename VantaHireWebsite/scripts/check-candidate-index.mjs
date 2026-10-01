@@ -50,7 +50,7 @@ export const FROZEN = {
   "server/schema-migrations/0010_organization_private_candidate_reference.sql": "eaecd7bdc1637aaa314bc0c04c123b1fcfbeb8501d2cc83c8cb58b8a75a30495",
   "server/schema-migrations/0011_candidate_consent.sql": "0d544103c5cacc60861b3916b243d2ae8690b8a470ed7233222eff4c3c7f4b74",
   "server/schema-migrations/catalog.lock.json": "999636b7722cc305b10f71b9a096cc75701400ff49aea91435f839cadf13b90c",
-  "server/storage.ts": "4ac21076375c828e4ff641ced53f4be30854d21edbee41ae0299428bdb6d06a2"
+  "server/storage.ts": "578c9ea5dce423081ec62101cfef89bd01a7e9f3e6f18caead63ccaac43c6cfc"
 };
 export const MIGRATION = "server/schema-migrations/0012_candidate_index_delivery.sql";
 export const AUTHORITIES = [MIGRATION, "server/schema-migrations/checksums.lock",

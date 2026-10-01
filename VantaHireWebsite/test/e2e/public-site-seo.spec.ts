@@ -134,9 +134,23 @@ test.describe('F-1 built public/management contract', () => {
       }
       const list = await (await page.request.get('/api/jobs?limit=1000&admin=true')).json();
       for (const job of list.jobs) expect(Object.keys(job).sort()).toEqual(publicKeys);
-      // F-2 is deliberately not changed by this field-disclosure fix.
-      expect(list.jobs.map((job: { id: number }) => job.id)).toEqual(expect.arrayContaining([90006, 90007]));
-      expect(list.pagination.limit).toBe(1000);
+      expect(list.jobs.map((job: { id: number }) => job.id)).not.toEqual(expect.arrayContaining([90006]));
+      expect(list.jobs.map((job: { id: number }) => job.id)).not.toEqual(expect.arrayContaining([90007]));
+      expect(list.pagination.limit).toBe(100);
+      expect(list.jobs.length).toBeLessThanOrEqual(100);
+      const defaults = await (await page.request.get('/api/jobs')).json();
+      expect(defaults.pagination.limit).toBe(10);
+      const recruiterJobsResponse = await page.request.get('/api/recruiters/90001/jobs');
+      expect(recruiterJobsResponse.status()).toBe(200);
+      const recruiterJobs = (await recruiterJobsResponse.json()).jobs;
+      expect(recruiterJobs.map((job: { id: number }) => job.id)).toContain(90001);
+      for (const excluded of [90005, 90006, 90007]) {
+        expect(recruiterJobs.map((job: { id: number }) => job.id)).not.toContain(excluded);
+      }
+      expect((await page.request.get('/api/recruiters/90005/jobs')).status()).toBe(404);
+      for (const query of ['page=0', 'limit=-1', 'page=1.5', 'limit=2junk', 'page=1&page=2', 'limit[x]=2', 'page=9007199254740991&limit=100']) {
+        expect((await page.request.get(`/api/jobs?${query}`)).status()).toBe(400);
+      }
       await page.goto('/jobs/90001');
       await expect(page.getByText(prose, { exact: false }).first()).toBeVisible();
       expect(await page.content()).not.toMatch(internal);

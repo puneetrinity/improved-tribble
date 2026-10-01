@@ -12,6 +12,7 @@ import type { Express, Request, Response, NextFunction } from 'express';
 import { publicJobDescription } from '@shared/jobDescription';
 import { toPublicJob } from '@shared/publicJob';
 import { parseManagementJobId, readManagementJob } from './lib/jobManagementRead';
+import { InvalidPublicJobPagination, publicJobPagination } from './lib/publicJobPagination';
 import { z } from 'zod';
 import { storage } from './storage';
 import { requireAuth, requireRole, requireSeat } from './auth';
@@ -197,8 +198,7 @@ export function registerJobsRoutes(
   // Get all jobs with filtering and pagination
   app.get("/api/jobs", async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const { page, limit } = publicJobPagination(req.query.page, req.query.limit, 'http');
       const location = req.query.location as string;
       const type = req.query.type as string;
       const search = req.query.search as string;
@@ -230,6 +230,10 @@ export function registerJobsRoutes(
       });
       return;
     } catch (error) {
+      if (error instanceof InvalidPublicJobPagination) {
+        res.status(400).json({ error: 'Invalid pagination', code: 'INVALID_PAGINATION' });
+        return;
+      }
       next(error);
     }
   });
