@@ -10,7 +10,10 @@
 
 import type { Express, Request, Response, NextFunction } from 'express';
 import { publicJobDescription } from '@shared/jobDescription';
-import { toPublicJob } from '@shared/publicJob';
+import { jobBriefEnabled, currentJdSchema } from './job-brief/contracts';
+import { transitionJob, editGovernedJob } from './job-brief/commands';
+import { BriefError, BriefRepository } from './job-brief/repository';
+import { toPublicJob, omitCanonicalJobSource } from '@shared/publicJob';
 import { parseManagementJobId, readManagementJob } from './lib/jobManagementRead';
 import { InvalidPublicJobPagination, publicJobPagination } from './lib/publicJobPagination';
 import { z } from 'zod';
@@ -125,7 +128,16 @@ export function registerJobsRoutes(
         return;
       }
 
-      console.log('Original JD:', rawDescription);
+      if(jobBriefEnabled()) {
+        if(Object.prototype.hasOwnProperty.call(req.body,'experienceYearsMax')) {
+          res.status(400).json({code:'BRIEF_EXPERIENCE_MAXIMUM_REFUSED'});return;
+        }
+        const source=currentJdSchema.parse(rawDescription);
+        const jobData=insertJobSchema.parse({...req.body,description:providedExtractedDescription??source,originalJD:source});
+        const job=await storage.createJob({...jobData,postedBy:req.user!.id,organizationId});
+        queueMauticFirstJobCreatedSync(req.user!.id,organizationId);
+        res.status(201).json(omitCanonicalJobSource(job));return;
+      }
 
       if (providedExtractedDescription) {
         console.log('Extracted JD:', providedExtractedDescription);
@@ -143,7 +155,7 @@ export function registerJobsRoutes(
 
         queueMauticFirstJobCreatedSync(req.user!.id, organizationId);
 
-        res.status(201).json(job);
+        res.status(201).json(omitCanonicalJobSource(job));
         return;
       }
 
@@ -177,7 +189,7 @@ export function registerJobsRoutes(
 
       queueMauticFirstJobCreatedSync(req.user!.id, organizationId);
 
-      res.status(201).json(job);
+      res.status(201).json(omitCanonicalJobSource(job));
       return;
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -220,7 +232,7 @@ export function registerJobsRoutes(
       const result = await storage.getJobs(filters);
 
       res.json({
-        jobs: result.jobs.map(toPublicJob),
+        jobs: result.jobs.map(job => toPublicJob(job,jobBriefEnabled()?'canonical':'legacy')),
         pagination: {
           page,
           limit,
@@ -309,7 +321,7 @@ export function registerJobsRoutes(
       // Increment view count for analytics
       await storage.incrementJobViews(job.id);
 
-      res.json(toPublicJob(job));
+      res.json(toPublicJob(job,jobBriefEnabled()?'canonical':'legacy'));
       return;
     } catch (error) {
       next(error);
@@ -540,18 +552,33 @@ export function registerJobsRoutes(
         updates.jdDigestVersion = null;
       }
 
-      if (Object.keys(updates).length === 0) {
+      if (Object.keys(updates).length === 0 && !jobBriefEnabled()) {
         res.status(400).json({ error: 'No valid fields to update' });
         return;
       }
 
+      if(jobBriefEnabled()) {
+        if(!existingJob.organizationId) {res.status(404).json({code:'BRIEF_NOT_FOUND'});return;}
+        const {description:_legacy,jdDigest:_digest,jdDigestVersion:_digestVersion,experienceYearsMax:_maximum,...patch}=updates;
+        if(experienceYearsMax!==undefined) {res.status(400).json({code:'BRIEF_MAXIMUM_EXPERIENCE_REFUSED'});return;}
+        try {
+          res.json(await editGovernedJob(new BriefRepository(),{organizationId:existingJob.organizationId,jobId,actorId:req.user!.id},
+            {requestId:req.body.requestId,expectedRevision:req.body.expectedRevision,currentJD:req.body.currentJD,
+              sourceChoice:req.body.sourceChoice,requesterKind:req.body.requesterKind,reasonCode:req.body.reasonCode,
+              ...(req.body.note!==undefined?{note:req.body.note}:{}),patch}));
+        } catch(error) {
+          const failure=error instanceof BriefError?error:new BriefError(error instanceof z.ZodError?'BRIEF_INVALID_COMMAND':'BRIEF_UNAVAILABLE',error instanceof z.ZodError?400:503);
+          res.status(failure.status).json({code:failure.code});
+        }
+        return;
+      }
       const job = await storage.updateJob(jobId, updates);
       if (!job) {
         res.status(404).json({ error: 'Job not found' });
         return;
       }
 
-      res.json(job);
+      res.json(omitCanonicalJobSource(job));
       return;
     } catch (error) {
       next(error);
@@ -618,8 +645,8 @@ export function registerJobsRoutes(
       const userJobs = await storage.getJobsByUser(user.id, organizationId);
 
       res.json(userJobs.map((job) => ({
-        ...job,
-        description: publicJobDescription(job),
+        ...omitCanonicalJobSource(job),
+        description: publicJobDescription(job,jobBriefEnabled()?'canonical':'legacy'),
       })));
       return;
     } catch (error) {
@@ -642,7 +669,7 @@ export function registerJobsRoutes(
         .orderBy(desc(jobs.createdAt));
 
       res.json(rows.map((row: typeof rows[number]) => ({
-        ...row.job,
+        ...omitCanonicalJobSource(row.job),
         applicationCount: row.applicationCount ?? 0,
       })));
       return;
@@ -684,13 +711,27 @@ export function registerJobsRoutes(
       }
 
       const { reason } = req.body;
+      if(jobBriefEnabled()) {
+        const current=await storage.getJob(jobId);
+        if(!current?.organizationId) {res.status(404).json({code:'BRIEF_NOT_FOUND'});return;}
+        try {
+          res.json(await transitionJob(new BriefRepository(),{organizationId:current.organizationId,jobId,actorId:req.user!.id},req.user!.role,
+            {action:isActive?'publish':'deactivate',requestId:req.body.requestId,
+              ...(req.user!.role!=='super_admin'?{expectedRevision:req.body.expectedRevision}:{}),
+              ...(!isActive && reason!==undefined?{reason}:{})}));
+        } catch(error) {
+          const failure=error instanceof BriefError?error:new BriefError(error instanceof z.ZodError?'BRIEF_INVALID_COMMAND':'BRIEF_UNAVAILABLE',error instanceof z.ZodError?400:503);
+          res.status(failure.status).json({code:failure.code});
+        }
+        return;
+      }
       const job = await storage.updateJobStatus(jobId, isActive, reason, req.user!.id);
       if (!job) {
         res.status(404).json({ error: 'Job not found' });
         return;
       }
 
-      res.json(job);
+      res.json(omitCanonicalJobSource(job));
       return;
     } catch (error) {
       next(error);

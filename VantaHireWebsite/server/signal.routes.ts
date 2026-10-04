@@ -38,6 +38,7 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
+import { jobBriefEnabled } from './job-brief/contracts';
 import { resolveActiveKGTenantId } from './lib/activekgTenant';
 import {
   CandidatePrivacyRestrictedError,
@@ -306,6 +307,11 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
       const { job, organizationId } = contextResult.context;
+
+      if(jobBriefEnabled()) {
+        res.status(503).json({code:'SOURCING_ACTIVATION_PENDING',error:'Sourcing awaits Wave 5B activation.'});
+        return;
+      }
 
       const signalTenantId = await requireSignalTenantId(organizationId);
 

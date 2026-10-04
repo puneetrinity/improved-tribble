@@ -15,7 +15,7 @@ const SOURCE_TREE = 'b1674cdd942bdf13f6c486b1a42714a879016fd3';
 const OCR_MERGE_SHA = 'cb3f95d2229d3d7edc02e2d4d9f05ddf643a3359';
 const OCR_MERGE_TREE = '2657e7c19c2de792f14fff87142e8b7bf9c2c1eb';
 const FROZEN_ON_DEMAND_BLOCKS = {
-  aiSingle: 'f94a0a41154e8d6b87260452b0a92b7aeddb2e34fe132f73559372947106c02e',
+  aiSingle: '720ad966aa2f112597fa4b8d92925253aabf81670e20145477d105998ff388c3',
   aiBulk: '1176d16f8977cb925edc8db8aab442af742971379a3bb7582cc9a1760b5f99a9',
 };
 
@@ -37,12 +37,12 @@ const FROZEN = {
   'server/lib/googleVisionOcrClient.ts': '4d39f6911ce8cfb0dfb392e5c9615d46602ee9d248b5ed73c91d1ce04df4506a',
   'server/lib/resumeImportExtraction.ts': 'b62bc1d0971eba48c5c3ff1a85a5b7c626525c6a391b430d5b29ef8d03a474ab',
   'server/lib/resumeExtractor.ts': '217ed1dd5b7c23fa6945d5602c55286cc5655ff8ba481f3b5dbf106fea44c0f2',
-  'server/aiWorker.ts': '33005db9323727ba10abf08944f8dc6651aeef48549eb9195c222e7c4eb6a94f',
+  'server/aiWorker.ts': '57f9a6a870ef561f4cb1a582e1e3fc5e9ce3e300d98799ff37be6424bd7cb7fd',
   'server/resume.routes.ts': '8a85106836a3bb681e66e1a25bf0dcedeb8181e00b4bbb669c1b8e85c446d26e',
   'server/bulkResumeImport.routes.ts': '7b0a7c07c42360c8d86ad950607335b7a2714318b7f685d7b502411d52abfa6e',
   'server/lib/resumeImportProcessor.ts': '1314be8df83e520c46c1eab5831d468f42659f3a4783a124e38c224381ad92e2',
   'server/gcs-storage.ts': '5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802',
-  'package.json': '51907c6e5cd174fe5c5e46f7cfa949e1f51323b2360dcb940ec2f80ef742317f',
+  'package.json': '3f6df818e2a46bf4c5e7356cd02dd39d2421f1adf7e91f69a8403c8362941fa0',
   'package-lock.json': 'b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539',
   'vitest.server.config.ts': 'aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe',
   'server/schema-control/manifest.ts': '16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2',

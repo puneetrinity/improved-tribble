@@ -82,20 +82,20 @@ async function resetDatabase(): Promise<void> {
 }
 
 async function resetFixtures(): Promise<void> {
-  const client = await clientFor(migrationUrl);
-  try {
-    await client.query(`TRUNCATE TABLE
-      candidate_privacy_request_events,
-      candidate_privacy_remote_projection,
-      candidate_privacy_outbox,
-      candidate_privacy_subject_links,
-      candidate_privacy_sync_state,
-      candidate_privacy_requests,
-      talent_pool_membership_events,
-      users RESTART IDENTITY CASCADE`);
-  } finally {
-    await client.end();
-  }
+  if (!safeTargetProven) throw new Error("Disposable target proof did not complete.");
+  // Fresh disposable schema: never truncate or disable immutable evidence.
+  await resetDatabase();
+  await runReleaseMigration({
+    migrationsDir,
+    creds: { migrateUrl: migrationUrl, expectedTargetId: targetId,
+      environment: "development", allowFreshInitialization: true },
+    connect: connectMigration,
+  });
+  await provisionRuntimeRole({
+    migrateUrl: migrationUrl, runtimeUrl,
+    runtimeRole: new URL(runtimeUrl).username, expectedTargetId: targetId,
+    connectMigration, connectRuntime,
+  });
 }
 
 async function createCandidate(): Promise<number> {

@@ -2247,7 +2247,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (manifest.format_version !== 1 || manifest.source_commit !== SOURCE_COMMIT) {
     problems.push("object authorization manifest pin or format is invalid.");
   }
-  if (manifest.route_registration_census !== 322) {
+  if (manifest.route_registration_census !== 327) {
     problems.push("object authorization route census contract is invalid.");
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
@@ -2461,7 +2461,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
 
   const routeCount = routeRegistrationCount(root);
   if (routeCount !== manifest.route_registration_census) {
-    problems.push(`Flow route registration census drifted (expected 322, found ${routeCount}).`);
+    problems.push(`Flow route registration census drifted (expected 327, found ${routeCount}).`);
   }
 
   try {

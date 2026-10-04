@@ -13,7 +13,7 @@ export const FROZEN = {
   "client/src/pages/candidate-dashboard.tsx": "c81367ee9c9ebc3d0d10cd171a72f146767bc499b9591d6e3dc5df30d6112409",
   "package-lock.json": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539",
   "playwright.config.ts": "98cf29f15ddd205e42c713db919a54737bedcf2437b410c61f33df4f75d43e46",
-  "server/ai.routes.ts": "f63c870b20405f82f161733aea7b82d43202baaf50b9e7e1487851cf2635e4c2",
+  "server/ai.routes.ts": "0708edb56f17304257441a8f51111cffd06a7e449c5c01ffd4ac432df1360421",
   "server/auth.ts": "25113b8fa50d0845ccb205b4fa02bae7c424e7b13aed30149d87b7e06a54b468",
   "server/candidate-consent/contracts.ts": "07bf05a48f5c475f3b44d30d1092196b106a5423174e4794a816ff8e9edb756e",
   "server/candidate-consent/memory-client.ts": "af32e401541bf21a8fdf33e09cc78c095948efaa62f151bd641a194b6eed8371",
@@ -24,7 +24,7 @@ export const FROZEN = {
   "server/candidate-privacy/memory-client.ts": "0f393868e04898b4091a4057b7f5fd30d92d1458dd30e1844d5fc36e5217e9e5",
   "server/candidate-privacy/repository.ts": "940e5617415a95b1fc1dbc823e48920bfa1031b26b641f29e2537c1786f1358b",
   "server/candidate-privacy/routes.ts": "5c6e77157b839026051716984fffba990057a29cdf8b3b4dd1de98d1014c45d9",
-  "server/candidatePortal.routes.ts": "82e6f6623cf9e2ae9ff98ea6ed5563c5cfca5eafd8f7e4dea149c337d3938f6e",
+  "server/candidatePortal.routes.ts": "ca44e6ece78601511681bf33bcf5308353a8ccd41198c24726a36e1d394c4da6",
   "server/db.ts": "25705dad7df8159fc3cac431ab18d87c84686627fff591ac3fead30a67c74ba7",
   "server/gcs-storage.ts": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802",
   "server/lib/resumeExtractor.ts": "217ed1dd5b7c23fa6945d5602c55286cc5655ff8ba481f3b5dbf106fea44c0f2",
@@ -50,7 +50,7 @@ export const FROZEN = {
   "server/schema-migrations/0010_organization_private_candidate_reference.sql": "eaecd7bdc1637aaa314bc0c04c123b1fcfbeb8501d2cc83c8cb58b8a75a30495",
   "server/schema-migrations/0011_candidate_consent.sql": "0d544103c5cacc60861b3916b243d2ae8690b8a470ed7233222eff4c3c7f4b74",
   "server/schema-migrations/catalog.lock.json": "999636b7722cc305b10f71b9a096cc75701400ff49aea91435f839cadf13b90c",
-  "server/storage.ts": "578c9ea5dce423081ec62101cfef89bd01a7e9f3e6f18caead63ccaac43c6cfc"
+  "server/storage.ts": "0aed7b614c05ce5e5e6e387bab39118c0ea4a89c1fe0d768fcce8c32adc81c81"
 };
 export const MIGRATION = "server/schema-migrations/0012_candidate_index_delivery.sql";
 export const AUTHORITIES = [MIGRATION, "server/schema-migrations/checksums.lock",

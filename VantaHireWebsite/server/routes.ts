@@ -17,6 +17,8 @@ import { registerAIRoutes } from "./ai.routes";
 import { registerAdminRoutes } from "./admin.routes";
 import { registerClientsRoutes } from "./clients.routes";
 import { registerJobsRoutes } from "./jobs.routes";
+import { registerJobBriefRoutes } from "./job-brief/routes";
+import { jobBriefEnabled } from "./job-brief/contracts";
 import { registerApplicationsRoutes } from "./applications.routes";
 import { registerBulkResumeImportRoutes } from "./bulkResumeImport.routes";
 import { registerCommunicationsRoutes } from "./communications.routes";
@@ -50,6 +52,7 @@ import {
 } from "./lib/membershipScopedReadAuthorization";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  jobBriefEnabled(); // Strict web-only configuration, before accepting requests.
   // Setup security middleware with environment-aware CSP
   const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -160,6 +163,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/client-config", (_req: Request, res: Response) => {
     res.json({
       apolloAppId: process.env.APOLLO_APP_ID || null,
+      jobBriefEnabled: jobBriefEnabled(),
     });
   });
 
@@ -373,6 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register jobs routes (job CRUD, analytics, AI analysis)
   registerJobsRoutes(app, doubleCsrfProtection);
+  registerJobBriefRoutes(app, doubleCsrfProtection);
 
   // Register applications routes (applications, pipeline, candidates, profiles)
   registerApplicationsRoutes(app, doubleCsrfProtection, upload);

@@ -219,43 +219,27 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
 
   beforeEach(async () => {
     if (!owner || !safeTargetProven) throw new Error("Disposable 3A target not proven.");
-    const hasCommittedEvidence = (await owner.query(
-      "SELECT EXISTS (SELECT 1 FROM public.decision_events LIMIT 1) present",
-    )).rows[0]?.present === true;
-    if (hasCommittedEvidence) {
-      // A committed event must never be erased through the product relation's
-      // mutation surface. Recreate the disposable schema between independent
-      // examples instead of disabling the production trigger or truncating
-      // non-empty evidence.
-      await owner.end();
-      owner = undefined;
-      await resetDatabase();
-      const rebuilt = await runReleaseMigration({
-        migrationsDir,
-        creds: {
-          migrateUrl: migrationUrl,
-          expectedTargetId: targetId,
-          environment: "development",
-          allowFreshInitialization: true,
-        },
-        connect: connectMigration,
-      });
-      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== currentTail) {
-        throw new Error("Disposable 3A per-test schema rebuild refused.");
-      }
-      await provisionRuntimeRole({
-        migrateUrl: migrationUrl,
-        runtimeUrl,
-        runtimeRole: new URL(runtimeUrl).username,
-        expectedTargetId: targetId,
-        connectMigration,
-        connectRuntime,
-      });
-      owner = await clientFor(migrationUrl);
+    // Fresh disposable schema: never truncate or disable immutable evidence.
+    await owner.end();
+    owner = undefined;
+    await resetDatabase();
+    const rebuilt = await runReleaseMigration({
+      migrationsDir,
+      creds: { migrateUrl: migrationUrl, expectedTargetId: targetId,
+        environment: "development", allowFreshInitialization: true },
+      connect: connectMigration,
+    });
+    if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== currentTail) {
+      throw new Error("Disposable per-test schema rebuild refused.");
     }
-    await owner.query("TRUNCATE public.users, public.organizations RESTART IDENTITY CASCADE");
+    await provisionRuntimeRole({
+      migrateUrl: migrationUrl, runtimeUrl,
+      runtimeRole: new URL(runtimeUrl).username, expectedTargetId: targetId,
+      connectMigration, connectRuntime,
+    });
+    owner = await clientFor(migrationUrl);
     await installFixture();
-  });
+  }, 180_000);
 
   afterAll(async () => {
     if (runtimePool) await runtimePool.end();

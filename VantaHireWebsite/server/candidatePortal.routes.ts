@@ -1,5 +1,6 @@
 import type { Express, NextFunction, Request, Response } from "express";
 import { publicJobDescription } from '@shared/jobDescription';
+import { jobBriefEnabled } from './job-brief/contracts';
 import { and, desc, eq } from "drizzle-orm";
 
 import { jobs, savedJobs, type Job } from "@shared/schema";
@@ -50,6 +51,7 @@ type PublicJob = Pick<
 >;
 type SavedJobRow = {
   originalJD: string | null;
+  currentJD: string | null;
   id: number;
   createdAt: Date;
   job: PublicJob;
@@ -121,6 +123,7 @@ export function registerCandidatePortalRoutes(
             id: savedJobs.id,
             createdAt: savedJobs.createdAt,
             originalJD: jobs.originalJD,
+            currentJD:jobs.currentJD,
             job: publicJobColumns,
           })
           .from(savedJobs)
@@ -130,9 +133,9 @@ export function registerCandidatePortalRoutes(
 
         const now = new Date();
         res.json({
-          savedJobs: rows.map(({ originalJD, ...row }) => ({
+          savedJobs: rows.map(({ originalJD,currentJD, ...row }) => ({
             ...row,
-            job: { ...row.job, description: publicJobDescription({ ...row.job, originalJD }) },
+            job: { ...row.job, description: publicJobDescription({ ...row.job, originalJD,currentJD },jobBriefEnabled()?'canonical':'legacy') },
             canApply: canCandidateApplyToJob(row.job, now),
           })),
         });

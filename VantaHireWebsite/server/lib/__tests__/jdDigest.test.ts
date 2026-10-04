@@ -2,10 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   normalizeAdjacentBuckets,
   normalizeAdjacentLocations,
+  workerDigestSource,
 } from '../jdDigest';
 import { JDDigestResponseSchema } from '../aiResponseSchemas';
 
 describe('JD digest relaxation adjacency', () => {
+  it('worker follows persisted canonical state without the web flag',()=>{
+    expect(workerDigestSource({currentJD:'Approved canonical prose',originalJD:'Old source',description:'Old JSON'})).toBe('Approved canonical prose');
+    expect(workerDigestSource({currentJD:null,originalJD:'Old source',description:'Fallback'})).toBe('Old source');
+    expect(()=>workerDigestSource({currentJD:'{"private":true}',originalJD:'Old source',description:'Fallback'})).toThrow('BRIEF_SOURCE_REQUIRED');
+  });
   it('keeps later title buckets distinct from the exact title query and each other', () => {
     expect(normalizeAdjacentBuckets([
       ['Backend Engineer', 'Platform Engineer', 'backend engineer'],

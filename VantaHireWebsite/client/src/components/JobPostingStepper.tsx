@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
+import { readBriefCapability } from '@/lib/job-brief';
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -169,6 +170,8 @@ const DEFAULT_STAGES = [
 ];
 
 export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
+  const {data:briefCapability}=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
+  const briefEnabled=briefCapability?.jobBriefEnabled===true;
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const [currentStep, setCurrentStep] = useState(1);
@@ -425,7 +428,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     onSuccess: (job) => {
       const stagesCreated = pipelineStages.length === 0 || (!useDefaultPipeline && customStages.length > 0);
       toast({
-        title: "Job posted successfully!",
+        title: briefEnabled?"Job draft saved — review the brief next":"Job posted successfully!",
         description: `${job.title} has been created${stagesCreated ? " with pipeline stages" : ""}.`,
       });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
@@ -434,7 +437,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       if (onSuccess) {
         onSuccess();
       } else {
-        setLocation(`/jobs/${job.id}/applications`);
+        setLocation(briefEnabled?`/jobs/${job.id}/edit#job-brief`:`/jobs/${job.id}/applications`);
       }
     },
     onError: (error: Error) => {
@@ -500,6 +503,10 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   // Handle next step
   const handleNext = async () => {
     if (currentStep === 1) {
+      if (briefEnabled) {
+        if (validateStep(1)) setCurrentStep(2);
+        return;
+      }
       await handleExtractDetails();
       return;
     }
@@ -576,7 +583,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
     if (!validateStep(4)) return;
 
     try {
-      const structuredDescription = buildStructuredDescriptionForSubmit();
+      const structuredDescription = briefEnabled ? formData.description : buildStructuredDescriptionForSubmit();
       const jobData = {
         title: formData.title,
         location: formData.location,
@@ -593,10 +600,10 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
         salaryPeriod: formData.salaryPeriod || undefined,
         educationRequirement: formData.educationRequirement || undefined,
         experienceYears: formData.experienceYears ? Number(formData.experienceYears) : undefined,
-        experienceYearsMax: formData.experienceYearsMax ? Number(formData.experienceYearsMax) : undefined,
+        ...(!briefEnabled && formData.experienceYearsMax ? {experienceYearsMax:Number(formData.experienceYearsMax)} : {}),
       };
 
-      if (!structuredJobProfile && !extractedDescriptionJson) {
+      if (!briefEnabled && !structuredJobProfile && !extractedDescriptionJson) {
         throw new Error("Please extract the job details first.");
       }
 
@@ -760,13 +767,13 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                         <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
-                        <p>Paste the raw JD first. We will extract structured details from this and auto-fill the form for review.</p>
+                        <p>{briefEnabled ? 'Paste the JD, save the draft job, then draft or edit its brief for explicit approval.' : 'Paste the raw JD first. We will extract structured details from this and auto-fill the form for review.'}</p>
                       </TooltipContent>
                     </Tooltip>
                   </Label>
-                  <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
+                  {!briefEnabled && <Button variant="outline" size="sm" onClick={() => setShowAiDrawer(true)}>
                     Analyze JD (AI)
-                  </Button>
+                  </Button>}
                 </div>
                 <Textarea
                   id="description"
@@ -804,7 +811,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  We’ll extract the title, location, skills, experience, and other structured details from this JD.
+                  {briefEnabled ? 'Enter the job details next. AI drafting is optional and available on the saved brief.' : 'We’ll extract the title, location, skills, experience, and other structured details from this JD.'}
                 </p>
               </div>
             </div>
@@ -1095,7 +1102,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                       <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs">
-                      <p>Set the minimum and (optionally) maximum years of experience. Sourcing uses this to match candidates at the right seniority — and the maximum prevents over-qualified candidates from being surfaced.</p>
+                      <p>{briefEnabled ? 'Set a minimum only. Exceeding it is not a penalty.' : 'Set the minimum and (optionally) maximum years of experience. Sourcing uses this to match candidates at the right seniority — and the maximum prevents over-qualified candidates from being surfaced.'}</p>
                     </TooltipContent>
                   </Tooltip>
                 </Label>
@@ -1109,7 +1116,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                     placeholder="Min (e.g., 3)"
                     className="w-32"
                   />
-                  <span className="text-muted-foreground text-sm">to</span>
+                  {!briefEnabled && <><span className="text-muted-foreground text-sm">to</span>
                   <Input
                     type="number"
                     min="0"
@@ -1119,6 +1126,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                     placeholder="Max (e.g., 8)"
                     className="w-32"
                   />
+                  </>}
                 </div>
               </div>
 
@@ -1505,7 +1513,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
 
             {currentStep < 4 ? (
               <Button type="button" onClick={handleNext} disabled={currentStep === 1 && isExtracting}>
-                {currentStep === 1 ? (isExtracting ? "Extracting..." : "Extract Details") : "Next"}
+                {currentStep === 1 && !briefEnabled ? (isExtracting ? "Extracting..." : "Extract Details") : "Next"}
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
@@ -1515,7 +1523,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 disabled={jobMutation.isPending}
                 className="bg-success hover:bg-success/80"
               >
-                {jobMutation.isPending ? "Posting..." : "Post Job"}
+                {jobMutation.isPending ? (briefEnabled?"Saving...":"Posting...") : briefEnabled?"Save job draft":"Post Job"}
                 <Check className="h-4 w-4 ml-2" />
               </Button>
             )}

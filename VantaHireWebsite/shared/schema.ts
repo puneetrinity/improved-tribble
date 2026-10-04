@@ -66,6 +66,8 @@ export const jobs = pgTable("jobs", {
   type: text("type").notNull(), // full-time, part-time, contract, remote
   description: text("description").notNull(),
   originalJD: text("original_jd"),
+  currentJD: text("current_jd"),
+  currentJDHash: text("current_jd_hash"),
   skills: text("skills").array(),
   deadline: date("deadline"),
   postedBy: integer("posted_by").notNull().references(() => users.id),
@@ -244,7 +246,8 @@ export const jobAuditLog = pgTable("job_audit_log", {
   organizationId: integer("organization_id").references(() => organizations.id, { onDelete: 'cascade' }), // Nullable for migration
   jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
   action: text("action").notNull(), // 'deactivated', 'reactivated', 'created', 'approved', 'declined'
-  performedBy: integer("performed_by").notNull().references(() => users.id),
+  performedBy: integer("performed_by").references(() => users.id),
+  actorKind: text("actor_kind").notNull().default('user'),
   reason: text("reason"), // Reason for action (e.g., 'auto_expired', 'manual', 'filled')
   metadata: jsonb("metadata"), // Additional context (e.g., { previousStatus: 'active', newStatus: 'inactive' })
   timestamp: timestamp("timestamp").defaultNow().notNull(),
@@ -253,6 +256,47 @@ export const jobAuditLog = pgTable("job_audit_log", {
   timestampIdx: index("job_audit_log_timestamp_idx").on(table.timestamp),
   actionIdx: index("job_audit_log_action_idx").on(table.action),
 }));
+
+// Wave 5A evidence. Runtime uses six definer routines, never direct table writes.
+// The circular composite pointers and immutable triggers are owned by migration0014.
+export const jobBriefState = pgTable('job_brief_state', {
+  organizationId: integer('organization_id').notNull().references(() => organizations.id, {onDelete:'restrict'}),
+  jobId: integer('job_id').notNull().references(() => jobs.id, {onDelete:'restrict'}),
+  revision: bigint('revision',{mode:'bigint'}).notNull().default(0n),
+  latestVersionId: uuid('latest_version_id'),approvedVersionId: uuid('approved_version_id'),
+  approvedMaterialHash: text('approved_material_hash'),sourceHash:text('source_hash'),
+  updatedAt:timestamp('updated_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({pk:primaryKey({name:'jb_state_pk',columns:[t.organizationId,t.jobId]})}));
+export const jobBriefVersions = pgTable('job_brief_versions', {
+  versionId:uuid('version_id').primaryKey(),organizationId:integer('organization_id').notNull(),jobId:integer('job_id').notNull(),
+  versionNumber:bigint('version_number',{mode:'bigint'}).notNull(),sourceJD:text('source_jd').notNull(),sourceHash:text('source_hash').notNull(),
+  payload:jsonb('payload').notNull(),materialHash:text('material_hash').notNull(),schemaVersion:integer('schema_version').notNull(),
+  compilerVersion:integer('compiler_version').notNull(),taxonomyVersion:integer('taxonomy_version').notNull(),
+  createdBy:integer('created_by').notNull().references(()=>users.id,{onDelete:'restrict'}),
+  createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({scope:foreignKey({name:'jb_versions_scope_fk',columns:[t.organizationId,t.jobId],foreignColumns:[jobBriefState.organizationId,jobBriefState.jobId]}).onDelete('restrict'),
+  number:unique('jb_versions_number_uq').on(t.organizationId,t.jobId,t.versionNumber),
+  scopeId:unique('jb_versions_scope_id_uq').on(t.organizationId,t.jobId,t.versionId)}));
+export const jobBriefEvents = pgTable('job_brief_events', {
+  eventId:uuid('event_id').primaryKey(),organizationId:integer('organization_id').notNull(),jobId:integer('job_id').notNull(),
+  requestId:uuid('request_id').notNull(),requestHash:text('request_hash').notNull(),action:text('action').notNull(),
+  actorId:integer('actor_id').notNull().references(()=>users.id,{onDelete:'restrict'}),previousVersionId:uuid('previous_version_id'),newVersionId:uuid('new_version_id'),
+  coordinationRevision:bigint('coordination_revision',{mode:'bigint'}).notNull(),requesterKind:text('requester_kind').notNull(),
+  reasonCode:text('reason_code'),note:text('note'),timing:text('timing').notNull(),timingBasis:text('timing_basis').notNull(),diff:jsonb('diff').notNull(),
+  recordedAt:timestamp('recorded_at',{withTimezone:true}).notNull().defaultNow(),
+},t=>({scope:foreignKey({name:'jb_events_scope_fk',columns:[t.organizationId,t.jobId],foreignColumns:[jobBriefState.organizationId,jobBriefState.jobId]}).onDelete('restrict'),
+  request:unique('jb_events_request_uq').on(t.organizationId,t.jobId,t.requestId),
+  history:index('jb_events_history_idx').on(t.organizationId,t.jobId,t.recordedAt,t.eventId)}));
+export const jobBriefDraftRequests = pgTable('job_brief_draft_requests', {
+  requestId:uuid('request_id').primaryKey(),organizationId:integer('organization_id').notNull(),jobId:integer('job_id').notNull(),
+  actorId:integer('actor_id').notNull().references(()=>users.id,{onDelete:'restrict'}),requestHash:text('request_hash').notNull(),sourceHash:text('source_hash').notNull(),
+  expectedRevision:bigint('expected_revision',{mode:'bigint'}).notNull(),modelId:text('model_id').notNull(),promptVersion:integer('prompt_version').notNull().default(1),
+  attemptNumber:integer('attempt_number').notNull(),state:text('state').notNull(),leaseToken:uuid('lease_token'),leaseDeadline:timestamp('lease_deadline',{withTimezone:true}),
+  result:jsonb('result'),closedCode:text('closed_code'),inputTokens:integer('input_tokens'),outputTokens:integer('output_tokens'),
+  createdAt:timestamp('created_at',{withTimezone:true}).notNull().defaultNow(),finishedAt:timestamp('finished_at',{withTimezone:true}),
+},t=>({scope:foreignKey({name:'jb_drafts_scope_fk',columns:[t.organizationId,t.jobId],foreignColumns:[jobBriefState.organizationId,jobBriefState.jobId]}).onDelete('restrict'),
+  attempt:unique('jb_drafts_attempt_uq').on(t.organizationId,t.jobId,t.sourceHash,t.attemptNumber),
+  lease:index('jb_drafts_lease_idx').on(t.state,t.leaseDeadline)}));
 
 // ATS: Pipeline stages
 export const pipelineStages = pgTable("pipeline_stages", {

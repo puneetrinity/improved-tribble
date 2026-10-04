@@ -12,10 +12,14 @@
  */
 
 import type { Express, Request, Response, NextFunction } from 'express';
+import { omitCanonicalJobSource } from '@shared/publicJob';
 import { z } from 'zod';
 import { sql, eq, and, desc, gte, inArray, or, isNull } from 'drizzle-orm';
 import { db } from './db';
 import { storage } from './storage';
+import { jobBriefEnabled } from './job-brief/contracts';
+import { transitionJob } from './job-brief/commands';
+import { BriefError, BriefRepository } from './job-brief/repository';
 import { requireRole } from './auth';
 import { mergeDuplicatePipelineStagesForOrg } from './lib/pipelineStageMerge';
 import {
@@ -68,7 +72,7 @@ export function registerAdminRoutes(
       );
 
       res.json({
-        jobs: result.jobs,
+        jobs: result.jobs.map(omitCanonicalJobSource),
         pagination: {
           page: parseInt(page as string),
           limit: parseInt(limit as string),
@@ -103,6 +107,18 @@ export function registerAdminRoutes(
         return;
       }
 
+      if(jobBriefEnabled()) {
+        const current=await storage.getJob(jobId);
+        if(!current?.organizationId) {res.status(404).json({code:'BRIEF_NOT_FOUND'});return;}
+        try {
+          res.json(await transitionJob(new BriefRepository(),{organizationId:current.organizationId,jobId,actorId:req.user!.id},req.user!.role,
+            {action:'moderate',requestId:req.body.requestId,status,...(reviewComments!==undefined?{reviewComments}:{})}));
+        } catch(error) {
+          const failure=error instanceof BriefError?error:new BriefError(error instanceof z.ZodError?'BRIEF_INVALID_COMMAND':'BRIEF_UNAVAILABLE',error instanceof z.ZodError?400:503);
+          res.status(failure.status).json({code:failure.code});
+        }
+        return;
+      }
       const job = await storage.reviewJob(jobId, status, reviewComments, req.user!.id);
 
       if (!job) {
@@ -132,14 +148,7 @@ export function registerAdminRoutes(
         return;
       }
 
-      const success = await storage.deleteJob(jobId);
-
-      if (!success) {
-        res.status(404).json({ error: "Job not found" });
-        return;
-      }
-
-      res.json({ message: "Job deleted successfully" });
+      res.status(409).json({code:'JOB_PERMANENT_DELETION_DISABLED',error:'Close the job instead. Applications and history must be retained.'});
       return;
     } catch (error) {
       next(error);
@@ -150,7 +159,7 @@ export function registerAdminRoutes(
   app.get("/api/admin/jobs/all", requireRole(['super_admin']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const jobs = await storage.getAllJobsWithDetails();
-      res.json(jobs);
+      res.json(jobs.map(omitCanonicalJobSource));
       return;
     } catch (error) {
       next(error);

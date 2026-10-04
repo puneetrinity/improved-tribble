@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "a1abb991b32ef564eb734c6b99e68c374edc22156a5655454c32c6b7fb788f32",
+  "source_census_sha256": "d2cad6594725bfb5fdb6477f0e81a87d83eea1ab43c3ddfa1ef852a06bcfa030",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/candidate-history/contracts.ts",
@@ -130,6 +130,7 @@
     { "file": "server/lib/outreachHygieneProcessor.ts", "classification": "excluded" },
     { "file": "server/lib/contactSendGuard.ts", "classification": "excluded" },
     { "file": "server/jobScheduler.ts", "classification": "excluded" },
+    { "file": "server/job-brief/commands.ts", "classification": "excluded" },
     { "file": "server/lib/backfillResumeText.ts", "classification": "excluded" },
     { "file": "server/lib/pipelineStageMerge.ts", "classification": "excluded" },
     { "file": "server/lib/outreachComplianceCore.ts", "classification": "excluded" },
@@ -1053,7 +1054,14 @@
       "file": "server/jobScheduler.ts",
       "symbol": "deactivateInactiveJobs",
       "reason": "Application aggregates only decide whether a job row may be archived; no candidate data or candidate count is returned or published.",
-      "anchors": ["hasRecentActivity", "hasUpcomingInterviews"]
+      "anchors": ["retireJobCycle", "deactivateInactiveJobs"]
+    },
+    {
+      "id": "locked-job-only-retirement-predicate",
+      "file": "server/job-brief/commands.ts",
+      "symbol": "retireJobCycle",
+      "reason": "A system-only transaction reads an application/interview existence predicate after locking the job. It returns only whether the job was retired, never candidate identity, content or counts; it does not authorize candidate access or change applications.",
+      "anchors": ["SELECT EXISTS(SELECT 1 FROM public.applications", "FOR UPDATE", "actor_kind"]
     },
     {
       "id": "retired-unsafe-resume-backfill",

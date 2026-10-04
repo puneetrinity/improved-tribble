@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useAuth } from '@/hooks/use-auth';
+import { changeJobPublication, readBriefCapability } from '@/lib/job-brief';
 import { cn } from "@/lib/utils";
 import { INTERNAL_PRIMARY_BUTTON } from "@/lib/internal-page-theme";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -34,6 +36,8 @@ type JobWithCounts = Job & {
 };
 
 export default function MyJobsPage() {
+  const {user}=useAuth();
+  const {data:briefCapability}=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,8 +63,8 @@ export default function MyJobsPage() {
   // Publish job mutation
   const publishJobMutation = useMutation({
     mutationFn: async ({ jobId, isActive }: { jobId: number; isActive: boolean }) => {
-      const res = await apiRequest("PATCH", `/api/jobs/${jobId}/status`, { isActive });
-      return await res.json();
+      if(!user) throw new Error('Sign in before publishing.');
+      return changeJobPublication(user.id,user.role,jobId,isActive,briefCapability?.jobBriefEnabled===true);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/my-jobs"] });

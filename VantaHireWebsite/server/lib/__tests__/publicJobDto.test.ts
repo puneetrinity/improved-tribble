@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { toPublicJob, toManagementJob, type PublicJobSource } from '@shared/publicJob';
+import { toPublicJob, toManagementJob, omitCanonicalJobSource, type PublicJobSource } from '@shared/publicJob';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -21,6 +21,9 @@ const source = {
 };
 
 describe('public job positive allowlist', () => {
+  it('removes canonical source/hash from raw internal rows',()=>{
+    expect(omitCanonicalJobSource({id:1,currentJD:'Private canonical',currentJDHash:'hash',title:'Title'})).toEqual({id:1,title:'Title'});
+  });
   it('publishes exactly 24 keys; no unknown keys or internal values escape', () => {
     const result = toPublicJob(source);
     expect(Object.keys(result).sort()).toEqual(keys);
@@ -53,7 +56,8 @@ describe('public job positive allowlist', () => {
       expect(text).toContain('/management`');
     }
     const ssr = readFileSync(resolve('server/vite.ts'), 'utf8');
-    expect(ssr).toContain('[JSON.stringify(["/api/jobs", param])]: toPublicJob(job)');
+    expect(ssr).toContain('[JSON.stringify(["/api/jobs", param])]: publicJob');
+    expect(ssr).toContain("toPublicJob(job,jobBriefEnabled()?'canonical':'legacy')");
   });
 });
 
