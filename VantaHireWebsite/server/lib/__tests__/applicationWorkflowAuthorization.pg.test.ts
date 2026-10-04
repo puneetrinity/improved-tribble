@@ -195,42 +195,27 @@ describe.skipIf(!enabled)("application workflow authorization exact-schema Postg
 
   beforeEach(async () => {
     if (!owner || !safeTargetProven) throw new Error("Disposable workflow target not proven.");
-    const hasCommittedEvidence = (await owner.query(
-      "SELECT EXISTS (SELECT 1 FROM public.decision_events LIMIT 1) present",
-    )).rows[0]?.present === true;
-    if (hasCommittedEvidence) {
-      // Keep committed event evidence immutable. Independent examples get a
-      // rebuilt disposable schema rather than a disabled trigger or a
-      // non-empty truncate.
-      await owner.end();
-      owner = undefined;
-      await resetDatabase();
-      const rebuilt = await runReleaseMigration({
-        migrationsDir,
-        creds: {
-          migrateUrl: migrationUrl,
-          expectedTargetId: targetId,
-          environment: "development",
-          allowFreshInitialization: true,
-        },
-        connect: connectMigration,
-      });
-      if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== currentTail) {
-        throw new Error("Disposable workflow per-test schema rebuild refused.");
-      }
-      await provisionRuntimeRole({
-        migrateUrl: migrationUrl,
-        runtimeUrl,
-        runtimeRole: new URL(runtimeUrl).username,
-        expectedTargetId: targetId,
-        connectMigration,
-        connectRuntime,
-      });
-      owner = await clientFor(migrationUrl);
+    // Fresh disposable schema: never truncate or disable immutable evidence.
+    await owner.end();
+    owner = undefined;
+    await resetDatabase();
+    const rebuilt = await runReleaseMigration({
+      migrationsDir,
+      creds: { migrateUrl: migrationUrl, expectedTargetId: targetId,
+        environment: "development", allowFreshInitialization: true },
+      connect: connectMigration,
+    });
+    if (rebuilt.applied.length !== currentLedger || rebuilt.applied.at(-1) !== currentTail) {
+      throw new Error("Disposable per-test schema rebuild refused.");
     }
-    await owner.query("TRUNCATE public.users, public.organizations RESTART IDENTITY CASCADE");
+    await provisionRuntimeRole({
+      migrateUrl: migrationUrl, runtimeUrl,
+      runtimeRole: new URL(runtimeUrl).username, expectedTargetId: targetId,
+      connectMigration, connectRuntime,
+    });
+    owner = await clientFor(migrationUrl);
     await installFixture();
-  });
+  }, 180_000);
 
   afterAll(async () => {
     if (runtimePool) await runtimePool.end();

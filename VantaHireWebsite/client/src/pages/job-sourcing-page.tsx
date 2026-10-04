@@ -1,6 +1,8 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { useParams } from "wouter";
+import { useQuery } from '@tanstack/react-query';
+import { readBriefCapability } from '@/lib/job-brief';
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
 import { Button } from "@/components/ui/button";
@@ -173,6 +175,8 @@ export default function JobSourcingPage() {
   const { data: status, isLoading: statusLoading, isPolling } = useSourcingStatus(jobId);
   const { data: candidatesData, isLoading: candidatesLoading } = useSourcedCandidates(jobId);
   const { trigger: findCandidatesBase, isPending: findPending } = useFindCandidates(jobId);
+  const {data:briefCapability}=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
+  const [briefSourcingNotice,setBriefSourcingNotice]=useState(false);
   const { update: updateState, isPending: updatePending } = useUpdateCandidateState(jobId);
   const { draftOutreach, isPending: draftingOutreach } = useDraftOutreach(jobId);
   const { sendOutreach, isPending: sendingOutreach } = useSendOutreach(jobId);
@@ -182,6 +186,7 @@ export default function JobSourcingPage() {
 
   // Open the progress modal first, then trigger sourcing
   const findCandidates = (opts: Record<string, unknown>) => {
+    if(briefCapability?.jobBriefEnabled===true) {setBriefSourcingNotice(true);return;}
     if (!opts.refresh) {
       openModal();
     }
@@ -484,6 +489,7 @@ export default function JobSourcingPage() {
 
   return (
     <Layout>
+      {briefSourcingNotice && <div role="status" className="container mx-auto px-4 py-3">Sourcing is not enabled for approved briefs yet. Your brief approval does not start a search.</div>}
       <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
         {/* Single job navigation, same placement as every other job page */}
         <JobSubNav jobId={jobId ?? 0} className="mb-4" />

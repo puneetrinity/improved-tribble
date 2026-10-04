@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { jobIntentRequest } from "@/lib/job-brief";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect, Link } from "wouter";
@@ -391,8 +392,7 @@ export default function AdminSuperDashboard() {
   // Update job status mutation
   const updateJobMutation = useMutation({
     mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
-      const res = await apiRequest("PATCH", `/api/jobs/${id}/status`, { isActive });
-      return res.json();
+      return jobIntentRequest(user!.id,id,'status',`/api/jobs/${id}/status`,{isActive});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs/all"] });
@@ -408,19 +408,19 @@ export default function AdminSuperDashboard() {
     },
   });
 
-  // Delete job mutation
+  // Close retains applications and decision evidence; never relabel a DELETE.
   const deleteJobMutation = useMutation({
     mutationFn: async (id: number) => {
-      await apiRequest("DELETE", `/api/admin/jobs/${id}`);
+      return jobIntentRequest(user!.id,id,'close',`/api/jobs/${id}/status`,{isActive:false,reason:'manual'});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs/all"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
-      toast({ title: "Job deleted successfully" });
+      toast({ title: "Job closed; applications and history retained" });
     },
     onError: (error: Error) => {
       toast({
-        title: "Failed to delete job",
+        title: "Failed to close job",
         description: error.message,
         variant: "destructive",
       });
@@ -430,8 +430,7 @@ export default function AdminSuperDashboard() {
   // Review job mutation (approve/decline)
   const reviewJobMutation = useMutation({
     mutationFn: async ({ id, status, comments }: { id: number; status: string; comments?: string }) => {
-      const res = await apiRequest("PATCH", `/api/admin/jobs/${id}/review`, { status, reviewComments: comments });
-      return res.json();
+      return jobIntentRequest(user!.id,id,'moderate',`/api/admin/jobs/${id}/review`,{status,reviewComments:comments});
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/jobs/all"] });
@@ -1606,9 +1605,9 @@ export default function AdminSuperDashboard() {
                               </AlertDialogTrigger>
                               <AlertDialogContent className="bg-card border-border">
                                 <AlertDialogHeader>
-                                  <AlertDialogTitle className="text-foreground">Delete Job</AlertDialogTitle>
+                                  <AlertDialogTitle className="text-foreground">Close Job</AlertDialogTitle>
                                   <AlertDialogDescription className="text-foreground/70">
-                                    Are you sure you want to delete "{job.title}"? This action cannot be undone and will remove all associated applications.
+                                    Close "{job.title}"? It will no longer be active. All applications and decision history will be retained.
                                   </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -1617,7 +1616,7 @@ export default function AdminSuperDashboard() {
                                     onClick={() => deleteJobMutation.mutate(job.id)}
                                     className="bg-destructive hover:bg-destructive/80"
                                   >
-                                    Delete
+                                    Close job
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>

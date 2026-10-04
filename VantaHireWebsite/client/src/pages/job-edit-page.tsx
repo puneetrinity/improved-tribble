@@ -22,6 +22,8 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { PageHeaderSkeleton } from "@/components/skeletons";
 import { CoRecruiterManagement } from "@/components/CoRecruiterManagement";
 import { jobEditPageCopy } from "@/lib/internal-copy";
+import { JobBriefPanel } from '@/components/job-brief-panel';
+import { jobIntentRequest, readBriefCapability, useJobBrief } from '@/lib/job-brief';
 
 const MIN_DESCRIPTION_WORDS = 200;
 const countWords = (value: string): number =>
@@ -58,6 +60,10 @@ export default function JobEditPage() {
   const descriptionWordsRemaining = Math.max(0, MIN_DESCRIPTION_WORDS - descriptionWordCount);
 
   const jobId = params?.id ? parseInt(params.id) : null;
+  const capability=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
+  const briefEnabled=capability.data?.jobBriefEnabled===true;
+  const brief=useJobBrief(jobId,user?.id,briefEnabled && user?.role==='recruiter');
+  const [editReason,setEditReason]=useState('role_scope_changed');
 
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 200);
@@ -106,7 +112,7 @@ export default function JobEditPage() {
     if (job) {
       setFormData({
         title: job.title,
-        description: job.description,
+        description: briefEnabled?(brief.data?.currentJD??''):job.description,
         location: job.location,
         type: job.type,
         skills: job.skills || [],
@@ -120,15 +126,22 @@ export default function JobEditPage() {
       setHiringManagerId(job.hiringManagerId ? String(job.hiringManagerId) : "");
       setClientId(job.clientId ? String(job.clientId) : "");
     }
-  }, [job]);
+  }, [job,briefEnabled,brief.data?.currentJD]);
 
   const updateJobMutation = useMutation({
     mutationFn: async (data: Partial<Job>) => {
+      if(briefEnabled) {
+        if(!brief.data || user.role!=='recruiter') throw new Error('A seated recruiter on this job must edit the brief.');
+        const {description,...patch}=data;
+        return jobIntentRequest(user.id,jobId!,'edit-job',`/api/jobs/${jobId}`,{...patch,currentJD:description,
+          sourceChoice:'recruiter_edit',requesterKind:'recruiter',reasonCode:editReason,expectedRevision:Number(brief.data.revision)});
+      }
       const res = await apiRequest("PATCH", `/api/jobs/${jobId}`, data);
       return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["job-management", user.id, jobId] });
+      queryClient.invalidateQueries({ queryKey: ['job-brief',user.id,jobId] });
       queryClient.invalidateQueries({ queryKey: ["/api/jobs", jobId] });
       queryClient.invalidateQueries({ queryKey: ["/api/my-jobs"] });
       toast({
@@ -243,6 +256,12 @@ export default function JobEditPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
+                {briefEnabled && <label className="block">Why are the requirements changing?
+                  <select aria-label="Job edit reason" value={editReason} onChange={e=>setEditReason(e.target.value)}>
+                    <option value="role_scope_changed">Role scope changed</option><option value="clarification_typo">Clarification / typo</option>
+                    <option value="hm_client_feedback">Hiring manager / client feedback</option><option value="other">Other</option>
+                  </select>
+                </label>}
                 <div className="space-y-2">
                   <Label htmlFor="title">Job Title</Label>
                   <Input
@@ -577,7 +596,7 @@ export default function JobEditPage() {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button type="submit" disabled={updateJobMutation.isPending}>
+                  <Button type="submit" disabled={updateJobMutation.isPending || capability.isPending || (briefEnabled && (!brief.data || user.role!=='recruiter'))}>
                     <Save className="h-4 w-4 mr-2" />
                     {updateJobMutation.isPending ? "Saving..." : "Save Changes"}
                   </Button>
@@ -586,6 +605,8 @@ export default function JobEditPage() {
             </CardContent>
           </Card>
 
+          {briefEnabled && user.role==='recruiter' && <JobBriefPanel jobId={jobId!} actorId={user.id}/>}
+          {briefEnabled && user.role!=='recruiter' && <p>A seated recruiter assigned to this job must edit and approve its brief. Admin moderation remains separate.</p>}
           {/* Co-Recruiter Management */}
           <CoRecruiterManagement jobId={jobId!} className="shadow-sm" />
         </div>

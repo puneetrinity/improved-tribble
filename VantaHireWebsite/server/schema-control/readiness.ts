@@ -11,6 +11,57 @@ import { readApplied, readIdentity, readRunHealth, type PgLike } from "./ledger"
 import { SYSTEM, safeTargetFingerprint, type ResolvedEnvironment } from "./targetIdentity";
 import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
   CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
+import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
+
+export const BRIEF_TRIGGER_FUNCTIONS=['flow_job_brief_immutable()','flow_lock_job_application_activity()'] as const;
+export const BRIEF_CATALOG_SHA256='192131490cf2163b865357cb386cc2a6b07833191dc862ea8ec2f1d7aafd016a';
+export const BRIEF_CATALOG_SQL=`WITH relations AS (
+ SELECT c.oid,c.relname,c.relowner,c.relrowsecurity,c.relforcerowsecurity
+ FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname='public' AND c.relname LIKE 'job_brief_%' AND c.relkind IN ('r','p')
+), functions AS (
+ SELECT p.* FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+ WHERE n.nspname='public' AND (p.proname LIKE 'flow_job_brief_%' OR p.proname='flow_lock_job_application_activity')
+), facts AS (SELECT jsonb_build_object(
+ 'tables',(SELECT jsonb_agg(jsonb_build_array(relname,relrowsecurity,relforcerowsecurity,relowner=(SELECT relowner FROM pg_class WHERE oid='public.jobs'::regclass)) ORDER BY relname) FROM relations),
+ 'columns',(SELECT jsonb_agg(jsonb_build_array(c.relname,a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,pg_get_expr(d.adbin,d.adrelid)) ORDER BY c.relname,a.attnum)
+   FROM pg_class c JOIN pg_attribute a ON a.attrelid=c.oid LEFT JOIN pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum
+   WHERE a.attnum>0 AND NOT a.attisdropped AND (c.oid IN(SELECT oid FROM relations) OR
+     (c.oid='public.jobs'::regclass AND a.attname IN ('current_jd','current_jd_hash')) OR
+     (c.oid='public.job_audit_log'::regclass AND a.attname IN ('actor_kind','performed_by')))),
+ 'constraints',(SELECT jsonb_agg(jsonb_build_array(c.conname,pg_get_constraintdef(c.oid),c.convalidated,c.condeferrable,c.condeferred) ORDER BY c.conname)
+   FROM pg_constraint c WHERE c.conrelid IN(SELECT oid FROM relations) OR
+    (c.conrelid='public.jobs'::regclass AND c.conname='jobs_current_jd_pair_ck') OR
+    (c.conrelid='public.job_audit_log'::regclass AND c.conname='job_audit_actor_ck')),
+ 'indexes',(SELECT jsonb_agg(jsonb_build_array(pg_get_indexdef(i.indexrelid),i.indisvalid,i.indisready) ORDER BY i.indexrelid::regclass::text)
+   FROM pg_index i WHERE i.indrelid IN(SELECT oid FROM relations)),
+ 'triggers',(SELECT jsonb_agg(jsonb_build_array(t.tgname,pg_get_triggerdef(t.oid),t.tgenabled) ORDER BY t.tgname)
+   FROM pg_trigger t WHERE NOT t.tgisinternal AND (t.tgrelid IN(SELECT oid FROM relations) OR
+     (t.tgrelid='public.applications'::regclass AND t.tgname IN ('job_activity_before_insert','job_activity_before_update')))),
+ 'functions',(SELECT jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,pg_get_functiondef(p.oid),p.proowner=(SELECT relowner FROM pg_class WHERE oid='public.jobs'::regclass)) ORDER BY p.oid::regprocedure::text) FROM functions p)
+ ) value) SELECT encode(sha256(convert_to(value::text,'UTF8')),'hex') digest FROM facts`;
+
+export async function jobBriefPrivilegesReady(pg:PgLike,role:string,required:boolean):Promise<boolean> {
+  const presence=await pg.query(`SELECT
+    (SELECT count(*)::integer FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) tables,
+    (SELECT count(*)::integer FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) functions`,[[...BRIEF_TABLES],[...BRIEF_FUNCTIONS,...BRIEF_TRIGGER_FUNCTIONS]]);
+  const p=presence.rows[0];
+  if(!p) return false;
+  if(p.tables===0 && p.functions===0) return !required;
+  if(p.tables!==4 || p.functions!==8) return false;
+  if((await pg.query(BRIEF_CATALOG_SQL)).rows[0]?.digest!==BRIEF_CATALOG_SHA256) return false;
+  const rights=await pg.query(`SELECT
+    NOT EXISTS(SELECT 1 FROM unnest($2::text[]) n CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) privilege
+      WHERE has_table_privilege($1,'public.'||n,privilege))
+    AND NOT EXISTS(SELECT 1 FROM unnest($2::text[]) n CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) privilege
+      WHERE has_any_column_privilege($1,'public.'||n,privilege))
+    AND NOT EXISTS(SELECT 1 FROM unnest($3::text[]) n WHERE NOT has_function_privilege($1,n,'EXECUTE'))
+    AND NOT EXISTS(SELECT 1 FROM unnest($4::text[]) n WHERE has_function_privilege($1,n,'EXECUTE'))
+    AND NOT EXISTS(SELECT 1 FROM unnest($3::text[]||$4::text[]) n JOIN pg_proc p ON p.oid=to_regprocedure(n)
+      CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee=0 OR (a.grantee<>p.proowner AND a.is_grantable))
+    AS ok`,[role,[...BRIEF_TABLES],[...BRIEF_FUNCTIONS],[...BRIEF_TRIGGER_FUNCTIONS]]);
+  return rights.rows[0]?.ok===true;
+}
 
 export class SchemaNotReadyError extends Error {}
 
@@ -316,6 +367,13 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
     async check(pg) {
       const who = await pg.query("SELECT current_user AS role");
       return candidateIndexPrivilegesReady(pg, who.rows[0]?.role, true);
+    },
+  },
+  {
+    name:'Job brief authority, immutable history and application locks are exact',
+    async check(pg) {
+      const who=await pg.query('SELECT current_user AS role');
+      return jobBriefPrivilegesReady(pg,who.rows[0]?.role,true);
     },
   },
   {
@@ -649,7 +707,8 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                      'organization_candidate_references','application_resume_versions',
                      'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
                      'candidate_consent_events','candidate_consent_outbox',
-                     'candidate_index_outbox','candidate_index_delivery_state'
+                     'candidate_index_outbox','candidate_index_delivery_state',
+                     'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests'
                    )
                    AND has_table_privilege(current_user, c.oid, 'SELECT')
                    AND has_table_privilege(current_user, c.oid, 'INSERT')
@@ -661,7 +720,8 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  )
                  OR c.relname IN ('candidate_consent_subjects','candidate_consent_sources',
                    'candidate_consent_events','candidate_consent_outbox',
-                   'candidate_index_outbox','candidate_index_delivery_state')
+                   'candidate_index_outbox','candidate_index_delivery_state',
+                   'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests')
                  -- Exact consent table/column privileges are a separate mandatory postcondition above.
                )
           )
@@ -691,7 +751,7 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
              WHERE n.nspname = 'public'
                AND (
                  pg_has_role(current_user, pg_get_userbyid(p.proowner), 'MEMBER')
-                 OR (p.proname<>'flow_candidate_index_evidence_guard'
+                 OR (p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity')
                    AND NOT has_function_privilege(current_user, p.oid, 'EXECUTE'))
                )
           ) AS ok

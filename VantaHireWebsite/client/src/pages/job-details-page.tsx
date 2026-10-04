@@ -12,6 +12,7 @@ import { fetchWithCsrf } from "@/lib/csrf";
 import { z } from "zod";
 import { differenceInDays, format } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
+import { changeJobPublication, readBriefCapability } from '@/lib/job-brief';
 import { DEFAULT_SITE_URL, generateJobPostingJsonLd, generateJobMetaDescription, getJobCanonicalUrl } from "@/lib/seoHelpers";
 import HomepageNav from "@/components/HomepageNav";
 import HomepageFooter from "@/components/HomepageFooter";
@@ -83,6 +84,7 @@ export default function JobDetailsPage() {
   const outreachAttributionToken = new URLSearchParams(search).get("outreach");
   const { toast } = useToast();
   const { user } = useAuth();
+  const {data:briefCapability}=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
   const candidateJobState = useCandidateJobState();
   const [showApplicationForm, setShowApplicationForm] = useState(false);
   const [formData, setFormData] = useState(createEmptyApplicationForm);
@@ -235,6 +237,10 @@ export default function JobDetailsPage() {
   // Job reactivation mutation
   const reactivateMutation = useMutation({
     mutationFn: async () => {
+      if(briefCapability?.jobBriefEnabled===true) {
+        if(!user || !job) throw new Error('Sign in before publishing.');
+        return changeJobPublication(user.id,user.role,job.id,true,true);
+      }
       const res = await apiRequest("PATCH", `/api/jobs/${job?.id}/status`, { isActive: true, reason: "Reactivated from job details page" });
       return res.json();
     },

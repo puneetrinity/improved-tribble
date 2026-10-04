@@ -52,7 +52,13 @@ function prose(input: unknown): string | null {
   return Array.from(value).slice(0, MAX_TEXT).join('');
 }
 
-export function resolveJobDescription(job: { description?: unknown; originalJD?: unknown }) {
+export type JobDescriptionSource = {description?:unknown;originalJD?:unknown;currentJD?:unknown};
+export type JobDescriptionMode = 'legacy' | 'canonical';
+export function resolveJobDescription(job: JobDescriptionSource, mode:JobDescriptionMode='legacy') {
+  if (mode==='canonical' && job.currentJD!==null && job.currentJD!==undefined) {
+    const current=prose(job.currentJD);
+    return current?{text:current,resolution:'current_prose' as const}:{text:'',resolution:'unavailable' as const};
+  }
   const original = prose(job.originalJD);
   const description = prose(job.description);
   if (original) return {
@@ -63,12 +69,12 @@ export function resolveJobDescription(job: { description?: unknown; originalJD?:
   return { text: '', resolution: 'unavailable' as const };
 }
 
-export function publicJobDescription(job: { description?: unknown; originalJD?: unknown }): string {
-  return resolveJobDescription(job).text || JOB_DESCRIPTION_UNAVAILABLE;
+export function publicJobDescription(job: JobDescriptionSource,mode:JobDescriptionMode='legacy'): string {
+  return resolveJobDescription(job,mode).text || JOB_DESCRIPTION_UNAVAILABLE;
 }
 
-export function jobMetaDescription(job: { title: string; location?: string | null; description?: unknown; originalJD?: unknown }): string {
-  const text = `Apply for ${job.title} at ${job.location || 'the advertised location'}. ${resolveJobDescription(job).text}`
+export function jobMetaDescription(job: JobDescriptionSource & { title: string; location?: string | null }, mode:JobDescriptionMode='legacy'): string {
+  const text = `Apply for ${job.title} at ${job.location || 'the advertised location'}. ${resolveJobDescription(job,mode).text}`
     .replace(/\s+/g, ' ').trim();
   const chars = Array.from(text);
   return chars.length > 155 ? chars.slice(0, 152).join('') + '...' : text;

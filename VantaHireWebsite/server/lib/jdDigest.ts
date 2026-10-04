@@ -14,6 +14,27 @@
 
 import { getGroqClient } from './groqClient';
 import { getGroqModel } from './aiModelConfig';
+import { currentJdSchema, jobBriefEnabled } from '../job-brief/contracts';
+
+export function digestSource(job:{currentJD?:string|null;originalJD?:string|null;description:string},enabled=jobBriefEnabled()):string {
+  if(!enabled) return job.originalJD || job.description;
+  const parsed=currentJdSchema.safeParse(job.currentJD);
+  if(!parsed.success) throw new Error('BRIEF_SOURCE_REQUIRED');
+  return parsed.data;
+}
+/** The worker has no web activation flag: persisted canonical state is authoritative. */
+export function workerDigestSource(job:{currentJD?:string|null;originalJD?:string|null;description:string}):string {
+  return digestSource(job,job.currentJD!==null && job.currentJD!==undefined);
+}
+export async function persistWorkerDigest(
+  pg:{query:(text:string,params:any[])=>Promise<{rows:any[]}>},
+  job:{id:number;currentJDHash:string|null;title:string;location:string},digest:JDDigest,
+):Promise<boolean> {
+  const result=await pg.query(`UPDATE public.jobs SET jd_digest=$1::jsonb,jd_digest_version=$2
+    WHERE id=$3 AND current_jd_hash IS NOT DISTINCT FROM $4 AND title=$5 AND location=$6 RETURNING id`,
+    [JSON.stringify(digest),digest.version,job.id,job.currentJDHash,job.title,job.location]);
+  return result.rows.length===1;
+}
 import { JDDigestResponseSchema, safeParseAiResponse } from './aiResponseSchemas';
 
 // v3: adds relaxation-ladder adjacency. Bumping the version triggers background

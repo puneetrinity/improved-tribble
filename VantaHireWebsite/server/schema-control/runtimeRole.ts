@@ -8,7 +8,8 @@
 import type { PgLike } from "./ledger";
 import { CANDIDATE_CONSENT_TABLES, CANDIDATE_CONSENT_FUNCTIONS, CANDIDATE_CONSENT_UPDATE_COLUMNS,
   candidateConsentPrivilegesReady, candidateIndexPrivilegesReady,
-  candidateHistoryPrivilegesReady, CANDIDATE_HISTORY_FUNCTION } from "./readiness";
+  candidateHistoryPrivilegesReady, CANDIDATE_HISTORY_FUNCTION, jobBriefPrivilegesReady, BRIEF_TRIGGER_FUNCTIONS } from "./readiness";
+import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
 import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
   CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
 import { DEFAULT_LOCK_KEY, type MigrationClient } from "./runner";
@@ -273,7 +274,8 @@ export async function assertRuntimeRoleContract(
                   'organization_candidate_references','application_resume_versions',
                   'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
                   'candidate_consent_events','candidate_consent_outbox',
-                  'candidate_index_outbox','candidate_index_delivery_state'
+                  'candidate_index_outbox','candidate_index_delivery_state',
+                  'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests'
                 )
                 AND has_table_privilege($1,c.oid,'SELECT')
                 AND has_table_privilege($1,c.oid,'INSERT')
@@ -285,7 +287,8 @@ export async function assertRuntimeRoleContract(
               )
               OR c.relname IN ('candidate_consent_subjects','candidate_consent_sources',
                 'candidate_consent_events','candidate_consent_outbox',
-                'candidate_index_outbox','candidate_index_delivery_state')
+                'candidate_index_outbox','candidate_index_delivery_state',
+                'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests')
               -- Separately asserted below, including effective per-column rights.
             )
        )
@@ -318,7 +321,7 @@ export async function assertRuntimeRoleContract(
        )
        AND NOT EXISTS (
          SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
-          WHERE n.nspname='public' AND p.proname<>'flow_candidate_index_evidence_guard'
+          WHERE n.nspname='public' AND p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity')
             AND NOT has_function_privilege($1,p.oid,'EXECUTE')
        )
        AND (
@@ -360,6 +363,9 @@ export async function assertRuntimeRoleContract(
     throw new RuntimeRoleProvisionError("Candidate index runtime authority is incomplete or excessive.");
   }
   await assertDefaultPrivileges(pg, role, controlPlaneRequired);
+  if (!(await jobBriefPrivilegesReady(pg,role,false))) {
+    throw new RuntimeRoleProvisionError('Job brief runtime authority contract is invalid.');
+  }
   if (!(await candidateHistoryPrivilegesReady(pg, role, false))) {
     throw new RuntimeRoleProvisionError("Candidate history read authority is incomplete or excessive.");
   }
@@ -612,6 +618,24 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
       if (history.routine) {
         await migration.query(`REVOKE ALL PRIVILEGES ON FUNCTION ${CANDIDATE_HISTORY_FUNCTION} FROM ${ident},PUBLIC`);
         await migration.query(`GRANT EXECUTE ON FUNCTION ${CANDIDATE_HISTORY_FUNCTION} TO ${ident}`);
+      }
+
+      const briefPresence=await migration.query(`SELECT
+        (SELECT count(*)::integer FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) tables,
+        (SELECT count(*)::integer FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) functions`,[[...BRIEF_TABLES],[...BRIEF_FUNCTIONS,...BRIEF_TRIGGER_FUNCTIONS]]);
+      const brief=briefPresence.rows[0];
+      if(!brief || !((brief.tables===0 && brief.functions===0)||(brief.tables===4 && brief.functions===8))) {
+        throw new RuntimeRoleProvisionError('Job brief catalog is incomplete.');
+      }
+      if(brief.tables===4) {
+        for(const table of BRIEF_TABLES) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON TABLE public.${table} FROM ${ident},PUBLIC`);
+          const columns=await migration.query('SELECT attname FROM pg_attribute WHERE attrelid=to_regclass($1) AND attnum>0 AND NOT attisdropped',[`public.${table}`]);
+          const names=columns.rows.map((r:any)=>quoteIdentifier(r.attname)).join(',');
+          await migration.query(`REVOKE SELECT(${names}),INSERT(${names}),UPDATE(${names}),REFERENCES(${names}) ON public.${table} FROM ${ident},PUBLIC`);
+        }
+        for(const signature of [...BRIEF_FUNCTIONS,...BRIEF_TRIGGER_FUNCTIONS]) await migration.query(`REVOKE ALL ON FUNCTION ${signature} FROM ${ident},PUBLIC`);
+        for(const signature of BRIEF_FUNCTIONS) await migration.query(`GRANT EXECUTE ON FUNCTION ${signature} TO ${ident}`);
       }
 
       controlPlanePresent = Boolean(

@@ -2,6 +2,7 @@ import { clients, jobs, users, userProfiles } from '@shared/schema';
 import { toManagementJob, type ManagementJob, type PublicJobSource } from '@shared/publicJob';
 import { and, eq, sql } from 'drizzle-orm';
 import { db } from '../db';
+import { jobBriefEnabled } from '../job-brief/contracts';
 
 export function parseManagementJobId(value: string): number | null {
   if (!/^[1-9][0-9]*$/.test(value)) return null;
@@ -19,7 +20,7 @@ export async function readManagementJob(actorId: number, jobId: number): Promise
   try {
     const rows = await db.select({
       id: jobs.id, title: jobs.title, location: jobs.location, type: jobs.type,
-      description: jobs.description, originalJD: jobs.originalJD, skills: jobs.skills,
+      description: jobs.description, originalJD: jobs.originalJD, currentJD:jobs.currentJD, skills: jobs.skills,
       goodToHaveSkills: jobs.goodToHaveSkills, educationRequirement: jobs.educationRequirement,
       experienceYears: jobs.experienceYears, salaryMin: jobs.salaryMin, salaryMax: jobs.salaryMax,
       salaryPeriod: jobs.salaryPeriod, deadline: jobs.deadline, createdAt: jobs.createdAt,
@@ -54,7 +55,7 @@ export async function readManagementJob(actorId: number, jobId: number): Promise
     if (rows.length === 0) return { ok: false, reason: 'not_found' };
     if (rows.length !== 1) return { ok: false, reason: 'unavailable' };
     return { ok: true, job: toManagementJob(rows[0] as PublicJobSource & Pick<ManagementJob,
-      'organizationId' | 'hiringManagerId' | 'clientId'>) };
+      'organizationId' | 'hiringManagerId' | 'clientId'>,jobBriefEnabled()?'canonical':'legacy') };
   } catch {
     return { ok: false, reason: 'unavailable' };
   }

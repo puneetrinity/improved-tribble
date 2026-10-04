@@ -19,7 +19,8 @@ import { eq, and, inArray, sql, desc, count } from 'drizzle-orm';
 import { upload, uploadToGCS, downloadFromGCS } from './gcs-storage';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
 import { extractResumeForOrdinaryIngest } from './lib/resumeIngestExtraction';
-import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
+import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION, digestSource } from './lib/jdDigest';
+import { jobBriefEnabled, sourceHash } from './job-brief/contracts';
 import { computeFitScore, isFitStale, getStalenessReason } from './lib/aiMatchingEngine';
 import {
   finalizeFitCredit,
@@ -725,7 +726,7 @@ export function registerAIRoutes(app: Express): void {
         let jdDigest: JDDigest = application.job.jdDigest as JDDigest;
 
         if (!jdDigest || !application.job.jdDigestVersion || application.job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-          jdDigest = await generateJDDigest(application.job.title, application.job.originalJD || application.job.description, { location: application.job.location });
+          jdDigest = await generateJDDigest(application.job.title, digestSource(application.job), { location: application.job.location });
 
           // Cache digest
           await db
@@ -734,7 +735,7 @@ export function registerAIRoutes(app: Express): void {
               jdDigest,
               jdDigestVersion: jdDigest.version,
             })
-            .where(eq(jobs.id, application.job.id));
+            .where(and(eq(jobs.id, application.job.id), jobBriefEnabled()?eq(jobs.currentJDHash,sourceHash(digestSource(application.job))):undefined));
         }
 
         // Reserve only after cache/resume/digest work. The reservation is the
@@ -1018,7 +1019,7 @@ export function registerAIRoutes(app: Express): void {
             let jdDigest: JDDigest = app.job.jdDigest as JDDigest;
 
             if (!jdDigest || !app.job.jdDigestVersion || app.job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-              jdDigest = await generateJDDigest(app.job.title, app.job.originalJD || app.job.description, { location: app.job.location });
+              jdDigest = await generateJDDigest(app.job.title, digestSource(app.job), { location: app.job.location });
 
               await db
                 .update(jobs)
@@ -1026,7 +1027,7 @@ export function registerAIRoutes(app: Express): void {
                   jdDigest,
                   jdDigestVersion: jdDigest.version,
                 })
-                .where(eq(jobs.id, app.job.id));
+                .where(and(eq(jobs.id, app.job.id), jobBriefEnabled()?eq(jobs.currentJDHash,sourceHash(digestSource(app.job))):undefined));
             }
 
             const reservationResult = await reserveFitCredit(

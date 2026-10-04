@@ -434,12 +434,12 @@ describe.skipIf(!enabled)("candidate index delivery PostgreSQL authority", () =>
           expect((await release(base)).applied).toHaveLength(12);
           await reconcile();
         }
-        expect((await release()).applied).toEqual(upgrade ? ["0012", "0013"] : loadManifest(migrations).map(entry => entry.version));
+        expect((await release()).applied).toEqual(loadManifest(migrations).filter(entry => !upgrade || Number(entry.version) >= 12).map(entry => entry.version));
         await expect(ready()).rejects.toThrow();
         await expect(reconcile()).resolves.toEqual({ controlPlaneReady: true });
-        await expect(ready()).resolves.toEqual({ version: "0013", applied: 14 });
+        await expect(ready()).resolves.toEqual({ version: loadManifest(migrations).at(-1)!.version, applied: loadManifest(migrations).length });
         expect((await release()).applied).toEqual([]);
-        await expect(ready()).resolves.toEqual({ version: "0013", applied: 14 });
+        await expect(ready()).resolves.toEqual({ version: loadManifest(migrations).at(-1)!.version, applied: loadManifest(migrations).length });
         expect((await owner.query("SELECT count(*)::int n FROM candidate_index_outbox")).rows[0].n).toBe(0);
         expect((await owner.query("SELECT count(*)::int n FROM users")).rows[0].n).toBe(0);
       }

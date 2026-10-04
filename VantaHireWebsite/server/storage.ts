@@ -1,5 +1,6 @@
 import slugify from 'slugify';
 import { publicJobDescription } from '@shared/jobDescription';
+import { currentJdSchema, jobBriefEnabled, sourceHash } from './job-brief/contracts';
 import { publicJobPagination } from './lib/publicJobPagination';
 import { randomUUID } from 'node:crypto';
 import {
@@ -942,6 +943,7 @@ export class DatabaseStorage implements IStorage {
 
   // Job methods
   async createJob(job: InsertJob & { postedBy: number; organizationId: number }): Promise<Job> {
+    if(jobBriefEnabled() && job.experienceYearsMax!=null) throw new Error('BRIEF_EXPERIENCE_MAXIMUM_REFUSED');
     // Generate base slug from title
     const baseSlug = slugify(job.title, {
       lower: true,
@@ -952,6 +954,7 @@ export class DatabaseStorage implements IStorage {
     // Insert with temporary slug, then update with unique slug using job ID
     const jobData = {
       ...job,
+      ...(jobBriefEnabled()?{currentJD:currentJdSchema.parse(job.originalJD),currentJDHash:sourceHash(currentJdSchema.parse(job.originalJD)),isActive:false,status:'pending'}:{}),
       slug: baseSlug, // Temporary, will be updated
       deadline: job.deadline ? job.deadline.toISOString().split('T')[0] : null
     };
@@ -1179,6 +1182,7 @@ export class DatabaseStorage implements IStorage {
   }
   
   async updateJobStatus(id: number, isActive: boolean, reason?: string, performedBy?: number): Promise<Job | undefined> {
+    if(jobBriefEnabled()) throw new Error('BRIEF_COMMAND_REQUIRED');
     // Get current job state
     const currentJob = await this.getJob(id);
     if (!currentJob) return undefined;
@@ -1199,6 +1203,7 @@ export class DatabaseStorage implements IStorage {
       // Reactivating job
       updates.reactivatedAt = now;
       updates.reactivationCount = (currentJob.reactivationCount || 0) + 1;
+      updates.warningEmailSent = false;
       updates.deactivationReason = null; // Clear reason on reactivation
     }
 
@@ -1240,6 +1245,7 @@ export class DatabaseStorage implements IStorage {
     id: number,
     updates: Partial<Pick<Job, 'title' | 'description' | 'location' | 'type' | 'skills' | 'hiringManagerId' | 'clientId' | 'jdDigest' | 'jdDigestVersion'>>
   ): Promise<Job | undefined> {
+    if(jobBriefEnabled()) throw new Error('BRIEF_COMMAND_REQUIRED');
     const currentJob = await this.getJob(id);
     if (!currentJob) return undefined;
 
@@ -1460,6 +1466,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reviewJob(id: number, status: string, reviewComments?: string, reviewedBy?: number): Promise<Job | undefined> {
+    if(jobBriefEnabled()) throw new Error('BRIEF_COMMAND_REQUIRED');
     // Get current job state to track lifecycle transitions
     const currentJob = await this.getJob(id);
     if (!currentJob) return undefined;
@@ -1478,6 +1485,7 @@ export class DatabaseStorage implements IStorage {
     if (status === 'approved' && !currentJob.isActive) {
       updates.reactivatedAt = now;
       updates.reactivationCount = (currentJob.reactivationCount || 0) + 1;
+      updates.warningEmailSent = false;
       updates.deactivationReason = null; // Clear reason on approval/reactivation
     }
 
@@ -1824,6 +1832,7 @@ export class DatabaseStorage implements IStorage {
         jobId: applications.jobId,
         userId: applications.userId,
         jobDescriptionOriginal: jobs.originalJD,
+        jobDescriptionCurrent: jobs.currentJD,
         aiFitScore: applications.aiFitScore,
         aiFitLabel: applications.aiFitLabel,
         aiFitReasons: applications.aiFitReasons,
@@ -1851,9 +1860,9 @@ export class DatabaseStorage implements IStorage {
       .where(and(whereClause, applicationPrivacyAllowed(false)))
       .orderBy(desc(applications.appliedAt));
 
-    return results.map(({ jobDescriptionOriginal, ...result }: any) => ({
+    return results.map(({ jobDescriptionOriginal, jobDescriptionCurrent, ...result }: any) => ({
       ...result,
-      job: { ...result.job, description: publicJobDescription({ ...result.job, originalJD: jobDescriptionOriginal }) }
+      job: { ...result.job, description: publicJobDescription({ ...result.job, originalJD: jobDescriptionOriginal,currentJD:jobDescriptionCurrent },jobBriefEnabled()?'canonical':'legacy') }
     }));
   }
 
@@ -2339,13 +2348,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteJob(jobId: number): Promise<boolean> {
-    // First delete all applications for this job
-    await db.delete(applications).where(eq(applications.jobId, jobId));
-
-    // Then delete the job itself
-    const result = await db.delete(jobs).where(eq(jobs.id, jobId));
-
-    return (result.rowCount || 0) > 0;
+    // Containment is unconditional, including legacy jobs and feature-off mode.
+    throw new Error('JOB_PERMANENT_DELETION_DISABLED');
   }
 
   // Job analytics methods

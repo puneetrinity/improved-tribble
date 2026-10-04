@@ -1,5 +1,11 @@
 import type { Job } from './schema';
-import { publicJobDescription } from './jobDescription';
+import { publicJobDescription, type JobDescriptionMode } from './jobDescription';
+
+/** Canonical source belongs to the brief-authorized read, not raw-row lists. */
+export function omitCanonicalJobSource<T extends object>(job:T):Omit<T,'currentJD'|'currentJDHash'> {
+  const {currentJD:_jd,currentJDHash:_hash,...rest}=job as T & {currentJD?:unknown;currentJDHash?:unknown};
+  return rest;
+}
 
 type PostingFields = Pick<Job,
   'id' | 'title' | 'location' | 'type' | 'description' | 'skills' |
@@ -23,6 +29,7 @@ export interface ManagementJob extends PublicJob {
 
 export type PublicJobSource = PostingFields & {
   originalJD?: string | null;
+  currentJD?: string | null;
   postedByName?: string | null;
   postedById?: string | number | null;
   isRecruiterProfilePublic?: boolean;
@@ -34,12 +41,12 @@ export type PublicJobSource = PostingFields & {
 };
 
 /** Positive allowlist: new storage columns never become public by accident. */
-export function toPublicJob(job: PublicJobSource): PublicJob {
+export function toPublicJob(job: PublicJobSource,mode:JobDescriptionMode='legacy'): PublicJob {
   const profilePublic = job.recruiter?.isProfilePublic ?? job.isRecruiterProfilePublic ?? false;
   const profileId = job.recruiter?.publicId ?? job.postedById;
   return {
     id: job.id, title: job.title, location: job.location, type: job.type,
-    description: publicJobDescription(job), skills: job.skills,
+    description: publicJobDescription(job,mode), skills: job.skills,
     goodToHaveSkills: job.goodToHaveSkills, educationRequirement: job.educationRequirement,
     experienceYears: job.experienceYears, salaryMin: job.salaryMin, salaryMax: job.salaryMax,
     salaryPeriod: job.salaryPeriod, deadline: job.deadline, createdAt: job.createdAt,
@@ -56,7 +63,7 @@ export function toPublicJob(job: PublicJobSource): PublicJob {
 }
 
 export function toManagementJob(job: PublicJobSource & Pick<Job,
-  'organizationId' | 'hiringManagerId' | 'clientId'>): ManagementJob {
-  return { ...toPublicJob(job), organizationId: job.organizationId,
+  'organizationId' | 'hiringManagerId' | 'clientId'>,mode:JobDescriptionMode='legacy'): ManagementJob {
+  return { ...toPublicJob(job,mode), organizationId: job.organizationId,
     hiringManagerId: job.hiringManagerId, clientId: job.clientId };
 }

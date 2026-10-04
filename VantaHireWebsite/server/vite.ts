@@ -8,6 +8,7 @@ import { storage } from "./storage";
 import { generateJobPostingSchema, stripHtml } from "./seoUtils";
 import { jobMetaDescription, resolveJobDescription, serializeJobJsonLd } from '@shared/jobDescription';
 import { toPublicJob } from '@shared/publicJob';
+import { jobBriefEnabled } from './job-brief/contracts';
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -653,14 +654,15 @@ export async function serveStatic(app: Express) {
       const baseUrl = process.env.BASE_URL || 'https://ealana.com';
       const jobUrl = job.slug ? `${baseUrl}/jobs/${job.slug}` : `${baseUrl}/jobs/${job.id}`;
       const pageTitle = `${job.title} | ealana`;
-      const metaDescription = jobMetaDescription(job);
+      const publicJob=toPublicJob(job,jobBriefEnabled()?'canonical':'legacy');
+      const metaDescription = jobMetaDescription(job,jobBriefEnabled()?'canonical':'legacy');
 
       const jsonLd = generateJobPostingSchema({
         id: job.id,
         title: job.title,
         // Prose JD, never the parsed-requirements JSON (original_jd drift):
         // the raw blob leaked internal scoring config into public schema/metas.
-        description: resolveJobDescription(job).text,
+        description: resolveJobDescription(job,jobBriefEnabled()?'canonical':'legacy').text,
         location: job.location,
         type: job.type,
         skills: job.skills as string[] | null,
@@ -703,7 +705,7 @@ export async function serveStatic(app: Express) {
         try {
           // Pre-populate query cache with the job data we already fetched
           const initialData: Record<string, unknown> = {
-            [JSON.stringify(["/api/jobs", param])]: toPublicJob(job),
+            [JSON.stringify(["/api/jobs", param])]: publicJob,
           };
           const { html: ssrHtml } = ssrRender(`/jobs/${param}`, initialData);
           if (ssrHtml) {

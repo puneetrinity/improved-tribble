@@ -1,6 +1,8 @@
 import cron from 'node-cron';
 import { storage } from './storage';
-import { db } from './db';
+import { db, pool } from './db';
+import { publicationCycle, retireJobCycle } from './job-brief/commands';
+const cycleSql=sql`CASE WHEN ${jobs.reactivatedAt} >= ${jobs.createdAt} AND ${jobs.reactivatedAt} <= now() THEN ${jobs.reactivatedAt} ELSE ${jobs.createdAt} END`;
 import {
   jobs,
   applications,
@@ -59,21 +61,10 @@ export function startJobScheduler() {
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
       // Archive declined jobs older than 30 days
-      const archivedJobs = await db
-        .update(jobs)
-        .set({
-          isActive: false,
-          deactivatedAt: new Date(),
-          deactivationReason: 'declined'
-        })
-        .where(
-          and(
-            eq(jobs.status, 'declined'),
-            lt(jobs.createdAt, thirtyDaysAgo)
-          )
-        )
-        .returning();
-
+      const declinedJobs = await db.select({id:jobs.id}).from(jobs).where(and(
+        eq(jobs.status,'declined'),lt(jobs.createdAt,thirtyDaysAgo),isNull(jobs.deactivatedAt)));
+      const archivedJobs:number[]=[];
+      for(const job of declinedJobs) if(await retireJobCycle(pool,job.id,'declined')) archivedJobs.push(job.id);
       if (archivedJobs.length > 0) {
         console.log(`Archived ${archivedJobs.length} declined jobs`);
       } else {
@@ -164,7 +155,7 @@ async function sendDeactivationWarnings(): Promise<void> {
       and(
         eq(jobs.isActive, true),
         eq(jobs.status, 'approved'),
-        lt(jobs.createdAt, fiftyThreeDaysAgo),
+        sql`${cycleSql} < ${fiftyThreeDaysAgo.toISOString()}::timestamptz`,
         eq(jobs.warningEmailSent, false)
       )
     );
@@ -188,26 +179,26 @@ async function sendDeactivationWarnings(): Promise<void> {
     try {
       await emailService.sendEmail({
         to: recruiter.username, // Assuming username is email
-        subject: `Action Required: Job "${job.title}" will auto-close in 7 days`,
+        subject: `Inactivity notice: Job "${job.title}" may become eligible for closure`,
         html: `
           <h2>Job Expiration Warning</h2>
           <p>Hello ${recruiter.firstName || recruiter.username},</p>
-          <p>Your job posting <strong>"${job.title}"</strong> will be automatically deactivated in 7 days due to inactivity.</p>
+          <p>Your job posting <strong>"${job.title}"</strong> may be deactivated once its current publication cycle is over 60 days old, only if there are no applications in the last 14 days or upcoming interviews.</p>
 
           <h3>Job Details:</h3>
           <ul>
             <li><strong>Title:</strong> ${job.title}</li>
             <li><strong>Location:</strong> ${job.location}</li>
             <li><strong>Posted:</strong> ${new Date(job.createdAt).toLocaleDateString()}</li>
-            <li><strong>Auto-closes:</strong> ${new Date(new Date(job.createdAt).getTime() + 60 * 24 * 60 * 60 * 1000).toLocaleDateString()}</li>
+            <li><strong>Earliest inactivity review:</strong> ${new Date(publicationCycle(job).getTime() + 60 * 24 * 60 * 60 * 1000).toLocaleDateString()}</li>
           </ul>
 
           <h3>Why is this happening?</h3>
-          <p>Jobs are automatically deactivated after 60 days to ensure our listings stay fresh and relevant.</p>
+          <p>The scheduler rechecks age and recruiting activity before closing a job. A warning is not a guaranteed closure date.</p>
 
           <h3>What can you do?</h3>
           <ul>
-            <li>If the position is still open: No action needed, it will deactivate automatically</li>
+            <li>If the position is still open: Review the posting and your current recruiting activity</li>
             <li>If you filled the position: You can manually close it now</li>
             <li>After deactivation: Contact an admin to reactivate if needed</li>
           </ul>
@@ -221,7 +212,7 @@ async function sendDeactivationWarnings(): Promise<void> {
       await db
         .update(jobs)
         .set({ warningEmailSent: true })
-        .where(eq(jobs.id, job.id));
+        .where(and(eq(jobs.id, job.id),eq(jobs.isActive,true),sql`${jobs.reactivatedAt} IS NOT DISTINCT FROM ${job.reactivatedAt?.toISOString()??null}::timestamp`));
 
       console.log(`Warning email sent for job ${job.id}: "${job.title}"`);
     } catch (error) {
@@ -250,7 +241,7 @@ async function deactivateInactiveJobs(): Promise<void> {
       and(
         eq(jobs.isActive, true),
         eq(jobs.status, 'approved'),
-        lt(jobs.createdAt, sixtyDaysAgo)
+        sql`${cycleSql} < ${sixtyDaysAgo.toISOString()}::timestamptz`
       )
     );
 
@@ -269,39 +260,9 @@ async function deactivateInactiveJobs(): Promise<void> {
 
     for (const job of batch) {
       try {
-        // Check for recent applications (last 14 days)
-        const recentApplications = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(applications)
-          .where(
-            and(
-              eq(applications.jobId, job.id),
-              sql`${applications.appliedAt} > ${fourteenDaysAgo}`
-            )
-          );
-
-        const hasRecentActivity = recentApplications[0]?.count > 0;
-
-        // Check for upcoming interviews
-        const upcomingInterviews = await db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(applications)
-          .where(
-            and(
-              eq(applications.jobId, job.id),
-              sql`${applications.interviewDate} > NOW()`
-            )
-          );
-
-        const hasUpcomingInterviews = upcomingInterviews[0]?.count > 0;
-
-        // Only deactivate if no recent activity and no upcoming interviews
-        if (!hasRecentActivity && !hasUpcomingInterviews) {
-          await storage.updateJobStatus(job.id, false, 'auto_expired', 1); // performedBy: system admin (ID 1)
+        if(await retireJobCycle(pool,job.id,'expired')) {
           deactivatedCount++;
-          console.log(`Deactivated job ${job.id}: "${job.title}" (no recent activity)`);
-        } else {
-          console.log(`Keeping job ${job.id}: "${job.title}" (has recent activity or interviews)`);
+          console.log(`Deactivated job ${job.id} (inactivity predicates rechecked under lock)`);
         }
       } catch (error) {
         console.error(`Error processing job ${job.id}:`, error);
@@ -335,7 +296,7 @@ export async function getJobsNearExpiry(): Promise<any[]> {
       .where(
         and(
           eq(jobs.isActive, true),
-          lt(jobs.createdAt, fiftyThreeDaysAgo),
+          sql`${cycleSql} < ${fiftyThreeDaysAgo.toISOString()}::timestamptz`,
           eq(jobs.warningEmailSent, false)
         )
       );

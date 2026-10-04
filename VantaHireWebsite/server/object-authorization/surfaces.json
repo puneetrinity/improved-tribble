@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 322,
+  "route_registration_census": 327,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
     {
@@ -746,9 +746,9 @@
     }
   ],
   "governed_files": [
-    {"file":"shared/publicJob.ts","sha256":"91e40030ee890aeaa38a18e9a98b8de4de154a0d4274f83076a1e2ea7a095c72"},
-    {"file":"server/lib/jobManagementRead.ts","sha256":"53c37b6b6ae98f1264c56d009841ac100784d6804015bbab19301a61c3270750"},
-    {"file":"server/lib/__tests__/publicJobDto.test.ts","sha256":"bae9764f965d5eceb57824333ace7ce94b3161015a85ac60d919d1aea7577bf4"},
+    {"file":"shared/publicJob.ts","sha256":"1f5d9c50034837bf733c5549b7f6145105c76aef04952d8494295e142afc6905"},
+    {"file":"server/lib/jobManagementRead.ts","sha256":"071471682a7385dd087bf6a7fa585b3c9d53730e48ef9d56e5fb38bcf77b1089"},
+    {"file":"server/lib/__tests__/publicJobDto.test.ts","sha256":"1a0f98236b49c2cf06c33f911c1c6eb3d6d8f50f8ba4c64147155979b1eac11e"},
     {"file":"server/lib/__tests__/publicJobDto.pg.test.ts","sha256":"5e466b9becb8e5825c0c06106da1dfe792da59327a6a44476ae231c016093570"},
     {
       "file": "server/candidate-history/contracts.ts",
@@ -764,11 +764,11 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "b6c195c584edd99ec1fc62fb19dd476c44d061125fc85449f9afeeed98fa41a1"
+      "sha256": "38275cfcc229b53a4df36bd274f960a8b48f44b94a53844c5acde72b96565444"
     },
     {
       "file": "package.json",
-      "sha256": "51907c6e5cd174fe5c5e46f7cfa949e1f51323b2360dcb940ec2f80ef742317f"
+      "sha256": "3f6df818e2a46bf4c5e7356cd02dd39d2421f1adf7e91f69a8403c8362941fa0"
     },
     {
       "file": "vitest.server.config.ts",
@@ -804,7 +804,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "6fc93ba9b36b9e70908b658f068b7d166491c74b968d2d70422705ee329b6a1b"
+      "sha256": "413ef87e5394d6689c6664793978589559c3e66f0eed367645a69277deef257e"
     },
     {
       "file": "server/resume.routes.ts",
@@ -824,7 +824,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "8ad42dac4f33a97f1b9f6f249bd48a74eda0bbd920d334c76e1a0dd2b6083e0a"
+      "sha256": "e6ab776418edc619d7cf2383cf58ad1727305cb4b7f48f675c56d17b7170805c"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -832,7 +832,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "10085d7fc898c1220010e844b17a038896dfe157a983a9f572a56c4d91dbb697"
+      "sha256": "bebb83bd14dfa56ed530f9d7f7284d62dcb4ff31748cf14f2e129adcddf1c343"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -880,7 +880,7 @@
     },
     {
       "file": "server/lib/__tests__/reviewerShareAuthorization.pg.test.ts",
-      "sha256": "979a2ad33e0d5a9dd474e4dd990c34a8f520eb1b7556b64dc4707316d735b769"
+      "sha256": "c156e845afdbfdb404e5dcd4a86315adc0a91a2a285fff46f8a1afc3ce41f9ee"
     },
     {
       "file": "server/lib/__tests__/applicationAiOutboundAuthorization.test.ts",
@@ -892,7 +892,7 @@
     },
     {
       "file": "server/lib/__tests__/applicationAiOutboundAuthorization.pg.test.ts",
-      "sha256": "90929dfbc534db0b5a62956b44ba7dd2a85096de72cbe494465f9d67a362f713"
+      "sha256": "8f1415db3eb54130a492eabe36755d4a489787f978ed68716016020998a1fe1a"
     },
     {
       "file": "server/lib/__tests__/authorizedTemplatedEmail.test.ts",
@@ -908,11 +908,11 @@
     },
     {
       "file": "server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
-      "sha256": "f06993388d3ff7fe0414d67ca256a2d005df954e3d1022c86aea84433dca2774"
+      "sha256": "9dea118be0686cdf946bad9e79d31b691b22065aa6251cd92b4e7cb64b73c48a"
     },
     {
       "file": "server/storage.ts",
-      "sha256": "578c9ea5dce423081ec62101cfef89bd01a7e9f3e6f18caead63ccaac43c6cfc"
+      "sha256": "0aed7b614c05ce5e5e6e387bab39118c0ea4a89c1fe0d768fcce8c32adc81c81"
     },
     {
       "file": "server/tests/applicationReadAuthorization.pg.test.ts",
@@ -920,7 +920,7 @@
     },
     {
       "file": "server/tests/candidatePrivacy.pg.test.ts",
-      "sha256": "aed4108690a27fc54782d767205000b365112d90188ff9981049dfcf77cc9359"
+      "sha256": "f0244a49dbc7b5b99c4d2db50bd243f6bcc709cde8e7be6261c834bd2af4969b"
     },
     {
       "file": "server/tests/interviewIcsAuthorization.routes.test.ts",
@@ -936,7 +936,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "05cab63ae914e4d40c99cd839baa07a662bacc1533dba98b2178530921bd0593"
+      "sha256": "0b531daaa7b1ca1c2c302b6bf6a29ca42655353cae5f0a865bddf82539bc8079"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -964,7 +964,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "e514459c92a8381b10e786ea392a2b3371b612a342810bbea1a4df4fbe53010b"
+      "sha256": "b7a98847b36a183a6404538871182fd0d24cf9ce555fbce552db6f1bc135baf7"
     },
     {
       "file": "shared/forms.types.ts",
@@ -984,15 +984,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "5d9e3c68088c721c729d2f77b71c3d1c8c37770c0a095500f5b8df5e22120bf8"
+      "sha256": "46ba649a4b07cbb8d2d155297092270624dfc953d34e0d058e60c42af3e9f5bf"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "8fec04908d614077f2a8eb0c425dccf96a1d61b31be9c6287a32acd9a4757b59"
+      "sha256": "373a5e11c651fb3cc769c4f6438fe745bc1dca88f9f6cd9bd3e7362e6fa8087c"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "df9512265fa1414399ec5e2e4f5c0a732b33be03632f927601e0c15fe080d821"
+      "sha256": "53625da4768ef3b2ec86518be41ee1cf965eb9e2dfa25909ddbe681c2039389b"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1008,11 +1008,11 @@
     },
     {
       "file": "server/lib/__tests__/scopedFinancialAdminPublicAuthorization.pg.test.ts",
-      "sha256": "87716d387fcd9e494ec1c7900cd8cb3af1c953581af09c14618d6de672d33f35"
+      "sha256": "262c542c3351f7c247ebfb465cb7ffefed3df2219c4a16630d64472daa2beecc"
     },
     {
       "file": "server/admin.routes.ts",
-      "sha256": "d55cee085e7abcdb9e307cf81f96c802a4e85b48216ea3f1c1a687d15656253d"
+      "sha256": "c3cded0eebf01cd2ffc995eb413dfbb8fac10e8151af369912d736ff48a1e861"
     },
     {
       "file": "client/src/hooks/use-subscription.ts",
@@ -1028,7 +1028,7 @@
     },
     {
       "file": "client/src/pages/admin-super-dashboard.tsx",
-      "sha256": "63e7981ffecc244d8b1f537c0b4e2f3bfe9105166be66e92648378c23ca21403"
+      "sha256": "6c2970c5c09889dc47dc4491776be6b032a01c2279d9d60d8e170ea93573addd"
     },
     {
       "file": "client/src/App.tsx",
@@ -1056,7 +1056,7 @@
     },
     {
       "file": "server/lib/__tests__/talentPoolAuthorization.pg.test.ts",
-      "sha256": "618360201cd492dddea0fff0f644d080e0bfa4ee8a2a7e9606da4d591b3553e3"
+      "sha256": "e9b8dedf29099d1932c9b309e3847725de07c721f2d40646c34b411696ed9e6e"
     },
     {
       "file": "test/integration/backward-compatibility.test.ts",
@@ -1088,7 +1088,7 @@
     },
     {
       "file": "server/lib/__tests__/privilegeGrantRevocation.pg.test.ts",
-      "sha256": "024fefeb7c60472230ed86d8e93c0b777a24de4eee7a20a97d82e17b68b15c14"
+      "sha256": "aff21358e6693f31018386f18391d9bc8f93be624386fa24e574e1ceacaa08cd"
     },
     {
       "file": "server/tests/org-team-member-removal.routes.test.ts",
@@ -1116,7 +1116,7 @@
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
-      "sha256": "e35e6ec6809d671622a3b99c88724f4aa859b86fc2e3065741288ecdad19414d"
+      "sha256": "6e8b4acd763373b1f505f6ddbb67c19c292ba89ffb4a4b7b8e4dde0b17e4cae5"
     },
     {
       "file": "test/integration/invite-and-webhook.test.ts",
@@ -1144,7 +1144,7 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "c2559a3542c8984d3a56dac8acb43df94baf50d894fa8e55b4cc8a6df0334b90"
+      "sha256": "87f0cd78d126000a3b961be2f85f6f4cb41f82629cd7b0908fcddad383ca51a1"
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
@@ -1259,7 +1259,7 @@
     },
     {
       "file": "server/aiWorker.ts",
-      "sha256": "33005db9323727ba10abf08944f8dc6651aeef48549eb9195c222e7c4eb6a94f"
+      "sha256": "57f9a6a870ef561f4cb1a582e1e3fc5e9ce3e300d98799ff37be6424bd7cb7fd"
     },
     {
       "file": "scripts/check-candidate-privacy-surfaces.mjs",
@@ -1267,11 +1267,11 @@
     },
     {
       "file": "client/src/pages/job-edit-page.tsx",
-      "sha256": "9be6cbc4ac625bb1e8ffc2204f12c7bd8c1fbd1a65423c9472ce825e3007fa71"
+      "sha256": "10772c3e01689a5fb8eb2bd0a4ea7ea825b7dcbe81fd1fc563b43b65ef99ee24"
     },
     {
       "file": "client/src/components/JobPostingStepper.tsx",
-      "sha256": "e5924ca374640e2a1f65d41dd6da1ca12e281195ce4173569af2219dbb437c3d"
+      "sha256": "053c31d59777c911b055f3735e40fdf33da7b0653291c6c8d2382d0bfd3580f5"
     },
     {
       "file": "server/schema-control/manifest.ts",

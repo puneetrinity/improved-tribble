@@ -249,9 +249,24 @@ describe.skipIf(!enabled)("versioned invitation grants exact-schema PostgreSQL",
 
   beforeEach(async () => {
     if (!owner || !safeTargetProven) throw new Error("Disposable 2L-B target not proven.");
-    await owner.query("TRUNCATE public.users, public.organizations, public.subscription_plans RESTART IDENTITY CASCADE");
+    // Fresh disposable schema: never truncate or disable immutable evidence.
+    await owner.end();
+    owner = undefined;
+    await resetDatabase();
+    await runReleaseMigration({
+      migrationsDir,
+      creds: { migrateUrl: migrationUrl, expectedTargetId: targetId,
+        environment: "development", allowFreshInitialization: true },
+      connect: connectMigration,
+    });
+    await provisionRuntimeRole({
+      migrateUrl: migrationUrl, runtimeUrl,
+      runtimeRole: new URL(runtimeUrl).username, expectedTargetId: targetId,
+      connectMigration, connectRuntime,
+    });
+    owner = await clientFor(migrationUrl);
     await installFixture();
-  });
+  }, 180_000);
 
   afterAll(async () => {
     if (runtimePool) await runtimePool.end();

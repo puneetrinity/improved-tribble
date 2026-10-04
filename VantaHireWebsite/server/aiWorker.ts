@@ -14,6 +14,7 @@
 
 import './lib/aiModelStartupGuard';
 import { assertCandidateIndexWorkerConfig } from './candidate-index/contracts';
+import { jobBriefEnabled } from './job-brief/contracts';
 import { Worker, Job, UnrecoverableError } from 'bullmq';
 import { pool } from './db';
 import { storage } from './storage';
@@ -29,7 +30,7 @@ import {
   type FitCreditReservation,
 } from './lib/aiLimits';
 import { hasEnoughCredits, useCredits, getCreditCostForOperation } from './lib/creditService';
-import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
+import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION, workerDigestSource, persistWorkerDigest } from './lib/jdDigest';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
 import { downloadFromGCS } from './gcs-storage';
 import { generateCandidateSummary } from './aiJobAnalyzer';
@@ -198,11 +199,8 @@ async function processOneApplication(
   // Get or generate JD digest
   let jdDigest: JDDigest = app.job.jdDigest as JDDigest;
   if (!jdDigest || !app.job.jdDigestVersion || app.job.jdDigestVersion < CURRENT_DIGEST_VERSION) {
-    jdDigest = await generateJDDigest(app.job.title, app.job.originalJD || app.job.description, { location: app.job.location });
-    await db.update(jobs).set({
-      jdDigest,
-      jdDigestVersion: jdDigest.version,
-    }).where(eq(jobs.id, app.job.id));
+    jdDigest = await generateJDDigest(app.job.title, workerDigestSource(app.job), { location: app.job.location });
+    if(!await persistWorkerDigest(pool,app.job,jdDigest)) throw new FitGenerationChangedError();
   }
 
   const reservationResult = await reserveFitCredit(
@@ -888,6 +886,9 @@ const REDIS_NAMESPACE = process.env.NODE_ENV || 'development';
 // Main entry
 async function main(): Promise<void> {
   assertCandidateIndexWorkerConfig();
+  if (process.env.FLOW_JOB_BRIEF_ENABLED !== undefined) {
+    jobBriefEnabled(process.env, true);
+  }
   assertCandidatePrivacyRuntimeConfig();
   assertDecisionProjectionDeliveryRuntimeConfig();
   console.log('[AI Worker] Starting AI worker...');

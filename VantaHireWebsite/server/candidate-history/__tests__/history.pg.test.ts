@@ -24,6 +24,7 @@ describe.skipIf(!enabled)("history exact 4D-to-4E release", () => {
     expect(runtimeTarget.username).toBe("flow_4d_test_runtime");
     const migrations = resolve("server/schema-migrations");
     const base = mkdtempSync(join(tmpdir(), "flow-history-base-"));
+    const historyTail = mkdtempSync(join(tmpdir(), "flow-history-tail-"));
     const owner = new Client({ connectionString: dsn });
     const runtime = new Client({ connectionString: runtimeUrl });
     await owner.connect(); await runtime.connect();
@@ -46,9 +47,17 @@ describe.skipIf(!enabled)("history exact 4D-to-4E release", () => {
       await owner.query("DROP SCHEMA IF EXISTS schema_control CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public AUTHORIZATION CURRENT_USER");
       expect((await release(base)).applied).toHaveLength(13);
       const before = (await owner.query("SELECT row_to_json(m) AS value FROM schema_control.applied m ORDER BY version")).rows;
-      expect((await release(migrations)).applied).toEqual(["0013"]);
+      // Keep the historical13->14 proof exact, then exercise the current tail
+      // so all reader tests below run with5A's application triggers installed.
+      const historyLock=JSON.parse(readFileSync(join(migrations,"checksums.lock"),"utf8"));
+      historyLock.migrations=Object.fromEntries(Object.entries(historyLock.migrations).filter(([v])=>Number(v)<14));
+      for(const entry of loadManifest(migrations).filter(e=>Number(e.version)<14))copyFileSync(join(migrations,entry.file),join(historyTail,entry.file));
+      copyFileSync(join(migrations,"catalog.lock.json"),join(historyTail,"catalog.lock.json"));
+      writeFileSync(join(historyTail,"checksums.lock"),JSON.stringify(historyLock));
+      expect((await release(historyTail)).applied).toEqual(["0013"]);
       expect((await owner.query("SELECT row_to_json(m) AS value FROM schema_control.applied m WHERE version<'0013' ORDER BY version")).rows).toEqual(before);
       expect((await owner.query("SELECT count(*)::int AS n FROM decision_events")).rows[0].n).toBe(0);
+      expect((await release(migrations)).applied).toEqual(["0014"]);
       await provisionRuntimeRole({ migrateUrl: dsn, runtimeUrl, runtimeRole: runtimeTarget.username,
         expectedTargetId: target, connectMigration: connector, connectRuntime: connector });
       await runtime.query("BEGIN READ ONLY");
@@ -57,7 +66,7 @@ describe.skipIf(!enabled)("history exact 4D-to-4E release", () => {
       await expect(runtime.query("SELECT * FROM decision_projection_outbox")).rejects.toMatchObject({ code: "42501" });
       expect((await release(migrations)).applied).toEqual([]);
     } finally {
-      await owner.end(); await runtime.end(); rmSync(base, { recursive: true, force: true });
+      await owner.end(); await runtime.end(); rmSync(base, { recursive: true, force: true });rmSync(historyTail,{recursive:true,force:true});
     }
   }, 120_000);
 });
