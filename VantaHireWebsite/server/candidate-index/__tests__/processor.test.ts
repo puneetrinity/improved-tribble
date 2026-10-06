@@ -13,6 +13,7 @@ import ts from "typescript";
 import { importSPKI, jwtVerify } from "jose";
 import { clearKeyCache } from "../../lib/services/jwt-signer";
 import { candidateIndexCommandKey } from "../contracts";
+import { sourcingEnabled } from "../../sourcing-authority/contracts";
 import { candidateIndexCommandDigest, CandidateIndexMemoryError, deliverCandidateIndex,
   validateCandidateIndexEnvelope, type CandidateIndexEnvelope } from "../memory-client";
 import { candidateIndexProcessorConfig, downloadCandidateIndexOriginal,
@@ -621,6 +622,7 @@ describe("actual AI worker startup placement", () => {
   async function startup(value?: string) {
     const events: string[] = []; const exits: number[] = []; const errors: string[] = [];
     const boundaries = {
+      sourcingEnabled,
       pool: { end: async () => { events.push("pool-end"); } },
       Worker: class { constructor() { events.push("worker"); } on() { return this; } },
       getIoRedisConnection: () => { events.push("queue-connection"); return {}; },

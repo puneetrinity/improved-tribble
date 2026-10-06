@@ -189,3 +189,21 @@ export function clearKeyCache(): void {
   cachedPrivateKey = null;
   cachedSignalPublicKey = null;
 }
+
+/** Machine-only acquisition authority. A callbacks:write token, browser
+ * session or broader scope bundle is not an acquisition grant credential. */
+export async function verifySignalSourcingJwt(token:string):Promise<{
+  tenantId:string;requestId:string;executionAttemptId:string;jti:string;
+}> {
+  const {payload}=await jwtVerify(token,await getSignalPublicKey(),{
+    issuer:'signal',audience:'vantahire',algorithms:[ALGORITHM],clockTolerance:5,
+  });
+  if(payload.sub!=='sourcing' || payload.scopes!=='sourcing:grant' || payload.acquisition_generation!==1 ||
+    typeof payload.tenant_id!=='string' || !payload.tenant_id || payload.tenant_id.length>160 ||
+    typeof payload.request_id!=='string' || !payload.request_id || payload.request_id.length>200 ||
+    typeof payload.execution_attempt_id!=='string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(payload.execution_attempt_id) ||
+    typeof payload.jti!=='string' || !payload.jti || payload.jti.length>200 ||
+    typeof payload.iat!=='number' || typeof payload.exp!=='number' || payload.exp<=payload.iat || payload.exp-payload.iat>300 || payload.iat>Date.now()/1000+5)
+    throw Error('SOURCING_MACHINE_AUTH_INVALID');
+  return {tenantId:payload.tenant_id,requestId:payload.request_id,executionAttemptId:payload.execution_attempt_id,jti:payload.jti};
+}

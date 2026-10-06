@@ -1,9 +1,35 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 327,
+  "route_registration_census": 331,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
+    {
+      "method": "get",
+      "path": "/api/jobs/:id/sourcing/admission",
+      "reader": "quoteSourcing / flow_sourcing_quote",
+      "authority": "authenticated current seated recruiter assigned to this organization/job; SQL recheck",
+      "projection": ["signed_quote", "payer", "window", "approved_artifact"]
+    },
+    {
+      "method": "get",
+      "path": "/api/jobs/:id/sourcing/preview",
+      "reader": "readSourcingPreview / flow_sourcing_preview_request",
+      "authority": "authenticated current seated recruiter assigned to this organization/job; SQL recheck",
+      "projection": ["count", "preparation", "admission_state", "allowance_reset"]
+    },
+    {
+      "method": "post",
+      "path": "/api/jobs/:id/sourcing/preview",
+      "command": "requestSourcingPreview",
+      "authority": "authenticated current seated recruiter assigned to this organization/job; CSRF and SQL recheck"
+    },
+    {
+      "method": "post",
+      "path": "/api/internal/sourcing/grant",
+      "command": "handleSourcingMachineCommand",
+      "authority": "dedicated signed sourcing:grant service credential bound to tenant, request and execution; fixed SQL routine"
+    },
     {
       "method": "get",
       "path": "/api/jobs/:id/management",
@@ -764,11 +790,11 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "38275cfcc229b53a4df36bd274f960a8b48f44b94a53844c5acde72b96565444"
+      "sha256": "7c12090fbce81aabbfc6eb1b1d2a8ebe0792ac62cf45cce278aeec9a96a4827e"
     },
     {
       "file": "package.json",
-      "sha256": "3f6df818e2a46bf4c5e7356cd02dd39d2421f1adf7e91f69a8403c8362941fa0"
+      "sha256": "c9de3726f183563a5952512355b9e3d9443f0528a4f3a703b86c1f75e5bb5be8"
     },
     {
       "file": "vitest.server.config.ts",
@@ -804,7 +830,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "413ef87e5394d6689c6664793978589559c3e66f0eed367645a69277deef257e"
+      "sha256": "057d157b1959962037a680dfd9266f37e46d3a80fe35d50e333e19dc2ca44a84"
     },
     {
       "file": "server/resume.routes.ts",
@@ -824,7 +850,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "e6ab776418edc619d7cf2383cf58ad1727305cb4b7f48f675c56d17b7170805c"
+      "sha256": "c5219a6a45f0bbd200316114c3e1c4295ca74618fd2c5ad3e082713ea8460eb5"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -832,7 +858,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "bebb83bd14dfa56ed530f9d7f7284d62dcb4ff31748cf14f2e129adcddf1c343"
+      "sha256": "18743cef174a4ef9d7a225ebd08c08fe8a93b32f559e544239636668de1b0a11"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -936,7 +962,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "0b531daaa7b1ca1c2c302b6bf6a29ca42655353cae5f0a865bddf82539bc8079"
+      "sha256": "54893c8a289fdc8002c241633f201e4ed0ee8ed1c1726c05932546989e33872b"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -964,7 +990,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "b7a98847b36a183a6404538871182fd0d24cf9ce555fbce552db6f1bc135baf7"
+      "sha256": "d86c37525f428907dee9f43975ccee340e493f7a85f9f9193314f246da73160c"
     },
     {
       "file": "shared/forms.types.ts",
@@ -984,15 +1010,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "46ba649a4b07cbb8d2d155297092270624dfc953d34e0d058e60c42af3e9f5bf"
+      "sha256": "a7166878f0ba4be41288c9d489af41b0f6a9370cb2685b75fd06756d67402534"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "373a5e11c651fb3cc769c4f6438fe745bc1dca88f9f6cd9bd3e7362e6fa8087c"
+      "sha256": "5142ff6ddc345a2d78b144e07ac7c572ca8742826ac1593cbb49a957fefb4b75"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "53625da4768ef3b2ec86518be41ee1cf965eb9e2dfa25909ddbe681c2039389b"
+      "sha256": "65c1a8867416693c9295649a96409bdd6abc051128eabc491899771c884b19de"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1259,7 +1285,7 @@
     },
     {
       "file": "server/aiWorker.ts",
-      "sha256": "57f9a6a870ef561f4cb1a582e1e3fc5e9ce3e300d98799ff37be6424bd7cb7fd"
+      "sha256": "9d3e4650d7d33911160eb76a06ccaa0d81b2b8f306faaad4fb7c06fc1ffa0dce"
     },
     {
       "file": "scripts/check-candidate-privacy-surfaces.mjs",

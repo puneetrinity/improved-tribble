@@ -1,8 +1,13 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { useParams } from "wouter";
-import { useQuery } from '@tanstack/react-query';
-import { readBriefCapability } from '@/lib/job-brief';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useJobBrief } from '@/lib/job-brief';
+import { useAuth } from '@/hooks/use-auth';
+import {readSourcingCapability,readSourcing,startGovernedSourcing,changePreparation,recordSourcingDecision,
+  type AdmissionQuote,type SourcingPreview} from '@/lib/sourcing-authority';
+import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from '@/components/ui/dialog';
+import {isApiError} from '@/lib/queryClient';
 import Layout from "@/components/Layout";
 import { JobSubNav } from "@/components/JobSubNav";
 import { Button } from "@/components/ui/button";
@@ -175,7 +180,40 @@ export default function JobSourcingPage() {
   const { data: status, isLoading: statusLoading, isPolling } = useSourcingStatus(jobId);
   const { data: candidatesData, isLoading: candidatesLoading } = useSourcedCandidates(jobId);
   const { trigger: findCandidatesBase, isPending: findPending } = useFindCandidates(jobId);
-  const {data:briefCapability}=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
+  const {user}=useAuth();
+  const queryClient=useQueryClient();
+  const capability=useQuery({queryKey:['sourcing-capability',user?.id],queryFn:readSourcingCapability,retry:false});
+  const briefCapability=capability.data;
+  const governed=briefCapability?.sourcingEnabled===true;
+  const brief=useJobBrief(jobId??null,user?.id,governed);
+  const preview=useQuery({queryKey:['sourcing-preview',user?.id,jobId],
+    queryFn:({signal})=>readSourcing<SourcingPreview>(jobId!,'preview',signal),enabled:governed&&!!jobId,
+    retry:false,refetchInterval:governed?5000:false});
+  const [admissionQuote,setAdmissionQuote]=useState<AdmissionQuote|null>(null);
+  const [governedMessage,setGovernedMessage]=useState('');
+  const invalidateSourcing=()=>{
+    void queryClient.invalidateQueries({queryKey:['/api/jobs',jobId,'sourcing-status']});
+    void queryClient.invalidateQueries({queryKey:['/api/jobs',jobId,'sourced-candidates']});
+    void preview.refetch();
+  };
+  const quoteMutation=useMutation({mutationFn:()=>readSourcing<AdmissionQuote>(jobId!,'admission'),
+    onSuccess:q=>{setGovernedMessage('');setAdmissionQuote(q);},onError:e=>setGovernedMessage(e.message)});
+  const admission=useMutation({mutationFn:(q:AdmissionQuote)=>startGovernedSourcing(user!.id,jobId!,q),
+    onSuccess:()=>{setAdmissionQuote(null);setGovernedMessage('Sourcing admitted. This job cannot start another run.');openModal();invalidateSourcing();},
+    onError:error=>{
+      if(isApiError(error)&&['SOURCING_PAYER_CHANGED','SOURCING_WINDOW_CHANGED','SOURCING_QUERY_STALE','SOURCING_REVISION_CONFLICT','SOURCING_QUOTE_INVALID','SOURCING_QUOTE_EXPIRED'].includes(error.code??'')){
+        setAdmissionQuote(null);setGovernedMessage('The allowance or brief changed. Click Find candidates to review and confirm a fresh quote.');
+      }else if(isApiError(error)&&['SOURCING_ALREADY_ADMITTED','SOURCING_ALLOWANCE_EXHAUSTED','SOURCING_ENTITLEMENT_REQUIRED','SOURCING_DISABLED','SOURCING_TENANT_REQUIRED','SOURCING_INVALID_COMMAND'].includes(error.code??'')){
+        setAdmissionQuote(null);setGovernedMessage('Sourcing was refused: '+error.code+'. No new run was admitted.');
+      }else setGovernedMessage('The outcome is not yet known. Retry this same confirmation to reconcile; do not start another run.');
+      invalidateSourcing();
+    }});
+  const preparation=useMutation({mutationFn:(payload:{action:'refresh';artifactId:string}|{action:'retry_preparation';briefVersionId:string})=>changePreparation(user!.id,jobId!,payload),
+    onSuccess:invalidateSourcing,onError:()=>setGovernedMessage('Preparation request refused. Refresh the status before retrying.')});
+  const decision=useMutation({mutationFn:({candidate,action,reasonCode}:{candidate:SourcedCandidateForUI;action:'shortlist'|'pass'|'clear';reasonCode?:string})=>{
+    if(!Number.isSafeInteger(candidate.decisionRevision))throw Error('Refresh this candidate before recording a decision.');
+    return recordSourcingDecision(user!.id,jobId!,candidate.id,candidate.decisionRevision!,action,reasonCode);
+  },onSuccess:invalidateSourcing,onError:()=>{setGovernedMessage('Decision not confirmed. Refresh before trying again; no replacement reason was inferred.');invalidateSourcing();}});
   const [briefSourcingNotice,setBriefSourcingNotice]=useState(false);
   const { update: updateState, isPending: updatePending } = useUpdateCandidateState(jobId);
   const { draftOutreach, isPending: draftingOutreach } = useDraftOutreach(jobId);
@@ -186,6 +224,8 @@ export default function JobSourcingPage() {
 
   // Open the progress modal first, then trigger sourcing
   const findCandidates = (opts: Record<string, unknown>) => {
+    if(!briefCapability){setGovernedMessage('Sourcing settings are unavailable. Please retry.');return;}
+    if(governed){quoteMutation.mutate();return;}
     if(briefCapability?.jobBriefEnabled===true) {setBriefSourcingNotice(true);return;}
     if (!opts.refresh) {
       openModal();
@@ -387,6 +427,9 @@ export default function JobSourcingPage() {
     : null;
 
   const hasRun = status?.hasRun ?? false;
+  // A failed/expired transport status is not proof of a refund. Only the
+  // authority's keyed census can permit a fresh admission after cancellation.
+  const governedRunBlocked = preview.data?.canAdmit !== true;
   const runStatus = status?.status;
   // const enrichment = status?.enrichment;
   // const enrichmentInProgress = enrichment?.inProgress === true;
@@ -425,6 +468,7 @@ export default function JobSourcingPage() {
   };
 
   const handleShortlistToggle = (c: SourcedCandidateForUI) => {
+    if(governed){decision.mutate({candidate:c,action:c.state==='shortlisted'?'clear':'shortlist'});return;}
     const nextState = c.state === "shortlisted" ? "new" : "shortlisted";
     if (nextState !== "shortlisted") {
       setRevealedEmails((current) => {
@@ -473,7 +517,10 @@ export default function JobSourcingPage() {
               candidate={c}
               onClick={() => handleCardClick(c)}
               onShortlist={() => handleShortlistToggle(c)}
-              isUpdating={updatePending}
+              governed={governed}
+              onPass={()=>decision.mutate({candidate:c,action:'pass'})}
+              onClearDecision={()=>decision.mutate({candidate:c,action:'clear'})}
+              isUpdating={updatePending||decision.isPending}
               shortlistMode={listMode === "shortlisted"}
               emailRevealed={Boolean(revealedEmails[c.id])}
               onToggleRevealEmail={() =>
@@ -490,6 +537,21 @@ export default function JobSourcingPage() {
   return (
     <Layout>
       {briefSourcingNotice && <div role="status" className="container mx-auto px-4 py-3">Sourcing is not enabled for approved briefs yet. Your brief approval does not start a search.</div>}
+      {governedMessage&&<div role="status" className="container mx-auto px-4 py-3">{governedMessage}</div>}
+      {capability.isError&&<div role="alert">Sourcing settings unavailable. <Button onClick={()=>void capability.refetch()}>Retry settings</Button></div>}
+      {governed&&<div className="container mx-auto px-4 py-3" aria-live="polite">
+        <p>{preview.data?.state==='complete'?`${preview.data.countRelation==='gte'?'At least':'Approximately'} ${preview.data.count?.toLocaleString()} matching profiles${preview.data.stale?' (stale)':''}`:'Pool size unavailable — this does not block sourcing.'}</p>
+        {preview.data?.observedAt&&<p>Checked {new Date(preview.data.observedAt).toLocaleString()}</p>}
+        {preview.data?.artifactId&&<Button variant="outline" disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'refresh',artifactId:preview.data!.artifactId!})}>Refresh pool size</Button>}
+        {preview.data?.allowanceResetAt&&<p>Monthly allowance resets {new Date(preview.data.allowanceResetAt).toLocaleString()}.</p>}
+        {preview.data?.admissionState==='cancelled_no_dispatch'&&<p>The previous attempt was cancelled before purchase and its allowance returned. You can confirm a new attempt.</p>}
+        {preview.data?.admissionState==='needs_attention'&&<p>This run needs operator review. Its reserved allowance has not been returned; do not start another purchase.</p>}
+        {!preview.data?.artifactId&&<p>{preview.isError?'Preparation status unavailable. Refresh to check; no work was started by this page.':
+          preview.data?.preparationCode==='QUERY_MAPPING_UNSUPPORTED'?`Edit unsupported search criteria: ${(preview.data.criterionIds??[]).join(', ')}.`:
+          preview.data?.preparation==='failed'?'Brief preparation failed.':preview.data?.preparation==='unknown'?'Preparation outcome unknown; administrator review required.':
+          preview.data?.preparation==='reserved'||preview.data?.preparation==='started'?'Preparing the approved brief. Find candidates becomes available when ready.':'No prepared approved brief is available.'}</p>}
+        {preview.data?.preparation==='failed'&&preview.data.preparationCode!=='QUERY_MAPPING_UNSUPPORTED'&&brief.data?.approvedVersionId&&<Button disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'retry_preparation',briefVersionId:brief.data!.approvedVersionId!})}>Retry preparation once</Button>}
+      </div>}
       <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
         {/* Single job navigation, same placement as every other job page */}
         <JobSubNav jobId={jobId ?? 0} className="mb-4" />
@@ -522,7 +584,7 @@ export default function JobSourcingPage() {
           <div className="flex items-center gap-2">
             <Button
               onClick={() => findCandidates({ forceSourcing: true })}
-              disabled={findPending || isRunning}
+              disabled={findPending || isRunning || !briefCapability || (governed&&(governedRunBlocked||!preview.data?.artifactId||quoteMutation.isPending||admission.isPending))}
               size="sm"
               variant={hasRun ? "outline" : "default"}
             >
@@ -531,7 +593,7 @@ export default function JobSourcingPage() {
               ) : (
                 <Search className="h-4 w-4 mr-1.5" />
               )}
-              {isRunning ? "Running..." : hasRun ? "Find Candidates Again" : "Find Candidates"}
+              {isRunning ? "Running..." : governed ? (governedRunBlocked&&hasRun?"Run already used":"Find Candidates") : hasRun ? "Find Candidates Again" : "Find Candidates"}
             </Button>
           </div>
         </div>
@@ -793,6 +855,7 @@ export default function JobSourcingPage() {
 
             <div className="mb-4">
               <SourcingFilters
+                governed={governed}
                 filters={filters}
                 onChange={setFilters}
                 sortBy={sortBy}
@@ -886,6 +949,7 @@ export default function JobSourcingPage() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onUpdateState={(candidateId, state) => {
+          if(governed){const candidate=allCandidates.find(c=>c.id===candidateId);if(candidate)decision.mutate({candidate,action:state==='shortlisted'?'shortlist':state==='hidden'?'pass':'clear'});return;}
           if (state !== "shortlisted") {
             setRevealedEmails((current) => {
               const next = { ...current };
@@ -895,8 +959,17 @@ export default function JobSourcingPage() {
           }
           updateState({ candidateId, state });
         }}
-        isUpdating={updatePending}
+        governed={governed}
+        onDecision={(action,reasonCode)=>{if(liveSelected)decision.mutate({candidate:liveSelected,action,...(reasonCode?{reasonCode}:{})});}}
+        isUpdating={updatePending||decision.isPending}
       />
+      <Dialog open={admissionQuote!==null} onOpenChange={open=>{if(!open&&!admission.isPending)setAdmissionQuote(null);}}>
+        <DialogContent><DialogHeader><DialogTitle>Start this job’s sourcing run?</DialogTitle>
+          <DialogDescription>Uses 1 of {admissionQuote?.remaining} remaining runs from {admissionQuote?.payerUserId===user?.id?'your allowance':`${admissionQuote?.payerDisplayName}’s allowance`}. One run per job. Once the paid search may have started, a timeout or zero results does not return the run.</DialogDescription>
+        </DialogHeader><DialogFooter><Button variant="outline" disabled={admission.isPending} onClick={()=>setAdmissionQuote(null)}>Cancel</Button>
+          <Button disabled={admission.isPending} onClick={()=>admissionQuote&&admission.mutate(admissionQuote)}>{admission.isPending?'Confirming…':'Confirm Find candidates'}</Button>
+        </DialogFooter></DialogContent>
+      </Dialog>
 
       <ColdOutreachSidebar
         open={outreachSidebarOpen}

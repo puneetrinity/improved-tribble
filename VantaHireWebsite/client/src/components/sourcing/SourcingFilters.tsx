@@ -18,7 +18,7 @@ export interface SourcingFilterState {
   enrichedOnly: boolean;
   location: string;
   seniority: string;
-  candidateState: "all" | "new" | "shortlisted" | "hidden";
+  candidateState: "all" | "new" | "shortlisted" | "hidden" | "passed";
 }
 
 export const defaultFilters: SourcingFilterState = {
@@ -30,6 +30,7 @@ export const defaultFilters: SourcingFilterState = {
 };
 
 interface SourcingFiltersProps {
+  governed?: boolean;
   filters: SourcingFilterState;
   onChange: (filters: SourcingFilterState) => void;
   sortBy: string;
@@ -44,6 +45,7 @@ interface SourcingFiltersProps {
 }
 
 export function SourcingFilters({
+  governed=false,
   filters,
   onChange,
   sortBy,
@@ -155,7 +157,8 @@ export function SourcingFilters({
                   <SelectItem value="all">All</SelectItem>
                   <SelectItem value="new">New</SelectItem>
                   <SelectItem value="shortlisted">Shortlisted</SelectItem>
-                  <SelectItem value="hidden">Hidden</SelectItem>
+                  {governed&&<SelectItem value="passed">Passed</SelectItem>}
+                  <SelectItem value="hidden">{governed?'Legacy hidden':'Hidden'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -57,7 +57,7 @@ describe.skipIf(!enabled)("history exact 4D-to-4E release", () => {
       expect((await release(historyTail)).applied).toEqual(["0013"]);
       expect((await owner.query("SELECT row_to_json(m) AS value FROM schema_control.applied m WHERE version<'0013' ORDER BY version")).rows).toEqual(before);
       expect((await owner.query("SELECT count(*)::int AS n FROM decision_events")).rows[0].n).toBe(0);
-      expect((await release(migrations)).applied).toEqual(["0014"]);
+      expect((await release(migrations)).applied).toEqual(loadManifest(migrations).filter(e=>Number(e.version)>=14).map(e=>e.version));
       await provisionRuntimeRole({ migrateUrl: dsn, runtimeUrl, runtimeRole: runtimeTarget.username,
         expectedTargetId: target, connectMigration: connector, connectRuntime: connector });
       await runtime.query("BEGIN READ ONLY");

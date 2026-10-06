@@ -266,3 +266,29 @@ export async function findContact(
 
   return normalizeContactResolutionResponse(body, res.status);
 }
+
+/** Governed sourcing transport: fixed endpoints, bounded request/response and
+ * no redirects. An uncertain response is replayed using the same durable ID. */
+export async function governedSignalPost(input: {
+  kind:'source'|'preview';tenantId:string;externalJobId:string;requestId:string;body:unknown;
+}):Promise<unknown> {
+  if(!/^vanta:jobs:[1-9][0-9]*$/.test(input.externalJobId))throw Error('SOURCING_INVALID_TARGET');
+  const base=new URL(getBaseUrl());
+  if(base.username || base.password || base.hash || base.search ||
+    (process.env.NODE_ENV==='production' ? base.protocol!=='https:' : !['https:','http:'].includes(base.protocol)))throw Error('SOURCING_INVALID_TARGET');
+  const encoded=JSON.stringify(input.body);
+  if(Buffer.byteLength(encoded,'utf8')>131072)throw Error('SOURCING_BODY_TOO_LARGE');
+  const token=await signServiceJwt('signal',{tenantId:input.tenantId,
+    scopes:input.kind==='source'?'jobs:source':'jobs:preview',requestId:input.requestId});
+  const response=await fetch(`${base.toString().replace(/\/+$/,'')}/api/v3/jobs/${encodeURIComponent(input.externalJobId)}/${input.kind}`,{
+    method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},
+    body:encoded,signal:AbortSignal.timeout(30000),redirect:'error',
+  });
+  if(!response.ok || !response.body) {await response.body?.cancel().catch(()=>undefined);throw Error('SOURCING_REMOTE_UNAVAILABLE');}
+  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let bytes=0;
+  try {
+    while(true){const {done,value}=await reader.read();if(done)break;
+      bytes+=value.byteLength;if(bytes>131072)throw Error('SOURCING_RESPONSE_TOO_LARGE');chunks.push(value);}
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  }finally{await reader.cancel().catch(()=>undefined);reader.releaseLock();}
+}

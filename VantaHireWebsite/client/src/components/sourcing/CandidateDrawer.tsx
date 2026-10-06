@@ -59,6 +59,8 @@ interface CandidateDrawerProps {
     state: "new" | "shortlisted" | "hidden",
   ) => void;
   isUpdating: boolean;
+  governed?: boolean;
+  onDecision?: (action:'shortlist'|'pass'|'clear',reasonCode?:string)=>void;
 }
 
 function FitBadge({
@@ -108,6 +110,8 @@ export function CandidateDrawer({
   onClose,
   onUpdateState,
   isUpdating,
+  governed=false,
+  onDecision,
 }: CandidateDrawerProps) {
   const { findContact, isPending: contactPending } = useFindContact();
 
@@ -663,7 +667,17 @@ export function CandidateDrawer({
 
         {/* Footer Actions (sticky — never scrolls) */}
         <div className="p-6 bg-muted/30 border-t flex gap-3 flex-wrap">
-          {c.state === "new" && (
+          {governed&&<>
+            <p className="w-full text-sm">Decision for this job: {c.state==='hidden'?'Legacy hidden (no recorded Pass)':c.state==='new'?'Not decided':c.state}. Decisions do not change ranking.</p>
+            <Button disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('shortlist')}>Shortlist</Button>
+            <Button variant="outline" disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('pass')}>Pass</Button>
+            {c.state!=='new'&&<Button variant="outline" disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('clear')}>Clear decision</Button>}
+            <div className="w-full flex flex-wrap gap-2" aria-label="Optional Pass reason">
+              <span className="w-full text-xs">Optional: Pass with a reason. Nothing is preselected.</span>
+              {([['skills_gap','Skills gap'],['experience_requirement','Experience requirement'],['role_seniority','Role / seniority'],['domain','Domain'],['location_work_arrangement','Location / work arrangement'],['compensation','Compensation'],['availability','Availability'],['insufficient_information','Insufficient information'],['other','Other']] as const).map(([reason,label])=><Button key={reason} size="sm" variant="outline" disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('pass',reason)}>{label}</Button>)}
+            </div>
+          </>}
+          {!governed&&c.state === "new" && (
             <>
               <Button className="flex-1 shadow-md" onClick={() => onUpdateState(c.id, "shortlisted")} disabled={isUpdating}>
                 <Star className="h-4 w-4 mr-2" />
@@ -676,7 +690,7 @@ export function CandidateDrawer({
             </>
           )}
 
-          {isShortlisted && (
+          {!governed&&isShortlisted && (
             <>
               <Button variant="outline" className="flex-1 border-amber-300 text-amber-700 bg-amber-50" onClick={() => onUpdateState(c.id, "new")} disabled={isUpdating}>
                 <Star className="h-4 w-4 mr-2 fill-amber-500 text-amber-500" />
@@ -689,7 +703,7 @@ export function CandidateDrawer({
             </>
           )}
 
-          {isHidden && (
+          {!governed&&isHidden && (
             <>
               <Button variant="outline" className="flex-1" onClick={() => onUpdateState(c.id, "new")} disabled={isUpdating}>
                 <Eye className="h-4 w-4 mr-2" />

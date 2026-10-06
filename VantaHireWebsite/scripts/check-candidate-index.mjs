@@ -29,7 +29,7 @@ export const FROZEN = {
   "server/gcs-storage.ts": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802",
   "server/lib/resumeExtractor.ts": "217ed1dd5b7c23fa6945d5602c55286cc5655ff8ba481f3b5dbf106fea44c0f2",
   "server/lib/services/activekg-client.ts": "936ce79804d7380bf2f213354a6a5128ef24c96a58d321caa1dce54a73be140d",
-  "server/lib/services/jwt-signer.ts": "0213eb5984388fba2c3e4bf8893ac94b7fbaecc1f669b12b50519ef0a24cd490",
+  "server/lib/services/jwt-signer.ts": "9abbfdb810b3717f925fdc49fec01772c55a3e8ba48d791599c1234bbdc3db2c",
   "server/organization-candidates/contracts.ts": "e68a6226ac9225f4767ffa69d2431392f15b6d9aef8857202047eddbf81696c8",
   "server/organization-candidates/memory-client.ts": "216691b47c39d3b8d54201cecf1b065f5bc55a95d5e5790bf41e8e177922e77b",
   "server/organization-candidates/processor.ts": "379701feac382b3b42e37e16ff9144adc595244a272e378b519d860b5c11d914",

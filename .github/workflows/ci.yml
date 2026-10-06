@@ -10,6 +10,60 @@ permissions:
   contents: read
 
 jobs:
+  sourcing-production-collation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        locale: ['C', 'en_US.utf8']
+    defaults:
+      run:
+        working-directory: VantaHireWebsite
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '55489'
+      PGUSER: postgres
+      PGPASSWORD: local-test-only
+      FLOW_SOURCING_DISPOSABLE: '1'
+      FLOW_SOURCING_EXPECT_LOCALE: ${{ matrix.locale }}
+      FLOW_SOURCING_OWNER_URL: postgresql://flow_collation_owner_test:local-test-only@127.0.0.1:55489/flow_collation_test
+      FLOW_SOURCING_CONCURRENCY_URL: postgresql://flow_collation_owner_test:local-test-only@127.0.0.1:55489/flow_collation_concurrency_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: VantaHireWebsite/package-lock.json
+      - run: npm ci
+      - name: Create isolated restricted owner databases
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-common ca-certificates locales
+          . /etc/os-release
+          pg_keyring=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+          if [ ! -r "$pg_keyring" ]; then
+            pg_keyring=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+          fi
+          test -r "$pg_keyring"
+          printf 'deb [signed-by=%s] https://apt.postgresql.org/pub/repos/apt %s-pgdg main\n' "$pg_keyring" "${VERSION_CODENAME:?}" | sudo tee /etc/apt/sources.list.d/wave5b-pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-17
+          sudo locale-gen en_US.UTF-8
+          /usr/lib/postgresql/17/bin/initdb -D "$RUNNER_TEMP/wave5b-pg17" -U postgres --auth-local=trust --auth-host=trust --locale="$FLOW_SOURCING_EXPECT_LOCALE" --encoding=UTF8
+          /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/wave5b-pg17" -l "$RUNNER_TEMP/wave5b-pg17.log" -o "-h 127.0.0.1 -k $RUNNER_TEMP -p 55489 -c shared_buffers=32MB -c max_connections=30 -c max_parallel_workers=0" -w start
+          psql -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE flow_collation_owner_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'local-test-only';
+          CREATE DATABASE flow_collation_test OWNER flow_collation_owner_test;
+          CREATE DATABASE flow_collation_concurrency_test OWNER flow_collation_owner_test;
+          SQL
+      - run: npm run test:sourcing-authority:pg
+      - name: Stop owned PostgreSQL 17
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/wave5b-pg17/postmaster.pid"; then
+            /usr/lib/postgresql/17/bin/pg_ctl -D "$RUNNER_TEMP/wave5b-pg17" -m fast -w stop
+          fi
   server-contracts:
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -60,6 +114,7 @@ jobs:
       - run: npm run check:candidate-history
       - run: node scripts/check-resume-ingest-ocr.mjs
       - run: npm run check:job-brief
+      - run: npm run check:sourcing-authority
       - run: npm run check:server
       - run: npm run check:client
       - run: npm run test:server
@@ -68,6 +123,8 @@ jobs:
       - run: npm run test:candidate-history
       - run: npm run test:job-brief
       - run: npm run test:job-brief:client
+      - run: npm run test:sourcing-authority
+      - run: npm run test:sourcing-authority:client
       - run: npm run test:candidate-consent:client
       - run: npm run test:candidate-index:client
       - name: Run disposable schema-control matrix
@@ -77,6 +134,18 @@ jobs:
           FLOW_SCHEMA_TEST_DATABASE_URL: postgresql://flow_schema_control_test_runner:runner-test-only@127.0.0.1:5432/flow_schema_control_test_ci
           FLOW_SCHEMA_TEST_RUNTIME_DATABASE_URL: postgresql://flow_schema_control_test_runtime:runtime-test-only@127.0.0.1:5432/flow_schema_control_test_ci
         run: npm run test:schema-control:pg
+      - name: Run governed sourcing against a fresh restricted owner
+        env:
+          FLOW_SOURCING_DISPOSABLE: '1'
+          FLOW_SOURCING_OWNER_URL: postgresql://flow_sourcing_owner_test:sourcing-test-only@127.0.0.1:5432/flow_sourcing_test
+          FLOW_SOURCING_CONCURRENCY_URL: postgresql://flow_sourcing_owner_test:sourcing-test-only@127.0.0.1:5432/flow_sourcing_concurrency_test
+        run: |
+          sudo -u postgres psql -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE flow_sourcing_owner_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'sourcing-test-only';
+          CREATE DATABASE flow_sourcing_test OWNER flow_sourcing_owner_test;
+          CREATE DATABASE flow_sourcing_concurrency_test OWNER flow_sourcing_owner_test;
+          SQL
+          npm run test:sourcing-authority:pg
       - name: Run disposable candidate-privacy matrix
         env:
           NODE_ENV: test

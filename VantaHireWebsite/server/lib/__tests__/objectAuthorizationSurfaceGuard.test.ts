@@ -29,7 +29,7 @@ describe("4C route census amendment", () => {
     const root = fixture();
     const path = join(root, MANIFEST);
     const manifest = JSON.parse(readFileSync(path, "utf8"));
-    expect(manifest.route_registration_census).toBe(327);
+    expect(manifest.route_registration_census).toBe(331);
     manifest.route_registration_census = 316;
     writeFileSync(path, JSON.stringify(manifest));
     expect(checkObjectAuthorization(root)).toContain("object authorization route census contract is invalid.");

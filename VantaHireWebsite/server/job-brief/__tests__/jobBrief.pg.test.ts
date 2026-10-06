@@ -40,16 +40,26 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
       // Exercise the actual shipped ledger14 -> 15 release, not hand-written
       // test DDL or a superuser runtime. Only a fresh explicitly local DB enters.
       const migrations=resolve('server/schema-migrations'),base=mkdtempSync(join(tmpdir(),'brief-ledger14-'));
+      const briefTail=mkdtempSync(join(tmpdir(),'brief-ledger15-'));
       const connect=async(url:string)=>{const c=new Client({connectionString:url});await c.connect();return c;};
       const release=(migrationsDir:string)=>runReleaseMigration({migrationsDir,creds:{migrateUrl:ownerUrl,expectedTargetId:'brief-ci-test',environment:'development',allowFreshInitialization:true},connect});
       try {
-        const lock=JSON.parse(readFileSync(join(migrations,'checksums.lock'),'utf8'));delete lock.migrations['0014'];
+        const lock=JSON.parse(readFileSync(join(migrations,'checksums.lock'),'utf8'));
+        lock.migrations=Object.fromEntries(Object.entries(lock.migrations).filter(([v])=>Number(v)<14));
         for(const entry of loadManifest(migrations).filter(e=>Number(e.version)<14))copyFileSync(join(migrations,entry.file),join(base,entry.file));
         copyFileSync(join(migrations,'catalog.lock.json'),join(base,'catalog.lock.json'));writeFileSync(join(base,'checksums.lock'),JSON.stringify(lock));
         expect((await release(base)).applied).toHaveLength(14);
         const prior=(await owner.query('SELECT row_to_json(a) value FROM schema_control.applied a ORDER BY version')).rows;
-        expect((await release(migrations)).applied).toEqual(['0014']);
+        const briefLock=JSON.parse(readFileSync(join(migrations,'checksums.lock'),'utf8'));
+        briefLock.migrations=Object.fromEntries(Object.entries(briefLock.migrations).filter(([v])=>Number(v)<=14));
+        for(const entry of loadManifest(migrations).filter(e=>Number(e.version)<=14))copyFileSync(join(migrations,entry.file),join(briefTail,entry.file));
+        copyFileSync(join(migrations,'catalog.lock.json'),join(briefTail,'catalog.lock.json'));
+        writeFileSync(join(briefTail,'checksums.lock'),JSON.stringify(briefLock));
+        expect((await release(briefTail)).applied).toEqual(['0014']);
         expect((await owner.query("SELECT row_to_json(a) value FROM schema_control.applied a WHERE version<'0014' ORDER BY version")).rows).toEqual(prior);
+        const briefLedger=(await owner.query('SELECT row_to_json(a) value FROM schema_control.applied a ORDER BY version')).rows;
+        expect((await release(migrations)).applied).toEqual(loadManifest(migrations).filter(e=>Number(e.version)>14).map(e=>e.version));
+        expect((await owner.query("SELECT row_to_json(a) value FROM schema_control.applied a WHERE version<='0014' ORDER BY version")).rows).toEqual(briefLedger);
         expect((await release(migrations)).applied).toEqual([]);
         await provisionRuntimeRole({migrateUrl:ownerUrl,runtimeUrl,runtimeRole:new URL(runtimeUrl).username,expectedTargetId:'brief-ci-test',connectMigration:connect,connectRuntime:connect});
         await assertSchemaReady({pg:runtime,migrationsDir:migrations,environment:'development',expectedTargetId:'brief-ci-test',criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS});
@@ -58,7 +68,7 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
         await owner.query("INSERT INTO organizations(id,name,slug,is_active) VALUES(90001,'Brief fixture','brief-fixture',true),(90002,'Other fixture','other-fixture',true)");
         await owner.query("INSERT INTO organization_members(organization_id,user_id,role,seat_assigned) VALUES(90001,90001,'owner',true),(90002,90002,'owner',true)");
         await owner.query("INSERT INTO jobs(id,organization_id,posted_by,title,location,type,description,original_jd,status,is_active) VALUES(90001,90001,90001,'Backend engineer','Bengaluru','full-time','{\"roleTitle\":\"private\"}','Build Python services.','approved',false)");
-      } finally {rmSync(base,{recursive:true,force:true});}
+      } finally {rmSync(base,{recursive:true,force:true});rmSync(briefTail,{recursive:true,force:true});}
     }
     expect((await owner.query("SELECT to_regclass('public.job_brief_state') present")).rows[0].present).not.toBeNull();
   },120_000);
