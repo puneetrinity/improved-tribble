@@ -1,4 +1,197 @@
 import { pgTable, pgSequence, text, serial, bigserial, integer, boolean, timestamp, date, numeric, index, jsonb, uniqueIndex, unique, char, decimal, check, foreignKey, uuid, bigint, primaryKey } from "drizzle-orm/pg-core";
+
+// Wave 5B column mappings. Migration 0015 and the exact-catalog guard own
+// the named CHECK/FK/index/RLS/routine contract; never use schema push.
+export const sourcingOrgState=pgTable("sourcing_org_state",{
+  organizationId:integer("organization_id").primaryKey(),
+  revision:bigint("revision",{mode:"bigint"}).notNull().default(0n),
+  enabled:boolean("enabled").notNull().default(false),
+  anchor:timestamp("anchor",{withTimezone:true}),
+  capacity:integer("capacity").notNull().default(0),
+  highWater:integer("high_water").notNull().default(0),
+  entitlementId:uuid("entitlement_id"),
+});
+
+export const sourcingEntitlements=pgTable("sourcing_entitlements",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  subscriptionId:integer("subscription_id").notNull(),
+  anchor:timestamp("anchor",{withTimezone:true}).notNull(),
+  validFrom:timestamp("valid_from",{withTimezone:true}).notNull(),
+  validUntil:timestamp("valid_until",{withTimezone:true}).notNull(),
+  capacity:integer("capacity").notNull(),
+  origin:text("origin").notNull(),
+  issuedAt:timestamp("issued_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+  supersedesId:uuid("supersedes_id"),
+});
+
+export const sourcingSeatSlots=pgTable("sourcing_seat_slots",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  slotNumber:integer("slot_number").notNull(),
+  active:boolean("active").notNull(),
+  currentUserId:integer("current_user_id"),
+  revision:bigint("revision",{mode:"bigint"}).notNull().default(0n),
+});
+
+export const sourcingSeatEvents=pgTable("sourcing_seat_events",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  slotId:uuid("slot_id").notNull(),
+  revision:bigint("revision",{mode:"bigint"}).notNull(),
+  previousUserId:integer("previous_user_id"),
+  nextUserId:integer("next_user_id"),
+  cause:text("cause").notNull(),
+  recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingAllowanceWindows=pgTable("sourcing_allowance_windows",{
+  organizationId:integer("organization_id").notNull(),
+  slotId:uuid("slot_id").notNull(),
+  startsAt:timestamp("starts_at",{withTimezone:true}).notNull(),
+  endsAt:timestamp("ends_at",{withTimezone:true}).notNull(),
+  entitlementId:uuid("entitlement_id").notNull(),
+  limitCount:integer("limit_count").notNull().default(5),
+  reserved:integer("reserved").notNull().default(0),
+  captured:integer("captured").notNull().default(0),
+  revision:bigint("revision",{mode:"bigint"}).notNull().default(0n),
+},t=>[primaryKey({name:"src_win_pk",columns:[t.slotId,t.startsAt ]})]);
+
+export const sourcingQueryArtifacts=pgTable("sourcing_query_artifacts",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  jobId:integer("job_id").notNull(),
+  briefVersionId:uuid("brief_version_id").notNull(),
+  materialHash:text("material_hash").notNull(),
+  compilerVersion:text("compiler_version").notNull(),
+  queryHash:text("query_hash").notNull(),
+  input:jsonb("input").notNull(),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingDigestRequests=pgTable("sourcing_digest_requests",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  jobId:integer("job_id").notNull(),
+  briefVersionId:uuid("brief_version_id").notNull(),
+  actorUserId:integer("actor_user_id").notNull(),
+  sourceHash:text("source_hash").notNull(),
+  model:text("model").notNull(),
+  state:text("state").notNull(),
+  result:jsonb("result"),
+  attemptCount:integer("attempt_count").notNull().default(0),
+  manualRetryRequestId:uuid("manual_retry_request_id"),
+  leaseId:uuid("lease_id"),
+  leaseUntil:timestamp("lease_until",{withTimezone:true}),
+  startedAt:timestamp("started_at",{withTimezone:true}),
+  completedAt:timestamp("completed_at",{withTimezone:true}),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingAdmissions=pgTable("sourcing_admissions",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  jobId:integer("job_id").notNull(),
+  requestId:uuid("request_id").notNull(),
+  actorUserId:integer("actor_user_id").notNull(),
+  payerUserId:integer("payer_user_id").notNull(),
+  payerSlotId:uuid("payer_slot_id").notNull(),
+  windowStart:timestamp("window_start",{withTimezone:true}).notNull(),
+  artifactId:uuid("artifact_id").notNull(),
+  state:text("state").notNull(),
+  revision:bigint("revision",{mode:"bigint"}).notNull().default(0n),
+  discoverRequestId:text("discover_request_id"),
+  cancellation:jsonb("cancellation"),
+  generation:integer("generation").notNull().default(1),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+  updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingAccountEvents=pgTable("sourcing_account_events",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  admissionId:uuid("admission_id").notNull(),
+  kind:text("kind").notNull(),
+  recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingDispatchOutbox=pgTable("sourcing_dispatch_outbox",{
+  admissionId:uuid("admission_id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  state:text("state").notNull(),
+  attempts:integer("attempts").notNull().default(0),
+  leaseId:uuid("lease_id"),
+  leaseUntil:timestamp("lease_until",{withTimezone:true}),
+  nextAttemptAt:timestamp("next_attempt_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+  receipt:jsonb("receipt"),
+  updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingExecutionGrants=pgTable("sourcing_execution_grants",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  admissionId:uuid("admission_id").notNull(),
+  slot:text("slot").notNull(),
+  issuedAt:timestamp("issued_at",{withTimezone:true}).notNull(),
+  expiresAt:timestamp("expires_at",{withTimezone:true}).notNull(),
+  state:text("state").notNull(),
+  receipt:jsonb("receipt"),
+});
+
+export const sourcingDeliveries=pgTable("sourcing_deliveries",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  jobId:integer("job_id").notNull(),
+  admissionId:uuid("admission_id").notNull(),
+  revision:integer("revision").notNull(),
+  executionAttemptId:text("execution_attempt_id").notNull(),
+  count:integer("count").notNull(),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingDeliveryItems=pgTable("sourcing_delivery_items",{
+  organizationId:integer("organization_id").notNull(),
+  jobId:integer("job_id").notNull(),
+  deliveryId:uuid("delivery_id").notNull(),
+  ordinal:integer("ordinal").notNull(),
+  sourcedCandidateId:integer("sourced_candidate_id").notNull(),
+  signalCandidateId:text("signal_candidate_id").notNull(),
+},t=>[primaryKey({name:"src_item_pk",columns:[t.deliveryId,t.ordinal ]})]);
+
+export const sourcingDecisionEvents=pgTable("sourcing_decision_events",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  jobId:integer("job_id").notNull(),
+  sourcedCandidateId:integer("sourced_candidate_id").notNull(),
+  requestId:uuid("request_id").notNull(),
+  actorUserId:integer("actor_user_id").notNull(),
+  deliveryId:uuid("delivery_id"),
+  briefVersionId:uuid("brief_version_id"),
+  revision:bigint("revision",{mode:"bigint"}).notNull(),
+  action:text("action").notNull(),
+  previousState:text("previous_state").notNull(),
+  nextState:text("next_state").notNull(),
+  reasonCode:text("reason_code"),
+  criterionId:uuid("criterion_id"),
+  recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
+
+export const sourcingCountPreviews=pgTable("sourcing_count_previews",{
+  id:uuid("id").primaryKey(),
+  organizationId:integer("organization_id").notNull(),
+  jobId:integer("job_id").notNull(),
+  artifactId:uuid("artifact_id").notNull(),
+  requestId:uuid("request_id").notNull(),
+  state:text("state").notNull(),
+  queryHash:text("query_hash").notNull(),
+  count:bigint("count",{mode:"bigint"}),
+  countRelation:text("count_relation"),
+  observedAt:timestamp("observed_at",{withTimezone:true}),
+  creditsUsed:numeric("credits_used"),
+  leaseId:uuid("lease_id"),
+  leaseUntil:timestamp("lease_until",{withTimezone:true}),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().default(sql`clock_timestamp()`),
+});
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations, sql } from "drizzle-orm";
@@ -91,6 +284,7 @@ export const jobs = pgTable("jobs", {
   // AI features
   jdDigest: jsonb("jd_digest"), // Cached job description digest for AI matching
   jdDigestVersion: integer("jd_digest_version").default(1),
+  jdDigestSourceHash: text("jd_digest_source_hash"),
   // Structured job requirements
   salaryMin: integer("salary_min"), // Minimum salary
   salaryMax: integer("salary_max"), // Maximum salary
@@ -1667,6 +1861,7 @@ export const checkoutIntents = pgTable("checkout_intents", {
 // Job Sourcing Runs — tracks each Signal sourcing request per job
 export const jobSourcingRuns = pgTable("job_sourcing_runs", {
   id: serial("id").primaryKey(),
+  sourcingAdmissionId: uuid("sourcing_admission_id"),
   organizationId: integer("organization_id").notNull().references(() => organizations.id, { onDelete: 'cascade' }),
   jobId: integer("job_id").notNull().references(() => jobs.id, { onDelete: 'cascade' }),
   requestId: text("request_id").notNull().unique(), // Vanta-generated UUID sent to Signal
@@ -1702,6 +1897,7 @@ export const jobSourcedCandidates = pgTable("job_sourced_candidates", {
   fitBreakdown: jsonb("fit_breakdown"), // Signal's fit breakdown object
   sourceType: text("source_type").notNull(), // raw Signal values: 'pool_enriched' | 'pool' | 'discovered'
   state: text("state").notNull().default('new'), // new, shortlisted, hidden, converted
+  decisionRevision: bigint("decision_revision", {mode:"number"}).notNull().default(0),
   candidateSummary: jsonb("candidate_summary"), // Signal intelligence snapshot for display
   foundEmail: text("found_email"),
   foundEmails: jsonb("found_emails"),

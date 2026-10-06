@@ -10,6 +10,7 @@ import { CANDIDATE_CONSENT_TABLES, CANDIDATE_CONSENT_FUNCTIONS, CANDIDATE_CONSEN
   candidateConsentPrivilegesReady, candidateIndexPrivilegesReady,
   candidateHistoryPrivilegesReady, CANDIDATE_HISTORY_FUNCTION, jobBriefPrivilegesReady, BRIEF_TRIGGER_FUNCTIONS } from "./readiness";
 import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
+import {SOURCING_TABLES,SOURCING_FUNCTIONS,SOURCING_PRIVATE_FUNCTIONS,SOURCING_PRIVATE_NAMES,sourcingPrivilegesReady} from '../sourcing-authority/catalog';
 import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
   CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
 import { DEFAULT_LOCK_KEY, type MigrationClient } from "./runner";
@@ -275,7 +276,8 @@ export async function assertRuntimeRoleContract(
                   'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
                   'candidate_consent_events','candidate_consent_outbox',
                   'candidate_index_outbox','candidate_index_delivery_state',
-                  'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests'
+                  'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
+                  ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')}
                 )
                 AND has_table_privilege($1,c.oid,'SELECT')
                 AND has_table_privilege($1,c.oid,'INSERT')
@@ -288,7 +290,8 @@ export async function assertRuntimeRoleContract(
               OR c.relname IN ('candidate_consent_subjects','candidate_consent_sources',
                 'candidate_consent_events','candidate_consent_outbox',
                 'candidate_index_outbox','candidate_index_delivery_state',
-                'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests')
+                'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
+                ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')})
               -- Separately asserted below, including effective per-column rights.
             )
        )
@@ -322,6 +325,7 @@ export async function assertRuntimeRoleContract(
        AND NOT EXISTS (
          SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
           WHERE n.nspname='public' AND p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity')
+            AND p.proname NOT IN (${SOURCING_PRIVATE_NAMES.map(n=>`'${n}'`).join(',')})
             AND NOT has_function_privilege($1,p.oid,'EXECUTE')
        )
        AND (
@@ -366,6 +370,7 @@ export async function assertRuntimeRoleContract(
   if (!(await jobBriefPrivilegesReady(pg,role,false))) {
     throw new RuntimeRoleProvisionError('Job brief runtime authority contract is invalid.');
   }
+  if(!(await sourcingPrivilegesReady(pg,role,false)))throw new RuntimeRoleProvisionError('Sourcing runtime authority contract is invalid.');
   if (!(await candidateHistoryPrivilegesReady(pg, role, false))) {
     throw new RuntimeRoleProvisionError("Candidate history read authority is incomplete or excessive.");
   }
@@ -620,6 +625,25 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
         await migration.query(`GRANT EXECUTE ON FUNCTION ${CANDIDATE_HISTORY_FUNCTION} TO ${ident}`);
       }
 
+      const sourcingPresence=await migration.query(`SELECT
+        (SELECT count(*)::integer FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) tables,
+        (SELECT count(*)::integer FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) functions`,
+        [[...SOURCING_TABLES],[...SOURCING_FUNCTIONS,...SOURCING_PRIVATE_FUNCTIONS]]);
+      const sourcing=sourcingPresence.rows[0];
+      if(!sourcing || !((sourcing.tables===0&&sourcing.functions===0)||
+        (sourcing.tables===SOURCING_TABLES.length&&sourcing.functions===SOURCING_FUNCTIONS.length+SOURCING_PRIVATE_FUNCTIONS.length))) {
+        throw new RuntimeRoleProvisionError('Sourcing catalog is incomplete.');
+      }
+      if(sourcing.tables===SOURCING_TABLES.length) {
+        for(const table of SOURCING_TABLES) {
+          await migration.query(`REVOKE ALL PRIVILEGES ON TABLE public.${table} FROM ${ident},PUBLIC`);
+          const columns=await migration.query("SELECT attname FROM pg_attribute WHERE attrelid=to_regclass($1) AND attnum>0 AND NOT attisdropped ORDER BY attnum",['public.'+table]);
+          const names=columns.rows.map(row=>quoteIdentifier(row.attname)).join(',');
+          await migration.query(`REVOKE SELECT(${names}),INSERT(${names}),UPDATE(${names}),REFERENCES(${names}) ON public.${table} FROM ${ident},PUBLIC`);
+        }
+        for(const signature of [...SOURCING_FUNCTIONS,...SOURCING_PRIVATE_FUNCTIONS])await migration.query(`REVOKE ALL ON FUNCTION public.${signature} FROM ${ident},PUBLIC`);
+        for(const signature of SOURCING_FUNCTIONS)await migration.query(`GRANT EXECUTE ON FUNCTION public.${signature} TO ${ident}`);
+      }
       const briefPresence=await migration.query(`SELECT
         (SELECT count(*)::integer FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) tables,
         (SELECT count(*)::integer FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) functions`,[[...BRIEF_TABLES],[...BRIEF_FUNCTIONS,...BRIEF_TRIGGER_FUNCTIONS]]);

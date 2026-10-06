@@ -40,7 +40,7 @@ import {
 } from './candidate-privacy/decision';
 
 const sourcedCandidatePrivacyAllowed = () => sql.raw(
-  privacyAllowedSql('job_sourced_candidate', 'job_sourced_candidates.id', { globalUse: true }),
+  privacyAllowedSql('job_sourced_candidate', '"jobSourcedCandidates"."id"', { globalUse: true }),
 );
 
 const MAX_OUTREACH_BATCH_SIZE = 50;

@@ -12,6 +12,7 @@ import { SYSTEM, safeTargetFingerprint, type ResolvedEnvironment } from "./targe
 import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
   CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
 import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
+import {SOURCING_TABLES,SOURCING_PRIVATE_NAMES,sourcingPrivilegesReady} from '../sourcing-authority/catalog';
 
 export const BRIEF_TRIGGER_FUNCTIONS=['flow_job_brief_immutable()','flow_lock_job_application_activity()'] as const;
 export const BRIEF_CATALOG_SHA256='192131490cf2163b865357cb386cc2a6b07833191dc862ea8ec2f1d7aafd016a';
@@ -384,6 +385,13 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
     },
   },
   {
+    name:'Governed sourcing catalog and routine-only runtime authority are exact',
+    async check(pg) {
+      const who=await pg.query('SELECT current_user AS role');
+      return sourcingPrivilegesReady(pg,who.rows[0]?.role,true);
+    },
+  },
+  {
     name: "Flow core application relations exist",
     async check(pg) {
       const result = await pg.query(
@@ -708,7 +716,8 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                      'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
                      'candidate_consent_events','candidate_consent_outbox',
                      'candidate_index_outbox','candidate_index_delivery_state',
-                     'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests'
+                     'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
+                     ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')}
                    )
                    AND has_table_privilege(current_user, c.oid, 'SELECT')
                    AND has_table_privilege(current_user, c.oid, 'INSERT')
@@ -721,7 +730,8 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  OR c.relname IN ('candidate_consent_subjects','candidate_consent_sources',
                    'candidate_consent_events','candidate_consent_outbox',
                    'candidate_index_outbox','candidate_index_delivery_state',
-                   'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests')
+                   'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
+                   ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')})
                  -- Exact consent table/column privileges are a separate mandatory postcondition above.
                )
           )
@@ -752,6 +762,7 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                AND (
                  pg_has_role(current_user, pg_get_userbyid(p.proowner), 'MEMBER')
                  OR (p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity')
+                   AND p.proname NOT IN (${SOURCING_PRIVATE_NAMES.map(n=>`'${n}'`).join(',')})
                    AND NOT has_function_privilege(current_user, p.oid, 'EXECUTE'))
                )
           ) AS ok

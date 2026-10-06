@@ -23,6 +23,9 @@ interface CandidateCardProps {
   candidate: SourcedCandidateForUI;
   onClick: () => void;
   onShortlist: () => void;
+  governed?: boolean;
+  onPass?: () => void;
+  onClearDecision?: () => void;
   isUpdating: boolean;
   displayPosition?: number;
   shortlistMode?: boolean;
@@ -97,6 +100,9 @@ export function CandidateCard({
   candidate,
   onClick,
   onShortlist,
+  governed=false,
+  onPass,
+  onClearDecision,
   isUpdating,
   displayPosition,
   shortlistMode = false,
@@ -449,6 +455,12 @@ export function CandidateCard({
         </div>
 
         {/* ── Shortlist button ── */}
+        {governed?<div className="flex shrink-0 flex-col gap-2" onClick={e=>e.stopPropagation()}>
+          <Badge variant="outline">{candidate.state==='passed'?'Passed':isShortlisted?'Shortlisted':isHidden?'Legacy hidden':candidate.state==='converted'?'Applied':'Not decided'}</Badge>
+          <Button size="sm" variant="outline" disabled={isUpdating||candidate.state==='converted'} onClick={onShortlist}>{isShortlisted?'Clear shortlist':'Shortlist'}</Button>
+          <Button size="sm" variant="outline" disabled={isUpdating||candidate.state==='converted'} onClick={onPass}>Pass</Button>
+          {candidate.state==='passed'&&<Button size="sm" variant="ghost" disabled={isUpdating} onClick={onClearDecision}>Clear decision</Button>}
+        </div>:
         <Button
           variant="ghost"
           size="icon"
@@ -472,7 +484,7 @@ export function CandidateCard({
               isShortlisted ? "fill-amber-400 text-amber-400" : "",
             )}
           />
-        </Button>
+        </Button>}
       </div>
     </div>
   );

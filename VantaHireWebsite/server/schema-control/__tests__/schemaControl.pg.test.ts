@@ -274,6 +274,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0012", apply_mode: "adopted" },
         { version: "0013", apply_mode: "adopted" },
         { version: "0014", apply_mode: "adopted" },
+        { version: "0015", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +
@@ -723,6 +724,17 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         });
         expect(ready).toEqual({ version: forwardVersion, applied: shippedVersions.length + 1 });
         await runtime.query("ROLLBACK");
+
+        expect((await runtime.query('SELECT flow_sourcing_org_state(987654,false) result')).rows[0].result).toEqual({latched:false,enabled:false});
+        for(const statement of ['SELECT * FROM sourcing_entitlements',"UPDATE sourcing_org_state SET enabled=true",'SELECT flow_sourcing_reconcile(987654)']) {
+          await expect(runtime.query(statement)).rejects.toMatchObject({code:'42501'});
+        }
+        await client.query('GRANT UPDATE(enabled) ON sourcing_org_state TO flow_schema_control_test_runtime');
+        try {
+          await expect(assertSchemaReady({pg:{query:(text,params)=>runtime.query(text,params as any)},migrationsDir:runtimeGrantDir,
+            environment:'production',expectedTargetId:adoptedTarget,criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS}))
+            .rejects.toThrow(/Governed sourcing catalog/);
+        } finally {await client.query('REVOKE UPDATE(enabled) ON sourcing_org_state FROM flow_schema_control_test_runtime');}
 
         // Readiness proves privileges catalogically. Positive execution proves
         // the inherited table/sequence/routine grants, while the negative DDL

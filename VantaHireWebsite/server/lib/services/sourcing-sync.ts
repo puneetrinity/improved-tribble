@@ -7,7 +7,9 @@ import type {
   SignalResultsResponse,
 } from './signal-contracts';
 import type { SignalExecutionIdentity } from './signal-callback-ack';
-import { commitIfSignalExecutionCurrent } from './signal-execution-fence';
+import { commitIfSignalExecutionCurrent,buildSignalExecutionLockQuery } from './signal-execution-fence';
+import {sourcingDeliverySchema,type SourcingDelivery} from '../../sourcing-authority/contracts';
+import {SourcingRepository} from '../../sourcing-authority/repository';
 import { loadCandidatePrivacyConfig } from '../../candidate-privacy/config';
 import { checkMemoryEligibilityBatch } from '../../candidate-privacy/memory-client';
 
@@ -178,11 +180,12 @@ export async function upsertSignalCandidates(
   candidates: SignalResultCandidateV3[],
   onCandidateUpserted?: (candidate: SignalResultCandidateV3, rank: number) => void,
   execution?: SignalExecutionIdentity,
+  governed?:SourcingDelivery,
 ): Promise<{ count: number; candidates: SignalResultCandidateV3[] }> {
-  if (candidates.length === 0) return { count: 0, candidates: [] };
+  if (candidates.length === 0 && !governed) return { count: 0, candidates: [] };
 
   const allowedCandidates = await filterPrivacyAllowedCandidates(candidates);
-  if (allowedCandidates.length === 0) return { count: 0, candidates: [] };
+  if (allowedCandidates.length === 0 && !governed) return { count: 0, candidates: [] };
 
   // Build all row values for a single bulk INSERT
   const rows = allowedCandidates.map((c) => {
@@ -266,7 +269,21 @@ export async function upsertSignalCandidates(
       updated_at = NOW()
   `;
 
-  if (execution) {
+  if(governed) {
+    if(!execution || execution.acquisitionGeneration!==1 || execution.executionAttemptId!==governed.executionAttemptId)throw Error('SOURCING_DELIVERY_EXECUTION_MISMATCH');
+    await db.transaction(async (transaction:typeof db)=>{
+      // Same org-first lock order as admission/decisions. The result projection
+      // and ordered evidence commit together, or neither does.
+      await transaction.execute(sql`SELECT public.flow_sourcing_org_state(${organizationId},true)`);
+      const locked=await transaction.execute(buildSignalExecutionLockQuery(requestId,execution));
+      if(locked.rows.length!==1)throw Error('SOURCING_DELIVERY_EXECUTION_STALE');
+      if(rows.length)await transaction.execute(bulkSql);
+      const command={requestId,executionAttemptId:governed.executionAttemptId,artifactHash:governed.artifactHash,
+        revision:governed.revision,orderedSignalIds:governed.orderedSignalIds};
+      const result=await transaction.execute(sql`SELECT public.flow_sourcing_deliver(${organizationId},${governed.flowRunId}::uuid,${JSON.stringify(command)}::jsonb) result`);
+      if(!result.rows[0]?.result)throw Error('SOURCING_DELIVERY_BINDING_MISSING');
+    });
+  } else if (execution) {
     const committed = await commitIfSignalExecutionCurrent(
       requestId,
       execution,
@@ -310,11 +327,18 @@ export async function syncSignalResultsIntoVanta(
   const candidates = Array.isArray(fetchedResults.data)
     ? fetchedResults.data
     : [];
+  const binding=await new SourcingRepository().call<{flowRunId:string;artifactHash:string;executionAttemptId:string}>('runBinding',
+    [params.organizationId,params.jobId,params.requestId]);
+  const governed=binding?sourcingDeliverySchema.parse(fetchedResults.governed):undefined;
+  if(governed && (governed.flowRunId!==binding!.flowRunId || governed.artifactHash!==binding!.artifactHash ||
+    governed.executionAttemptId!==binding!.executionAttemptId || fetchedResults.requestId!==params.requestId ||
+    fetchedResults.externalJobId!==params.externalJobId || JSON.stringify(governed.orderedSignalIds)!==JSON.stringify(candidates.map(c=>c.candidate.id))))throw Error('SOURCING_DELIVERY_BINDING_MISMATCH');
+  if(!binding&&fetchedResults.governed)throw Error('SOURCING_DELIVERY_BINDING_MISSING');
   let candidateCount = fetchedResults.resultCount ?? 0;
   let upsertedCount = 0;
   let privacyAllowedCandidates: SignalResultCandidateV3[] = [];
 
-  if (candidates.length > 0) {
+  if (candidates.length > 0 || governed) {
     const upserted = await upsertSignalCandidates(
       params.organizationId,
       params.jobId,
@@ -322,6 +346,7 @@ export async function syncSignalResultsIntoVanta(
       candidates,
       onCandidateUpserted,
       params.execution,
+      governed,
     );
     upsertedCount = upserted.count;
     privacyAllowedCandidates = upserted.candidates;

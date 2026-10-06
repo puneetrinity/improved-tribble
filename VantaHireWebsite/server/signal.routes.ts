@@ -39,6 +39,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { jobBriefEnabled } from './job-brief/contracts';
+import {sourcingEnabled,MAX_SOURCING_BODY_BYTES} from './sourcing-authority/contracts';
+import {SourcingRepository,SourcingError} from './sourcing-authority/repository';
+import {admitSourcing,decideSourcing} from './sourcing-authority/commands';
 import { resolveActiveKGTenantId } from './lib/activekgTenant';
 import {
   CandidatePrivacyRestrictedError,
@@ -46,7 +49,7 @@ import {
   requireCandidatePrivacyAllowed,
 } from './candidate-privacy/decision';
 
-const sourcedCandidatePrivacyAllowed = (qualifiedId = 'job_sourced_candidates.id') => sql.raw(
+const sourcedCandidatePrivacyAllowed = (qualifiedId = '"jobSourcedCandidates"."id"') => sql.raw(
   privacyAllowedSql('job_sourced_candidate', qualifiedId, { globalUse: true }),
 );
 
@@ -276,6 +279,7 @@ export function computeContextHash(job: {
 }
 
 export function registerSignalRoutes(app: Express, csrfProtection: any) {
+  const sourcingRepository=new SourcingRepository();
 
   /**
    * POST /api/jobs/:id/find-candidates
@@ -307,6 +311,18 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
       const { job, organizationId } = contextResult.context;
+
+      const authority=await sourcingRepository.call<{latched:boolean;enabled:boolean}>('orgState',[organizationId,false]);
+      if(!authority || typeof authority.latched!=='boolean')throw new SourcingError('SOURCING_UNAVAILABLE',503);
+      if(sourcingEnabled() || authority.latched) {
+        res.set('Cache-Control','private, no-store');
+        if(!sourcingEnabled() || !authority.enabled)throw new SourcingError('SOURCING_DISABLED',503);
+        if(!/^[1-9][0-9]*$/.test(req.params.id??'') || !Number.isSafeInteger(jobId))throw new SourcingError('SOURCING_NOT_FOUND',404);
+        if(Buffer.byteLength(JSON.stringify(req.body??null),'utf8')>MAX_SOURCING_BODY_BYTES)throw new SourcingError('SOURCING_BODY_TOO_LARGE',413);
+        const admitted=await admitSourcing(sourcingRepository,{organizationId,jobId,actorId:req.user!.id},req.body);
+        res.status(202).json(admitted);
+        return;
+      }
 
       if(jobBriefEnabled()) {
         res.status(503).json({code:'SOURCING_ACTIVATION_PENDING',error:'Sourcing awaits Wave 5B activation.'});
@@ -523,6 +539,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         idempotent: signalResponse.idempotent,
       });
     } catch (error: any) {
+      if(error instanceof SourcingError){res.status(error.status).json({code:error.code});return;}
+      if(error instanceof z.ZodError){res.status(400).json({code:'SOURCING_INVALID_COMMAND'});return;}
       if (error.message?.includes('no Signal integration configured')) {
         res.status(400).json({
           error: 'Signal integration not configured',
@@ -979,13 +997,6 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
 
-      const parseResult = patchStateSchema.safeParse(req.body);
-      if (!parseResult.success) {
-        res.status(400).json({ error: 'Invalid body', details: parseResult.error.flatten() });
-        return;
-      }
-      const { state: newState } = parseResult.data;
-
       const contextResult = await resolveAccessibleSignalJobContext(req.user as SignalRouteUser, jobId);
       if (!contextResult.ok) {
         if (contextResult.error === 'JOB_NOT_FOUND') {
@@ -1000,6 +1011,37 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
       const { organizationId, signalTenantId } = contextResult.context;
+
+      const authority=await sourcingRepository.call<{latched:boolean;enabled:boolean}>('orgState',[organizationId,false]);
+      if(!authority || typeof authority.latched!=='boolean')throw new SourcingError('SOURCING_UNAVAILABLE',503);
+      if(sourcingEnabled() || authority.latched) {
+        res.set('Cache-Control','private, no-store');
+        // Decisions on existing candidates do not purchase a sourcing run.
+        if(!sourcingEnabled())throw new SourcingError('SOURCING_DISABLED',503);
+        if(!/^[1-9][0-9]*$/.test(req.params.id??'') || !/^[1-9][0-9]*$/.test(req.params.candidateId??'') ||
+          !Number.isSafeInteger(jobId) || !Number.isSafeInteger(candidateId))throw new SourcingError('SOURCING_NOT_FOUND',404);
+        if(Buffer.byteLength(JSON.stringify(req.body??null),'utf8')>MAX_SOURCING_BODY_BYTES)throw new SourcingError('SOURCING_BODY_TOO_LARGE',413);
+        // Do not let a foreign candidate's privacy status become an oracle.
+        // SQL rechecks this scope and current authority when committing.
+        const scopedCandidate=await db.query.jobSourcedCandidates.findFirst({
+          where:and(eq(jobSourcedCandidates.id,candidateId),eq(jobSourcedCandidates.jobId,jobId),
+            eq(jobSourcedCandidates.organizationId,organizationId),sourcedCandidatePrivacyAllowed()),
+          columns:{id:true},
+        });
+        if(!scopedCandidate)throw new SourcingError('SOURCING_NOT_FOUND',404);
+        const decision=await decideSourcing(sourcingRepository,{organizationId,jobId,actorId:req.user!.id},candidateId,req.body);
+        // The fixed routine committed the existing durable contact queue state
+        // together with the decision. No provider call or Memory feedback here.
+        wakeContactResolutionProcessor();
+        res.json(decision);
+        return;
+      }
+      const parseResult = patchStateSchema.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({ error: 'Invalid body', details: parseResult.error.flatten() });
+        return;
+      }
+      const { state: newState } = parseResult.data;
 
       // Fetch candidate — verify it belongs to org + job
       const candidate = await db.query.jobSourcedCandidates.findFirst({
@@ -1214,6 +1256,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         wakeContactResolutionProcessor();
       }
     } catch (error) {
+      if(error instanceof SourcingError){res.status(error.status).json({code:error.code});return;}
+      if(error instanceof z.ZodError){res.status(400).json({code:'SOURCING_INVALID_COMMAND'});return;}
       next(error);
     }
   });

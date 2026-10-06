@@ -70,6 +70,7 @@ export interface SignalSourceResponse {
 
 /** Response from Signal GET /api/v3/jobs/{externalJobId}/results?requestId=... */
 export interface SignalResultsResponse {
+  governed?:import('../../sourcing-authority/contracts').SourcingDelivery;
   requestId: string;
   externalJobId: string;
   resultCount: number | null;
@@ -229,6 +230,7 @@ export interface SignalIntelligenceSnapshot {
 
 /** HTTP body of Signal callback POST (SourcingCallbackPayload from Signal types.ts) */
 export interface SignalCallbackPayload {
+  governed?: {protocolVersion:1;flowRunId:string;artifactHash:string};
   version: 1;
   requestId: string;                        // camelCase in body (NOT snake_case)
   externalJobId: string;
@@ -316,7 +318,8 @@ export interface SourcedCandidateForUI {
   fitBreakdown: Record<string, unknown> | null;
   sourceType: SignalSourceType;
   displayBucket: SourceDisplayBucket;
-  state: 'new' | 'shortlisted' | 'hidden' | 'converted';
+  state: 'new' | 'shortlisted' | 'hidden' | 'converted' | 'passed';
+  decisionRevision?: number;
   foundEmail: string | null;
   foundEmails: string[] | null;
   emailResolvedAt: string | null;
@@ -573,6 +576,7 @@ export function flattenCandidateForUI(row: {
   fitBreakdown: unknown;
   sourceType: string;
   state: string;
+  decisionRevision?: number;
   foundEmail?: string | null;
   foundEmails?: unknown;
   emailResolvedAt?: Date | string | null;
@@ -590,7 +594,7 @@ export function flattenCandidateForUI(row: {
     row.candidateSummary && typeof row.candidateSummary === 'object'
       ? (row.candidateSummary as Record<string, unknown>)
       : {};
-  const candidateState = (['new', 'shortlisted', 'hidden', 'converted'].includes(row.state)
+  const candidateState = (['new', 'shortlisted', 'hidden', 'converted', 'passed'].includes(row.state)
     ? row.state
     : 'new') as SourcedCandidateForUI['state'];
   const contactVisible = candidateState === 'shortlisted';
@@ -629,6 +633,7 @@ export function flattenCandidateForUI(row: {
     sourceType: (row.sourceType as SignalSourceType) || 'discovered',
     displayBucket: toDisplayBucket((row.sourceType as SignalSourceType) || 'discovered'),
     state: candidateState,
+    ...(row.decisionRevision!==undefined?{decisionRevision:row.decisionRevision}:{}),
     foundEmail: contactResolved ? safeString(row.foundEmail) : null,
     foundEmails: contactResolved
       ? Array.isArray(row.foundEmails)

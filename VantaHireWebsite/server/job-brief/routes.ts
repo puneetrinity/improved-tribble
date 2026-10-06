@@ -7,6 +7,9 @@ import { jobBriefEnabled, MAX_REQUEST_BYTES } from './contracts';
 import { BriefError, BriefRepository, type BriefScope, scopeParameters } from './repository';
 import { approveBrief, readBrief, saveBrief } from './commands';
 import { draftBrief } from './draft';
+import { sourcingEnabled } from '../sourcing-authority/contracts';
+import { approveSourcingBrief } from '../sourcing-authority/commands';
+import { SourcingError, SourcingRepository } from '../sourcing-authority/repository';
 
 function available(req:Request,res:Response,next:NextFunction) {
   res.set('Cache-Control','private, no-store');res.set('Vary','Cookie');
@@ -29,16 +32,18 @@ function handler(fn:(req:Request,repository:BriefRepository,keys:BriefScope)=>Pr
     try {res.json(await fn(req,repository,await scope(req)));}
     catch(error) {
       if(error instanceof BriefError) {res.status(error.status).json({code:error.code});return;}
+      if(error instanceof SourcingError) {res.status(error.status).json({code:error.code});return;}
       if(error instanceof ZodError || error instanceof SyntaxError) {res.status(400).json({code:'BRIEF_INVALID_COMMAND'});return;}
       res.status(503).json({code:'BRIEF_UNAVAILABLE'});
     }
   };
 }
-export function registerJobBriefRoutes(app:Express,csrf:CsrfMiddleware,repository=new BriefRepository()) {
+export function registerJobBriefRoutes(app:Express,csrf:CsrfMiddleware,repository=new BriefRepository(),sourcingRepository=new SourcingRepository()) {
   app.get('/api/jobs/:id/brief',available,requireAuth,handler((_req,repo,keys)=>readBrief(repo,keys),repository));
   app.post('/api/jobs/:id/brief/draft',available,requireAuth,csrf,handler((req,repo,keys)=>draftBrief(repo,keys,req.body),repository));
   app.patch('/api/jobs/:id/brief',available,requireAuth,csrf,handler((req,repo,keys)=>saveBrief(repo,keys,req.body),repository));
-  app.post('/api/jobs/:id/brief/approve',available,requireAuth,csrf,handler((req,repo,keys)=>approveBrief(repo,keys,req.body),repository));
+  app.post('/api/jobs/:id/brief/approve',available,requireAuth,csrf,handler((req,repo,keys)=>
+    sourcingEnabled()?approveSourcingBrief(sourcingRepository,keys,req.body):approveBrief(repo,keys,req.body),repository));
   app.get('/api/jobs/:id/brief/history',available,requireAuth,handler(async(req,repo,keys)=>{
     const raw=req.query.limit??'25';
     if (typeof raw!=='string' || !/^[1-9][0-9]*$/.test(raw) || Number(raw)>50) throw new BriefError('BRIEF_INVALID_PAGE',400);

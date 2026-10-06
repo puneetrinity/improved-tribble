@@ -8,10 +8,10 @@ const APP_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 const frozenHashes = {
   "package-lock.json": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539",
-  "server/aiWorker.ts": "57f9a6a870ef561f4cb1a582e1e3fc5e9ce3e300d98799ff37be6424bd7cb7fd",
+  "server/aiWorker.ts": "9d3e4650d7d33911160eb76a06ccaa0d81b2b8f306faaad4fb7c06fc1ffa0dce",
   "server/gcs-storage.ts": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802",
   "server/lib/applicationGraphSyncProcessor.ts": "c014dab9d22d4d5686b9611b986a080c7e65b1f2bad664059d22cbcc195b2f56",
-  "server/lib/services/jwt-signer.ts": "0213eb5984388fba2c3e4bf8893ac94b7fbaecc1f669b12b50519ef0a24cd490",
+  "server/lib/services/jwt-signer.ts": "9abbfdb810b3717f925fdc49fec01772c55a3e8ba48d791599c1234bbdc3db2c",
   "server/schema-migrations/0009_decision_projection_delivery_state.sql": "ce5999cab8bf087b838bdc05e4eca81d6012a1f044e957ff4ab196c41919f348",
   "server/storage.ts": "0aed7b614c05ce5e5e6e387bab39118c0ea4a89c1fe0d768fcce8c32adc81c81",
   "server/candidate-privacy/decision.ts": "02bd1b412deb3f89f8cd4646dae19a2a0825486acf0c09c109c247da83c38f52",

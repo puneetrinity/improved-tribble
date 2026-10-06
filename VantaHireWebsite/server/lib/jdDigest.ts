@@ -30,7 +30,9 @@ export async function persistWorkerDigest(
   pg:{query:(text:string,params:any[])=>Promise<{rows:any[]}>},
   job:{id:number;currentJDHash:string|null;title:string;location:string},digest:JDDigest,
 ):Promise<boolean> {
-  const result=await pg.query(`UPDATE public.jobs SET jd_digest=$1::jsonb,jd_digest_version=$2
+  // A legacy source has no canonical hash: keep it explicitly unknown. The
+  // governed compiler never promotes this cache into an approved query artifact.
+  const result=await pg.query(`UPDATE public.jobs SET jd_digest=$1::jsonb,jd_digest_version=$2,jd_digest_source_hash=$4
     WHERE id=$3 AND current_jd_hash IS NOT DISTINCT FROM $4 AND title=$5 AND location=$6 RETURNING id`,
     [JSON.stringify(digest),digest.version,job.id,job.currentJDHash,job.title,job.location]);
   return result.rows.length===1;

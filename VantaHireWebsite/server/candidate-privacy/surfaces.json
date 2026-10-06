@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "d2cad6594725bfb5fdb6477f0e81a87d83eea1ab43c3ddfa1ef852a06bcfa030",
+  "source_census_sha256": "8744820f4ef16398d8ef6d210f3d1f2837a91feb59e4278893335badb4cbbc45",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/candidate-history/contracts.ts",
@@ -60,6 +60,9 @@
     "client/src/components/kanban/ApplicationDetailPanel.tsx"
   ],
   "sources": [
+    { "file": "server/sourcing-authority/commands.ts", "classification": "fenced" },
+    { "file": "server/schema-migrations/0015_governed_sourcing.sql", "classification": "fenced" },
+    { "file": "client/src/lib/sourcing-authority.ts", "classification": "ui_consumer" },
     { "file": "server/lib/jobManagementRead.ts", "classification": "excluded" },
     { "file": "server/candidate-history/contracts.ts", "classification": "fenced" },
     { "file": "server/candidate-history/memory-client.ts", "classification": "fenced" },
@@ -534,6 +537,28 @@
       "organization_scope": "owning_org",
       "enforcement": "Every active collection/object projection and mutation is fenced with non-global candidate privacy inside its single statement; removal/restore events are atomic with the row change.",
       "anchors": ["privacyAllowedSql(\"talent_pool\", \"pool.id\", { globalUse: false })", "HAVING COUNT(*) = 1", "talentPoolMembershipEvents"]
+    },
+    {
+      "id": "governed-sourcing-decision-command",
+      "file": "server/sourcing-authority/commands.ts",
+      "symbol": "decideSourcing",
+      "models": ["job_sourced_candidates", "sourcing_decision_events"],
+      "direction": "read_write",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "owning_org_job",
+      "enforcement": "Scoped route lookup precedes healthy global-use privacy observation; fixed owner routine rechecks current seat, assignment, candidate keys and local privacy before atomically recording the decision and contact queue state. No Memory preference feedback.",
+      "anchors": ["requireCandidatePrivacyAllowed", "globalUse:true", "repository.call('decide'"]
+    },
+    {
+      "id": "governed-sourcing-decision-sql",
+      "file": "server/schema-migrations/0015_governed_sourcing.sql",
+      "symbol": "flow_sourcing_decide",
+      "models": ["job_sourced_candidates", "sourcing_decision_events", "sourcing_deliveries", "sourcing_delivery_items"],
+      "direction": "read_write",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "owning_org_job",
+      "enforcement": "Scoped candidate lock, current brief authorization and local global-use privacy predicate precede append-only decision evidence. Delivery stores references only after healthy batch eligibility. Audit references are retained, not a new erasure or retention override.",
+      "anchors": ["flow_job_brief_read(p_org,p_job,p_actor)", "candidate_privacy_subject_links", "IN ('block_global','block_all','review')", "src_dec_cand_fk", "src_item_cand_fk"]
     },
     {
       "id": "signal-sourced-reader-writer",
@@ -1153,6 +1178,13 @@
       "symbol": "ApplicationDetailModal",
       "reason": "Presentation-only modal receives server-filtered application state.",
       "anchors": ["application", "ApplicationDetailPanel"]
+    },
+    {
+      "id": "ui-governed-sourcing-commands",
+      "file": "client/src/lib/sourcing-authority.ts",
+      "symbol": "recordSourcingDecision",
+      "reason": "Browser transport only. Authenticated server routes and fixed SQL routines own seat, job, privacy and expected-revision authority; the client cannot authorize or infer a decision.",
+      "anchors": ["jobIntentRequest", "expectedRevision", "sourced-candidates"]
     },
     {
       "id": "ui-move-candidate",

@@ -20,7 +20,8 @@ export interface SourcedCandidateForUI {
   fitBreakdown: Record<string, unknown> | null;
   sourceType: string;
   displayBucket: "talent_pool" | "newly_discovered";
-  state: "new" | "shortlisted" | "hidden" | "converted";
+  state: "new" | "shortlisted" | "hidden" | "converted" | "passed";
+  decisionRevision?: number;
   foundEmail: string | null;
   foundEmails: string[] | null;
   emailResolvedAt: string | null;

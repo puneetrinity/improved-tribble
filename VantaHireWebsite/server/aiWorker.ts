@@ -15,6 +15,7 @@
 import './lib/aiModelStartupGuard';
 import { assertCandidateIndexWorkerConfig } from './candidate-index/contracts';
 import { jobBriefEnabled } from './job-brief/contracts';
+import { sourcingEnabled } from './sourcing-authority/contracts';
 import { Worker, Job, UnrecoverableError } from 'bullmq';
 import { pool } from './db';
 import { storage } from './storage';
@@ -886,6 +887,7 @@ const REDIS_NAMESPACE = process.env.NODE_ENV || 'development';
 // Main entry
 async function main(): Promise<void> {
   assertCandidateIndexWorkerConfig();
+  sourcingEnabled(process.env,true);
   if (process.env.FLOW_JOB_BRIEF_ENABLED !== undefined) {
     jobBriefEnabled(process.env, true);
   }

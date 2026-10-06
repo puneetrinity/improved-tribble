@@ -19,6 +19,9 @@ import { registerClientsRoutes } from "./clients.routes";
 import { registerJobsRoutes } from "./jobs.routes";
 import { registerJobBriefRoutes } from "./job-brief/routes";
 import { jobBriefEnabled } from "./job-brief/contracts";
+import { sourcingEnabled } from "./sourcing-authority/contracts";
+import { registerSourcingAuthorityRoutes } from "./sourcing-authority/routes";
+import { startSourcingAuthorityWorker } from "./sourcing-authority/worker";
 import { registerApplicationsRoutes } from "./applications.routes";
 import { registerBulkResumeImportRoutes } from "./bulkResumeImport.routes";
 import { registerCommunicationsRoutes } from "./communications.routes";
@@ -53,6 +56,7 @@ import {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   jobBriefEnabled(); // Strict web-only configuration, before accepting requests.
+  sourcingEnabled();
   // Setup security middleware with environment-aware CSP
   const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -164,6 +168,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       apolloAppId: process.env.APOLLO_APP_ID || null,
       jobBriefEnabled: jobBriefEnabled(),
+      sourcingEnabled: sourcingEnabled(),
     });
   });
 
@@ -378,6 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register jobs routes (job CRUD, analytics, AI analysis)
   registerJobsRoutes(app, doubleCsrfProtection);
   registerJobBriefRoutes(app, doubleCsrfProtection);
+  registerSourcingAuthorityRoutes(app, doubleCsrfProtection);
 
   // Register applications routes (applications, pipeline, candidates, profiles)
   registerApplicationsRoutes(app, doubleCsrfProtection, upload);
@@ -461,6 +467,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   const httpServer = createServer(app);
+  let stopSourcingWorker: (()=>void)|undefined;
+  httpServer.once('listening',()=>{stopSourcingWorker=startSourcingAuthorityWorker(code=>console.error(`[Sourcing] ${code}`));});
+  httpServer.once('close',()=>stopSourcingWorker?.());
 
   // Handle HTTP parse errors gracefully (malformed requests, health checks, bots)
   httpServer.on('clientError', (err: NodeJS.ErrnoException, socket) => {

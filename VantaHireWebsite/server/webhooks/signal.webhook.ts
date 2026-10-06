@@ -42,6 +42,8 @@ import {
   commitIfSignalExecutionCurrent,
 } from '../lib/services/signal-execution-fence';
 import { requireNewCandidateIdentityAllowed } from '../candidate-privacy/decision';
+import {SourcingRepository} from '../sourcing-authority/repository';
+import {callbackBindingMatches} from '../sourcing-authority/contracts';
 
 const WEBHOOK_PROVIDER = 'signal';
 
@@ -214,6 +216,13 @@ export function registerSignalWebhook(app: Express) {
           payload.acquisitionGeneration ?? null,
         executionAttemptId: payload.executionAttemptId ?? null,
       };
+      const binding=await new SourcingRepository().call<{flowRunId:string;artifactHash:string;executionAttemptId:string}>(
+        'runBinding',[run.organizationId,run.jobId,run.requestId]);
+      if(!callbackBindingMatches(payload.governed,binding)||
+        (binding&&(payload.externalJobId!==run.externalJobId||callbackExecution.acquisitionGeneration!==1||callbackExecution.executionAttemptId!==binding.executionAttemptId))){
+        await finalizeWebhookEvent(claims.jti,'failed','Sourcing binding mismatch');
+        res.status(403).json({error:'Sourcing binding mismatch'});return;
+      }
       const initialExecutionDecision = decideSignalCallbackExecution(
         callbackExecution,
         readSignalExecution(run.meta),
