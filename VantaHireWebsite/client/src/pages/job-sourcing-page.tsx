@@ -62,6 +62,7 @@ const SOURCE_PRIORITY: Record<string, number> = {
 
 function sortCandidates(candidates: SourcedCandidateForUI[], sortBy: SortKey): SourcedCandidateForUI[] {
   const sorted = [...candidates];
+  if(sorted.some(c=>c.ranking))return sorted.sort((a,b)=>(a.ranking?.ordinal??101)-(b.ranking?.ordinal??101));
   const signalRank = (candidate: SourcedCandidateForUI): number =>
     typeof candidate.signalRank === "number" ? candidate.signalRank : Number.MAX_SAFE_INTEGER;
   const recencyDays = (candidate: SourcedCandidateForUI): number =>
@@ -250,6 +251,7 @@ export default function JobSourcingPage() {
   const prevCandidateCountRef = useRef<number>(-1);
 
   const allCandidates = candidatesData?.candidates ?? [];
+  const rubricRanked=candidatesData?.rankingProtocol===2||allCandidates.some(c=>c.ranking);
   const counts = candidatesData?.counts ?? { total: 0, talentPool: 0, newlyDiscovered: 0 };
   const shortlistedCandidates = allCandidates.filter((candidate) => candidate.state === "shortlisted");
   const shortlistedWithResolvedEmail = shortlistedCandidates.filter((candidate) => candidate.emailResolveStatus === "resolved" && candidate.foundEmail);
@@ -350,8 +352,9 @@ export default function JobSourcingPage() {
   );
 
   const grouped = useMemo(
-    () => splitByTier(filteredSorted, lockedTierModel ?? undefined),
-    [filteredSorted, lockedTierModel],
+    () => rubricRanked?{tierModel:'explicit' as const,bestMatches:filteredSorted.filter(c=>c.ranking?.eligibility!=='wider'),
+      broaderPool:filteredSorted.filter(c=>c.ranking?.eligibility==='wider')}:splitByTier(filteredSorted, lockedTierModel ?? undefined),
+    [filteredSorted, lockedTierModel,rubricRanked],
   );
 
   // Lock on first non-empty load
@@ -460,7 +463,7 @@ export default function JobSourcingPage() {
       job_id: jobId ?? 0,
       candidate_id: c.id,
       signal_rank: c.signalRank ?? 0,
-      fit_score: c.fitScore ?? 0,
+      ...(c.ranking ? {rubric_points:c.ranking.N,rubric_possible:c.ranking.D} : {fit_score:c.fitScore ?? 0}),
       engagement_ready: c.engagementReady ?? false,
     });
     setSelectedCandidate(c);
@@ -540,7 +543,9 @@ export default function JobSourcingPage() {
       {governedMessage&&<div role="status" className="container mx-auto px-4 py-3">{governedMessage}</div>}
       {capability.isError&&<div role="alert">Sourcing settings unavailable. <Button onClick={()=>void capability.refetch()}>Retry settings</Button></div>}
       {governed&&<div className="container mx-auto px-4 py-3" aria-live="polite">
-        <p>{preview.data?.state==='complete'?`${preview.data.countRelation==='gte'?'At least':'Approximately'} ${preview.data.count?.toLocaleString()} matching profiles${preview.data.stale?' (stale)':''}`:'Pool size unavailable — this does not block sourcing.'}</p>
+        <p>{preview.data?.state==='complete'?`${preview.data.countRelation==='gte'?'At least':'Approximately'} ${preview.data.count?.toLocaleString()} profiles match the search filters${preview.data.stale?' (stale)':''}`:'Pool size unavailable — this does not block sourcing.'}</p>
+        <p>Your experience and skills requirements may reduce the final list.</p>
+        {brief.data && <Button variant="outline" asChild><a href={`/jobs/${jobId}/edit#job-brief`}>Edit brief</a></Button>}
         {preview.data?.observedAt&&<p>Checked {new Date(preview.data.observedAt).toLocaleString()}</p>}
         {preview.data?.artifactId&&<Button variant="outline" disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'refresh',artifactId:preview.data!.artifactId!})}>Refresh pool size</Button>}
         {preview.data?.allowanceResetAt&&<p>Monthly allowance resets {new Date(preview.data.allowanceResetAt).toLocaleString()}.</p>}
@@ -548,9 +553,12 @@ export default function JobSourcingPage() {
         {preview.data?.admissionState==='needs_attention'&&<p>This run needs operator review. Its reserved allowance has not been returned; do not start another purchase.</p>}
         {!preview.data?.artifactId&&<p>{preview.isError?'Preparation status unavailable. Refresh to check; no work was started by this page.':
           preview.data?.preparationCode==='QUERY_MAPPING_UNSUPPORTED'?`Edit unsupported search criteria: ${(preview.data.criterionIds??[]).join(', ')}.`:
+          preview.data?.preparationCode==='SOURCING_DIGEST_UNAUTHORIZED'?'Brief preparation needs service credential repair. Contact your administrator.':
+          preview.data?.preparationCode==='SOURCING_DIGEST_RATE_LIMITED'?'Brief preparation was rate-limited. Retry once when the service is available.':
           preview.data?.preparation==='failed'?'Brief preparation failed.':preview.data?.preparation==='unknown'?'Preparation outcome unknown; administrator review required.':
           preview.data?.preparation==='reserved'||preview.data?.preparation==='started'?'Preparing the approved brief. Find candidates becomes available when ready.':'No prepared approved brief is available.'}</p>}
         {preview.data?.preparation==='failed'&&preview.data.preparationCode!=='QUERY_MAPPING_UNSUPPORTED'&&brief.data?.approvedVersionId&&<Button disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'retry_preparation',briefVersionId:brief.data!.approvedVersionId!})}>Retry preparation once</Button>}
+        {preview.isSuccess&&!preview.data?.preparation&&!preview.data?.artifactId&&brief.data?.approvedVersionId&&<Button disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'retry_preparation',briefVersionId:brief.data!.approvedVersionId!})}>Prepare approved brief</Button>}
       </div>}
       <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
         {/* Single job navigation, same placement as every other job page */}
@@ -751,10 +759,10 @@ export default function JobSourcingPage() {
 
         {isCompleted && counts.total === 0 && !candidatesLoading && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-sm text-muted-foreground mb-4">No matching candidates found for this role.</p>
-            <Button variant="outline" size="sm" onClick={() => findCandidates({})} disabled={findPending}>
+            <p className="text-sm text-muted-foreground mb-4">{rubricRanked?"No candidates could be shown under the approved brief and available evidence. The completed sourcing run is still used.":"No matching candidates found for this role."}</p>
+            {!governed&&<Button variant="outline" size="sm" onClick={() => findCandidates({})} disabled={findPending}>
               Retry
-            </Button>
+            </Button>}
           </div>
         )}
 
@@ -764,7 +772,7 @@ export default function JobSourcingPage() {
               <Card>
                 <CardContent className="p-4">
                   <p className="text-xs text-muted-foreground">
-                    {allBroader ? "Wider Search Results" : "Total"}
+                    {rubricRanked?"Candidates available":allBroader ? "Wider Search Results" : "Total"}
                   </p>
                   <p className="text-base font-semibold">{counts.total}</p>
                 </CardContent>
@@ -773,13 +781,13 @@ export default function JobSourcingPage() {
                 <>
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground">Top Matches</p>
+                      <p className="text-xs text-muted-foreground">{rubricRanked?"Within approved range / unrestricted":"Top Matches"}</p>
                       <p className="text-base font-semibold">{bestMatches.length}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground">Wider Search</p>
+                      <p className="text-xs text-muted-foreground">{rubricRanked?"Wider experience group":"Wider Search"}</p>
                       <p className="text-base font-semibold">{broaderPool.length}</p>
                     </CardContent>
                   </Card>
@@ -787,7 +795,8 @@ export default function JobSourcingPage() {
               )}
             </div>
 
-            {(qualityDebug || kpis) && (
+            {rubricRanked&&allCandidates.length<100&&<p className="text-sm text-muted-foreground mb-4">{allCandidates.length} candidates are available under the approved brief and privacy rules. We do not pad the list or start another purchase to reach 100.</p>}
+            {!rubricRanked&&(qualityDebug || kpis) && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 p-3 mb-4">
                 <p className="text-xs font-medium text-slate-800 dark:text-slate-200">
                   Search Quality
@@ -806,7 +815,7 @@ export default function JobSourcingPage() {
               </div>
             )}
 
-            {strictRescueApplied && (
+            {!rubricRanked&&strictRescueApplied && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-3 mb-4">
                 <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
                   We found limited exact matches, so we're showing the best available candidates in the requested region.
@@ -818,7 +827,7 @@ export default function JobSourcingPage() {
               </div>
             )}
 
-            {allBroader && (
+            {!rubricRanked&&allBroader && (
               <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-3 mb-4">
                 <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                   {requestedLocation
@@ -838,7 +847,7 @@ export default function JobSourcingPage() {
               </div>
             )}
 
-            {!allBroader && !bestMatchesOnly && broaderPool.length > 0 && (
+            {!rubricRanked&&!allBroader && !bestMatchesOnly && broaderPool.length > 0 && (
               <div className="rounded-lg border border-warning/30 bg-warning/10 p-3 mb-4">
                 <p className="text-sm text-warning-foreground font-medium">
                   {requestedLocation
@@ -855,6 +864,7 @@ export default function JobSourcingPage() {
 
             <div className="mb-4">
               <SourcingFilters
+                rubricRanked={rubricRanked}
                 governed={governed}
                 filters={filters}
                 onChange={setFilters}
@@ -874,7 +884,7 @@ export default function JobSourcingPage() {
                 <section>
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-sm font-medium text-muted-foreground">
-                      {requestedLocation ? `Additional Candidates near ${requestedLocation}` : "Wider Search Results"}
+                      {rubricRanked?"Wider experience range — all required skills evidenced":requestedLocation ? `Additional Candidates near ${requestedLocation}` : "Wider Search Results"}
                     </h2>
                     <Badge variant="secondary">{currentBroaderPool.length}</Badge>
                   </div>
@@ -886,7 +896,7 @@ export default function JobSourcingPage() {
                     <section>
                       <div className="flex items-center justify-between mb-2">
                         <h2 className="text-sm font-medium text-muted-foreground">
-                          {grouped.tierModel === "fallback"
+                          {rubricRanked?(allCandidates.some(c=>c.ranking?.eligibility==='in_range')?"Within approved range":"Candidates ranked against approved brief"):grouped.tierModel === "fallback"
                             ? "Candidates"
                             : requestedLocation ? `Top Matches in ${requestedLocation}` : "Top Matches"}
                         </h2>
@@ -904,7 +914,7 @@ export default function JobSourcingPage() {
                         onClick={() => setShowBroader((v) => !v)}
                       >
                         {showBroader ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        Wider Search Results ({broaderPool.length})
+                        {rubricRanked?"Wider experience range — all required skills evidenced":"Wider Search Results"} ({broaderPool.length})
                       </button>
                       {showBroader && renderList(currentBroaderPool)}
                     </section>

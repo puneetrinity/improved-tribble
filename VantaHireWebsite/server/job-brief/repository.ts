@@ -7,6 +7,7 @@ const failures: Record<string, number> = {
   BRIEF_REQUEST_CONFLICT:409, BRIEF_REVISION_CONFLICT:409, BRIEF_SOURCE_CONFLICT:409,
   BRIEF_APPROVAL_REQUIRED:409, BRIEF_SOURCE_REQUIRED:409, BRIEF_DRAFT_INFLIGHT:409,
   BRIEF_DRAFT_SETTLED:409, BRIEF_DRAFT_LIMIT:429,
+  BRIEF_UPDATED_APPROVAL_REQUIRED:409,
 };
 export function closedDatabaseError(error: unknown): BriefError {
   const e=error as {code?:string;message?:string};

@@ -11,6 +11,7 @@ export type MatchStrength = "strong" | "good" | "possible";
 export type LocationMatchType = "city_exact" | "city_alias" | "country_only" | "unknown_location" | "none";
 
 export interface SourcedCandidateForUI {
+  ranking?:import('../../../server/sourcing-authority/ranking-contract').RankedCandidate;
   id: number;
   jobId: number;
   signalCandidateId: string;
@@ -130,6 +131,7 @@ export interface SourcingStatus {
 }
 
 export interface SourcedCandidatesResponse {
+  rankingProtocol?: 2;
   candidates: SourcedCandidateForUI[];
   counts: {
     total: number;

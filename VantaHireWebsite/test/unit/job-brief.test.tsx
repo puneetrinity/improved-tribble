@@ -1,5 +1,5 @@
 import React from 'react';
-import {act} from 'react-dom/test-utils';
+import {act,Simulate} from 'react-dom/test-utils';
 import {createRoot,type Root} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
@@ -10,7 +10,7 @@ vi.mock('../../client/src/lib/queryClient',()=>({apiRequest:mocks.api}));
 import {JobBriefPanel} from '../../client/src/components/job-brief-panel';
 const id='10000000-0000-4000-8000-000000000001';
 const criterion={id,label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}};
-const payload={schemaVersion:1,compilerVersion:1,taxonomyVersion:1,criteria:[criterion]};
+const payload={schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[criterion]};
 const brief={revision:'2',currentJD:'Build Python services.',sourceHash:'a'.repeat(64),latest:{version_id:id,version_number:1,payload},approvedVersionId:null,draft:null,source:{initialized:true,ambiguous:false,choices:[]}};
 describe('brief recruiter UI',()=>{
   let host:HTMLDivElement;let root:Root;let cache:QueryClient;
@@ -23,6 +23,33 @@ describe('brief recruiter UI',()=>{
   const render=()=>act(async()=>{root.render(<QueryClientProvider client={cache}><JobBriefPanel jobId={9} actorId={3}/></QueryClientProvider>);});
   const button=(label:string)=>Array.from(host.querySelectorAll('button')).find(b=>b.textContent===label)!;
   const click=(label:string)=>act(async()=>{button(label).click();});
+  const change=(label:string,value:string)=>act(async()=>{
+    const element=host.querySelector(`[aria-label="${label}"]`) as HTMLInputElement;
+    element.value=value;Simulate.change(element);
+  });
+  it('historical briefs need explicit save and reapproval without an automatic request',async()=>{
+    mocks.query.mockReturnValue({data:{...brief,latest:{...brief.latest,payload:{...payload,schemaVersion:1,compilerVersion:1,taxonomyVersion:1}}},isPending:false,isError:false});
+    await render();expect(button('Approve brief').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
+    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload).toMatchObject({schemaVersion:2,compilerVersion:2,taxonomyVersion:2});
+    expect(mocks.intent).toHaveBeenCalledTimes(1);
+  });
+  it('shows editable scoring titles in the one approval flow, defaulting to preferred',async()=>{
+    await render();await change('Criterion 1 type','title');
+    await change('Criterion 1 accepted titles','Backend Engineer\n\nBackend Developer\n');
+    expect(button('Approve brief').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('They do not change the search title list');
+    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload.criteria[0]).toMatchObject({
+      subject:'title',class:'preferred',use:'assessment',requirement:{kind:'accepted_titles',values:['Backend Engineer','Backend Developer']}});
+  });
+  it('saves an explicit range and does not convert a cleared minimum into zero',async()=>{
+    await render();await change('Criterion 1 type','experience_years');
+    await change('Criterion 1 requirement','6');await change('Criterion 1 maximum years','10');
+    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload.criteria[0].requirement).toEqual({kind:'experience_range',minimum:6,maximum:10});
+    await change('Criterion 1 type','experience_years');await change('Criterion 1 maximum years','10');
+    await change('Criterion 1 requirement','');await click('Save brief');
+    expect(Number.isNaN(mocks.intent.mock.calls[1][4].payload.criteria[0].requirement.minimum)).toBe(true);
+    expect(host.textContent).toContain('Internships do not count');
+  });
   it('approval sends only the saved version and never publishes or sources',async()=>{
     await render();expect(mocks.intent).not.toHaveBeenCalled();await click('Approve brief');
     expect(mocks.intent).toHaveBeenCalledExactlyOnceWith(3,9,'approve-brief','/api/jobs/9/brief/approve',{expectedRevision:2,versionId:id},'POST');

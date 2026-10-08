@@ -62,7 +62,7 @@ export function compileSourcingQuery(rawBasis: unknown, rawDigest: unknown, prep
     if (criterion.subject === 'skill' && criterion.requirement.kind === 'text' && ['must_have','preferred'].includes(criterion.class)) {
       (criterion.class === 'preferred' ? preferredSkills : skills).push(criterion.requirement.value);
     }
-    if (criterion.subject === 'experience_years' && criterion.requirement.kind === 'minimum_years' && criterion.class === 'must_have') {
+    if (criterion.subject === 'experience_years' && ['minimum_years', 'experience_range'].includes(criterion.requirement.kind) && 'minimum' in criterion.requirement && criterion.class === 'must_have') {
       minimumExperience = Math.max(minimumExperience ?? 0, criterion.requirement.minimum);
     }
   }

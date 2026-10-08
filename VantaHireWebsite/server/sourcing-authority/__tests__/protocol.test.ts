@@ -5,6 +5,7 @@ vi.mock('../../candidate-privacy/decision',()=>({requireCandidatePrivacyAllowed:
 vi.mock('../../lib/aiModelConfig',()=>({getGroqModel:()=> 'fixture-model'}));
 import { admitSourcing, openQuote, sealQuote, quoteSourcing } from '../commands';
 import {SourcingRepository} from '../repository';
+import {closedDatabaseError} from '../../job-brief/repository';
 import type {Pool} from 'pg';
 import {verifySignalSourcingJwt,clearKeyCache} from '../../lib/services/jwt-signer';
 import {callbackBindingMatches} from '../contracts';
@@ -61,6 +62,15 @@ describe('authenticated sourcing quote',()=>{
 });
 
 describe('brief approval independent of paid sourcing allowance',()=>{
+  it('returns a conflict for an outdated brief rather than service unavailable',()=>{
+    expect(closedDatabaseError({code:'P0001',message:'BRIEF_UPDATED_APPROVAL_REQUIRED'})).toMatchObject({status:409});
+  });
+  it('rolls back an invalid SQL-produced ranking contract before committing a reservation',async()=>{
+    const query=vi.fn(async(sql:string)=>({rows:sql.includes('flow_sourcing_admit')?[{result:{id,replayed:false,rankingContract:{invalid:true}}}]:[]}));
+    const client={query,release:vi.fn()},pool={connect:vi.fn().mockResolvedValue(client)} as unknown as Pool;
+    await expect(new SourcingRepository(pool).call('admit',[])).rejects.toMatchObject({code:'SOURCING_INVALID_COMMAND',status:409});
+    expect(query).toHaveBeenCalledWith('ROLLBACK');expect(query).not.toHaveBeenCalledWith('COMMIT');
+  });
   it.each([false,true])('commits approval with enabled=%s and schedules only when entitled',async enabled=>{
     const query=vi.fn(async(sql:string)=>({rows:sql.includes('flow_sourcing_org_state')?[{result:{enabled,latched:enabled}}]:
       sql.includes('flow_job_brief_approve')?[{result:{approved:true}}]:[]}));

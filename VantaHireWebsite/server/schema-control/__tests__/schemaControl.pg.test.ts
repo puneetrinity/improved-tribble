@@ -241,6 +241,28 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
     for (const dir of scratch) rmSync(dir, { recursive: true, force: true });
   });
 
+  it("upgrades the shipped 0015 ledger to 0016 exactly once and preserves restricted grants", async () => {
+    const previous=mkdtempSync(join(tmpdir(),'flow-schema-control-5c-upgrade-'));scratch.push(previous);
+    const manifest=loadManifest(migrationsDir),lock=JSON.parse(readFileSync(join(migrationsDir,'checksums.lock'),'utf8'));
+    for(const entry of manifest.filter(e=>e.version<='0015'))copyFileSync(join(migrationsDir,entry.file),join(previous,entry.file));
+    copyFileSync(join(migrationsDir,'catalog.lock.json'),join(previous,'catalog.lock.json'));
+    delete lock.migrations['0016'];writeFileSync(join(previous,'checksums.lock'),JSON.stringify(lock));
+    expect((await runReleaseMigration({migrationsDir:previous,creds:credentials(),connect})).applied).toHaveLength(16);
+    expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:['0016']});
+    expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:[]});
+    await provisionRuntimeRole({migrateUrl:databaseUrl,runtimeUrl:runtimeDatabaseUrl,runtimeRole:'flow_schema_control_test_runtime',
+      expectedTargetId:targetId,connectMigration:connect,connectRuntime:async()=>{
+        const runtime=await runtimeClient();return {query:(text,params)=>runtime.query(text,params as any),end:()=>runtime.end()};
+      }});
+    const runtime=await runtimeClient();
+    try {
+      const privileges=await runtime.query("SELECT has_table_privilege(current_user,'public.sourcing_admissions','SELECT,INSERT,UPDATE,DELETE') direct,has_function_privilege(current_user,'public.flow_sourcing_admit(integer,integer,integer,uuid,jsonb)','EXECUTE') admit,has_function_privilege(current_user,'public.flow_sourcing_enable(integer,uuid)','EXECUTE') enable");
+      expect(privileges.rows[0]).toEqual({direct:false,admit:true,enable:false});
+      await assertSchemaReady({pg:{query:(text,params)=>runtime.query(text,params as any)},migrationsDir,
+        environment:'development',expectedTargetId:targetId,criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS});
+    }finally{await runtime.end();}
+  });
+
   it("installs the exact baseline once and repeats as a no-op", async () => {
     expect(loadManifest(migrationsDir).map(entry => entry.file)).toEqual(expect.arrayContaining([
       "0002_resume_access_attempts.sql", "0004_reviewer_share_authority.sql",
@@ -275,6 +297,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0013", apply_mode: "adopted" },
         { version: "0014", apply_mode: "adopted" },
         { version: "0015", apply_mode: "adopted" },
+        { version: "0016", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { Pool } from 'pg';
 import { resolveJobDescription } from '../../shared/jobDescription';
-import { approveBriefSchema, briefPayloadSchema, canonicalJson, currentJdSchema, saveBriefSchema, sourceHash, validateSourceSpans } from './contracts';
+import { approveBriefSchema, currentBriefPayloadSchema, canonicalJson, currentJdSchema, saveBriefSchema, sourceHash, validateSourceSpans } from './contracts';
 import { BriefError, BriefRepository, scopeParameters, type BriefScope } from './repository';
 
 export type BriefRead = {
@@ -78,7 +78,9 @@ export async function editGovernedJob(repository:BriefRepository,scope:BriefScop
 /** Model output is a proposal. This validates it without saving or approving. */
 export function parseDraftProposal(content:string,jd:string) {
   if (Buffer.byteLength(content,'utf8')>65_536) throw new BriefError('BRIEF_MODEL_INVALID',502);
-  const proposal=briefPayloadSchema.parse(JSON.parse(content));
+  const proposal=currentBriefPayloadSchema.parse(JSON.parse(content));
+  // AI may suggest alternatives, never silently promote the noisy title signal.
+  for (const c of proposal.criteria) if (c.subject==='title') c.class='preferred';
   validateSourceSpans(proposal,jd);
   return proposal;
 }

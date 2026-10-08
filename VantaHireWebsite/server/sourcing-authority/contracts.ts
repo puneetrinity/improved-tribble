@@ -39,16 +39,20 @@ export const sourcingDecisionSchema = z.object({
 });
 export type SourcingDecision = z.infer<typeof sourcingDecisionSchema>;
 
-export const sourcingDeliverySchema=z.object({
+const legacyDeliverySchema=z.object({
   protocolVersion:z.literal(1),flowRunId:idSchema,artifactHash:hashSchema,executionAttemptId:idSchema,
   revision:z.number().int().min(1).max(2147483647),orderedSignalIds:z.array(z.string().min(1).max(256)).max(100),
-}).strict().refine(v=>new Set(v.orderedSignalIds).size===v.orderedSignalIds.length,'duplicate delivery identity');
+}).strict();
+export const sourcingDeliverySchema=z.discriminatedUnion('protocolVersion',[
+  legacyDeliverySchema,
+  legacyDeliverySchema.extend({protocolVersion:z.literal(2),rankingRevision:idSchema,rankingHash:hashSchema,contractHash:hashSchema}).strict(),
+]).refine(v=>new Set(v.orderedSignalIds).size===v.orderedSignalIds.length,'duplicate delivery identity');
 export type SourcingDelivery=z.infer<typeof sourcingDeliverySchema>;
-export const sourcingCallbackBindingSchema=z.object({protocolVersion:z.literal(1),flowRunId:idSchema,artifactHash:hashSchema}).strict();
-export function callbackBindingMatches(raw:unknown,binding:{flowRunId:string;artifactHash:string}|null):boolean {
+export const sourcingCallbackBindingSchema=z.object({protocolVersion:z.union([z.literal(1),z.literal(2)]),flowRunId:idSchema,artifactHash:hashSchema}).strict();
+export function callbackBindingMatches(raw:unknown,binding:{flowRunId:string;artifactHash:string;protocolVersion?:1|2}|null):boolean {
   if(!binding)return raw===undefined;
   const parsed=sourcingCallbackBindingSchema.safeParse(raw);
-  return parsed.success&&parsed.data.flowRunId===binding.flowRunId&&parsed.data.artifactHash===binding.artifactHash;
+  return parsed.success&&parsed.data.flowRunId===binding.flowRunId&&parsed.data.artifactHash===binding.artifactHash&&parsed.data.protocolVersion===(binding.protocolVersion??1);
 }
 
 export const sourcingAdmissionSchema = z.object({

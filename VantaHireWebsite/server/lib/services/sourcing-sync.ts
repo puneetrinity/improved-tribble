@@ -10,6 +10,7 @@ import type { SignalExecutionIdentity } from './signal-callback-ack';
 import { commitIfSignalExecutionCurrent,buildSignalExecutionLockQuery } from './signal-execution-fence';
 import {sourcingDeliverySchema,type SourcingDelivery} from '../../sourcing-authority/contracts';
 import {SourcingRepository} from '../../sourcing-authority/repository';
+import {rankedCandidateSchema} from '../../sourcing-authority/ranking-contract';
 import { loadCandidatePrivacyConfig } from '../../candidate-privacy/config';
 import { checkMemoryEligibilityBatch } from '../../candidate-privacy/memory-client';
 
@@ -152,6 +153,9 @@ function buildSignalRunMetaPatch(
 
   return {
     signalStatus: fetchedResults.status,
+    ...(fetchedResults.governed?.protocolVersion===2?{rankingProtocolVersion:2,
+      rankingRevision:fetchedResults.governed.rankingRevision,rankingHash:fetchedResults.governed.rankingHash,
+      rankingContractHash:fetchedResults.governed.contractHash}:{}),
     resultCount: fetchedResults.resultCount,
     ...(fetchedResults.trackDecision ? { trackDecision: fetchedResults.trackDecision } : {}),
     ...(fetchedResults.groupCounts ? { groupCounts: fetchedResults.groupCounts } : {}),
@@ -196,6 +200,7 @@ export async function upsertSignalCandidates(
     const searchSignals = (c.candidate as unknown as { searchSignals?: unknown }).searchSignals ?? null;
 
     const summary = {
+      ...(governed?.protocolVersion===2?{ranking:rankedCandidateSchema.parse(c.ranking)}:{}),
       candidate: c.candidate,
       sourcingContext: c.sourcingContext,
       cardSignals: c.cardSignals,
@@ -279,7 +284,9 @@ export async function upsertSignalCandidates(
       if(locked.rows.length!==1)throw Error('SOURCING_DELIVERY_EXECUTION_STALE');
       if(rows.length)await transaction.execute(bulkSql);
       const command={requestId,executionAttemptId:governed.executionAttemptId,artifactHash:governed.artifactHash,
-        revision:governed.revision,orderedSignalIds:governed.orderedSignalIds};
+        revision:governed.revision,orderedSignalIds:governed.protocolVersion===2
+          ? allowedCandidates.map(c=>c.candidate.id) : governed.orderedSignalIds,
+        ...(governed.protocolVersion===2?{rankingRevision:governed.rankingRevision,rankingHash:governed.rankingHash,contractHash:governed.contractHash}:{})};
       const result=await transaction.execute(sql`SELECT public.flow_sourcing_deliver(${organizationId},${governed.flowRunId}::uuid,${JSON.stringify(command)}::jsonb) result`);
       if(!result.rows[0]?.result)throw Error('SOURCING_DELIVERY_BINDING_MISSING');
     });
@@ -327,12 +334,29 @@ export async function syncSignalResultsIntoVanta(
   const candidates = Array.isArray(fetchedResults.data)
     ? fetchedResults.data
     : [];
-  const binding=await new SourcingRepository().call<{flowRunId:string;artifactHash:string;executionAttemptId:string}>('runBinding',
+  const binding=await new SourcingRepository().call<{flowRunId:string;artifactHash:string;executionAttemptId:string;protocolVersion?:1|2;contractHash?:string}>('runBinding',
     [params.organizationId,params.jobId,params.requestId]);
   const governed=binding?sourcingDeliverySchema.parse(fetchedResults.governed):undefined;
+  if(governed && (governed.protocolVersion!==(binding!.protocolVersion??1)||
+    (governed.protocolVersion===2&&governed.contractHash!==binding!.contractHash)))throw Error('SOURCING_RANKING_CONFLICT');
   if(governed && (governed.flowRunId!==binding!.flowRunId || governed.artifactHash!==binding!.artifactHash ||
     governed.executionAttemptId!==binding!.executionAttemptId || fetchedResults.requestId!==params.requestId ||
-    fetchedResults.externalJobId!==params.externalJobId || JSON.stringify(governed.orderedSignalIds)!==JSON.stringify(candidates.map(c=>c.candidate.id))))throw Error('SOURCING_DELIVERY_BINDING_MISMATCH');
+    fetchedResults.externalJobId!==params.externalJobId || (governed.protocolVersion===1&&JSON.stringify(governed.orderedSignalIds)!==JSON.stringify(candidates.map(c=>c.candidate.id)))))throw Error('SOURCING_DELIVERY_BINDING_MISMATCH');
+  if(governed?.protocolVersion===2) {
+    let previous=0;
+    const seen=new Set<string>();
+    if(JSON.stringify(governed.orderedSignalIds)!==JSON.stringify(candidates.map(c=>c.candidate.id)))
+      throw Error('SOURCING_DELIVERY_BINDING_MISMATCH');
+    for(const candidate of candidates) {
+      const ranking=rankedCandidateSchema.parse(candidate.ranking);
+      if(ranking.revisionId!==governed.rankingRevision||ranking.outputHash!==governed.rankingHash||
+        ranking.contractHash!==governed.contractHash||ranking.candidateId!==candidate.candidate.id||
+        ranking.ordinal<=previous||
+        candidate.sourcingContext?.rank!==ranking.ordinal||seen.has(ranking.candidateId)||candidate.fitScore!=null)
+        throw Error('SOURCING_RANKING_CONFLICT');
+      previous=ranking.ordinal;seen.add(ranking.candidateId);
+    }
+  }
   if(!binding&&fetchedResults.governed)throw Error('SOURCING_DELIVERY_BINDING_MISSING');
   let candidateCount = fetchedResults.resultCount ?? 0;
   let upsertedCount = 0;

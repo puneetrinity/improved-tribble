@@ -50,5 +50,9 @@ describe('governed sourcing browser contract',()=>{
     expect(sourcingErrorMessage('SOURCING_ALLOWANCE_EXHAUSTED')).toContain('Neither');
     expect(sourcingErrorMessage('SOURCING_PAYER_CHANGED')).toContain('fresh confirmation');
     expect(sourcingErrorMessage('SOURCING_PREPARING')).toContain('prepared');
+    expect(sourcingErrorMessage('BRIEF_UPDATED_APPROVAL_REQUIRED')).toContain('approve the updated brief');
+    expect(sourcingErrorMessage('SOURCING_UPDATED_BRIEF_REQUIRED')).toContain('approve the updated brief');
+    expect(sourcingErrorMessage('SOURCING_DIGEST_UNAUTHORIZED')).toContain('credentials');
+    expect(sourcingErrorMessage('SOURCING_DIGEST_RATE_LIMITED')).toContain('rate-limited');
   });
 });

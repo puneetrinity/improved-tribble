@@ -11,7 +11,7 @@ import {afterAll,beforeAll,describe,expect,it} from 'vitest';
 
 const enabled=process.env.FLOW_SOURCING_PROCESS_DISPOSABLE==='1';
 const execFileAsync=promisify(execFile);
-describe.skipIf(!enabled)('retained real-process privacy/history on the 5B Flow schema',()=>{
+describe.skipIf(!enabled)('retained real-process privacy/history on the 5C Flow schema',()=>{
   let root:string,port:number,memory:string,python:string,started=false;
   const pg='/usr/lib/postgresql/16/bin';
   const cleanEnv:NodeJS.ProcessEnv={PATH:process.env.PATH,LANG:'C.UTF-8',HOME:process.env.HOME,
@@ -51,7 +51,7 @@ def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
     if old in body:
         assert body.count(old)==1
-        body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+        body=body.replace(old,"if(result.applied.length!==17)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 # Only the exact new ledger tail changes. All six old process assertions,
@@ -82,7 +82,7 @@ from tests import test_candidate_index_cross_system as index
 original=index._node
 def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
-    if old in body: body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+    if old in body: body=body.replace(old,"if(result.applied.length!==17)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 class Stack(index.ProcessStack):
@@ -117,7 +117,7 @@ finally:s.close()
   },420000);
   it.skipIf(!process.env.FLOW_SOURCING_DISCOVER_ROOT||(Boolean(process.env.FLOW_SOURCING_PROCESS_ONLY)&&process.env.FLOW_SOURCING_PROCESS_ONLY!=='governed'))('runs an admitted search through real Flow, Discover, Redis and Memory processes',async()=>{
     const discover=resolve(process.env.FLOW_SOURCING_DISCOVER_ROOT!);
-    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('b17b65cd088bec5818bef27459690e61b051f1d7');
+    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('b7744ff330e88e7ba3b1a8eca1b09959803fe752');
     const env={...cleanEnv,ACTIVEKG_INDEX_XS_FLOW_ROOT:resolve('..'),
       ACTIVEKG_INDEX_XS_ADMIN_DSN:`postgresql://fixture_admin_test@127.0.0.1:${port}/postgres`,
       FLOW_INDEX_TEST_OWNER_URL:`postgresql://flow_4d_test_placeholder_owner_test@127.0.0.1:${port}/flow_4d_test_placeholder_test`,
@@ -136,7 +136,7 @@ from tests import test_candidate_index_cross_system as index
 original=index._node
 def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
-    if old in body: body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+    if old in body: body=body.replace(old,"if(result.applied.length!==17)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 class Stack(index.ProcessStack):
@@ -228,13 +228,14 @@ globalThis.fetch=async(input,init)=>{
    if(headers.get('x-api-version')!=='2025-11-01')throw Error('FIXTURE_API_VERSION');
    fs.appendFileSync(process.env.FIXTURE_PROVIDER_LOG,JSON.stringify({kind:'crustdata',body})+'\n');
    if(body.limit===300&&process.env.FIXTURE_ACQUISITION_FAIL==='1')throw Error('fixture-provider-timeout-after-dispatch');
-   const profiles=process.env.FIXTURE_ACQUISITION_FAIL==='2'?[{
-     crustdata_person_id:951001,basic_profile:{name:'Synthetic Backend Fixture',headline:'Senior Backend Engineer',current_title:'Senior Backend Engineer',summary:'Python backend services and PostgreSQL',location:{city:'Bengaluru',country:'India',full_location:'Bengaluru, India'}},
+   const profiles=process.env.FIXTURE_ACQUISITION_FAIL==='2'?['2020-01-01','2015-01-01','2005-01-01',null].map((start,index)=>({
+     crustdata_person_id:951001+index,basic_profile:{name:index?'Synthetic Range Fixture '+index:'Synthetic Backend Fixture',headline:'Senior Backend Engineer',current_title:'Senior Backend Engineer',summary:'Python backend services and PostgreSQL',location:{city:'Bengaluru',country:'India',full_location:'Bengaluru, India'}},
      skills:{professional_network_skills:['Python','PostgreSQL']},years_of_experience_raw:6,
-     experience:{employment_details:{current:[{company_name:'Fixture Systems',title:'Senior Backend Engineer',start_date:'2020-01-01',description:'Build Python backend services'}]}},
-     social_handles:{professional_network_identifier:{profile_url:'https://www.linkedin.com/in/synthetic-governed-fixture'}}
-   }]:[];
-   return Response.json({profiles,total_count:profiles.length},{headers:{'X-Credits-Used':profiles.length?'0.03':'0'}});
+     experience:{employment_details:{current:start?[{company_name:'Fixture Systems',title:'Senior Backend Engineer',start_date:start,description:'Build Python backend services'}]:[]}},
+     social_handles:{professional_network_identifier:{profile_url:'https://www.linkedin.com/in/synthetic-governed-fixture-'+index}}
+   })):[];
+   const returned=profiles.slice(0,body.limit);
+   return Response.json({profiles:returned,total_count:profiles.length},{headers:{'X-Credits-Used':String(returned.length*0.03)}});
  }
  fs.appendFileSync(process.env.FIXTURE_FORBIDDEN,'unexpected-fetch\n');
  throw Error('FIXTURE_EXTERNAL_FETCH_REFUSED');
@@ -282,7 +283,10 @@ globalThis.fetch=async(input,init)=>{
                 jd='Build reliable Python backend services and maintain production software.'
                 flow.execute('UPDATE jobs SET original_jd=%s,description=%s WHERE id=%s',(jd,jd,job))
                 body={'action':'save_brief','currentJD':jd,'sourceChoice':'original_prose','requesterKind':'recruiter','reasonCode':'other',
-                    'payload':{'schemaVersion':1,'compilerVersion':1,'taxonomyVersion':1,'criteria':[{'id':str(uuid4()),'label':'Python','class':'must_have','subject':'skill','requirement':{'kind':'text','value':'Python'},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}}]}}
+                    'payload':{'schemaVersion':2,'compilerVersion':2,'taxonomyVersion':2,'criteria':[
+                        {'id':str(uuid4()),'label':'Python','class':'must_have','subject':'skill','requirement':{'kind':'text','value':'Python'},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}},
+                        {'id':str(uuid4()),'label':'Backend role','class':'preferred','subject':'title','requirement':{'kind':'accepted_titles','values':['Backend Engineer','Backend Developer']},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}},
+                        {'id':str(uuid4()),'label':'Recorded experience','class':'must_have','subject':'experience_years','requirement':{'kind':'experience_range','minimum':6,'maximum':10},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}}]}}
                 saved=flow.execute('SELECT flow_job_brief_save(%s,%s,%s,%s,0,%s)',(org,job,actor,str(uuid4()),Jsonb(body))).fetchone()[0]
                 approval=self.post(client,f'/api/jobs/{job}/brief/approve',json={'requestId':str(uuid4()),'expectedRevision':1,'versionId':saved['versionId']})
                 assert approval.status_code==200,(approval.status_code,approval.text)
@@ -321,14 +325,16 @@ globalThis.fetch=async(input,init)=>{
                     # observe the independent delivery boundary explicitly.
                     self.wait(lambda: flow.execute('SELECT count(*) FROM sourcing_deliveries WHERE organization_id=%s',(org,)).fetchone()[0]==1)
                     if os.environ.get('FIXTURE_ACQUISITION_FAIL')=='2':
-                        assert flow.execute('SELECT count(*) FROM sourcing_delivery_items WHERE organization_id=%s',(org,)).fetchone()[0]==1
+                        assert flow.execute('SELECT count(*) FROM sourcing_delivery_items WHERE organization_id=%s',(org,)).fetchone()[0]==2
+                        assert discover.execute('SELECT count(*) FROM governed_ranking_items WHERE tenant_id=%s',(tenant,)).fetchone()[0]==4
+                        assert discover.execute('SELECT eligibility_code FROM governed_ranking_items WHERE tenant_id=%s AND selected_ordinal IS NOT NULL ORDER BY selected_ordinal',(tenant,)).fetchall()==[('in_range',),('wider',)]
                 calls=[json.loads(x) for x in self.provider_log.read_text().splitlines()]
                 assert len([x for x in calls if x['kind']=='digest'])==1,calls
                 assert len([x for x in calls if x['kind']=='crustdata' and x['body']['limit']==300])==1,calls
                 assert self.forbidden.read_text()==''
                 browser('after')
                 if os.environ.get('FIXTURE_ACQUISITION_FAIL')=='2':
-                    cid,revision=flow.execute('SELECT id,decision_revision FROM job_sourced_candidates WHERE organization_id=%s',(org,)).fetchone()
+                    cid,revision=flow.execute('SELECT id,decision_revision FROM job_sourced_candidates WHERE organization_id=%s ORDER BY id LIMIT 1',(org,)).fetchone()
                     before_order=flow.execute('SELECT ordinal,signal_candidate_id FROM sourcing_delivery_items WHERE organization_id=%s ORDER BY ordinal',(org,)).fetchall()
                     def decide(action,rev):
                         response=client.patch(f'/api/jobs/{job}/sourced-candidates/{cid}',headers=self.csrf(client),json={
@@ -389,7 +395,7 @@ from uuid import uuid4
 original=index._node
 def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
-    if old in body: body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+    if old in body: body=body.replace(old,"if(result.applied.length!==17)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 root=Path(os.environ['RETAINED_PROOF_ROOT']);base=root/'index-base';base.mkdir(mode=0o700)
