@@ -117,7 +117,7 @@ finally:s.close()
   },420000);
   it.skipIf(!process.env.FLOW_SOURCING_DISCOVER_ROOT||(Boolean(process.env.FLOW_SOURCING_PROCESS_ONLY)&&process.env.FLOW_SOURCING_PROCESS_ONLY!=='governed'))('runs an admitted search through real Flow, Discover, Redis and Memory processes',async()=>{
     const discover=resolve(process.env.FLOW_SOURCING_DISCOVER_ROOT!);
-    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('b7744ff330e88e7ba3b1a8eca1b09959803fe752');
+    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('b6ccc2a80c6dd57d5e8664115ce0fa9c2d650086');
     const env={...cleanEnv,ACTIVEKG_INDEX_XS_FLOW_ROOT:resolve('..'),
       ACTIVEKG_INDEX_XS_ADMIN_DSN:`postgresql://fixture_admin_test@127.0.0.1:${port}/postgres`,
       FLOW_INDEX_TEST_OWNER_URL:`postgresql://flow_4d_test_placeholder_owner_test@127.0.0.1:${port}/flow_4d_test_placeholder_test`,
