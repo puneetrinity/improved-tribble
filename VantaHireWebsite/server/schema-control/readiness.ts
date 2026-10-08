@@ -15,7 +15,7 @@ import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
 import {SOURCING_TABLES,SOURCING_PRIVATE_NAMES,sourcingPrivilegesReady} from '../sourcing-authority/catalog';
 
 export const BRIEF_TRIGGER_FUNCTIONS=['flow_job_brief_immutable()','flow_lock_job_application_activity()'] as const;
-export const BRIEF_CATALOG_SHA256='192131490cf2163b865357cb386cc2a6b07833191dc862ea8ec2f1d7aafd016a';
+export const BRIEF_CATALOG_SHA256='cf7346ceb6b3c3539d747967665cf2642257f3a684d1e1ac695ba08d14969c3b';
 export const BRIEF_CATALOG_SQL=`WITH relations AS (
  SELECT c.oid,c.relname,c.relowner,c.relrowsecurity,c.relforcerowsecurity
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace

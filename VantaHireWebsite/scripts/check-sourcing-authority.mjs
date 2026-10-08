@@ -15,6 +15,13 @@ export const frozenSourcingFiles={
   'server/candidate-index/search.ts':'eab5ded0878a5ea9125cc3d732b987c3b05576ffc774410a4f304cb4b6b55146',
 };
 export const sourcingAuthorityTokens={
+  'server/schema-migrations/0016_rubric_ranking.sql':[
+    'SOURCING_RANKING_IMMUTABLE','SOURCING_UPDATED_BRIEF_REQUIRED','SOURCING_RANKING_CONFLICT',
+    "COLLATE \"C\"",'FOR NO KEY UPDATE','ranking_contract','ranking_revision','ranking_sha256',
+    "p_command->>'revision'<>'1'","IF action NOT IN ('schedule','retry')",'SOURCING_DIGEST_UNAUTHORIZED','SOURCING_DIGEST_RATE_LIMITED',
+  ],
+  'server/sourcing-authority/ranking-contract.ts':['rubric-range-v1','rubric-taxonomy-v3','rubric-evidence-v1','rubric-local-match-v3',
+    'currentBriefPayloadSchema','rankingProjection','rankingHash(body)!==contractHash','rankedCandidateSchema'],
   'server/schema-migrations/0015_governed_sourcing.sql':[
     'CREATE UNIQUE INDEX src_adm_job_uq ON public.sourcing_admissions(organization_id,job_id)',"WHERE state<>'cancelled_no_dispatch'",'src_acct_terminal_uq',
     'src_win_balance_ck CHECK (reserved>=0 AND captured>=0 AND reserved+captured<=limit_count)',
@@ -45,6 +52,8 @@ export function checkSourcingAuthority(read=path=>readFileSync(resolve(root,path
   if((sql.match(/CREATE FUNCTION public\.flow_sourcing_/g)||[]).length!==25)throw Error('sourcing_routine_inventory');
   const lock=JSON.parse(read('server/schema-migrations/checksums.lock'));
   if(!JSON.stringify(lock).includes(hash(sql)))throw Error('sourcing_migration_hash');
+  if(lock.migrations?.['0016']!==hash(read('server/schema-migrations/0016_rubric_ranking.sql')))
+    throw Error('ranking_migration_hash');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const pg=process.argv.includes('--pg'),tests=process.argv.includes('--test'),client=process.argv.includes('--client'),processProof=process.argv.includes('--process');

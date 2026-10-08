@@ -17,7 +17,7 @@ const ownerUrl=process.env.FLOW_BRIEF_OWNER_URL??'';
 const runtimeUrl=process.env.FLOW_BRIEF_RUNTIME_URL??'';
 const jd='Build Python services.';
 const criterion={id:'10000000-0000-4000-8000-000000000001',label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'jd',sourceHash:sourceHash(jd),start:6,end:12}};
-const payload={schemaVersion:1,compilerVersion:1,taxonomyVersion:1,criteria:[criterion]};
+const payload={schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[criterion]};
 const save={action:'save_brief',currentJD:jd,payload,sourceChoice:'original_prose',requesterKind:'recruiter',reasonCode:'other'};
 function checkTarget(raw:string) {
   const u=new URL(raw);

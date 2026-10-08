@@ -4,6 +4,7 @@ import {governedSignalPost} from '../lib/services/signal-client';
 import {SourcingRepository} from './repository';
 import {executeDigestPreparation,type DigestClaim} from './digest';
 import {sourcingEnabled,hashSchema,idSchema} from './contracts';
+import {rankingContractSchema} from './ranking-contract';
 
 const boundSchema=z.object({requestId:z.string().min(1).max(200),status:z.string(),flowRunId:idSchema,artifactHash:hashSchema,
   acquisitionGeneration:z.literal(1),executionAttemptId:idSchema,idempotent:z.boolean()}).strict();
@@ -38,12 +39,19 @@ export async function runSourcingAuthorityCycle(repository=new SourcingRepositor
     const dispatch=await repository.call<Dispatch>('dispatchClaim',[randomUUID()]);
     if(dispatch) {
       let result:unknown;
+      let transportStarted=false;
       try {
+        if(dispatch.command.protocolVersion===2) {
+          const ranking=rankingContractSchema.parse(dispatch.command.rankingContract);
+          if(ranking.briefVersionId!==dispatch.command.briefVersionId || ranking.materialHash!==dispatch.command.materialHash) throw Error('SOURCING_RANKING_BINDING');
+        }
+        transportStarted=true;
         const response=boundSchema.parse(await transport({kind:'source',tenantId:dispatch.tenantId,
           externalJobId:String(dispatch.command.externalJobId),requestId:dispatch.admissionId,body:{...dispatch.command,callbackUrl:callback}}));
         result={kind:'bound',requestId:response.requestId,flowRunId:response.flowRunId,artifactHash:response.artifactHash,
           acquisitionGeneration:response.acquisitionGeneration,executionAttemptId:response.executionAttemptId};
-      }catch{result={kind:'retry',code:'SOURCING_BIND_UNCERTAIN'};}
+      }catch{result=transportStarted?{kind:'retry',code:'SOURCING_BIND_UNCERTAIN'}:
+        {kind:'needs_attention',code:'SOURCING_LOCAL_CONTRACT_INVALID'};}
       await repository.call('dispatchFinish',[dispatch.admissionId,dispatch.lease,result]);
     }
   }catch{report('SOURCING_DISPATCH_CYCLE_FAILED');}

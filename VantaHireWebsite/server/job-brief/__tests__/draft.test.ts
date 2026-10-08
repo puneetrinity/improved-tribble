@@ -5,7 +5,7 @@ import type { BriefRepository } from '../repository';
 import { sourceHash } from '../contracts';
 
 const jd='Build Python services.';const requestId='10000000-0000-4000-8000-000000000001';
-const payload={schemaVersion:1,compilerVersion:1,taxonomyVersion:1,criteria:[{id:requestId,label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'jd',sourceHash:sourceHash(jd),start:6,end:12}}]};
+const payload={schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[{id:requestId,label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'jd',sourceHash:sourceHash(jd),start:6,end:12}}]};
 const scope={organizationId:1,jobId:2,actorId:3};const input={requestId,expectedRevision:1};
 function fixture(response:()=>Response|Promise<Response>,lease=true) {
   // The actual SDK executes request construction/error/retry handling. Only HTTP

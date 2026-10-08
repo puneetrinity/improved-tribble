@@ -1,5 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import {closedDatabaseError} from '../job-brief/repository';
+import {rankingContractSchema} from './ranking-contract';
 
 export class SourcingError extends Error {
   constructor(readonly code: string, readonly status: number) { super(code); }
@@ -13,6 +14,7 @@ const failures: Record<string, number> = {
   SOURCING_GRANT_EXPIRED:409, SOURCING_NEEDS_ATTENTION:409, SOURCING_CONVERTED:409,
   SOURCING_PREVIEW_LIMIT:429, SOURCING_DIGEST_RETRY_REFUSED:409,
   SOURCING_TENANT_REQUIRED:409,
+  SOURCING_UPDATED_BRIEF_REQUIRED:409,
 };
 export function sourcingDatabaseError(error: unknown): SourcingError {
   const e = error as {code?: string; message?: string};
@@ -82,6 +84,16 @@ export class SourcingRepository {
       await client.query('BEGIN ISOLATION LEVEL READ COMMITTED');
       await client.query("SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='5s'");
       const result = (await client.query<{result: T | null}>(statements[operation], parameters)).rows[0]?.result ?? null;
+      // Validate SQL's exact contract before committing the allowance reservation.
+      // This internal field never becomes part of the public admission response.
+      if (operation === 'admit' && result) {
+        const admission = result as Record<string, unknown>;
+        if (admission.rankingContract != null && !rankingContractSchema.safeParse(admission.rankingContract).success)
+          throw new SourcingError('SOURCING_INVALID_COMMAND', 409);
+        if (admission.rankingContract == null && admission.replayed !== true)
+          throw new SourcingError('SOURCING_INVALID_COMMAND', 409);
+        delete admission.rankingContract;
+      }
       await client.query('COMMIT');
       return result;
     } catch (error) {

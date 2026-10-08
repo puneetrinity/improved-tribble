@@ -15,6 +15,7 @@
 // =====================================================
 
 /** Raw Signal source type values. Never map/transform before storage. */
+import {rankedCandidateSchema,type RankedCandidate} from '../../sourcing-authority/ranking-contract';
 export type SignalSourceType = 'pool_enriched' | 'pool' | 'discovered';
 
 /** UI display bucket — derived at read time, never stored. */
@@ -117,6 +118,7 @@ export interface SignalResultsGroupCounts {
 }
 
 export interface SignalResultCandidateV3 {
+  ranking?:import('../../sourcing-authority/ranking-contract').RankedCandidate;
   // --- NEW UNIFIED CARD SCHEMA ---
   candidate: {
     id: string;
@@ -138,7 +140,7 @@ export interface SignalResultCandidateV3 {
   };
   sourcingContext: {
     rank: number;
-    matchStrength: 'strong' | 'good' | 'possible';
+    matchStrength: 'strong' | 'good' | 'possible' | null;
     locationStatus: 'verified' | 'partial' | 'unverified' | 'mismatch' | 'unknown';
   };
   cardSignals: {
@@ -309,6 +311,7 @@ export interface SignalMatchStrengthBands {
 
 /** Flattened candidate shape for UI consumption. */
 export interface SourcedCandidateForUI {
+  ranking?:RankedCandidate;
   id: number;
   jobId: number;
   signalCandidateId: string;
@@ -589,7 +592,7 @@ export function flattenCandidateForUI(row: {
   candidateSummary: unknown;
   lastSyncedAt: Date | string | null;
   createdAt: Date | string | null;
-}): SourcedCandidateForUI {
+}, governedRanking=false): SourcedCandidateForUI {
   const rawCandidateSummary: Record<string, unknown> =
     row.candidateSummary && typeof row.candidateSummary === 'object'
       ? (row.candidateSummary as Record<string, unknown>)
@@ -611,20 +614,31 @@ export function flattenCandidateForUI(row: {
   // Legacy Signal code copied provider emails into candidateSummary/searchMeta.
   // That blob is not qualified contact evidence and must never be an API lane.
   const cs = redactContactEvidence(rawCandidateSummary) as Record<string, unknown>;
+  const rawRanking=!governedRanking?undefined:rankedCandidateSchema.parse(rawCandidateSummary.ranking);
+  // Typed IDs/hashes/timestamps are not contact text. Redacting a numeric UUID
+  // segment corrupts the envelope; only its human-readable evidence is cleaned.
+  const cleanText=(value:string)=>redactContactEvidence(value) as string;
+  const ranking=rawRanking?{...rawRanking,
+    experience:{...rawRanking.experience,display:cleanText(rawRanking.experience.display),reason:cleanText(rawRanking.experience.reason)},
+    assessments:rawRanking.assessments.map(a=>({...a,subject:cleanText(a.subject),labels:a.labels.map(cleanText),refs:a.refs.map(cleanText)})),
+  }:undefined;
+  if(ranking)cs.ranking=ranking;
+  if(ranking&&ranking.candidateId!==row.signalCandidateId)throw Error('SOURCING_RANKING_CONFLICT');
 
   const identitySummary = extractIdentitySummary(cs);
   const snapshot = extractSnapshot(cs);
   const searchSignals = extractSearchSignals(cs);
-  const normalizedFitScore = toPctFit(row.fitScore);
+  const normalizedFitScore = ranking?null:toPctFit(row.fitScore);
 
   const lastEnrichedAt = safeString((cs as any)?.lastEnrichedAt) ?? safeString(snapshot?.computedAt);
   const lastIdentityCheckAt = identitySummary?.lastIdentityCheckAt ?? null;
 
   return {
+    ...(ranking?{ranking}:{}),
     id: row.id,
     jobId: row.jobId,
     signalCandidateId: row.signalCandidateId,
-    signalRank: safeNumber(cs.rank),
+    signalRank: ranking?.ordinal??safeNumber(cs.rank),
     fitScore: normalizedFitScore,
     fitScoreRaw: safeNumber(cs.fitScoreRaw),
     fitBreakdown: (row.fitBreakdown && typeof row.fitBreakdown === 'object'

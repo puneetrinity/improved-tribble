@@ -7,6 +7,16 @@ const jd = 'Build Python services.';
 const item = { id, label: 'Python', class: 'must_have', subject: 'skill', requirement: { kind: 'text', value: 'Python' }, evidenceKinds: ['profile_evidence'], use: 'retrieval', provenance: { kind: 'jd', sourceHash: sourceHash(jd), start: 6, end: 12 } };
 const payload = { schemaVersion: 1, compilerVersion: 1, taxonomyVersion: 1, criteria: [item] };
 describe('brief closed contracts', () => {
+  it('v2 supports explicit ranges and approved titles without changing historical v1',()=>{
+    const v2={schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[{...item,subject:'experience_years',label:'Maximum experience',use:'assessment',requirement:{kind:'experience_range',minimum:6,maximum:10}}]};
+    expect(briefPayloadSchema.safeParse(v2).success).toBe(true);
+    expect(briefPayloadSchema.safeParse({...v2,schemaVersion:1,compilerVersion:1,taxonomyVersion:1}).success).toBe(false);
+    expect(briefPayloadSchema.safeParse({...v2,criteria:[{...v2.criteria[0],note:'Maximum age 30'}]}).success).toBe(false);
+    expect(briefPayloadSchema.safeParse({...v2,criteria:[{...v2.criteria[0],requirement:{kind:'experience_range',minimum:10,maximum:6}}]}).success).toBe(false);
+    const title={...item,subject:'title',class:'preferred',use:'assessment',requirement:{kind:'accepted_titles',values:['Backend Engineer','Backend Developer']}};
+    expect(briefPayloadSchema.safeParse({...v2,criteria:[title]}).success).toBe(true);
+    expect(briefPayloadSchema.safeParse({...v2,criteria:[{...title,use:'retrieval'}]}).success).toBe(false);
+  });
   it.each([["No career gaps",false],["Career gap",false],["Married",false],["Marriott hospitality systems experience",true],["unmarried only",false],["Native Hindi speaker",false],["Native English speaker",false],["Native fluent English speaker",false],["US citizens only",false],["Citizen of India",false],["Recent graduate",false],["age limit 30",false],["male candidates only",false],["female applicants preferred",false],["Debug race conditions in Go services",true],["Handle a race condition",true],["Age of Empires modding",true],["male/female connectors",true]])('C4 contextual phrase %s accepted=%s in every text field',(text,accepted)=>{
     for(const patch of [{label:text},{requirement:{kind:'text',value:text}},{note:text}]) {
       expect(briefPayloadSchema.safeParse({...payload,criteria:[{...item,...patch}]}).success).toBe(accepted);

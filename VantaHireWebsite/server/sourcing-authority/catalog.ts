@@ -17,12 +17,13 @@ export const SOURCING_FUNCTIONS=[
   'flow_sourcing_preview_claim(uuid)','flow_sourcing_preview_finish(uuid,uuid,jsonb)',
 ] as const;
 export const SOURCING_PRIVATE_FUNCTIONS=[
+  'flow_sourcing_ranking_immutable()',
   'flow_sourcing_immutable()','flow_sourcing_seat_sync()','flow_sourcing_reconcile(integer)','flow_sourcing_enable(integer,uuid)',
   'flow_sourcing_window(timestamp with time zone,timestamp with time zone)','flow_sourcing_canonical(jsonb)',
 ] as const;
 export const SOURCING_PRIVATE_NAMES=SOURCING_PRIVATE_FUNCTIONS.map(s=>s.slice(0,s.indexOf('(')));
 // Reproduced from the final disposable catalog before the build can pass readiness.
-export const SOURCING_CATALOG_SHA256='d6d89d2585d31d51191b5e2c5c88f3f03e6325fb679d251ea0537b6c875ace4e';
+export const SOURCING_CATALOG_SHA256='364e246e81c6354388d35d55876acf3b4bb35c497c9450413b34d2c749ff0a7f';
 export const SOURCING_CATALOG_SQL=`WITH relations AS (
  SELECT c.* FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname='public' AND c.relname LIKE 'sourcing_%' AND c.relkind IN ('r','p')

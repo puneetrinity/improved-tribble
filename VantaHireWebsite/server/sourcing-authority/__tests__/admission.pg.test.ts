@@ -25,7 +25,7 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
     await db.query('INSERT INTO job_recruiters(job_id,recruiter_id,organization_id) VALUES($1,$2,$3)', [id, peer, org]);
     const saved = await one('SELECT flow_job_brief_save($1,$2,$3,$4,0,$5) result', [org, id, actor, randomUUID(), {
       action: 'save_brief', currentJD: 'Build Python services.', sourceChoice: 'original_prose', requesterKind: 'recruiter', reasonCode: 'other',
-      payload: { schemaVersion: 1, compilerVersion: 1, taxonomyVersion: 1, criteria: [{
+      payload: { schemaVersion: 2, compilerVersion: 2, taxonomyVersion: 2, criteria: [{
         id: randomUUID(), label: 'Python', class: 'must_have', subject: 'skill', requirement: { kind: 'text', value: 'Python' },
         use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' },
       }] },
@@ -40,7 +40,7 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
   const command = (q: any) => ({ expectedRevision: q.revision, briefVersionId: q.briefVersionId, materialHash: q.materialHash,
     artifactId: q.artifactId, expectedPayerSlotId: q.payerSlotId, expectedWindowStart: q.windowStart, quoteExpiresAt:q.expiresAt });
   const admit = (q: any, jobId = 95201, request = randomUUID(), user = actor) => one('SELECT flow_sourcing_admit($1,$2,$3,$4,$5) result', [org, jobId, user, request, command(q)]);
-  async function boundAdmission(bind=true){
+  async function boundAdmission(bind=true,historical=false){
     await db.query("UPDATE organizations SET signal_tenant_id='sourcing-fixture-tenant' WHERE id=$1",[org]);
     const request=randomUUID();
     await one('SELECT flow_sourcing_digest_claim($1,$2,$3,$4,$5) result',[org,95201,actor,request,{action:'schedule',model:'fixture-model'}]);
@@ -50,7 +50,18 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
     await one('SELECT flow_sourcing_digest_finish($1,$2,$3) result',[request,claim.lease,{state:'succeeded',digest,inputTokens:80,outputTokens:50}]);
     const artifact=compileSourcingQuery(claim.basis,digest,claim.basisHash);
     await one('SELECT flow_sourcing_artifact_put($1,$2,$3,$4,$5) result',[org,95201,actor,artifact.briefVersionId,artifact]);
-    const admitted=await admit(await quote()),dispatch=await one('SELECT flow_sourcing_dispatch_claim($1) result',[randomUUID()]);
+    // Rehearse an admission issued by shipped 5B, then restore the new routine.
+    // This is test-transaction-only; no trigger bypass or historical row rewrite.
+    const admissionDefinition=(file:string)=>{
+      const source=readFileSync(resolve('server/schema-migrations',file),'utf8');
+      const definition=source.match(/CREATE(?: OR REPLACE)? FUNCTION public\.flow_sourcing_admit\([\s\S]*?REVOKE ALL ON FUNCTION public\.flow_sourcing_admit\(integer,integer,integer,uuid,jsonb\) FROM PUBLIC;/)?.[0];
+      if(!definition)throw Error('Missing admission fixture');
+      return definition.replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION');
+    };
+    if(historical)await db.query(admissionDefinition('0015_governed_sourcing.sql'));
+    const admitted=await admit(await quote());
+    if(historical)await db.query(admissionDefinition('0016_rubric_ranking.sql'));
+    const dispatch=await one('SELECT flow_sourcing_dispatch_claim($1) result',[randomUUID()]);
     const discover=randomUUID(),execution=randomUUID();
     const finish=()=>one('SELECT flow_sourcing_dispatch_finish($1,$2,$3) result',[admitted.id,dispatch.lease,{kind:'bound',requestId:discover,flowRunId:admitted.id,
       artifactHash:artifact.queryHash,acquisitionGeneration:1,executionAttemptId:execution}]);
@@ -394,7 +405,7 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
     expect((await db.query("SELECT count(*)::int n FROM sourcing_account_events WHERE kind='release'")).rows[0].n).toBe(1);
   });
   it('binds immutable delivered order and preserves a recruiter decision on replay',async()=>{
-    const f=await boundAdmission(),grant=await f.grant();
+    const f=await boundAdmission(true,true),grant=await f.grant();
     await one('SELECT flow_sourcing_receipt($1,$2,$3) result',[org,f.admitted.id,f.receipt(grant,'started')]);
     const candidate=(await db.query("INSERT INTO job_sourced_candidates(organization_id,job_id,request_id,signal_candidate_id,source_type) VALUES($1,95201,$2,'delivery-person','discovered') RETURNING id",[org,f.grantCommand.discoverRequestId])).rows[0].id;
     const command={requestId:f.grantCommand.discoverRequestId,executionAttemptId:f.grantCommand.executionAttemptId,
@@ -424,19 +435,19 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
     const first = await claim('start');
     expect(first.lease).toBeTruthy();
     expect((await claim('start')).lease).toBeUndefined();
-    expect(await one('SELECT flow_sourcing_digest_finish($1,$2,$3) result', [first.id,first.lease,{state:'failed',code:'INVALID'}])).toMatchObject({state:'failed'});
+    expect(await one('SELECT flow_sourcing_digest_finish($1,$2,$3) result', [first.id,first.lease,{state:'failed',code:'SOURCING_DIGEST_INVALID'}])).toMatchObject({state:'failed'});
     const retry = randomUUID();
     expect(await claim('retry',retry)).toMatchObject({state:'reserved'});
     expect(await claim('retry',retry)).toMatchObject({replayed:true});
     const second = await claim('start');
-    await one('SELECT flow_sourcing_digest_finish($1,$2,$3) result', [second.id,second.lease,{state:'failed',code:'INVALID'}]);
+    await one('SELECT flow_sourcing_digest_finish($1,$2,$3) result', [second.id,second.lease,{state:'failed',code:'SOURCING_DIGEST_INVALID'}]);
     await expect(claim('retry',randomUUID())).rejects.toThrow('SOURCING_DIGEST_RETRY_REFUSED');
   });
   it('an uncertain model outcome never permits another paid attempt', async () => {
     const request = randomUUID();
     const call = (action: string) => one('SELECT flow_sourcing_digest_claim($1,$2,$3,$4,$5) result',[org,95201,actor,request,{action,model:'fixture-model'}]);
     await call('schedule'); const claim = await call('start');
-    await one('SELECT flow_sourcing_digest_finish($1,$2,$3) result',[claim.id,claim.lease,{state:'unknown',code:'TIMEOUT'}]);
+    await one('SELECT flow_sourcing_digest_finish($1,$2,$3) result',[claim.id,claim.lease,{state:'unknown',code:'SOURCING_DIGEST_UNKNOWN'}]);
     await expect(call('retry')).rejects.toThrow('SOURCING_DIGEST_RETRY_REFUSED');
   });
   it('a browser retry cannot schedule preparation against a different approved brief',async()=>{

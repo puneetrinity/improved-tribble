@@ -152,8 +152,9 @@ export function CandidateCard({
 
   // Total experience, deduped by company (see computeTotalExperienceYears —
   // Crustdata repeats full company tenure per title, so a naive sum inflates it).
-  const totalExpYears = computeTotalExperienceYears(candidate.crustdata) ?? 0;
-  const expYearsDisplay = totalExpYears > 0 ? `${totalExpYears} yrs` : null;
+  const totalExpYears = candidate.ranking?null:computeTotalExperienceYears(candidate.crustdata);
+  const expYearsDisplay = candidate.ranking?candidate.ranking.experience.display:
+    totalExpYears!=null&&totalExpYears>0?`${totalExpYears} yrs`:null;
 
   const pictureUrl = candidate.crustdata?.professional_network?.profile_picture_permalink || candidate.crustdata?.basic_profile?.profile_picture_permalink || null;
 
@@ -238,11 +239,11 @@ export function CandidateCard({
             <span className="font-semibold text-lg leading-tight truncate shrink min-w-[100px] max-w-full">
               {name}
             </span>
-            <FitBadge
+            {candidate.ranking?<Badge variant="outline">Met {candidate.ranking.N} of {candidate.ranking.D} points</Badge>:<FitBadge
               score={candidate.fitScore}
               matchStrength={candidate.matchStrength}
-            />
-            {candidate.engagementReady && (
+            />}
+            {candidate.engagementReady && !candidate.ranking && (
               <Badge
                 variant="outline"
                 className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 shrink-0"
@@ -252,6 +253,8 @@ export function CandidateCard({
               </Badge>
             )}
           </div>
+          {candidate.ranking?.assessments.some(a=>a.state==='not_met')&&
+            <p className="text-sm font-medium">Known requirement not met — review the criterion evidence.</p>}
 
           {/* Row 2: current role @ company */}
           {(currentTitle || company) && (

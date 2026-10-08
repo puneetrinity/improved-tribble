@@ -58,7 +58,7 @@ describe.skipIf(!enabled)('sourcing seats and simultaneous admissions',()=>{
         await db.query('INSERT INTO job_recruiters(job_id,recruiter_id,organization_id) VALUES($1,$2,$3)',[id,peer,org]);
         const saved=await one(db,'SELECT flow_job_brief_save($1,$2,$3,$4,0,$5) result',[org,id,actor,randomUUID(),{
           action:'save_brief',currentJD:'Build Python services.',sourceChoice:'original_prose',requesterKind:'recruiter',reasonCode:'other',
-          payload:{schemaVersion:1,compilerVersion:1,taxonomyVersion:1,criteria:[{id:randomUUID(),label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}}]},
+          payload:{schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[{id:randomUUID(),label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}}]},
         }]);
         await one(db,'SELECT flow_job_brief_approve($1,$2,$3,$4,1,$5,$6) result',[org,id,actor,randomUUID(),saved.versionId,hash]);
         await db.query("INSERT INTO sourcing_query_artifacts(id,organization_id,job_id,brief_version_id,material_hash,compiler_version,query_hash,input) SELECT $1,organization_id,job_id,approved_version_id,approved_material_hash,'1',$2,'{}'::jsonb FROM job_brief_state WHERE job_id=$3",[randomUUID(),hash,id]);

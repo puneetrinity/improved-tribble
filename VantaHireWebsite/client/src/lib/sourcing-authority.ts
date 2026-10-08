@@ -28,6 +28,10 @@ export async function readSourcing<T>(jobId:number,part:'admission'|'preview',si
 }
 export function sourcingErrorMessage(code:unknown):string {
   switch(code) {
+    case 'BRIEF_UPDATED_APPROVAL_REQUIRED':
+    case 'SOURCING_UPDATED_BRIEF_REQUIRED':return 'Review, save and approve the updated brief before sourcing.';
+    case 'SOURCING_DIGEST_UNAUTHORIZED':return 'Brief preparation is unavailable because the service credentials need attention. Contact your workspace administrator.';
+    case 'SOURCING_DIGEST_RATE_LIMITED':return 'Brief preparation was rate-limited. Retry preparation once when the service is available.';
     case 'SOURCING_ALLOWANCE_EXHAUSTED':return 'Neither the job poster nor you has a sourcing run available this month.';
     case 'SOURCING_ALREADY_ADMITTED':return 'This job already has its one sourcing run. Refresh to see its progress.';
     case 'SOURCING_PAYER_CHANGED':
