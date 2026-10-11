@@ -43,7 +43,7 @@ export function openQuote(token:string,scope:BriefScope,key:KeyObject=quoteKey()
     const value=signedQuoteSchema.parse(JSON.parse(Buffer.from(body!,'base64url').toString('utf8')));
     if(value.organizationId!==scope.organizationId || value.jobId!==scope.jobId || value.actorId!==scope.actorId) throw Error('scope');
     const start=Date.parse(value.quote.quotedAt),end=Date.parse(value.quote.expiresAt);
-    if(end<=start || end-start>60001 || start>Date.now()+1000) throw Error('time');
+    if(end<=start || end-start>60001 || start>Date.now()+5000) throw Error('time');
     // Expiry is enforced by SQL after its duplicate-request check. Expired
     // authentic quotes may replay a committed admission, never create one.
     return value.quote;

@@ -5,12 +5,14 @@ import { trackEvent } from "@/lib/analytics";
 import { useRef, useEffect, useState, useCallback } from "react";
 import type { PipelineProgressState, EnrichmentCandidateEvent } from "@/components/sourcing/SourcingProgressModal";
 import { INITIAL_PROGRESS } from "@/components/sourcing/SourcingProgressModal";
+import type { SignalRcProgress } from '@shared/rc-skills-progress';
 
 export type MatchTier = "best_matches" | "broader_pool";
 export type MatchStrength = "strong" | "good" | "possible";
 export type LocationMatchType = "city_exact" | "city_alias" | "country_only" | "unknown_location" | "none";
 
 export interface SourcedCandidateForUI {
+  ranking?:import('../../../server/sourcing-authority/ranking-contract').RankedCandidate;
   id: number;
   jobId: number;
   signalCandidateId: string;
@@ -126,10 +128,12 @@ export interface SourcingStatus {
   submittedAt?: string;
   completedAt?: string;
   errorMessage?: string;
-
+  rcProgress?: SignalRcProgress;
+  rcStatusUnavailable?: boolean;
 }
 
 export interface SourcedCandidatesResponse {
+  rankingProtocol?: 2;
   candidates: SourcedCandidateForUI[];
   counts: {
     total: number;
@@ -357,6 +361,32 @@ export function useSourcingProgress(jobId: number | undefined) {
   const [modalOpen, setModalOpen] = useState(false);
   const startTimeRef = useRef<number | null>(null);
   const logsRef = useRef<string[]>([]);
+  const rcActiveRef = useRef(false);
+
+  // Observe the existing status poll; no second poll, result sync or paid action.
+  useEffect(() => {
+    if (!jobId || !modalOpen) return;
+    const update = () => {
+      const status = queryClient.getQueryData<SourcingStatus>(['/api/jobs', jobId, 'sourcing-status']);
+      const failed = queryClient.getQueryState(['/api/jobs', jobId, 'sourcing-status'])?.status === 'error';
+      if (failed && (rcActiveRef.current || status?.rcProgress || status?.rcStatusUnavailable)) {
+        rcActiveRef.current = true;
+        setProgress(previous => ({ ...previous, rcStatusUnavailable: true }));
+        return;
+      }
+      if (!status?.rcProgress && !status?.rcStatusUnavailable) return;
+      rcActiveRef.current = true;
+      setProgress(previous => ({ ...previous,
+        ...(status.rcProgress ? { rcProgress: status.rcProgress } : {}),
+        rcStatusUnavailable: status.rcStatusUnavailable === true,
+      }));
+    };
+    update();
+    return queryClient.getQueryCache().subscribe(event => {
+      const key = event.query.queryKey;
+      if (key[0] === '/api/jobs' && key[1] === jobId && key[2] === 'sourcing-status') update();
+    });
+  }, [jobId, modalOpen, queryClient]);
 
   const addLog = useCallback((msg: string) => {
     const now = new Date().toLocaleTimeString("en-GB", { hour12: false });
@@ -366,6 +396,7 @@ export function useSourcingProgress(jobId: number | undefined) {
   }, []);
 
   const resetProgress = useCallback(() => {
+    rcActiveRef.current = false;
     logsRef.current = [];
     startTimeRef.current = Date.now();
     setProgress({ ...INITIAL_PROGRESS });
@@ -401,6 +432,11 @@ export function useSourcingProgress(jobId: number | undefined) {
       try {
         const data = JSON.parse(rawEvent.data);
         if (data.jobId !== jobId) return;
+        // Durable RC status owns this view, not legacy guessed percentages.
+        if (rcActiveRef.current) {
+          void queryClient.invalidateQueries({ queryKey: ['/api/jobs', jobId, 'sourcing-status'] });
+          return;
+        }
 
         switch (data.type) {
           case "phase_started":
@@ -508,7 +544,7 @@ export function useSourcingProgress(jobId: number | undefined) {
     if (!modalOpen) return;
     const interval = setInterval(() => {
       setProgress((p) => {
-        if (p.phase === "complete" || p.phase === "error" || p.phase === "idle") return p;
+        if (p.rcProgress || p.rcStatusUnavailable || p.phase === "complete" || p.phase === "error" || p.phase === "idle") return p;
         return { ...p, percent: Math.min(p.percent + 0.3, 88) };
       });
     }, 2000);

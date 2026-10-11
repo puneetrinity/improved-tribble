@@ -30,6 +30,7 @@ export const defaultFilters: SourcingFilterState = {
 };
 
 interface SourcingFiltersProps {
+  rubricRanked?:boolean;
   governed?: boolean;
   filters: SourcingFilterState;
   onChange: (filters: SourcingFilterState) => void;
@@ -45,6 +46,7 @@ interface SourcingFiltersProps {
 }
 
 export function SourcingFilters({
+  rubricRanked=false,
   governed=false,
   filters,
   onChange,
@@ -92,7 +94,7 @@ export function SourcingFilters({
             </SelectContent>
           </Select>
 
-          <Select value={sortBy} onValueChange={onSortChange}>
+          <Select value={rubricRanked?'rank':sortBy} onValueChange={onSortChange} disabled={rubricRanked}>
             <SelectTrigger className="w-40 h-8 text-sm">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>

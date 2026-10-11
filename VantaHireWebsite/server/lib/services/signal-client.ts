@@ -8,6 +8,8 @@
 import { signServiceJwt } from './jwt-signer';
 import {
   SIGNAL_SCOPES,
+  signalRcProgressSchema,
+  type SignalRcProgress,
   type SignalSourceRequest,
   type SignalSourceResponse,
   type SignalResultsResponse,
@@ -42,6 +44,7 @@ async function signalFetch(
     requestId?: string;
     body?: unknown;
     timeoutMs?: number;
+    redirect?: 'error' | 'follow' | 'manual';
   },
 ): Promise<Response> {
   const token = await signServiceJwt('signal', {
@@ -58,6 +61,7 @@ async function signalFetch(
       'Authorization': `Bearer ${token}`,
     },
     ...(opts.timeoutMs ? { signal: AbortSignal.timeout(opts.timeoutMs) } : {}),
+    ...(opts.redirect ? { redirect: opts.redirect } : {}),
     ...(opts.body ? { body: JSON.stringify(opts.body) } : {}),
   });
 
@@ -165,6 +169,44 @@ export async function getResults(
   }
 
   return body as SignalResultsResponse;
+}
+
+/** Read-only progress; deliberately never invokes result synchronization. */
+export async function getRcProgress(
+  tenantId: string, externalJobId: string, requestId: string,
+): Promise<SignalRcProgress | null> {
+  const params = new URLSearchParams({ requestId, progressOnly: '1' });
+  const response = await signalFetch(
+    `/api/v3/jobs/${encodeURIComponent(externalJobId)}/results?${params}`,
+    { method: 'GET', tenantId, requestId, scopes: SIGNAL_SCOPES.RESULTS,
+      timeoutMs: 10_000, redirect: 'error' },
+  );
+  if (response.status === 404) { await response.body?.cancel(); return null; }
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) {
+    await response.body?.cancel();
+    throw new SignalApiError('Sourcing status temporarily unavailable', response.status);
+  }
+  const reader = response.body?.getReader();
+  if (!reader) throw new SignalApiError('Sourcing status temporarily unavailable', 503);
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const part = await reader.read();
+      if (part.done) break;
+      size += part.value.byteLength;
+      if (size > 4096) throw new Error('Response too large');
+      chunks.push(part.value);
+    }
+    const body: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if (!body || typeof body !== 'object' || Array.isArray(body)
+      || Object.keys(body).some(key => key !== 'success' && key !== 'rcProgress')
+      || (body as {success?: unknown}).success !== true) throw new Error('Invalid envelope');
+    return signalRcProgressSchema.parse((body as {rcProgress?: unknown}).rcProgress);
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    throw new SignalApiError('Sourcing status temporarily unavailable', 503);
+  } finally { reader.releaseLock(); }
 }
 
 /**

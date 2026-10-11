@@ -54,10 +54,12 @@ export async function executeDigestPreparation(repository: SourcingRepository,
         ?{state:'failed',code:error.code,criterionIds:error.criterionIds}
         :{state:'failed',code:'SOURCING_DIGEST_INVALID'}; }
     }
-  } catch {
+  } catch (error) {
     // Timeout/transport failure cannot prove no provider work. Never quietly
     // open a second attempt; uncertainty remains visible for operator review.
-    outcome = dispatched?{ state: 'unknown', code: 'SOURCING_DIGEST_UNKNOWN' }
+    const status=typeof error==='object'&&error!==null&&'status' in error?(error as {status:unknown}).status:undefined;
+    outcome = dispatched&&(status===401||status===429)?{state:'failed',code:status===401?'SOURCING_DIGEST_UNAUTHORIZED':'SOURCING_DIGEST_RATE_LIMITED'}:
+      dispatched?{ state: 'unknown', code: 'SOURCING_DIGEST_UNKNOWN' }
       :{state:'failed',code:'SOURCING_DIGEST_NO_DISPATCH'};
   }
   const settled = await repository.call<{state: string}>('digestFinish', [claim.id, claim.lease, outcome]);

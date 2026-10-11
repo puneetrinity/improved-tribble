@@ -14,6 +14,16 @@ const digest = { topSkills: ['Python','Invented skill'], seniorityLevel: 'senior
   titleSearchTerms: ['Backend Engineer','Software Engineer'], adjacentBuckets: [['Platform Engineer']], adjacentLocations: [], tokenCount: 100, version: 3 };
 
 describe('durable preparation failure classification',()=>{
+  it.each([401,429,503])('settles provider HTTP %s without leaving preparation started',async status=>{
+    const call=vi.fn(async(operation:string,args:unknown[])=>operation==='digestFinish'?args[2]:null);
+    const create=vi.fn(async()=>{throw Object.assign(Error('private provider detail'),{status});});
+    const result=await executeDigestPreparation({call} as unknown as SourcingRepository,{organizationId:1,jobId:2,actorId:3,requestId:id,model:'fixture'},
+      {client:{chat:{completions:{create}}} as unknown as Groq,claim:{id,state:'started',lease:id,model:'fixture',basis,basisHash:digestBasisHash(basis)}});
+    expect(result).toEqual(status===503?{state:'unknown',code:'SOURCING_DIGEST_UNKNOWN'}:
+      {state:'failed',code:status===401?'SOURCING_DIGEST_UNAUTHORIZED':'SOURCING_DIGEST_RATE_LIMITED'});
+    expect(create).toHaveBeenCalledTimes(1);expect(call).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(result)).not.toContain('private provider detail');
+  });
   it.each(['mapping','before-dispatch','timeout'])('records the actual %s failure boundary',async kind=>{
     const b=kind==='mapping'?{...basis,payload:{...basis.payload,criteria:[{...basis.payload.criteria[0]!,use:'retrieval' as const}]}}:basis;
     const call=vi.fn(async(operation:string,args:unknown[])=>operation==='digestFinish'?args[2]:null);

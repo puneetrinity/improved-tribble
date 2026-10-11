@@ -14,8 +14,9 @@ import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
 import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
 import {SOURCING_TABLES,SOURCING_PRIVATE_NAMES,sourcingPrivilegesReady} from '../sourcing-authority/catalog';
 
-export const BRIEF_TRIGGER_FUNCTIONS=['flow_job_brief_immutable()','flow_lock_job_application_activity()'] as const;
-export const BRIEF_CATALOG_SHA256='192131490cf2163b865357cb386cc2a6b07833191dc862ea8ec2f1d7aafd016a';
+// Owner-private helpers share the same deny-runtime treatment as trigger functions.
+export const BRIEF_TRIGGER_FUNCTIONS=['flow_job_brief_immutable()','flow_lock_job_application_activity()','flow_job_brief_validate_v3(jsonb)'] as const;
+export const BRIEF_CATALOG_SHA256='c71cafce99884c6013c805a9e4f999a359e5f4ae9be3b0354a49211c3368d44d';
 export const BRIEF_CATALOG_SQL=`WITH relations AS (
  SELECT c.oid,c.relname,c.relowner,c.relrowsecurity,c.relforcerowsecurity
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -24,22 +25,22 @@ export const BRIEF_CATALOG_SQL=`WITH relations AS (
  SELECT p.* FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
  WHERE n.nspname='public' AND (p.proname LIKE 'flow_job_brief_%' OR p.proname='flow_lock_job_application_activity')
 ), facts AS (SELECT jsonb_build_object(
- 'tables',(SELECT jsonb_agg(jsonb_build_array(relname,relrowsecurity,relforcerowsecurity,relowner=(SELECT relowner FROM pg_class WHERE oid='public.jobs'::regclass)) ORDER BY relname) FROM relations),
- 'columns',(SELECT jsonb_agg(jsonb_build_array(c.relname,a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,pg_get_expr(d.adbin,d.adrelid)) ORDER BY c.relname,a.attnum)
+ 'tables',(SELECT jsonb_agg(jsonb_build_array(relname,relrowsecurity,relforcerowsecurity,relowner=(SELECT relowner FROM pg_class WHERE oid='public.jobs'::regclass)) ORDER BY relname COLLATE "C") FROM relations),
+ 'columns',(SELECT jsonb_agg(jsonb_build_array(c.relname,a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,pg_get_expr(d.adbin,d.adrelid)) ORDER BY c.relname COLLATE "C",a.attnum)
    FROM pg_class c JOIN pg_attribute a ON a.attrelid=c.oid LEFT JOIN pg_attrdef d ON d.adrelid=c.oid AND d.adnum=a.attnum
    WHERE a.attnum>0 AND NOT a.attisdropped AND (c.oid IN(SELECT oid FROM relations) OR
      (c.oid='public.jobs'::regclass AND a.attname IN ('current_jd','current_jd_hash')) OR
      (c.oid='public.job_audit_log'::regclass AND a.attname IN ('actor_kind','performed_by')))),
- 'constraints',(SELECT jsonb_agg(jsonb_build_array(c.conname,pg_get_constraintdef(c.oid),c.convalidated,c.condeferrable,c.condeferred) ORDER BY c.conname)
+ 'constraints',(SELECT jsonb_agg(jsonb_build_array(c.conname,pg_get_constraintdef(c.oid),c.convalidated,c.condeferrable,c.condeferred) ORDER BY c.conname COLLATE "C")
    FROM pg_constraint c WHERE c.conrelid IN(SELECT oid FROM relations) OR
     (c.conrelid='public.jobs'::regclass AND c.conname='jobs_current_jd_pair_ck') OR
     (c.conrelid='public.job_audit_log'::regclass AND c.conname='job_audit_actor_ck')),
- 'indexes',(SELECT jsonb_agg(jsonb_build_array(pg_get_indexdef(i.indexrelid),i.indisvalid,i.indisready) ORDER BY i.indexrelid::regclass::text)
+ 'indexes',(SELECT jsonb_agg(jsonb_build_array(pg_get_indexdef(i.indexrelid),i.indisvalid,i.indisready) ORDER BY i.indexrelid::regclass::text COLLATE "C")
    FROM pg_index i WHERE i.indrelid IN(SELECT oid FROM relations)),
- 'triggers',(SELECT jsonb_agg(jsonb_build_array(t.tgname,pg_get_triggerdef(t.oid),t.tgenabled) ORDER BY t.tgname)
+ 'triggers',(SELECT jsonb_agg(jsonb_build_array(t.tgname,pg_get_triggerdef(t.oid),t.tgenabled) ORDER BY t.tgname COLLATE "C")
    FROM pg_trigger t WHERE NOT t.tgisinternal AND (t.tgrelid IN(SELECT oid FROM relations) OR
      (t.tgrelid='public.applications'::regclass AND t.tgname IN ('job_activity_before_insert','job_activity_before_update')))),
- 'functions',(SELECT jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,pg_get_functiondef(p.oid),p.proowner=(SELECT relowner FROM pg_class WHERE oid='public.jobs'::regclass)) ORDER BY p.oid::regprocedure::text) FROM functions p)
+ 'functions',(SELECT jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,pg_get_functiondef(p.oid),p.proowner=(SELECT relowner FROM pg_class WHERE oid='public.jobs'::regclass)) ORDER BY p.oid::regprocedure::text COLLATE "C") FROM functions p)
  ) value) SELECT encode(sha256(convert_to(value::text,'UTF8')),'hex') digest FROM facts`;
 
 export async function jobBriefPrivilegesReady(pg:PgLike,role:string,required:boolean):Promise<boolean> {
@@ -49,7 +50,7 @@ export async function jobBriefPrivilegesReady(pg:PgLike,role:string,required:boo
   const p=presence.rows[0];
   if(!p) return false;
   if(p.tables===0 && p.functions===0) return !required;
-  if(p.tables!==4 || p.functions!==8) return false;
+  if(p.tables!==BRIEF_TABLES.length || p.functions!==BRIEF_FUNCTIONS.length+BRIEF_TRIGGER_FUNCTIONS.length) return false;
   if((await pg.query(BRIEF_CATALOG_SQL)).rows[0]?.digest!==BRIEF_CATALOG_SHA256) return false;
   const rights=await pg.query(`SELECT
     NOT EXISTS(SELECT 1 FROM unnest($2::text[]) n CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) privilege
@@ -761,7 +762,7 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
              WHERE n.nspname = 'public'
                AND (
                  pg_has_role(current_user, pg_get_userbyid(p.proowner), 'MEMBER')
-                 OR (p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity')
+                 OR (p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity','flow_job_brief_validate_v3')
                    AND p.proname NOT IN (${SOURCING_PRIVATE_NAMES.map(n=>`'${n}'`).join(',')})
                    AND NOT has_function_privilege(current_user, p.oid, 'EXECUTE'))
                )

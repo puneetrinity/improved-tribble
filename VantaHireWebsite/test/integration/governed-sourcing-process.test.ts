@@ -8,10 +8,25 @@ import {tmpdir} from 'node:os';
 import {join,resolve} from 'node:path';
 import net from 'node:net';
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
+import {signalRcProgressSchema} from '../../server/lib/services/signal-contracts';
+
+describe('RC progress wire is bounded and contains no candidate evidence',()=>{
+  const progress={version:1,state:'stalled',processed:3,total:5,
+    updatedAt:'2026-10-09T00:00:00.000000Z',notificationDelivered:false,safeReason:'recovery_pending'};
+  it('keeps recovery and notification states distinct',()=>{
+    expect(signalRcProgressSchema.parse(progress)).toEqual(progress);
+    expect(signalRcProgressSchema.parse({...progress,notificationDelivered:true}).notificationDelivered).toBe(true);
+  });
+  it('refuses impossible counts, raw errors and candidate fields',()=>{
+    for(const value of [{...progress,processed:6},{...progress,total:301},{...progress,total:-1},
+      {...progress,candidateId:'private'},{...progress,safeReason:'raw provider response'},
+      {...progress,updatedAt:'not a timestamp'}])expect(signalRcProgressSchema.safeParse(value).success).toBe(false);
+  });
+});
 
 const enabled=process.env.FLOW_SOURCING_PROCESS_DISPOSABLE==='1';
 const execFileAsync=promisify(execFile);
-describe.skipIf(!enabled)('retained real-process privacy/history on the 5B Flow schema',()=>{
+describe.skipIf(!enabled)('retained real-process privacy/history on the 5C Flow schema',()=>{
   let root:string,port:number,memory:string,python:string,started=false;
   const pg='/usr/lib/postgresql/16/bin';
   const cleanEnv:NodeJS.ProcessEnv={PATH:process.env.PATH,LANG:'C.UTF-8',HOME:process.env.HOME,
@@ -51,7 +66,7 @@ def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
     if old in body:
         assert body.count(old)==1
-        body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+        body=body.replace(old,"if(result.applied.length!==18)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 # Only the exact new ledger tail changes. All six old process assertions,
@@ -82,7 +97,7 @@ from tests import test_candidate_index_cross_system as index
 original=index._node
 def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
-    if old in body: body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+    if old in body: body=body.replace(old,"if(result.applied.length!==18)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 class Stack(index.ProcessStack):
@@ -117,7 +132,12 @@ finally:s.close()
   },420000);
   it.skipIf(!process.env.FLOW_SOURCING_DISCOVER_ROOT||(Boolean(process.env.FLOW_SOURCING_PROCESS_ONLY)&&process.env.FLOW_SOURCING_PROCESS_ONLY!=='governed'))('runs an admitted search through real Flow, Discover, Redis and Memory processes',async()=>{
     const discover=resolve(process.env.FLOW_SOURCING_DISCOVER_ROOT!);
-    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('b17b65cd088bec5818bef27459690e61b051f1d7');
+    const rcMemory=process.env.FLOW_SOURCING_RC_MEMORY_ROOT?resolve(process.env.FLOW_SOURCING_RC_MEMORY_ROOT):null;
+    if(rcMemory){
+      if(!rcMemory.startsWith('/home/ews/')||rcMemory===memory)throw Error('ISOLATED_RC_MEMORY_REQUIRED');
+      expect(execFileSync('git',['rev-parse','HEAD'],{cwd:rcMemory,encoding:'utf8'}).trim()).toBe('82164119f896b98b8d99fb4812aa4e9db5ca13f6');
+    }
+    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('65933f1e25c055858c9853f1a80859b3a62f3539');
     const env={...cleanEnv,ACTIVEKG_INDEX_XS_FLOW_ROOT:resolve('..'),
       ACTIVEKG_INDEX_XS_ADMIN_DSN:`postgresql://fixture_admin_test@127.0.0.1:${port}/postgres`,
       FLOW_INDEX_TEST_OWNER_URL:`postgresql://flow_4d_test_placeholder_owner_test@127.0.0.1:${port}/flow_4d_test_placeholder_test`,
@@ -133,18 +153,27 @@ from psycopg.types.json import Jsonb
 from psycopg.conninfo import conninfo_to_dict,make_conninfo
 from cryptography.hazmat.primitives import serialization
 from tests import test_candidate_index_cross_system as index
+if os.environ.get('FIXTURE_RC')=='1':
+    import inspect
+    # The method contains a column-zero multiline SQL/JS string, so dedent()
+    # cannot remove its class indentation. Unindent only the four-space prefix.
+    bootstrap='\n'.join(line[4:] if line.startswith('    ') else line for line in inspect.getsource(index.ProcessStack.bootstrap).splitlines())
+    assert bootstrap.count('== 29')==1
+    namespace={}
+    exec(bootstrap.replace('== 29','== 31'),index.__dict__,namespace)
+    index.ProcessStack.bootstrap=namespace['bootstrap']
 original=index._node
 def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
-    if old in body: body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+    if old in body: body=body.replace(old,"if(result.applied.length!==18)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 class Stack(index.ProcessStack):
     def __init__(self,path):
         super().__init__(path,None)
         self.discover=Path(os.environ['GOVERNED_DISCOVER_ROOT'])
-        self.dp,self.wp,self.tp=self.port(),self.port(),self.port()
-        self.ports.extend([self.dp,self.wp,self.tp])
+        self.dp,self.wp,self.tp,self.mp=self.port(),self.port(),self.port(),self.port()
+        self.ports.extend([self.dp,self.wp,self.tp,self.mp])
         self.base.update(UV_THREADPOOL_SIZE='1',NODE_OPTIONS='--max-old-space-size=2048')
     def start(self,command,env,cwd=None):
         # One generated fixture key serves both legitimate issuers. No auth
@@ -153,6 +182,7 @@ class Stack(index.ProcessStack):
             env={**env,'SIGNAL_JWT_PUBLIC_KEY':env['JWT_PUBLIC_KEY'],
                 'GLOBAL_MEMORY_ENABLED':'true','GLOBAL_PUBLIC_PROFILE_SEARCH_ENABLED':'true',
                 'GLOBAL_LEGACY_CANDIDATE_SEARCH_ENABLED':'false'}
+            if os.environ.get('FIXTURE_RC')=='1': env={**env,'RC_SKILLS_ENABLED':'true'}
         return super().start(command,env,cwd)
     def governed(self):
         self.setup()
@@ -195,6 +225,11 @@ class Stack(index.ProcessStack):
         self.public_url=f'https://127.0.0.1:{self.tp}'
         self.start(['node','--input-type=module','-e',"import https from 'node:https';import http from 'node:http';import fs from 'node:fs';https.createServer({key:fs.readFileSync(process.env.FIXTURE_TLS_KEY),cert:fs.readFileSync(process.env.FIXTURE_TLS_CERT)},(req,res)=>{const upstream=http.request(process.env.FIXTURE_UPSTREAM+req.url,{method:req.method,headers:req.headers},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res);});upstream.on('error',()=>{res.writeHead(502);res.end();});req.pipe(upstream);}).listen(Number(process.env.FIXTURE_TLS_PORT),'127.0.0.1');"],
             {'FIXTURE_TLS_KEY':str(keypath),'FIXTURE_TLS_CERT':str(certpath),'FIXTURE_UPSTREAM':self.web_url,'FIXTURE_TLS_PORT':str(self.tp),'NODE_OPTIONS':'--max-old-space-size=128 --import='+str(self.flow_fence)})
+        memory_url=self.api_url
+        if os.environ.get('FIXTURE_RC')=='1':
+            memory_url=f'https://127.0.0.1:{self.mp}'
+            self.start(['node','--input-type=module','-e',"import https from 'node:https';import http from 'node:http';import fs from 'node:fs';https.createServer({key:fs.readFileSync(process.env.FIXTURE_TLS_KEY),cert:fs.readFileSync(process.env.FIXTURE_TLS_CERT)},(req,res)=>{const upstream=http.request(process.env.FIXTURE_UPSTREAM+req.url,{method:req.method,headers:req.headers},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res);});upstream.on('error',()=>{res.writeHead(502);res.end();});req.pipe(upstream);}).listen(Number(process.env.FIXTURE_TLS_PORT),'127.0.0.1');"],
+                {'FIXTURE_TLS_KEY':str(keypath),'FIXTURE_TLS_CERT':str(certpath),'FIXTURE_UPSTREAM':self.api_url,'FIXTURE_TLS_PORT':str(self.mp),'NODE_OPTIONS':'--max-old-space-size=128 --import='+str(self.flow_fence)})
         # Substitute only external HTTP, before SDK imports. All local network
         # calls go through the real servers. The retained socket fence rejects
         # every non-loopback socket, even if a provider escapes this wrapper.
@@ -223,18 +258,28 @@ globalThis.fetch=async(input,init)=>{
    fs.appendFileSync(process.env.FIXTURE_PROVIDER_LOG,JSON.stringify({kind:'digest'})+'\n');
    return Response.json({id:'fixture',object:'chat.completion',created:1,model:'fixture',choices:[{index:0,finish_reason:'stop',message:{role:'assistant',content:JSON.stringify(digest)}}],usage:{prompt_tokens:100,completion_tokens:40,total_tokens:140}});
  }
+ if(url.hostname==='api.reversecontact.com'&&process.env.FIXTURE_RC==='1'){
+   if(!['/v2/fetch/persons/check','/v2/fetch/persons'].includes(url.pathname))throw Error('FIXTURE_RC_ENDPOINT');
+   const check=url.pathname.endsWith('/check'),body=JSON.parse(init.body);
+   fs.appendFileSync(process.env.FIXTURE_PROVIDER_LOG,JSON.stringify({kind:check?'rc-check':'rc-fetch'})+'\n');
+   const data=check?{exists:true,lastUpdate:new Date(Date.now()-86400000).toISOString(),skillCount:2}
+     :{linkedinUrl:body.url,skills:['Python 3','PostgreSQL'],email:'discard@fixture.invalid'};
+   return Response.json({success:true,error:null,data,quotas:{creditsConsumed:check?0:1}});
+ }
  if(url.href==='https://api.crustdata.com/person/search'){
    const body=JSON.parse(init.body),headers=new Headers(init.headers);
    if(headers.get('x-api-version')!=='2025-11-01')throw Error('FIXTURE_API_VERSION');
    fs.appendFileSync(process.env.FIXTURE_PROVIDER_LOG,JSON.stringify({kind:'crustdata',body})+'\n');
    if(body.limit===300&&process.env.FIXTURE_ACQUISITION_FAIL==='1')throw Error('fixture-provider-timeout-after-dispatch');
-   const profiles=process.env.FIXTURE_ACQUISITION_FAIL==='2'?[{
-     crustdata_person_id:951001,basic_profile:{name:'Synthetic Backend Fixture',headline:'Senior Backend Engineer',current_title:'Senior Backend Engineer',summary:'Python backend services and PostgreSQL',location:{city:'Bengaluru',country:'India',full_location:'Bengaluru, India'}},
-     skills:{professional_network_skills:['Python','PostgreSQL']},years_of_experience_raw:6,
-     experience:{employment_details:{current:[{company_name:'Fixture Systems',title:'Senior Backend Engineer',start_date:'2020-01-01',description:'Build Python backend services'}]}},
-     social_handles:{professional_network_identifier:{profile_url:'https://www.linkedin.com/in/synthetic-governed-fixture'}}
-   }]:[];
-   return Response.json({profiles,total_count:profiles.length},{headers:{'X-Credits-Used':profiles.length?'0.03':'0'}});
+   const profiles=process.env.FIXTURE_ACQUISITION_FAIL==='2'?['2020-01-01','2015-01-01','2005-01-01',null].map((start,index)=>({
+     crustdata_person_id:951001+index,basic_profile:{name:index?'Synthetic Range Fixture '+index:'Synthetic Backend Fixture',headline:'Senior Backend Engineer',current_title:'Senior Backend Engineer',summary:'Python backend services and PostgreSQL',location:{city:'Bengaluru',country:'India',full_location:'Bengaluru, India'}},
+     skills:{professional_network_skills:process.env.FIXTURE_RC==='1'?[]:['Python','PostgreSQL']},years_of_experience_raw:6,
+     experience:{employment_details:{current:start?[{company_name:'Fixture Systems',title:'Senior Backend Engineer',start_date:start,description:'Build Python backend services'}]:[]}},
+     social_handles:{professional_network_identifier:{profile_url:'https://www.linkedin.com/in/synthetic-governed-fixture-'+index}}
+   })):[];
+   const returned=profiles.slice(0,body.limit);
+   if(body.limit===300&&process.env.FIXTURE_RC==='1')fs.writeFileSync(process.env.FIXTURE_CRUSTDATA_RESULT,JSON.stringify({profiles:returned,total_count:profiles.length}));
+   return Response.json({profiles:returned,total_count:profiles.length},{headers:{'X-Credits-Used':String(returned.length*0.03)}});
  }
  fs.appendFileSync(process.env.FIXTURE_FORBIDDEN,'unexpected-fetch\n');
  throw Error('FIXTURE_EXTERNAL_FETCH_REFUSED');
@@ -246,7 +291,10 @@ globalThis.fetch=async(input,init)=>{
         de={'NODE_ENV':'production','DATABASE_URL':self.dr,'SIGNAL_SCHEMA_ENVIRONMENT':'development','SIGNAL_SCHEMA_TARGET_ID':se['SIGNAL_SCHEMA_TARGET_ID'],
             'REDIS_URL':f'redis://127.0.0.1:{self.redisport}/0','FLOW_SOURCING_V1_ENABLED':'true',
             'VANTAHIRE_JWT_PUBLIC_KEY':public,'SIGNAL_JWT_PRIVATE_KEY':private,'SIGNAL_JWT_ACTIVE_KID':'v1',
-            'ACTIVEGRAPH_URL':self.api_url,'CRUSTDATA_API_KEY':'fixture-only','GROQ_API_KEY':'fixture-only',
+            'ACTIVEGRAPH_URL':memory_url,'CRUSTDATA_API_KEY':'fixture-only','GROQ_API_KEY':'fixture-only',
+            'RC_SKILLS_ENABLED':os.environ.get('FIXTURE_RC')=='1' and 'true' or 'false',
+            'REVERSECONTACT_API_KEY':'synthetic-fixture-only','FIXTURE_RC':os.environ.get('FIXTURE_RC','0'),
+            'FIXTURE_CRUSTDATA_RESULT':str(self.path/'purchase-result.json'),
             'SOURCE_PUBLIC_MEMORY_HYDRATION_ENABLED':'true','SOURCE_PLATFORM_EXCLUSION_ENABLED':'true',
             'SOURCE_TWO_LAYER_POOL_ENABLED':'true','SOURCE_RERANK_AFTER_ENRICHMENT':'false','TRACK_GROQ_ENABLED':'false',
             'SOURCE_PUBLIC_MEMORY_INGEST_WORKER_ENABLED':'false','SOURCING_WORKER_CONCURRENCY':'1',
@@ -258,6 +306,7 @@ globalThis.fetch=async(input,init)=>{
         self.api=self.start(['node','node_modules/next/dist/bin/next','start','-H','127.0.0.1','-p',str(self.dp)],de,self.discover)
         self.worker=self.start(['node','--import','tsx','src/lib/sourcing/worker.ts'],{**de,'PORT':str(self.wp)},self.discover)
         self.fe.update({'FLOW_JOB_BRIEF_ENABLED':'true','FLOW_SOURCING_V1_ENABLED':'true','BASE_URL':self.public_url,
+            'RC_SKILLS_ENABLED':os.environ.get('FIXTURE_RC')=='1' and 'true' or 'false',
             'CONTACT_RESOLUTION_RECOVERY_ENABLED':'true',
             'SIGNAL_BASE_URL':f'http://127.0.0.1:{self.dp}','SIGNAL_JWT_PUBLIC_KEY':public,'GROQ_API_KEY':'fixture-only',
             'NODE_OPTIONS':options,'FIXTURE_PROVIDER_LOG':str(self.provider_log),'FIXTURE_FORBIDDEN':str(self.forbidden),
@@ -275,6 +324,10 @@ globalThis.fetch=async(input,init)=>{
             flow.execute("INSERT INTO sourcing_entitlements(id,organization_id,subscription_id,anchor,valid_from,valid_until,capacity,origin,evidence_sha256) VALUES(%s,%s,%s,'2026-01-01Z','2026-01-01Z','2030-01-01Z',1,'verified_paid',%s)",(ent,org,sub,'a'*64))
             flow.execute('SELECT flow_sourcing_enable(%s,%s)',(org,ent))
             discover.execute('INSERT INTO governed_sourcing_tenants(tenant_id,enabled_at,policy_hash,allow_new,organization_ref,callback_url) VALUES(%s,clock_timestamp(),%s,true,%s,%s)',(tenant,'a'*64,str(org),self.public_url+'/api/webhooks/signal/callback'))
+            if os.environ.get('FIXTURE_RC')=='1':
+                policy=str(uuid4())
+                discover.execute("INSERT INTO rc_rate_policies(id,policy_hash,rc_account_hash,rc_fetch_credits_max,rpm,enabled) VALUES(%s,%s,%s,1,500,true)",(policy,'b'*64,'c'*64))
+                discover.execute('INSERT INTO rc_org_policies(tenant_id,policy_id,enabled) VALUES(%s,%s,true)',(tenant,policy))
             self.privacy_fresh(flow)
             self.wait(lambda: discover.execute("SELECT count(*) FROM candidate_privacy_sync_state WHERE status='healthy' AND last_success_at>clock_timestamp()-interval '1 minute'").fetchone()[0]==1)
             with httpx.Client(base_url=self.web_url,trust_env=False,timeout=20) as client:
@@ -282,7 +335,10 @@ globalThis.fetch=async(input,init)=>{
                 jd='Build reliable Python backend services and maintain production software.'
                 flow.execute('UPDATE jobs SET original_jd=%s,description=%s WHERE id=%s',(jd,jd,job))
                 body={'action':'save_brief','currentJD':jd,'sourceChoice':'original_prose','requesterKind':'recruiter','reasonCode':'other',
-                    'payload':{'schemaVersion':1,'compilerVersion':1,'taxonomyVersion':1,'criteria':[{'id':str(uuid4()),'label':'Python','class':'must_have','subject':'skill','requirement':{'kind':'text','value':'Python'},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}}]}}
+                    'payload':{'schemaVersion':3,'compilerVersion':3,'taxonomyVersion':3,'criteria':[
+                        {'id':str(uuid4()),'label':'Python','class':'must_have','subject':'skill','requirement':{'kind':'accepted_skills','primary':'Python','alternatives':['Python 3']},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}},
+                        {'id':str(uuid4()),'label':'Backend role','class':'preferred','subject':'title','requirement':{'kind':'accepted_titles','values':['Backend Engineer','Backend Developer']},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}},
+                        {'id':str(uuid4()),'label':'Recorded experience','class':'must_have','subject':'experience_years','requirement':{'kind':'experience_range','minimum':6,'maximum':10},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}}]}}
                 saved=flow.execute('SELECT flow_job_brief_save(%s,%s,%s,%s,0,%s)',(org,job,actor,str(uuid4()),Jsonb(body))).fetchone()[0]
                 approval=self.post(client,f'/api/jobs/{job}/brief/approve',json={'requestId':str(uuid4()),'expectedRevision':1,'versionId':saved['versionId']})
                 assert approval.status_code==200,(approval.status_code,approval.text)
@@ -305,6 +361,10 @@ globalThis.fetch=async(input,init)=>{
                         {'FLOW_SOURCING_BROWSER_DISPOSABLE':'1','FLOW_SOURCING_BROWSER_FIXTURE':str(fixture),
                          'PLAYWRIGHT_BROWSERS_PATH':str(Path.home()/'.cache/ms-playwright'),'UV_THREADPOOL_SIZE':'1','NODE_OPTIONS':'--max-old-space-size=2048'},timeout=180)
                 browser('before')
+                if os.environ.get('FIXTURE_RC_RESUME')=='1':
+                    # A real database refusal after all paid lookups exercises
+                    # both bounded automatic resumes and operator recovery.
+                    discover.execute('REVOKE EXECUTE ON FUNCTION signal_rc_seal(text,uuid,jsonb) FROM signal_runtime')
                 # Both viewports reviewed/cancelled without spending. The real
                 # browser Confirm, not a harness POST, creates the admission.
                 browser('confirm')
@@ -313,6 +373,26 @@ globalThis.fetch=async(input,init)=>{
                 assert again.status_code in (200,202),(again.status_code,again.text)
                 failed=os.environ.get('FIXTURE_ACQUISITION_FAIL')=='1'
                 expected_status='failed' if failed else 'complete'
+                if os.environ.get('FIXTURE_RC_RESUME')=='1':
+                    self.wait(lambda:discover.execute("SELECT count(*) FROM rc_sourcing_runs WHERE tenant_id=%s AND state='stalled'",(tenant,)).fetchone()[0]==1,seconds=90)
+                    rc_run,revision,request_id,old_execution=discover.execute('SELECT flow_run_id,revision,request_id,execution_attempt_id FROM rc_sourcing_runs WHERE tenant_id=%s',(tenant,)).fetchone()
+                    assert discover.execute('SELECT paid_lookups FROM rc_sourcing_runs WHERE tenant_id=%s',(tenant,)).fetchone()[0]==4
+                    assert discover.execute('SELECT count(*) FROM crustdata_acquisition_receipts WHERE "tenantId"=%s',(tenant,)).fetchone()[0]==1
+                    # Prove the old failed job is retained: reusing its ID
+                    # would make Bull ignore a new add.
+                    self.run(['node','--input-type=module','-e',
+                        "import {Queue} from 'bullmq';const q=new Queue('sourcing',{connection:{host:'127.0.0.1',port:"+str(self.redisport)+"}});try{let j;for(let n=0;n<100;n++){j=await q.getJob("+json.dumps(request_id+'-'+old_execution)+");if(j&&await j.getState()==='failed')break;await new Promise(r=>setTimeout(r,50));}if(!j||await j.getState()!=='failed'||j.attemptsMade!==3)throw Error('EXPECTED_EXHAUSTED_RETAINED_JOB');}finally{await q.close();}"],de,self.discover)
+                    discover.execute('GRANT EXECUTE ON FUNCTION signal_rc_seal(text,uuid,jsonb) TO signal_runtime')
+                    recovery={'version':1,'action':'resume','requestId':str(uuid4()),'expectedRevision':str(revision),'reason':'Disposable corrected service recovery','hold':None}
+                    command_file=self.file('resume-command.json',json.dumps(recovery))
+                    self.run(['node','scripts/rc-skills-recover.mjs','--tenant',tenant,'--run',str(rc_run),'--command-file',str(command_file),'--approve-recovery'],
+                        {**de,'RC_SKILLS_OWNER_DATABASE_URL':self.do},self.discover)
+                    assert discover.execute('SELECT execution_attempt_id FROM job_sourcing_requests WHERE id=%s',(request_id,)).fetchone()[0]==old_execution
+                    # Replay the approved command, then use the actual scheduler
+                    # to enqueue its durable intent. Neither may buy again.
+                    self.run(['node','scripts/rc-skills-recover.mjs','--tenant',tenant,'--run',str(rc_run),'--command-file',str(command_file),'--approve-recovery'],
+                        {**de,'RC_SKILLS_OWNER_DATABASE_URL':self.do},self.discover)
+                    self.run(['node','scripts/rc-skills-maintenance.mjs','--once'],de,self.discover,timeout=90)
                 self.wait(lambda: discover.execute('SELECT count(*) FROM job_sourcing_requests WHERE "tenantId"=%s AND status=%s',(tenant,expected_status)).fetchone()[0]==1,seconds=120)
                 self.wait(lambda: flow.execute('SELECT captured FROM sourcing_allowance_windows WHERE organization_id=%s',(org,)).fetchone()[0]==1)
                 assert flow.execute('SELECT count(*) FROM sourcing_admissions WHERE organization_id=%s',(org,)).fetchone()[0]==1
@@ -321,14 +401,45 @@ globalThis.fetch=async(input,init)=>{
                     # observe the independent delivery boundary explicitly.
                     self.wait(lambda: flow.execute('SELECT count(*) FROM sourcing_deliveries WHERE organization_id=%s',(org,)).fetchone()[0]==1)
                     if os.environ.get('FIXTURE_ACQUISITION_FAIL')=='2':
-                        assert flow.execute('SELECT count(*) FROM sourcing_delivery_items WHERE organization_id=%s',(org,)).fetchone()[0]==1
+                        assert flow.execute('SELECT count(*) FROM sourcing_delivery_items WHERE organization_id=%s',(org,)).fetchone()[0]==2
+                        assert discover.execute('SELECT count(*) FROM governed_ranking_items WHERE tenant_id=%s',(tenant,)).fetchone()[0]==4
+                        assert discover.execute('SELECT eligibility_code FROM governed_ranking_items WHERE tenant_id=%s AND selected_ordinal IS NOT NULL ORDER BY selected_ordinal',(tenant,)).fetchall()==[('in_range',),('wider',)]
                 calls=[json.loads(x) for x in self.provider_log.read_text().splitlines()]
                 assert len([x for x in calls if x['kind']=='digest'])==1,calls
                 assert len([x for x in calls if x['kind']=='crustdata' and x['body']['limit']==300])==1,calls
+                if os.environ.get('FIXTURE_RC')=='1':
+                    assert len([x for x in calls if x['kind']=='rc-check'])==4,calls
+                    assert len([x for x in calls if x['kind']=='rc-fetch'])==4,calls
+                    assert discover.execute("SELECT count(*) FROM rc_lookup_attempts WHERE operation='FETCH' AND state='success'").fetchone()[0]==4
+                    self.wait(lambda:self.owner.execute("SELECT count(*) FROM rc_skill_observations WHERE outcome='success'").fetchone()[0]==4)
+                    assert self.owner.execute("SELECT count(*) FROM rc_skill_observations WHERE skills::text LIKE '%discard@%'").fetchone()[0]==0
+                    progress=client.get(f'/api/jobs/{job}/sourcing-status')
+                    assert progress.status_code==200,progress.text
+                    assert progress.json()['rcProgress']['processed']==4
+                    # Reproduce the durable receipt/ack crash gap. Maintenance
+                    # repairs through the real Memory API, with no new provider
+                    # call and no change to the published ranking.
+                    before_rc_order=discover.execute('SELECT candidate_id,selected_ordinal FROM governed_ranking_items WHERE tenant_id=%s ORDER BY candidate_id',(tenant,)).fetchall()
+                    before_outbox_count=discover.execute('SELECT count(*) FROM public_memory_ingest_outbox WHERE "tenantId"=%s',(tenant,)).fetchone()[0]
+                    # Callback already released the acknowledged raw copy.
+                    # Restore the exact synthetic wire result to reproduce a
+                    # pre-ack crash, not the impossible released-without-ack state.
+                    bought=json.loads((self.path/'purchase-result.json').read_text())
+                    assert discover.execute("UPDATE crustdata_acquisition_receipts SET status='complete',result=%s,memory_ingested_at=NULL WHERE \"tenantId\"=%s AND slot='exact'",(Jsonb(bought),tenant)).rowcount==1
+                    assert len(discover.execute("SELECT signal_rc_maintain(%s)",(Jsonb({'version':1,'action':'deliveries'}),)).fetchone()[0]['runs'])==1
+                    # The ingest worker claims one bounded wave (two people),
+                    # and acknowledgement is checked on the following cycle.
+                    for _ in range(8):
+                        self.run(['node','scripts/rc-skills-maintenance.mjs','--once'],de,self.discover,timeout=90)
+                        if discover.execute('SELECT count(*) FROM crustdata_acquisition_receipts WHERE "tenantId"=%s AND memory_ingested_at IS NULL',(tenant,)).fetchone()[0]==0:
+                            break
+                    assert discover.execute('SELECT count(*) FROM crustdata_acquisition_receipts WHERE "tenantId"=%s AND memory_ingested_at IS NULL',(tenant,)).fetchone()[0]==0,discover.execute('SELECT status,"lastErrorCode",count(*) FROM public_memory_ingest_outbox WHERE "tenantId"=%s GROUP BY status,"lastErrorCode"',(tenant,)).fetchall()
+                    assert discover.execute('SELECT candidate_id,selected_ordinal FROM governed_ranking_items WHERE tenant_id=%s ORDER BY candidate_id',(tenant,)).fetchall()==before_rc_order
+                    assert discover.execute('SELECT count(*) FROM public_memory_ingest_outbox WHERE "tenantId"=%s',(tenant,)).fetchone()[0]==before_outbox_count
                 assert self.forbidden.read_text()==''
                 browser('after')
                 if os.environ.get('FIXTURE_ACQUISITION_FAIL')=='2':
-                    cid,revision=flow.execute('SELECT id,decision_revision FROM job_sourced_candidates WHERE organization_id=%s',(org,)).fetchone()
+                    cid,revision=flow.execute('SELECT id,decision_revision FROM job_sourced_candidates WHERE organization_id=%s ORDER BY id LIMIT 1',(org,)).fetchone()
                     before_order=flow.execute('SELECT ordinal,signal_candidate_id FROM sourcing_delivery_items WHERE organization_id=%s ORDER BY ordinal',(org,)).fetchall()
                     def decide(action,rev):
                         response=client.patch(f'/api/jobs/{job}/sourced-candidates/{cid}',headers=self.csrf(client),json={
@@ -354,6 +465,9 @@ globalThis.fetch=async(input,init)=>{
                 time.sleep(4)
                 repeated=[json.loads(x) for x in self.provider_log.read_text().splitlines()]
                 assert len([x for x in repeated if x['kind']=='crustdata' and x['body']['limit']==300])==1
+                if os.environ.get('FIXTURE_RC')=='1':
+                    assert len([x for x in repeated if x['kind']=='rc-fetch'])==4
+                    assert len([x for x in repeated if x['kind']=='rc-check'])==4
                 assert flow.execute('SELECT captured FROM sourcing_allowance_windows WHERE organization_id=%s',(org,)).fetchone()[0]==1
                 assert self.forbidden.read_text()==''
                 print('GOVERNED_THREE_SYSTEM_PASS',flush=True)
@@ -362,12 +476,13 @@ stack=Stack(p)
 try: stack.governed()
 finally: stack.close()
 `;
-    for(const [variant,fail] of [['zero-results','0'],['uncertain-dispatch','1'],['nonempty-delivery','2']] as const){
+    for(const [variant,fail] of [['zero-results','0'],['uncertain-dispatch','1'],['nonempty-delivery','2'],...(rcMemory?[['rc-skills-delivery','2'],['rc-operator-resume','2']]:[])] as const){
       if(process.env.FLOW_SOURCING_PROCESS_VARIANT&&process.env.FLOW_SOURCING_PROCESS_VARIANT!==variant)continue;
       const variantRoot=join(root,variant);execFileSync('mkdir',['-m','700',variantRoot]);
       const log=join(root,variant+'.log');
       try{
-        const {stdout,stderr}=await execFileAsync(python,['-c',script],{cwd:memory,env:{...env,RETAINED_PROOF_ROOT:variantRoot,FIXTURE_ACQUISITION_FAIL:fail},encoding:'utf8',timeout:420000,maxBuffer:8*1024*1024});
+        const rc=variant==='rc-skills-delivery'||variant==='rc-operator-resume';
+        const {stdout,stderr}=await execFileAsync(python,['-c',script],{cwd:rc?rcMemory!:memory,env:{...env,RETAINED_PROOF_ROOT:variantRoot,FIXTURE_ACQUISITION_FAIL:fail,FIXTURE_RC:rc?'1':'0',FIXTURE_RC_RESUME:variant==='rc-operator-resume'?'1':'0'},encoding:'utf8',timeout:420000,maxBuffer:8*1024*1024});
         writeFileSync(log,stdout+stderr,{mode:0o600});expect(stdout).toContain('GOVERNED_THREE_SYSTEM_PASS');
       }catch(error){const e=error as {stdout?:string;stderr?:string};writeFileSync(log,String(e.stdout??'')+String(e.stderr??''),{mode:0o600});throw Error(`Governed process proof failed: ${log}\n${readFileSync(log,'utf8').slice(-6000)}`);}
     }
@@ -389,7 +504,7 @@ from uuid import uuid4
 original=index._node
 def current_tail(path,root,dsn,body,**kwargs):
     old="if(result.applied.length!==14)throw Error('fixture_ledger');"
-    if old in body: body=body.replace(old,"if(result.applied.length!==16)throw Error('fixture_ledger');")
+    if old in body: body=body.replace(old,"if(result.applied.length!==18)throw Error('fixture_ledger');")
     return original(path,root,dsn,body,**kwargs)
 index._node=current_tail
 root=Path(os.environ['RETAINED_PROOF_ROOT']);base=root/'index-base';base.mkdir(mode=0o700)

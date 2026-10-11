@@ -324,7 +324,7 @@ export async function assertRuntimeRoleContract(
        )
        AND NOT EXISTS (
          SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
-          WHERE n.nspname='public' AND p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity')
+          WHERE n.nspname='public' AND p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity','flow_job_brief_validate_v3')
             AND p.proname NOT IN (${SOURCING_PRIVATE_NAMES.map(n=>`'${n}'`).join(',')})
             AND NOT has_function_privilege($1,p.oid,'EXECUTE')
        )
@@ -648,7 +648,7 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
         (SELECT count(*)::integer FROM unnest($1::text[]) n WHERE to_regclass('public.'||n) IS NOT NULL) tables,
         (SELECT count(*)::integer FROM unnest($2::text[]) n WHERE to_regprocedure(n) IS NOT NULL) functions`,[[...BRIEF_TABLES],[...BRIEF_FUNCTIONS,...BRIEF_TRIGGER_FUNCTIONS]]);
       const brief=briefPresence.rows[0];
-      if(!brief || !((brief.tables===0 && brief.functions===0)||(brief.tables===4 && brief.functions===8))) {
+      if(!brief || !((brief.tables===0 && brief.functions===0)||(brief.tables===BRIEF_TABLES.length && brief.functions===BRIEF_FUNCTIONS.length+BRIEF_TRIGGER_FUNCTIONS.length))) {
         throw new RuntimeRoleProvisionError('Job brief catalog is incomplete.');
       }
       if(brief.tables===4) {

@@ -14,7 +14,7 @@ import { requireRole } from './auth';
 import { requireSeat } from './auth';
 import { getUserOrganization, requireSignalTenantId } from './lib/organizationService';
 import { queueMauticSourcingRunSync } from './lib/mauticService';
-import { sourceJob, enrichBatch } from './lib/services/signal-client';
+import { sourceJob, enrichBatch, getRcProgress } from './lib/services/signal-client';
 import {
   enqueueCandidateContactResolution,
   revalidateCandidateContact,
@@ -34,6 +34,7 @@ import {
   type SignalSourceRequest,
   type SourcingRunStatus,
   type SourcedCandidateForUI,
+  type SignalRcProgress,
 } from './lib/services/signal-contracts';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -41,6 +42,7 @@ import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { jobBriefEnabled } from './job-brief/contracts';
 import {sourcingEnabled,MAX_SOURCING_BODY_BYTES} from './sourcing-authority/contracts';
 import {SourcingRepository,SourcingError} from './sourcing-authority/repository';
+import {rankingHash,rankedCandidateSchema} from './sourcing-authority/ranking-contract';
 import {admitSourcing,decideSourcing} from './sourcing-authority/commands';
 import { resolveActiveKGTenantId } from './lib/activekgTenant';
 import {
@@ -595,10 +597,34 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
 
-      // Lazy expiry: mark stale non-terminal runs as expired on poll
+      // RC progress is read-only. Never expire a recoverable RC run from a page
+      // view, including when its status endpoint is temporarily unavailable.
+      let rcProgress: SignalRcProgress | null = null;
+      let rcStatusUnavailable = false;
+      let rcGoverned = false;
+      if (process.env.RC_SKILLS_ENABLED === 'true' && sourcingEnabled()) {
+        try {
+          const binding = await sourcingRepository.call<{protocolVersion?: number}>(
+            'runBinding', [organizationId, jobId, latestRun.requestId],
+          );
+          if (binding?.protocolVersion === 2) {
+            const tenantId = contextResult.context.signalTenantId;
+            if (!tenantId) throw new Error('Missing sourcing tenant');
+            rcGoverned = true;
+            rcProgress = await getRcProgress(tenantId, latestRun.externalJobId, latestRun.requestId);
+            // An explicit not-bound response preserves legacy expiry behavior.
+            rcGoverned = rcProgress !== null;
+          }
+        } catch {
+          rcGoverned = true;
+          rcStatusUnavailable = true;
+        }
+      }
+
+      // Lazy expiry applies only to the pre-RC path.
       const rawStaleMs = parseInt(process.env.SIGNAL_STALE_THRESHOLD_MS ?? '', 10);
       const STALE_THRESHOLD_MS = Number.isFinite(rawStaleMs) && rawStaleMs > 0 ? rawStaleMs : 15 * 60 * 1000;
-      if (!isTerminalStatus(latestRun.status as SourcingRunStatus)) {
+      if (!rcGoverned && !isTerminalStatus(latestRun.status as SourcingRunStatus)) {
         const submittedMs = latestRun.submittedAt
           ? new Date(latestRun.submittedAt).getTime()
           : new Date(latestRun.createdAt).getTime();
@@ -675,6 +701,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         errorMessage: latestRun.status === 'failed' || latestRun.status === 'expired'
           ? latestRun.errorMessage : undefined,
         enrichment,
+        ...(rcProgress ? { rcProgress } : {}),
+        ...(rcStatusUnavailable ? { rcStatusUnavailable: true } : {}),
       });
     } catch (error) {
       next(error);
@@ -725,11 +753,15 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
             eq(jobSourcingRuns.jobId, jobId),
           ),
           orderBy: desc(jobSourcingRuns.createdAt),
-          columns: { id: true, meta: true, submittedAt: true },
+          columns: { id: true, requestId: true, meta: true, submittedAt: true },
         }),
       ]);
 
       const runMeta = (latestRunForMeta?.meta as Record<string, unknown>) ?? {};
+      const binding=sourcingEnabled()&&latestRunForMeta?await sourcingRepository.call<{protocolVersion?:number;contractHash?:string;
+        delivery?:{revisionId:string;outputHash:string;items:Array<{candidateId:string;ordinal:number;assessmentHash:string}>}|null}>('runBinding',
+        [organizationId,jobId,latestRunForMeta.requestId]):null;
+      const rankedRun=binding?.protocolVersion===2;
 
       // Flatten to UI shape and preserve Signal's assembly order when rank exists.
       const stillAllowed = (await Promise.all(candidates.map(async (candidate) => {
@@ -744,9 +776,23 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           throw error;
         }
       }))).filter((candidate): candidate is JobSourcedCandidate => candidate !== null);
-      const enriched = sortSourcedCandidatesForDisplay(
-        stillAllowed.map((c: JobSourcedCandidate) => flattenCandidateForUI(c)),
-      );
+      let enriched:SourcedCandidateForUI[];
+      try {
+        if(rankedRun) {
+          const delivery=binding?.delivery,items=new Map(delivery?.items.map(i=>[i.candidateId,i])??[]);
+          if(stillAllowed.some(c=>{
+            const item=items.get(c.signalCandidateId);
+            const ranking=rankedCandidateSchema.parse((c.candidateSummary as Record<string,unknown>|null)?.ranking);
+            return !delivery||!item||ranking.candidateId!==c.signalCandidateId||ranking.contractHash!==binding?.contractHash||
+              ranking.revisionId!==delivery.revisionId||ranking.outputHash!==delivery.outputHash||
+              ranking.ordinal!==item.ordinal||rankingHash(ranking)!==item.assessmentHash;
+          }))throw Error('SOURCING_RANKING_CONFLICT');
+        }
+        enriched=sortSourcedCandidatesForDisplay(stillAllowed.map((c:JobSourcedCandidate)=>flattenCandidateForUI(c,rankedRun)));
+      }catch(error){
+        if(!rankedRun)throw error;
+        res.status(503).json({error:'Sourcing ranking unavailable',code:'SOURCING_RANKING_CONFLICT'});return;
+      }
 
       // Stage-5B: attach canonical resume pointers. Memory knows which of
       // these people applied (same tenant) — surface the resume through the
@@ -965,13 +1011,15 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       res.json({
         candidates: enriched,
+        ...(rankedRun?{rankingProtocol:2}:{}),
         counts,
-        groupCounts,
-        expansionReason: resolvedExpansionReason,
+        groupCounts:rankedRun?{bestMatches:enriched.filter(c=>c.ranking?.eligibility!=='wider').length,
+          broaderPool:enriched.filter(c=>c.ranking?.eligibility==='wider').length}:groupCounts,
+        expansionReason: rankedRun?null:resolvedExpansionReason,
         requestedLocation: resolvedRequestedLocation,
         discoverySummary,
-        qualityDebug,
-        kpis,
+        qualityDebug:rankedRun?null:qualityDebug,
+        kpis:rankedRun?null:kpis,
       });
     } catch (error) {
       next(error);

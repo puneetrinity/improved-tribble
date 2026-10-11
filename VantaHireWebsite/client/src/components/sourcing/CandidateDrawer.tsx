@@ -180,8 +180,8 @@ export function CandidateDrawer({
 
   // Total experience, deduped by company (Crustdata repeats full company tenure
   // per title, so a naive sum inflates it — e.g. 6 yrs shown as 18).
-  const totalExpYears = computeTotalExperienceYears(c.crustdata) ?? 0;
-  const experienceYears = totalExpYears > 0 ? totalExpYears : null;
+  const totalExpYears = c.ranking?null:computeTotalExperienceYears(c.crustdata);
+  const experienceYears = totalExpYears!=null&&totalExpYears>0?totalExpYears:null;
 
   const industry = currentRole?.company_professional_network_industry
     || pastRole?.company_professional_network_industry || null;
@@ -250,7 +250,7 @@ export function CandidateDrawer({
               </div>
 
               {/* Premium Enrichlayer Stats Row */}
-              {(seniority || followerCount !== null || connections !== null || experienceYears !== null || industry !== null) && (
+              {(seniority || followerCount !== null || connections !== null || experienceYears !== null || c.ranking || industry !== null) && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 text-xs text-muted-foreground border-t border-muted/50 mt-2">
                   {seniority && (
                     <span className="flex items-center gap-1 font-medium text-foreground/90 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
@@ -258,10 +258,10 @@ export function CandidateDrawer({
                       {seniority}
                     </span>
                   )}
-                  {experienceYears !== null && (
+                  {(experienceYears !== null||c.ranking) && (
                     <span className="flex items-center gap-1 font-medium text-foreground/90 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
                       <Briefcase className="h-3.5 w-3.5 text-primary/80" />
-                      {experienceYears} Yrs Exp
+                      {c.ranking?c.ranking.experience.display:`${experienceYears} Yrs Exp`}
                     </span>
                   )}
                   {followerCount !== null && (
@@ -287,11 +287,11 @@ export function CandidateDrawer({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <FitBadge
+            {c.ranking?<Badge variant="outline">Met {c.ranking.N} of {c.ranking.D} points</Badge>:<FitBadge
               score={c.fitScore}
               matchStrength={c.matchStrength}
-            />
-            {c.engagementReady && (
+            />}
+            {c.engagementReady && !c.ranking && (
               <Badge variant="outline" className="text-xs font-semibold bg-green-50 text-green-700 border-green-200">
                 <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                 Verified & Ready
@@ -316,6 +316,15 @@ export function CandidateDrawer({
         </div>
 
         <div className="px-6 py-8 space-y-8">
+          {c.ranking&&<section aria-label="Approved brief evidence" className="space-y-2">
+            <h3 className="font-semibold">Approved brief evidence</h3>
+            <p className="text-sm text-muted-foreground">Met {c.ranking.N} of {c.ranking.D} points. Unknown and not met earn no points; neither subtracts points. Equal scores do not imply a meaningful order within a tie.</p>
+            {c.ranking.assessments.map(a=><div key={a.criterionIds.join(':')} className="text-sm border rounded p-2">
+              <span className="font-medium">{a.labels.join(' / ')}: {a.state.replace(/_/g,' ')}</span>
+              <span> · {a.points} points</span>
+              {a.refs.length>0&&<p className="text-xs text-muted-foreground">Evidence: {a.refs.join(', ')}</p>}
+            </div>)}
+          </section>}
           {/* About Summary */}
           {summary && (
             <Section title="About" icon={UserCheck}>
