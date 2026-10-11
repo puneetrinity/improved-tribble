@@ -5,14 +5,16 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { useJobBrief, jobIntentRequest } from '../lib/job-brief';
 import type { BriefPayload } from '../../../server/job-brief/contracts';
+import { acceptedSkillsShape, duplicateSkillNames, overlappingSkillCriteria, skillAlternativesFromEditor } from '../../../shared/skill-alternatives';
 
 type Criterion=BriefPayload['criteria'][number];
 const subjects=['title','seniority','experience_years','skill','domain','function','location','certification','language','education_requirement','relevant_work','responsibility','leadership','availability','work_eligibility'] as const;
 const reasons=['clarification_typo','hm_client_feedback','role_scope_changed','seniority_changed','skills_changed','location_changed','compensation_changed','sourcing_quality_volume','market_availability','application_interview_evidence','policy_compliance','other'];
-const empty:BriefPayload={schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[]};
+const empty:BriefPayload={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[]};
 // Presentation of an old brief is a proposal for explicit save, never a backfilled approval.
 function editablePayload(value:BriefPayload):BriefPayload {
-  return {...value,schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:value.criteria.map(c=>
+  return {...value,schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:value.criteria.map(c=>
+    c.subject==='skill' && c.requirement.kind==='text' ? {...c,requirement:{kind:'accepted_skills',primary:c.requirement.value,alternatives:[]}} :
     c.subject==='title' && c.requirement.kind==='text' ? {...c,class:'preferred',use:'assessment',requirement:{kind:'accepted_titles',values:[c.requirement.value]}} :
     c.subject==='experience_years' ? {...c,use:'assessment'} : c)};
 }
@@ -43,15 +45,22 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
         setPayload(result.result);setDirty(true);setNotice('AI proposal only. Review every criterion and save before approving.');
       } else if(operation==='save') {
         const savedPayload={...payload,criteria:payload.criteria.map(c=>c.requirement.kind==='accepted_titles'
-          ? {...c,requirement:{...c.requirement,values:c.requirement.values.map(v=>v.trim()).filter(Boolean)}} : c)};
+          ? {...c,requirement:{...c.requirement,values:c.requirement.values.map(v=>v.trim()).filter(Boolean)}} :
+          c.requirement.kind==='accepted_skills' ? {...c,requirement:{...c.requirement,primary:c.requirement.primary.trim(),
+            alternatives:skillAlternativesFromEditor(c.requirement.alternatives.join('\n'))}} : c)};
+        if(savedPayload.criteria.some(c=>c.requirement.kind==='accepted_skills' &&
+          (!acceptedSkillsShape.safeParse(c.requirement).success || duplicateSkillNames(c.requirement))) ||
+          overlappingSkillCriteria(savedPayload.criteria).length) throw Error('SKILL_NAMES_INVALID');
         await jobIntentRequest(actorId,jobId,'save-brief',`/api/jobs/${jobId}/brief`,{currentJD:source,sourceChoice:source===brief.currentJD?'current_jd':choice,requesterKind:requester,reasonCode:reason,expectedRevision:revision,payload:savedPayload});
         setDirty(false);await refresh();setNotice('Brief saved. Approval is a separate action.');
       } else {
-        if(!brief.latest || dirty || brief.latest.payload.schemaVersion!==2) throw new Error('Save the updated brief before approving.');
+        if(!brief.latest || dirty || brief.latest.payload.schemaVersion!==3) throw new Error('Save the updated brief before approving.');
         await jobIntentRequest(actorId,jobId,'approve-brief',`/api/jobs/${jobId}/brief/approve`,{expectedRevision:revision,versionId:brief.latest.version_id},'POST');
         await refresh();setNotice('Brief approved. This did not publish the job or start sourcing.');
       }
-    } catch(error) {setError(error instanceof Error && /BRIEF_UPDATED_APPROVAL_REQUIRED|Save the updated brief/.test(error.message)
+    } catch(error) {setError(error instanceof Error && error.message==='SKILL_NAMES_INVALID'
+      ? 'Fix the skill names: at most 20 nonblank names per skill, no control characters, duplicates or shared names across skills.'
+      : error instanceof Error && /BRIEF_UPDATED_APPROVAL_REQUIRED|Save the updated brief/.test(error.message)
       ? 'Review, save and approve the updated brief. Your edits are kept.'
       : 'The change was not confirmed. Your edits are kept. Refresh the brief after a conflict, or retry the same action after a connection failure.');}
     finally {setBusy(false);}
@@ -59,6 +68,7 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
   const update=(index:number,patch:Partial<Criterion>)=>{setDirty(true);setPayload({...payload,criteria:payload.criteria.map((c,i)=>i===index?{...c,...patch,provenance:{kind:'recruiter_edit'}}:c)});};
   return <section aria-label="Job brief" className="space-y-4 rounded-lg border p-4" id="job-brief">
     <h2 className="text-xl font-semibold">Job brief and approval</h2>
+    {brief.latest && brief.latest.payload.schemaVersion!==3 && <p role="status">This older brief needs review. The proposed updated format is not saved or approved. Review skill names, save, then approve.</p>}
     <p>{brief.approvedVersionId?`Approved version retained${brief.latest?.version_id!==brief.approvedVersionId?'; latest revision is cosmetic':''}.`:'No approved brief yet.'} Approval never publishes or starts sourcing.</p>
     {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     {!brief.source.initialized && <div><p>Select the actual JD or enter it below. Nothing is inferred from the old screening configuration.</p>
@@ -77,10 +87,20 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
       <label className="block">Label<Input aria-label={`Criterion ${index+1} label`} value={c.label} maxLength={120} onChange={e=>update(index,{label:e.target.value})}/></label>
       <label>Class <select aria-label={`Criterion ${index+1} class`} value={c.class} onChange={e=>update(index,{class:e.target.value as Criterion['class']})}>{['must_have','preferred','disqualifier','evidence_required'].map(k=><option key={k} value={k}>{label(k)}</option>)}</select></label>{' '}
       <label>Type <select aria-label={`Criterion ${index+1} type`} value={c.subject} onChange={e=>{
-        const subject=e.target.value as Criterion['subject'];update(index,{subject,use:'assessment',...(subject==='title'?{class:'preferred' as const}:{}),requirement:subject==='experience_years'?{kind:'minimum_years',minimum:0}:subject==='title'?{kind:'accepted_titles',values:['']}:{kind:'text',value:''},
+        const subject=e.target.value as Criterion['subject'];update(index,{subject,use:'assessment',...(subject==='title'?{class:'preferred' as const}:{}),requirement:subject==='experience_years'?{kind:'minimum_years',minimum:0}:subject==='title'?{kind:'accepted_titles',values:['']}:subject==='skill'?{kind:'accepted_skills',primary:'',alternatives:[]}:{kind:'text',value:''},
           evidenceKinds:['responsibility','leadership','availability'].includes(subject)?['recruiter_judgement']:subject==='work_eligibility'?['candidate_provided']:['profile_evidence']});
       }}>{subjects.map(k=><option key={k} value={k}>{label(k)}</option>)}</select></label>
-      {c.requirement.kind==='accepted_titles' ? <label className="block">Accepted scoring titles (one per line, up to 20)
+      {c.requirement.kind==='accepted_skills' ? <div>
+        <label className="block">Skill name<Input aria-label={`Criterion ${index+1} requirement`} maxLength={120} value={c.requirement.primary}
+          onChange={e=>{if(c.requirement.kind==='accepted_skills')update(index,{requirement:{...c.requirement,primary:e.target.value}});}}/></label>
+        <label className="block">Also accepted (equivalent names only)
+          <Textarea aria-label={`Criterion ${index+1} accepted skills`} value={c.requirement.alternatives.join('\n')}
+            onChange={e=>{if(c.requirement.kind==='accepted_skills')update(index,{requirement:{...c.requirement,alternatives:e.target.value.split('\n')}});}}/>
+        </label>
+        <p>{1+skillAlternativesFromEditor(c.requirement.alternatives.join('\n')).length} of 20 names, including the skill name. Review suggestions before the same brief approval; each skill scores once.</p>
+        {(duplicateSkillNames({...c.requirement,alternatives:skillAlternativesFromEditor(c.requirement.alternatives.join('\n'))}) ||
+          overlappingSkillCriteria(payload.criteria).includes(c.id)) && <p role="alert">Duplicate skill name. Merge or edit names shared within or across skills.</p>}
+      </div> : c.requirement.kind==='accepted_titles' ? <label className="block">Accepted scoring titles (one per line, up to 20)
         <Textarea aria-label={`Criterion ${index+1} accepted titles`} value={c.requirement.values.join('\n')} onChange={e=>update(index,{requirement:{kind:'accepted_titles',values:e.target.value.split('\n')}})}/>
         <span>These titles earn points only after you approve this brief. They do not change the search title list.</span></label> :
         c.requirement.kind==='minimum_years' || c.requirement.kind==='experience_range' ? <div>
@@ -93,9 +113,9 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
       <p>{c.evidenceKinds.includes('recruiter_judgement')?'Recruiter-judged; never automatically scored.':c.subject==='work_eligibility'?'Candidate-provided evidence only.':'Evidence required; missing information stays unknown.'}</p>
       <Button type="button" variant="outline" onClick={()=>{setDirty(true);setPayload({...payload,criteria:payload.criteria.filter((_,i)=>i!==index)});}}>Remove criterion {index+1}</Button>
     </fieldset>)}
-    <Button type="button" variant="outline" disabled={busy || payload.criteria.length>=12} onClick={()=>{setDirty(true);setPayload({...payload,criteria:[...payload.criteria,{id:crypto.randomUUID(),label:'',class:'must_have',subject:'skill',requirement:{kind:'text',value:''},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}}]});}}>Add criterion</Button>
+    <Button type="button" variant="outline" disabled={busy || payload.criteria.length>=12} onClick={()=>{setDirty(true);setPayload({...payload,criteria:[...payload.criteria,{id:crypto.randomUUID(),label:'',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'',alternatives:[]},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}}]});}}>Add criterion</Button>
     <div className="flex flex-wrap gap-2"><Button type="button" disabled={busy || payload.criteria.length===0} onClick={()=>void invoke('save')}>Save brief</Button>
-      <Button type="button" disabled={busy || dirty || !brief.latest || brief.latest.payload.schemaVersion!==2} onClick={()=>void invoke('approve')}>Approve brief</Button>
+      <Button type="button" disabled={busy || dirty || !brief.latest || brief.latest.payload.schemaVersion!==3} onClick={()=>void invoke('approve')}>Approve brief</Button>
       <Button type="button" variant="outline" disabled={busy} onClick={()=>{setDirty(false);void query.refetch();}}>Reload saved brief</Button></div>
   </section>;
 }

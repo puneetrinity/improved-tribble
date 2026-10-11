@@ -241,14 +241,19 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
     for (const dir of scratch) rmSync(dir, { recursive: true, force: true });
   });
 
-  it("upgrades the shipped 0015 ledger to 0016 exactly once and preserves restricted grants", async () => {
+  it("upgrades 0015 to 0016 then 0017 exactly once and preserves restricted grants", async () => {
     const previous=mkdtempSync(join(tmpdir(),'flow-schema-control-5c-upgrade-'));scratch.push(previous);
     const manifest=loadManifest(migrationsDir),lock=JSON.parse(readFileSync(join(migrationsDir,'checksums.lock'),'utf8'));
     for(const entry of manifest.filter(e=>e.version<='0015'))copyFileSync(join(migrationsDir,entry.file),join(previous,entry.file));
     copyFileSync(join(migrationsDir,'catalog.lock.json'),join(previous,'catalog.lock.json'));
-    delete lock.migrations['0016'];writeFileSync(join(previous,'checksums.lock'),JSON.stringify(lock));
+    const priorHash=lock.migrations['0016'];
+    delete lock.migrations['0016'];delete lock.migrations['0017'];writeFileSync(join(previous,'checksums.lock'),JSON.stringify(lock));
     expect((await runReleaseMigration({migrationsDir:previous,creds:credentials(),connect})).applied).toHaveLength(16);
-    expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:['0016']});
+    copyFileSync(join(migrationsDir,'0016_rubric_ranking.sql'),join(previous,'0016_rubric_ranking.sql'));
+    lock.migrations['0016']=priorHash;writeFileSync(join(previous,'checksums.lock'),JSON.stringify(lock));
+    expect(await runReleaseMigration({migrationsDir:previous,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:['0016']});
+    expect(await runReleaseMigration({migrationsDir:previous,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:[]});
+    expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:['0017']});
     expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:[]});
     await provisionRuntimeRole({migrateUrl:databaseUrl,runtimeUrl:runtimeDatabaseUrl,runtimeRole:'flow_schema_control_test_runtime',
       expectedTargetId:targetId,connectMigration:connect,connectRuntime:async()=>{
@@ -261,7 +266,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       await assertSchemaReady({pg:{query:(text,params)=>runtime.query(text,params as any)},migrationsDir,
         environment:'development',expectedTargetId:targetId,criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS});
     }finally{await runtime.end();}
-  });
+  }, 120_000);
 
   it("installs the exact baseline once and repeats as a no-op", async () => {
     expect(loadManifest(migrationsDir).map(entry => entry.file)).toEqual(expect.arrayContaining([
@@ -298,6 +303,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0014", apply_mode: "adopted" },
         { version: "0015", apply_mode: "adopted" },
         { version: "0016", apply_mode: "adopted" },
+        { version: "0017", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +

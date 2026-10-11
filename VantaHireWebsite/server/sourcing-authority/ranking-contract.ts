@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { currentBriefPayloadSchema, type BriefPayload } from '../job-brief/contracts';
+import { briefPayloadSchema, type BriefPayload } from '../job-brief/contracts';
 const hash=z.string().regex(/^[a-f0-9]{64}$/);
 export const rankedCandidateSchema=z.object({
   protocolVersion:z.literal(2),revisionId:z.string().uuid(),contractHash:hash,outputHash:hash,asOf:z.string().datetime(),
@@ -28,10 +28,21 @@ export const rankedCandidateSchema=z.object({
     ctx.addIssue({code:z.ZodIssueCode.custom,message:'Invalid ranking assessment'});
 });
 export type RankedCandidate=z.infer<typeof rankedCandidateSchema>;
-export const POLICY_VERSION = 'rubric-range-v1' as const;
-export const TAXONOMY_VERSION = 'rubric-taxonomy-v3' as const;
+export const POLICY_VERSION = 'rubric-approved-skills-v1' as const;
+export const TAXONOMY_VERSION = 'rubric-taxonomy-v4' as const;
 export const ADAPTER_VERSION = 'rubric-evidence-v1' as const;
-export const LOCAL_MATCH_VERSION = 'rubric-local-match-v3' as const;
+export const LOCAL_MATCH_VERSION = 'rubric-local-match-v4' as const;
+export function rankingVersions(briefVersion: number) {
+  if (briefVersion === 2) return {
+    policyVersion: 'rubric-range-v1' as const, taxonomyVersion: 'rubric-taxonomy-v3' as const,
+    adapterVersion: ADAPTER_VERSION, localMatchVersion: 'rubric-local-match-v3' as const,
+  };
+  if (briefVersion === 3) return {
+    policyVersion: POLICY_VERSION, taxonomyVersion: TAXONOMY_VERSION,
+    adapterVersion: ADAPTER_VERSION, localMatchVersion: LOCAL_MATCH_VERSION,
+  };
+  throw Error('RUBRIC_UNSUPPORTED_BRIEF_VERSION');
+}
 export function canonical(value: unknown): string {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
   if (value !== null && typeof value === 'object') return '{' + Object.keys(value).sort(byteCompare).map(k => JSON.stringify(k) + ':' + canonical((value as Record<string,unknown>)[k])).join(',') + '}';
@@ -56,12 +67,21 @@ export function rankingProjection(payload: BriefPayload): string {
 }
 const rankingContractBody = z.object({
   schemaVersion:z.literal(1), briefVersionId:z.string().uuid(), materialHash:hash,
-  policyVersion:z.literal(POLICY_VERSION), taxonomyVersion:z.literal(TAXONOMY_VERSION),
-  adapterVersion:z.literal(ADAPTER_VERSION), localMatchVersion:z.literal(LOCAL_MATCH_VERSION),
-  payload:currentBriefPayloadSchema, projectionText:z.string().max(20000), projectionHash:hash,
+  policyVersion:z.enum(['rubric-range-v1', POLICY_VERSION]), taxonomyVersion:z.enum(['rubric-taxonomy-v3', TAXONOMY_VERSION]),
+  adapterVersion:z.literal(ADAPTER_VERSION), localMatchVersion:z.enum(['rubric-local-match-v3', LOCAL_MATCH_VERSION]),
+  payload:briefPayloadSchema.refine(v=>v.schemaVersion>=2, 'Ranking requires a versioned sourcing brief'), projectionText:z.string().max(20000), projectionHash:hash,
 }).strict();
 export const rankingContractSchema = rankingContractBody.extend({contractHash:hash}).superRefine((v,ctx)=>{
   const {contractHash,...body}=v;
+  if (v.payload.schemaVersion !== 2 && v.payload.schemaVersion !== 3) {
+    ctx.addIssue({code:z.ZodIssueCode.custom,message:'Unsupported ranking brief version'});
+    return;
+  }
+  const versions=rankingVersions(v.payload.schemaVersion);
+  if (v.policyVersion!==versions.policyVersion || v.taxonomyVersion!==versions.taxonomyVersion ||
+      v.localMatchVersion!==versions.localMatchVersion) {
+    ctx.addIssue({code:z.ZodIssueCode.custom,message:'Mixed ranking versions'});
+  }
   if (rankingHash(body)!==contractHash || v.projectionText!==rankingProjection(v.payload) ||
       rankingHash(v.projectionText)!==v.projectionHash || Buffer.byteLength(canonical(v),'utf8')>32768) {
     ctx.addIssue({code:z.ZodIssueCode.custom,message:'Ranking contract binding mismatch'});
@@ -70,8 +90,8 @@ export const rankingContractSchema = rankingContractBody.extend({contractHash:ha
 export type RankingContract = z.infer<typeof rankingContractSchema>;
 export type Criterion = BriefPayload['criteria'][number];
 export function createRankingContract(briefVersionId:string, materialHash:string, rawPayload:unknown):RankingContract {
-  const payload=currentBriefPayloadSchema.parse(rawPayload), projectionText=rankingProjection(payload);
-  const body={schemaVersion:1 as const,briefVersionId,materialHash,policyVersion:POLICY_VERSION,taxonomyVersion:TAXONOMY_VERSION,
-    adapterVersion:ADAPTER_VERSION,localMatchVersion:LOCAL_MATCH_VERSION,payload,projectionText,projectionHash:rankingHash(projectionText)};
+  const payload=briefPayloadSchema.parse(rawPayload), projectionText=rankingProjection(payload);
+  const body={schemaVersion:1 as const,briefVersionId,materialHash,...rankingVersions(payload.schemaVersion),
+    payload,projectionText,projectionHash:rankingHash(projectionText)};
   return rankingContractSchema.parse({...body,contractHash:rankingHash(body)});
 }

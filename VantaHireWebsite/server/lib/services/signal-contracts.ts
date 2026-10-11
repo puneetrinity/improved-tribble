@@ -16,6 +16,9 @@
 
 /** Raw Signal source type values. Never map/transform before storage. */
 import {rankedCandidateSchema,type RankedCandidate} from '../../sourcing-authority/ranking-contract';
+import { z } from 'zod';
+
+export {signalRcProgressSchema,type SignalRcProgress} from '../../../shared/rc-skills-progress';
 export type SignalSourceType = 'pool_enriched' | 'pool' | 'discovered';
 
 /** UI display bucket — derived at read time, never stored. */

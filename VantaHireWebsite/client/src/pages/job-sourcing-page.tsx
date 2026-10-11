@@ -539,6 +539,13 @@ export default function JobSourcingPage() {
 
   return (
     <Layout>
+      {(status?.rcProgress || status?.rcStatusUnavailable) && <div role="status" className="container mx-auto px-4 py-3">
+        {status.rcStatusUnavailable ? 'Status temporarily unavailable. Your saved search has not been restarted.'
+          : status.rcProgress?.state === 'stalled' ? `Your search needs attention. ${status.rcProgress.notificationDelivered ? 'Support has been notified.' : 'Recovery notification is pending.'}`
+          : status.rcProgress?.state === 'closed_unrecoverable' ? 'We could not complete this search. Contact support.'
+          : status.rcProgress?.state === 'enriching_skills' ? `Checking skills: ${status.rcProgress.processed} of ${status.rcProgress.total} profiles processed. You can leave this page.`
+          : 'Skills check finished. Available skills are retained; results appear once the shortlist is saved.'}
+      </div>}
       {briefSourcingNotice && <div role="status" className="container mx-auto px-4 py-3">Sourcing is not enabled for approved briefs yet. Your brief approval does not start a search.</div>}
       {governedMessage&&<div role="status" className="container mx-auto px-4 py-3">{governedMessage}</div>}
       {capability.isError&&<div role="alert">Sourcing settings unavailable. <Button onClick={()=>void capability.refetch()}>Retry settings</Button></div>}

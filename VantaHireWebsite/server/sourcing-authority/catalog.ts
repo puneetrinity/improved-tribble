@@ -23,7 +23,7 @@ export const SOURCING_PRIVATE_FUNCTIONS=[
 ] as const;
 export const SOURCING_PRIVATE_NAMES=SOURCING_PRIVATE_FUNCTIONS.map(s=>s.slice(0,s.indexOf('(')));
 // Reproduced from the final disposable catalog before the build can pass readiness.
-export const SOURCING_CATALOG_SHA256='364e246e81c6354388d35d55876acf3b4bb35c497c9450413b34d2c749ff0a7f';
+export const SOURCING_CATALOG_SHA256='69e55d718b039a7cf44a1bcb56789e8d57aa9bc5f500c7fb841d4e100c8a980e';
 export const SOURCING_CATALOG_SQL=`WITH relations AS (
  SELECT c.* FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname='public' AND c.relname LIKE 'sourcing_%' AND c.relkind IN ('r','p')

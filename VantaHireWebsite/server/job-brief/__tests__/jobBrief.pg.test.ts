@@ -11,13 +11,14 @@ import {assertSchemaReady,FLOW_CRITICAL_POSTCONDITIONS,jobBriefPrivilegesReady} 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { sourceHash } from '../contracts';
 import {persistWorkerDigest,type JDDigest} from '../../lib/jdDigest';
+import unicodeFixtures from '../../../test/fixtures/approved-skills-v1.json';
 
 const enabled=process.env.FLOW_BRIEF_DISPOSABLE==='1';
 const ownerUrl=process.env.FLOW_BRIEF_OWNER_URL??'';
 const runtimeUrl=process.env.FLOW_BRIEF_RUNTIME_URL??'';
 const jd='Build Python services.';
-const criterion={id:'10000000-0000-4000-8000-000000000001',label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'jd',sourceHash:sourceHash(jd),start:6,end:12}};
-const payload={schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[criterion]};
+const criterion={id:'10000000-0000-4000-8000-000000000001',label:'Python',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'jd',sourceHash:sourceHash(jd),start:6,end:12}};
+const payload={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[criterion]};
 const save={action:'save_brief',currentJD:jd,payload,sourceChoice:'original_prose',requesterKind:'recruiter',reasonCode:'other'};
 function checkTarget(raw:string) {
   const u=new URL(raw);
@@ -78,6 +79,17 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
   it('reads an uninitialized job without creating state',async()=>{
     expect(await read()).toMatchObject({revision:'0',currentJD:null,latest:null});
     expect((await owner.query('SELECT count(*)::integer n FROM job_brief_state WHERE organization_id=90001 AND job_id=90001')).rows[0].n).toBe(0);
+  });
+  it('uses identical pinned Unicode names in SQL and refuses direct duplicate saves',async()=>{
+    for(const {input,expected} of unicodeFixtures.normalization){
+      const bad={...payload,criteria:[{...criterion,provenance:{kind:'recruiter_edit'},requirement:{kind:'accepted_skills',primary:input,alternatives:[expected]}}]};
+      expect((await owner.query('SELECT public.flow_job_brief_validate_v3($1) ok',[bad])).rows[0].ok).toBe(false);
+      await runtime.query('SAVEPOINT invalid_skill');
+      await expect(saveVersion(randomUUID(),0,{...save,payload:bad})).rejects.toMatchObject({code:'22023'});
+      await runtime.query('ROLLBACK TO SAVEPOINT invalid_skill');
+    }
+    expect((await owner.query('SELECT public.flow_job_brief_validate_v3($1) ok',[payload])).rows[0].ok).toBe(true);
+    expect((await runtime.query("SELECT has_function_privilege(current_user,'public.flow_job_brief_validate_v3(jsonb)','EXECUTE') ok")).rows[0].ok).toBe(false);
   });
   it('does not grant candidates, foreign recruiters or admins brief authority',async()=>{
     for(const actor of [90002,90003,90004]) expect(await call('SELECT flow_job_brief_read(90001,90001,$1) result',[actor])).toBeNull();
@@ -164,7 +176,9 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
     await expect(saveVersion(randomUUID(),0,{...save,payload:{...payload,criteria:[{...criterion,note}]}})).rejects.toThrow('BRIEF_INVALID_PAYLOAD');
   });
   it.each([["No career gaps",false],["Career gap",false],["Married",false],["Marriott hospitality systems experience",true],["unmarried only",false],["Native Hindi speaker",false],["Native English speaker",false],["Native fluent English speaker",false],["US citizens only",false],["Citizen of India",false],["Recent graduate",false],["age limit 30",false],["male candidates only",false],["female applicants preferred",false],["Debug race conditions in Go services",true],["Handle a race condition",true],["Age of Empires modding",true],["male/female connectors",true]])('C4 SQL contextual phrase %s accepted=%s in every text field',async(text,accepted)=>{
-    for(const patch of [{label:text},{requirement:{kind:'text',value:text}},{note:text}]) {
+    for(const patch of [{label:text},{subject:'domain',requirement:{kind:'text',value:text}},
+      {requirement:{kind:'accepted_skills',primary:text,alternatives:[]}},
+      {requirement:{kind:'accepted_skills',primary:'Python',alternatives:[text]}},{note:text}]) {
       await runtime.query('SAVEPOINT trait_probe');
       const operation=saveVersion(randomUUID(),0,{...save,payload:{...payload,criteria:[{...criterion,...patch}]}});
       if(accepted) await expect(operation).resolves.toHaveProperty('versionId');
@@ -173,7 +187,7 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
     }
   });
   it('C4 SQL permits citizenship only with the work-eligibility evidence contract',async()=>{
-    const c={...criterion,subject:'work_eligibility',label:'Citizen of India',evidenceKinds:['candidate_provided']};
+    const c={...criterion,subject:'work_eligibility',label:'Citizen of India',requirement:{kind:'text',value:'Citizen of India'},evidenceKinds:['candidate_provided']};
     await runtime.query('SAVEPOINT eligibility');
     await expect(saveVersion(randomUUID(),0,{...save,payload:{...payload,criteria:[c]}})).resolves.toHaveProperty('versionId');
     await runtime.query('ROLLBACK TO SAVEPOINT eligibility');

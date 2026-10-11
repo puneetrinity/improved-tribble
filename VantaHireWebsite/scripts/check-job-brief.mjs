@@ -62,7 +62,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
     const {startVitest}=await import('vitest/node');const pg=process.argv.includes('--pg'),client=process.argv.includes('--client');
     const plugins=client?[(await import('@vitejs/plugin-react')).default()]:[];
     const v=await startVitest('test',[],{root,config:false,environment:client?'jsdom':'node',watch:false,
-      include:[client?'test/unit/job-brief.test.tsx':pg?'server/job-brief/__tests__/*.pg.test.ts':'server/job-brief/__tests__/*.test.ts'],
+      include:client?['test/unit/job-brief.test.tsx','test/unit/rc-skills-progress.test.tsx']:pg?['server/job-brief/__tests__/*.pg.test.ts']:['server/job-brief/__tests__/*.test.ts','test/contracts/skill-alternatives.test.ts'],
       exclude:pg?[]:['**/*.pg.test.ts'],fileParallelism:false,testTimeout:30000,hookTimeout:30000,
       alias:{'@shared':resolve(root,'shared'),'@':resolve(root,'client/src')}},{plugins});
     if(!v)process.exitCode=1;else await v.close();

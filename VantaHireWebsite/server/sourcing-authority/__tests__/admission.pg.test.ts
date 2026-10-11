@@ -25,8 +25,8 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
     await db.query('INSERT INTO job_recruiters(job_id,recruiter_id,organization_id) VALUES($1,$2,$3)', [id, peer, org]);
     const saved = await one('SELECT flow_job_brief_save($1,$2,$3,$4,0,$5) result', [org, id, actor, randomUUID(), {
       action: 'save_brief', currentJD: 'Build Python services.', sourceChoice: 'original_prose', requesterKind: 'recruiter', reasonCode: 'other',
-      payload: { schemaVersion: 2, compilerVersion: 2, taxonomyVersion: 2, criteria: [{
-        id: randomUUID(), label: 'Python', class: 'must_have', subject: 'skill', requirement: { kind: 'text', value: 'Python' },
+      payload: { schemaVersion: 3, compilerVersion: 3, taxonomyVersion: 3, criteria: [{
+        id: randomUUID(), label: 'Python', class: 'must_have', subject: 'skill', requirement: { kind: 'accepted_skills', primary: 'Python', alternatives: [] },
         use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' },
       }] },
     }]);

@@ -14,7 +14,7 @@ import { requireRole } from './auth';
 import { requireSeat } from './auth';
 import { getUserOrganization, requireSignalTenantId } from './lib/organizationService';
 import { queueMauticSourcingRunSync } from './lib/mauticService';
-import { sourceJob, enrichBatch } from './lib/services/signal-client';
+import { sourceJob, enrichBatch, getRcProgress } from './lib/services/signal-client';
 import {
   enqueueCandidateContactResolution,
   revalidateCandidateContact,
@@ -34,6 +34,7 @@ import {
   type SignalSourceRequest,
   type SourcingRunStatus,
   type SourcedCandidateForUI,
+  type SignalRcProgress,
 } from './lib/services/signal-contracts';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
@@ -596,10 +597,34 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
 
-      // Lazy expiry: mark stale non-terminal runs as expired on poll
+      // RC progress is read-only. Never expire a recoverable RC run from a page
+      // view, including when its status endpoint is temporarily unavailable.
+      let rcProgress: SignalRcProgress | null = null;
+      let rcStatusUnavailable = false;
+      let rcGoverned = false;
+      if (process.env.RC_SKILLS_ENABLED === 'true' && sourcingEnabled()) {
+        try {
+          const binding = await sourcingRepository.call<{protocolVersion?: number}>(
+            'runBinding', [organizationId, jobId, latestRun.requestId],
+          );
+          if (binding?.protocolVersion === 2) {
+            const tenantId = contextResult.context.signalTenantId;
+            if (!tenantId) throw new Error('Missing sourcing tenant');
+            rcGoverned = true;
+            rcProgress = await getRcProgress(tenantId, latestRun.externalJobId, latestRun.requestId);
+            // An explicit not-bound response preserves legacy expiry behavior.
+            rcGoverned = rcProgress !== null;
+          }
+        } catch {
+          rcGoverned = true;
+          rcStatusUnavailable = true;
+        }
+      }
+
+      // Lazy expiry applies only to the pre-RC path.
       const rawStaleMs = parseInt(process.env.SIGNAL_STALE_THRESHOLD_MS ?? '', 10);
       const STALE_THRESHOLD_MS = Number.isFinite(rawStaleMs) && rawStaleMs > 0 ? rawStaleMs : 15 * 60 * 1000;
-      if (!isTerminalStatus(latestRun.status as SourcingRunStatus)) {
+      if (!rcGoverned && !isTerminalStatus(latestRun.status as SourcingRunStatus)) {
         const submittedMs = latestRun.submittedAt
           ? new Date(latestRun.submittedAt).getTime()
           : new Date(latestRun.createdAt).getTime();
@@ -676,6 +701,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         errorMessage: latestRun.status === 'failed' || latestRun.status === 'expired'
           ? latestRun.errorMessage : undefined,
         enrichment,
+        ...(rcProgress ? { rcProgress } : {}),
+        ...(rcStatusUnavailable ? { rcStatusUnavailable: true } : {}),
       });
     } catch (error) {
       next(error);

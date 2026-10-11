@@ -25,8 +25,8 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     await db.query('INSERT INTO job_recruiters(job_id,recruiter_id,organization_id) VALUES($1,$2,$3)', [id, peer, org]);
     const saved = await one('SELECT flow_job_brief_save($1,$2,$3,$4,0,$5) result', [org, id, actor, randomUUID(), {
       action: 'save_brief', currentJD: 'Build Python services.', sourceChoice: 'original_prose', requesterKind: 'recruiter', reasonCode: 'other',
-      payload: { schemaVersion: 2, compilerVersion: 2, taxonomyVersion: 2, criteria: [{
-        id: randomUUID(), label: 'Python', class: 'must_have', subject: 'skill', requirement: { kind: 'text', value: 'Python' },
+      payload: { schemaVersion: 3, compilerVersion: 3, taxonomyVersion: 3, criteria: [{
+        id: randomUUID(), label: 'Python', class: 'must_have', subject: 'skill', requirement: { kind: 'accepted_skills', primary: 'Python', alternatives: [] },
         use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' },
       }] },
     }]);
@@ -124,7 +124,7 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     await expect(action()).rejects.toThrow(message);
     await db.query('ROLLBACK TO SAVEPOINT refused');
   }
-  function rangePayload(){return {schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[
+  function rangePayload(){return {schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[
     {id:randomUUID(),label:'Role',class:'preferred',subject:'title',requirement:{kind:'accepted_titles',values:['Backend Engineer','Backend Developer']},
       use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}},
     {id:randomUUID(),label:'Experience',class:'must_have',subject:'experience_years',requirement:{kind:'experience_range',minimum:6,maximum:10},
@@ -134,16 +134,16 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     return one('SELECT flow_job_brief_save($1,$2,$3,$4,2,$5) result',[org,95201,actor,request,{
       action:'save_brief',currentJD:'Build Python services.',sourceChoice:'original_prose',requesterKind:'recruiter',reasonCode:'other',payload}]);
   }
-  it('saves range/title schema2 immutably, invalidates approval and replays without another version',async()=>{
+  it('saves range/title schema3 immutably, invalidates approval and replays without another version',async()=>{
     const payload=rangePayload(),request=randomUUID(),saved=await savePayload(payload,request);
     expect(await savePayload(payload,request)).toEqual(saved);
     const version=(await db.query('SELECT schema_version,compiler_version,taxonomy_version,payload FROM job_brief_versions WHERE version_id=$1',[saved.versionId])).rows[0];
-    expect(version).toMatchObject({schema_version:2,compiler_version:2,taxonomy_version:2,payload});
+    expect(version).toMatchObject({schema_version:3,compiler_version:3,taxonomy_version:3,payload});
     expect(await one('SELECT approved_version_id result FROM job_brief_state WHERE job_id=95201')).toBeNull();
     await refusal(()=>quote(),'SOURCING_QUERY_STALE');
   });
   it.each(['maximum_only','reversed_range','negative','too_large','string_maximum','duplicate_title','too_many_titles','empty_titles',
-    'protected_title','protected_note','duplicate_range','retrieval_range','mixed_version','historical_new_save'])('SQL refuses %s without mutating approval',async variant=>{
+    'protected_title','protected_note','duplicate_range','retrieval_range','mixed_version','historical_new_save','historical_v2_new_save'])('SQL refuses %s without mutating approval',async variant=>{
     const payload:any=rangePayload();
     const title=payload.criteria[0],years=payload.criteria[1];
     if(variant==='maximum_only')delete years.requirement.minimum;
@@ -160,6 +160,7 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     if(variant==='retrieval_range')years.use='both';
     if(variant==='mixed_version')payload.compilerVersion=1;
     if(variant==='historical_new_save')payload.schemaVersion=payload.compilerVersion=payload.taxonomyVersion=1;
+    if(variant==='historical_v2_new_save')payload.schemaVersion=payload.compilerVersion=payload.taxonomyVersion=2;
     const before=await one('SELECT approved_version_id result FROM job_brief_state WHERE job_id=95201');
     await refusal(()=>savePayload(payload),'BRIEF_INVALID_PAYLOAD');
     expect(await one('SELECT approved_version_id result FROM job_brief_state WHERE job_id=95201')).toBe(before);

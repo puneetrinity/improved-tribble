@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {rcProgressPresentation,type SignalRcProgress} from '@shared/rc-skills-progress';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 // The state contract is owned by `useSourcingProgress` and is unchanged.
@@ -52,6 +53,8 @@ export interface PipelineProgressState {
   candidates: EnrichmentCandidateEvent[];
   devLogs: string[];
   error?: string;
+  rcProgress?: SignalRcProgress;
+  rcStatusUnavailable?: boolean;
 }
 
 export const INITIAL_PROGRESS: PipelineProgressState = {
@@ -139,7 +142,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
 
   const isComplete = progress.phase === "complete";
   const isError = progress.phase === "error";
-  const isRunning = open && !isComplete && !isError;
+  const isRunning = open && !isComplete && !isError && !progress.rcProgress && !progress.rcStatusUnavailable;
 
   // Smooth animated percent display (tracks the REAL percent, never a fixed timer)
   const [displayPct, setDisplayPct] = useState(0);
@@ -187,6 +190,21 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
   const ringColor = isError ? "#DC2626" : isComplete ? "#1FA463" : "#4B8EF0";
 
   // Modal is closed by the hook after candidates are pre-fetched (unchanged behaviour).
+
+  if (progress.rcProgress || progress.rcStatusUnavailable) {
+    const rc = progress.rcProgress;
+    const {heading,message}=rcProgressPresentation(rc,progress.rcStatusUnavailable);
+    return (
+      <Dialog open={open} onOpenChange={value => { if (!value) onClose?.(); }}>
+        <DialogContent data-sourcing-progress-modal="" data-rc-progress="" className="max-w-md">
+          <DialogTitle>{heading}</DialogTitle>
+          {rc && <p>{rc.processed} of {rc.total} profiles processed. This is progress, not a count of matching skills.</p>}
+          <p>{message}</p>
+          <button type="button" onClick={onClose} className="rounded border px-3 py-2">Close</button>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={() => { if ((isComplete || isError) && onClose) onClose(); }}>

@@ -21,7 +21,8 @@ export const sourcingAuthorityTokens={
     "p_command->>'revision'<>'1'","IF action NOT IN ('schedule','retry')",'SOURCING_DIGEST_UNAUTHORIZED','SOURCING_DIGEST_RATE_LIMITED',
   ],
   'server/sourcing-authority/ranking-contract.ts':['rubric-range-v1','rubric-taxonomy-v3','rubric-evidence-v1','rubric-local-match-v3',
-    'currentBriefPayloadSchema','rankingProjection','rankingHash(body)!==contractHash','rankedCandidateSchema'],
+    "briefPayloadSchema.refine(v=>v.schemaVersion>=2",'rubric-approved-skills-v1','rubric-taxonomy-v4','rubric-local-match-v4',
+    'rankingProjection','rankingHash(body)!==contractHash','rankedCandidateSchema'],
   'server/schema-migrations/0015_governed_sourcing.sql':[
     'CREATE UNIQUE INDEX src_adm_job_uq ON public.sourcing_admissions(organization_id,job_id)',"WHERE state<>'cancelled_no_dispatch'",'src_acct_terminal_uq',
     'src_win_balance_ck CHECK (reserved>=0 AND captured>=0 AND reserved+captured<=limit_count)',
@@ -60,7 +61,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   if(pg||tests||client||processProof){
     const {startVitest}=await import('vitest/node');
     const v=await startVitest('test',[],{root,config:false,environment:'node',watch:false,
-      include:[processProof?'test/integration/governed-sourcing-process.test.ts':client?'client/src/lib/sourcing-authority.test.ts':pg?'server/sourcing-authority/__tests__/*.pg.test.ts':'server/sourcing-authority/__tests__/*.test.ts'],
+      include:[processProof?'test/integration/governed-sourcing-process.test.ts':client?'client/src/lib/sourcing-authority.test.ts':pg?'server/sourcing-authority/__tests__/*.pg.test.ts':'server/sourcing-authority/__tests__/*.test.ts',...(!processProof&&!client&&!pg?['test/integration/rc-skills-progress.test.ts']:[])],
       exclude:pg?[]:['**/*.pg.test.ts'],fileParallelism:false,maxWorkers:1,minWorkers:1,testTimeout:30000,hookTimeout:120000});
     if(!v)process.exitCode=1;else await v.close();
   }else{checkSourcingAuthority();console.log('sourcing-authority-guard: OK');}

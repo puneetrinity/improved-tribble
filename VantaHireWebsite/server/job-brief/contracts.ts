@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { acceptedSkillsShape, duplicateSkillNames, overlappingSkillCriteria } from '../../shared/skill-alternatives';
 import { resolveJobDescription } from '../../shared/jobDescription';
 
 export const BRIEF_TABLES = ['job_brief_state', 'job_brief_versions', 'job_brief_events', 'job_brief_draft_requests'] as const;
@@ -11,7 +12,7 @@ export const BRIEF_FUNCTIONS = [
   'flow_job_brief_draft_claim(integer,integer,integer,uuid,bigint,text,text,text)',
   'flow_job_brief_draft_finish(uuid,uuid,jsonb)',
 ] as const;
-export const BRIEF_VERSION = 2;
+export const BRIEF_VERSION = 3;
 export const MAX_JD_BYTES = 20_000;
 export const MAX_REQUEST_BYTES = 65_536;
 
@@ -42,6 +43,7 @@ const criterion = z.object({
   class: z.enum(criterionClasses),
   subject: z.enum(criterionSubjects),
   requirement: z.discriminatedUnion('kind', [
+    acceptedSkillsShape,
     z.object({ kind: z.literal('text'), value: boundedText(500) }).strict(),
     z.object({ kind: z.literal('minimum_years'), minimum: z.number().finite().min(0).max(80) }).strict(),
     z.object({ kind: z.literal('experience_range'), minimum: z.number().finite().min(0).max(80), maximum: z.number().finite().min(0).max(80) }).strict(),
@@ -56,6 +58,10 @@ const criterion = z.object({
   ]),
   note: z.string().max(300).optional(),
 }).strict().superRefine((value, ctx) => {
+  if (value.requirement.kind === 'accepted_skills' &&
+      (value.subject !== 'skill' || duplicateSkillNames(value.requirement))) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Approved skill names must be unique and belong to a skill criterion' });
+  }
   if ((value.subject === 'experience_years') !== ['minimum_years','experience_range'].includes(value.requirement.kind)) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Experience needs a minimum or approved range' });
   }
@@ -77,29 +83,33 @@ const criterion = z.object({
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Work eligibility needs candidate-provided or verified evidence' });
   }
   const texts = [value.label, value.requirement.kind === 'text' ? value.requirement.value : '', value.note??'',
-    ...(value.requirement.kind === 'accepted_titles' ? value.requirement.values : [])];
+    ...(value.requirement.kind === 'accepted_titles' ? value.requirement.values : []),
+    ...(value.requirement.kind === 'accepted_skills' ? [value.requirement.primary, ...value.requirement.alternatives] : [])];
   if (texts.some(text=>hasBannedCriterionText(text,value.subject))) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Unsupported criterion' });
   }
 });
 export const briefPayloadSchema = z.object({
-  schemaVersion: z.union([z.literal(1),z.literal(2)]), compilerVersion: z.union([z.literal(1),z.literal(2)]), taxonomyVersion: z.union([z.literal(1),z.literal(2)]),
+  schemaVersion: z.union([z.literal(1),z.literal(2),z.literal(3)]), compilerVersion: z.union([z.literal(1),z.literal(2),z.literal(3)]), taxonomyVersion: z.union([z.literal(1),z.literal(2),z.literal(3)]),
   criteria: z.array(criterion).min(1).max(12),
 }).strict().superRefine((value, ctx) => {
   if (new Set(value.criteria.map(c => c.id)).size !== value.criteria.length) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Duplicate criterion ID' });
   if (value.schemaVersion !== value.compilerVersion || value.schemaVersion !== value.taxonomyVersion) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Mixed brief versions'});
   for (const c of value.criteria) {
+    if (value.schemaVersion < 3 && c.requirement.kind === 'accepted_skills') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Historical brief shape cannot change'});
+    if (value.schemaVersion === 3 && c.subject === 'skill' && c.requirement.kind !== 'accepted_skills') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Skill needs approved names'});
     if (value.schemaVersion === 1 && ['experience_range','accepted_titles'].includes(c.requirement.kind)) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Historical brief shape cannot change'});
-    if (value.schemaVersion === 2 && c.subject === 'title' && c.requirement.kind !== 'accepted_titles') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Title needs approved alternatives'});
-    if (value.schemaVersion === 2 && c.subject === 'experience_years' && !c.evidenceKinds.includes('profile_evidence')) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Experience calculation requires profile employment evidence'});
-    if (value.schemaVersion === 2 && ['experience_years','title'].includes(c.subject) && c.use !== 'assessment') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Scoring titles and experience are assessed after retrieval'});
+    if (value.schemaVersion >= 2 && c.subject === 'title' && c.requirement.kind !== 'accepted_titles') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Title needs approved alternatives'});
+    if (value.schemaVersion >= 2 && c.subject === 'experience_years' && !c.evidenceKinds.includes('profile_evidence')) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Experience calculation requires profile employment evidence'});
+    if (value.schemaVersion >= 2 && ['experience_years','title'].includes(c.subject) && c.use !== 'assessment') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Scoring titles and experience are assessed after retrieval'});
   }
-  if (value.schemaVersion === 2) for (const subject of ['title','experience_years']) {
+  if (value.schemaVersion === 3 && overlappingSkillCriteria(value.criteria).length) ctx.addIssue({code:z.ZodIssueCode.custom,message:'A skill name appears under multiple criteria; merge or edit the skills'});
+  if (value.schemaVersion >= 2) for (const subject of ['title','experience_years']) {
     if (value.criteria.filter(c=>c.subject===subject).length>1) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Duplicate title or experience criterion'});
   }
 });
 export type BriefPayload = z.infer<typeof briefPayloadSchema>;
-/** Historical v1 remains readable; only an explicit new v2 save may be approved for ranking. */
+/** Historical versions remain readable; only an explicit v3 save can be approved. */
 export const currentBriefPayloadSchema = briefPayloadSchema.refine(v=>v.schemaVersion===BRIEF_VERSION, 'Review and save the updated brief');
 export const currentJdSchema = z.string().min(1)
   .refine(v => Buffer.byteLength(v, 'utf8') <= MAX_JD_BYTES, 'JD exceeds byte limit')

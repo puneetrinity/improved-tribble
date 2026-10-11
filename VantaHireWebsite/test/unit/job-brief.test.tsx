@@ -9,8 +9,8 @@ vi.mock('../../client/src/lib/job-brief',async importOriginal=>({...await import
 vi.mock('../../client/src/lib/queryClient',()=>({apiRequest:mocks.api}));
 import {JobBriefPanel} from '../../client/src/components/job-brief-panel';
 const id='10000000-0000-4000-8000-000000000001';
-const criterion={id,label:'Python',class:'must_have',subject:'skill',requirement:{kind:'text',value:'Python'},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}};
-const payload={schemaVersion:2,compilerVersion:2,taxonomyVersion:2,criteria:[criterion]};
+const criterion={id,label:'Python',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}};
+const payload={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[criterion]};
 const brief={revision:'2',currentJD:'Build Python services.',sourceHash:'a'.repeat(64),latest:{version_id:id,version_number:1,payload},approvedVersionId:null,draft:null,source:{initialized:true,ambiguous:false,choices:[]}};
 describe('brief recruiter UI',()=>{
   let host:HTMLDivElement;let root:Root;let cache:QueryClient;
@@ -28,9 +28,9 @@ describe('brief recruiter UI',()=>{
     element.value=value;Simulate.change(element);
   });
   it('historical briefs need explicit save and reapproval without an automatic request',async()=>{
-    mocks.query.mockReturnValue({data:{...brief,latest:{...brief.latest,payload:{...payload,schemaVersion:1,compilerVersion:1,taxonomyVersion:1}}},isPending:false,isError:false});
+    mocks.query.mockReturnValue({data:{...brief,latest:{...brief.latest,payload:{...payload,schemaVersion:1,compilerVersion:1,taxonomyVersion:1,criteria:[{...criterion,requirement:{kind:'text',value:'Python'}}]}}},isPending:false,isError:false});
     await render();expect(button('Approve brief').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
-    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload).toMatchObject({schemaVersion:2,compilerVersion:2,taxonomyVersion:2});
+    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload).toMatchObject({schemaVersion:3,compilerVersion:3,taxonomyVersion:3});
     expect(mocks.intent).toHaveBeenCalledTimes(1);
   });
   it('shows editable scoring titles in the one approval flow, defaulting to preferred',async()=>{
@@ -40,6 +40,22 @@ describe('brief recruiter UI',()=>{
     expect(host.textContent).toContain('They do not change the search title list');
     await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload.criteria[0]).toMatchObject({
       subject:'title',class:'preferred',use:'assessment',requirement:{kind:'accepted_titles',values:['Backend Engineer','Backend Developer']}});
+  });
+  it('shows skill alternatives, drops blank editor lines only on save and requires reapproval',async()=>{
+    await render();
+    await change('Criterion 1 requirement','AWS');
+    await change('Criterion 1 accepted skills','Amazon Web Services\n\nAmazon AWS\n');
+    expect(button('Approve brief').disabled).toBe(true);
+    expect(mocks.intent).not.toHaveBeenCalled();
+    await click('Save brief');
+    expect(mocks.intent.mock.calls[0][4].payload.criteria[0].requirement).toEqual({
+      kind:'accepted_skills',primary:'AWS',alternatives:['Amazon Web Services','Amazon AWS']});
+  });
+  it('refuses duplicate skill names locally without a request',async()=>{
+    await render();await change('Criterion 1 accepted skills','python');
+    await click('Save brief');
+    expect(mocks.intent).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Fix the skill names');
   });
   it('saves an explicit range and does not convert a cleared minimum into zero',async()=>{
     await render();await change('Criterion 1 type','experience_years');
@@ -66,7 +82,8 @@ describe('brief recruiter UI',()=>{
     await click('Use original prose');expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('First JD');expect(mocks.intent).not.toHaveBeenCalled();
   });
   it('preserves edits on a refused save and does not approve them',async()=>{
-    await render();await click('Add criterion');mocks.intent.mockRejectedValue(new Error('Conflict'));await click('Save brief');
+    await render();await click('Add criterion');await change('Criterion 2 label','Kafka');await change('Criterion 2 requirement','Kafka');
+    mocks.intent.mockRejectedValue(new Error('Conflict'));await click('Save brief');
     expect(host.querySelectorAll('fieldset')).toHaveLength(2);expect(host.textContent).toContain('Your edits are kept');expect(button('Approve brief').disabled).toBe(true);
   });
   it('allows at most twelve criteria and keeps disqualifiers as flags',async()=>{

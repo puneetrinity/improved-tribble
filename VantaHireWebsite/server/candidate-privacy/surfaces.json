@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "19bd8c64f80dd975d484e43cda53a438314f1b5b8f04e101faff8c6e8ca69fe4",
+  "source_census_sha256": "1c27a74fa37653d0906a4dc82550fa8b451e22d8c81c9d3e3e124bc2ed788212",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/candidate-history/contracts.ts",
@@ -788,7 +788,7 @@
       "direction": "provider_read",
       "privacy_action": ["withdraw_global_matching", "request_erasure"],
       "organization_scope": "new_org",
-      "enforcement": "Results enter Flow only through the batch-filtered sourcing-sync materializer; contact calls are made only by fenced callers.",
+      "enforcement": "Candidate results enter Flow only through the batch-filtered sourcing-sync materializer; contact calls are made only by fenced callers. RC progress is a separate strict counts-only read after job/organization/seat authorization and does not invoke result sync.",
       "anchors": ["find-contact", "candidateIds"]
     },
     {
