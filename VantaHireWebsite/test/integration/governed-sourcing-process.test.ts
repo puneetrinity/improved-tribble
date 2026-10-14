@@ -137,7 +137,7 @@ finally:s.close()
       if(!rcMemory.startsWith('/home/ews/')||rcMemory===memory)throw Error('ISOLATED_RC_MEMORY_REQUIRED');
       expect(execFileSync('git',['rev-parse','HEAD'],{cwd:rcMemory,encoding:'utf8'}).trim()).toBe('82164119f896b98b8d99fb4812aa4e9db5ca13f6');
     }
-    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('65933f1e25c055858c9853f1a80859b3a62f3539');
+    expect(execFileSync('git',['rev-parse','HEAD'],{cwd:discover,encoding:'utf8'}).trim()).toBe('5472865f48e74e8e1ab7f424b44a6967de164c41');
     const env={...cleanEnv,ACTIVEKG_INDEX_XS_FLOW_ROOT:resolve('..'),
       ACTIVEKG_INDEX_XS_ADMIN_DSN:`postgresql://fixture_admin_test@127.0.0.1:${port}/postgres`,
       FLOW_INDEX_TEST_OWNER_URL:`postgresql://flow_4d_test_placeholder_owner_test@127.0.0.1:${port}/flow_4d_test_placeholder_test`,
@@ -160,7 +160,7 @@ if os.environ.get('FIXTURE_RC')=='1':
     bootstrap='\n'.join(line[4:] if line.startswith('    ') else line for line in inspect.getsource(index.ProcessStack.bootstrap).splitlines())
     assert bootstrap.count('== 29')==1
     namespace={}
-    exec(bootstrap.replace('== 29','== 31'),index.__dict__,namespace)
+    exec(bootstrap.replace('== 29','== 32'),index.__dict__,namespace)
     index.ProcessStack.bootstrap=namespace['bootstrap']
 original=index._node
 def current_tail(path,root,dsn,body,**kwargs):
@@ -264,7 +264,7 @@ globalThis.fetch=async(input,init)=>{
    fs.appendFileSync(process.env.FIXTURE_PROVIDER_LOG,JSON.stringify({kind:check?'rc-check':'rc-fetch'})+'\n');
    const data=check?{exists:true,lastUpdate:new Date(Date.now()-86400000).toISOString(),skillCount:2}
      :{linkedinUrl:body.url,skills:['Python 3','PostgreSQL'],email:'discard@fixture.invalid'};
-   return Response.json({success:true,error:null,data,quotas:{creditsConsumed:check?0:1}});
+   return Response.json({success:true,error:null,data,metadata:{updatedAt:new Date(Date.now()-86400000).toISOString()},quotas:{creditsConsumed:check?0:1}});
  }
  if(url.href==='https://api.crustdata.com/person/search'){
    const body=JSON.parse(init.body),headers=new Headers(init.headers);
@@ -408,10 +408,18 @@ globalThis.fetch=async(input,init)=>{
                 assert len([x for x in calls if x['kind']=='digest'])==1,calls
                 assert len([x for x in calls if x['kind']=='crustdata' and x['body']['limit']==300])==1,calls
                 if os.environ.get('FIXTURE_RC')=='1':
-                    assert len([x for x in calls if x['kind']=='rc-check'])==4,calls
+                    assert len([x for x in calls if x['kind']=='rc-check'])==0,calls
                     assert len([x for x in calls if x['kind']=='rc-fetch'])==4,calls
                     assert discover.execute("SELECT count(*) FROM rc_lookup_attempts WHERE operation='FETCH' AND state='success'").fetchone()[0]==4
-                    self.wait(lambda:self.owner.execute("SELECT count(*) FROM rc_skill_observations WHERE outcome='success'").fetchone()[0]==4)
+                    # Publication does not synchronously drain the durable skills
+                    # outbox. Exercise the actual independent maintenance owner.
+                    cache_deadline=time.monotonic()+75
+                    while self.owner.execute("SELECT count(*) FROM rc_skill_observations WHERE outcome='success'").fetchone()[0]!=4:
+                        assert time.monotonic()<cache_deadline,'durable skills outbox did not drain'
+                        self.run(['node','scripts/rc-skills-maintenance.mjs','--once'],de,self.discover,timeout=90)
+                        # The real outbox has a 30-second retry delay. Keep the
+                        # scheduler cycling; never rewrite its timestamps.
+                        time.sleep(3)
                     assert self.owner.execute("SELECT count(*) FROM rc_skill_observations WHERE skills::text LIKE '%discard@%'").fetchone()[0]==0
                     progress=client.get(f'/api/jobs/{job}/sourcing-status')
                     assert progress.status_code==200,progress.text
@@ -467,7 +475,7 @@ globalThis.fetch=async(input,init)=>{
                 assert len([x for x in repeated if x['kind']=='crustdata' and x['body']['limit']==300])==1
                 if os.environ.get('FIXTURE_RC')=='1':
                     assert len([x for x in repeated if x['kind']=='rc-fetch'])==4
-                    assert len([x for x in repeated if x['kind']=='rc-check'])==4
+                    assert len([x for x in repeated if x['kind']=='rc-check'])==0
                 assert flow.execute('SELECT captured FROM sourcing_allowance_windows WHERE organization_id=%s',(org,)).fetchone()[0]==1
                 assert self.forbidden.read_text()==''
                 print('GOVERNED_THREE_SYSTEM_PASS',flush=True)
