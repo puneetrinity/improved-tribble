@@ -12,6 +12,22 @@ function transport(response:Response){
  const call=vi.fn(async()=>response);vi.stubGlobal('fetch',call);return call;
 }
 describe('RC progress HTTP contract',()=>{
+ it.each([
+  {state:'queued',safeReason:'worker_queue',processed:0,total:0,workStarted:false},
+  {state:'queued',safeReason:'quota_window',processed:3,total:5,workStarted:true},
+ ])('accepts truthful queue progress without new admission state',async fields=>{
+  const value={...progress,...fields};transport(Response.json({success:true,rcProgress:value}));
+  expect(await getRcProgress('org_9','job','request')).toEqual(value);
+ });
+ it.each([
+  {...progress,state:'queued',safeReason:'worker_queue'},
+  {...progress,state:'queued',safeReason:'quota_window',workStarted:false},
+  {...progress,workStarted:true},
+  {...progress,safeReason:'worker_queue'},
+  {...progress,state:'queued',safeReason:'working',workStarted:true},
+ ])('refuses inconsistent queue metadata %#',value=>{
+  expect(signalRcProgressSchema.safeParse(value).success).toBe(false);
+ });
  it('accepts the real PostgreSQL timestamp shape and sends only the scoped read',async()=>{
   const call=transport(Response.json({success:true,rcProgress:progress}));
   expect(await getRcProgress('org_9','vanta:jobs:7','request-1')).toEqual(progress);

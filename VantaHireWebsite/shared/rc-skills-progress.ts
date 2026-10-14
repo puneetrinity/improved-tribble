@@ -3,11 +3,14 @@ import {z} from 'zod';
 /** Counts-only public progress. No profile, provider payload or recovery command. */
 export const signalRcProgressSchema=z.object({
  version:z.literal(1),
- state:z.enum(['enriching_skills','partial','complete','stalled','closed_unrecoverable']),
+ state:z.enum(['queued','enriching_skills','partial','complete','stalled','closed_unrecoverable']),
  processed:z.number().int().min(0).max(300),total:z.number().int().min(0).max(300),
  updatedAt:z.string().datetime({offset:true}),notificationDelivered:z.boolean(),
- safeReason:z.enum(['working','skills_unavailable','rate_unavailable','deadline','recovery_pending','closed']),
-}).strict().refine(value=>value.processed<=value.total,'Invalid progress');
+ safeReason:z.enum(['worker_queue','quota_window','working','skills_unavailable','rate_unavailable','deadline','recovery_pending','closed']),
+ workStarted:z.boolean().optional(),
+}).strict().refine(value=>value.processed<=value.total&&
+ (value.state==='queued'?typeof value.workStarted==='boolean'&&['worker_queue','quota_window'].includes(value.safeReason)&&
+  (value.workStarted||(value.processed===0&&value.total===0)):value.workStarted===undefined&&!['worker_queue','quota_window'].includes(value.safeReason)),'Invalid progress');
 export type SignalRcProgress=z.infer<typeof signalRcProgressSchema>;
 
 export function rcProgressPresentation(progress:SignalRcProgress|undefined,unavailable=false){
