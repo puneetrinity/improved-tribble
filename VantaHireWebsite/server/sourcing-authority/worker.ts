@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {z} from 'zod';
-import {governedSignalPost} from '../lib/services/signal-client';
+import {governedSignalPost,governedTransportDiagnostic} from '../lib/services/signal-client';
 import {SourcingRepository} from './repository';
 import {executeDigestPreparation,type DigestClaim} from './digest';
 import {sourcingEnabled,hashSchema,idSchema} from './contracts';
@@ -50,8 +50,15 @@ export async function runSourcingAuthorityCycle(repository=new SourcingRepositor
           externalJobId:String(dispatch.command.externalJobId),requestId:dispatch.admissionId,body:{...dispatch.command,callbackUrl:callback}}));
         result={kind:'bound',requestId:response.requestId,flowRunId:response.flowRunId,artifactHash:response.artifactHash,
           acquisitionGeneration:response.acquisitionGeneration,executionAttemptId:response.executionAttemptId};
-      }catch{result=transportStarted?{kind:'retry',code:'SOURCING_BIND_UNCERTAIN'}:
-        {kind:'needs_attention',code:'SOURCING_LOCAL_CONTRACT_INVALID'};}
+      }catch(error){
+        const diagnostic=governedTransportDiagnostic(error);
+        if(transportStarted){
+          // Diagnostic callbacks must not interfere with durable settlement.
+          try{report(`DISPATCH_${diagnostic.replace(/:/g,'_')}`);}catch{}
+          const code=`SOURCING_BIND_UNCERTAIN:${diagnostic}`;
+          result={kind:'retry',code:code.length<=100?code:'SOURCING_BIND_UNCERTAIN'};
+        }else result={kind:'needs_attention',code:'SOURCING_LOCAL_CONTRACT_INVALID'};
+      }
       await repository.call('dispatchFinish',[dispatch.admissionId,dispatch.lease,result]);
     }
   }catch{report('SOURCING_DISPATCH_CYCLE_FAILED');}
@@ -64,7 +71,8 @@ export async function runSourcingAuthorityCycle(repository=new SourcingRepositor
           externalJobId:preview.externalJobId,requestId:preview.id,body:preview.command}));
         if(response.previewId!==preview.id)throw Error('SOURCING_PREVIEW_BINDING');
         result=response.state==='complete'?{state:'complete',count:response.count,countRelation:response.countRelation,creditsUsed:response.creditsUsed}:{state:response.state};
-      }catch{
+      }catch(error){
+        try{report(`PREVIEW_${governedTransportDiagnostic(error).replace(/:/g,'_')}`);}catch{}
         // Re-poll the same preview identity, never make a new purchase. SQL
         // bounds total polling time and ultimately records unknown.
         result={state:'pending'};

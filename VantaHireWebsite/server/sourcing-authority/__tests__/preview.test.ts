@@ -6,7 +6,7 @@ vi.mock('../../lib/organizationService',()=>({getUserOrganization:mocks.organiza
 vi.mock('../../candidate-privacy/decision',()=>({requireCandidatePrivacyAllowed:vi.fn()}));
 vi.mock('../../lib/aiModelConfig',()=>({getGroqModel:()=> 'fixture-model'}));
 vi.mock('../digest',()=>({executeDigestPreparation:mocks.digest}));
-vi.mock('../../lib/services/signal-client',()=>({governedSignalPost:vi.fn(()=>{throw Error('NO_NETWORK');})}));
+vi.mock('../../lib/services/signal-client',async importOriginal=>({...await importOriginal<typeof import('../../lib/services/signal-client')>(),governedSignalPost:vi.fn(()=>{throw Error('NO_NETWORK');})}));
 import {registerSourcingAuthorityRoutes} from '../routes';
 import {readSourcingPreview,requestSourcingPreview} from '../commands';
 import {SourcingRepository,SourcingError} from '../repository';
