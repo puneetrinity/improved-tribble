@@ -1,7 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useContext } from "react";
+import { AuthContext } from "@/hooks/use-auth";
+import { useOrganization } from "@/hooks/use-organization";
+import type { ManagementJob } from "@shared/publicJob";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { readBriefCapability } from '@/lib/job-brief';
+import { HiringCriteriaStepForCurrentUser } from '@/components/hiring-criteria-step';
+import { mergeAutofill, mergeAutofillList } from '@/lib/job-autofill';
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { insertJobSchema, type Client, type Job, type EmailTemplate, type PipelineStage } from "@shared/schema";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, ApiError, RateLimitError } from "@/lib/queryClient";
 import { getCsrfToken } from "@/lib/csrf";
 import {
   Plus,
@@ -82,6 +87,8 @@ const step3Schema = z.object({
 
 interface JobPostingStepperProps {
   onSuccess?: () => void;
+  /** Reopen an already-saved draft job at the hiring-criteria step. Never creates another job. */
+  draftJobId?: number | undefined;
 }
 
 interface FieldError {
@@ -143,6 +150,16 @@ const STEPS = [
   { id: 4, title: "Setup", description: "Templates & pipeline" },
 ];
 
+const BRIEF_STEPS = [
+  { id: 1, title: "Job Description", description: "Paste the JD. We fill in the job details from it." },
+  { id: 2, title: "Details", description: "Check what we filled in and add anything missing" },
+  { id: 3, title: "Team", description: "Hiring manager & client" },
+  { id: 4, title: "Setup", description: "Templates & pipeline" },
+  { id: 5, title: "Hiring criteria", description: "Approve the criteria, see the pool, post the job" },
+];
+/** Tab-only progress before the job exists, scoped to the signed-in account so another account in the same tab never sees it. */
+const draftProgressKey = (userId: number | undefined, orgId: number | undefined) => userId && orgId ? `job-post-progress:v3:${userId}:${orgId}` : null;
+
 const dedupeStrings = (values: string[]): string[] => {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -169,12 +186,30 @@ const DEFAULT_STAGES = [
   { name: "Hired", order: 5, color: "#22c55e" },
 ];
 
-export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
+export function JobPostingStepper({ onSuccess, draftJobId }: JobPostingStepperProps) {
   const {data:briefCapability}=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
   const briefEnabled=briefCapability?.jobBriefEnabled===true;
+  const steps=briefEnabled?BRIEF_STEPS:STEPS;
+  const auth=useContext(AuthContext);
+  const org=useOrganization({enabled:briefEnabled && !!auth?.user});
+  const progressKey=draftProgressKey(auth?.user?.id,org.data?.organization?.id);
+  const lastProgressKey=useRef<string|null>(null);
+  // Which account+organisation the form contents belong to; saving is skipped until it matches the current scope.
+  const [formScope,setFormScope]=useState<string|null>(null);
+  // Reopening a saved draft: load its saved details (never create another job).
+  const savedDraft=useQuery<ManagementJob>({queryKey:['job-management',auth?.user?.id,draftJobId],enabled:!!draftJobId,retry:false,
+    queryFn:async({signal})=>{const r=await fetch(`/api/jobs/${draftJobId}/management`,{signal,credentials:'include',cache:'no-store'});
+      if(!r.ok)throw new Error('DRAFT_UNAVAILABLE');return r.json();}});
+  const [draftHydrated,setDraftHydrated]=useState(!draftJobId);
+  const [createdJobId,setCreatedJobId]=useState<number|null>(draftJobId??null);
+  const [createUncertain,setCreateUncertain]=useState(false);
+  // Values written by autofill; a later autofill may refresh a field only while it still holds that value.
+  const autofilled=useRef<Record<string,string>>({});
+  const autofilledLists=useRef<{skills?:string[];goodToHaveSkills?:string[]}>({});
+  const [autofillFailed,setAutofillFailed]=useState(false);
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(draftJobId ? 5 : 1);
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [extractionError, setExtractionError] = useState<string | null>(null);
@@ -215,6 +250,45 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   const [hiringManagerId, setHiringManagerId] = useState<string>("");
   const [clientId, setClientId] = useState<string>("");
   const [showAiDrawer, setShowAiDrawer] = useState(false);
+  // A different account or organisation in the same tab starts from an empty form.
+  useEffect(() => {
+    if (!progressKey) return;
+    const previous=lastProgressKey.current; lastProgressKey.current=progressKey;
+    setFormScope(progressKey);
+    if (previous===null || previous===progressKey || draftJobId || createdJobId!==null) return;
+    setFormData(prev=>({...prev,title:'',location:'',type:'full-time',description:'',deadline:'',salaryMin:'',salaryMax:'',salaryPeriod:'per_month',educationRequirement:'',experienceYears:'',experienceYearsMax:''}));
+    setSkills([]);setGoodToHaveSkills([]);setHiringManagerId('');setClientId('');autofilled.current={};autofilledLists.current={};
+    setHasExtractedDetails(false);setAutofillFailed(false);setExtractionError(null);setCreateUncertain(false);setCurrentStep(1);
+  }, [progressKey]);
+  useEffect(() => {
+    if (!briefEnabled || !progressKey) return;
+    // Drop any other account's or organisation's unsaved progress left in this tab.
+    try { for (const key of Object.keys(sessionStorage)) if (key.startsWith('job-post-progress:') && key !== progressKey) sessionStorage.removeItem(key); } catch {}
+    if (draftJobId) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(progressKey) ?? 'null');
+      if (saved && saved.version === 1) {
+        setFormData(prev => ({ ...prev, ...saved.formData })); setSkills(saved.skills ?? []); setGoodToHaveSkills(saved.goodToHaveSkills ?? []);
+        setHiringManagerId(saved.hiringManagerId ?? ''); setClientId(saved.clientId ?? '');
+        autofilled.current = saved.autofilled ?? {}; setCurrentStep(Math.min(Math.max(Number(saved.step) || 1, 1), 4));
+      }
+    } catch {}
+  }, [briefEnabled, draftJobId, progressKey]);
+  useEffect(() => {
+    const job = savedDraft.data; if (!job || draftHydrated) return;
+    setFormData(prev => ({ ...prev, title: job.title ?? '', location: job.location ?? '', type: (job.type as typeof prev.type) || prev.type,
+      description: job.description ?? '', deadline: job.deadline ? String(job.deadline).slice(0, 10) : '',
+      salaryMin: job.salaryMin != null ? String(job.salaryMin) : '', salaryMax: job.salaryMax != null ? String(job.salaryMax) : '',
+      salaryPeriod: (job.salaryPeriod as typeof prev.salaryPeriod) || prev.salaryPeriod, educationRequirement: job.educationRequirement ?? '',
+      experienceYears: job.experienceYears != null ? String(job.experienceYears) : '' }));
+    setSkills(job.skills ?? []); setGoodToHaveSkills(job.goodToHaveSkills ?? []);
+    setHiringManagerId(job.hiringManagerId ? String(job.hiringManagerId) : ''); setClientId(job.clientId ? String(job.clientId) : '');
+    setDraftHydrated(true);
+  }, [savedDraft.data, draftHydrated]);
+  useEffect(() => {
+    if (!briefEnabled || currentStep > 4 || createdJobId !== null || !progressKey || formScope !== progressKey) return;
+    try { sessionStorage.setItem(progressKey, JSON.stringify({ version: 1, step: currentStep, formData, skills, goodToHaveSkills, hiringManagerId, clientId, autofilled: autofilled.current })); } catch {}
+  }, [briefEnabled, currentStep, formData, skills, goodToHaveSkills, hiringManagerId, clientId, createdJobId, progressKey, formScope]);
   const descriptionWordCount = countWords(formData.description);
   const descriptionWordsRemaining = Math.max(0, MIN_DESCRIPTION_WORDS - descriptionWordCount);
 
@@ -426,6 +500,15 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       return job;
     },
     onSuccess: (job) => {
+      if (briefEnabled) {
+        try { if (progressKey) sessionStorage.removeItem(progressKey); } catch {}
+        queryClient.invalidateQueries({ queryKey: ["/api/my-jobs"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/pipeline/stages"] });
+        setCreatedJobId(job.id);
+        setCurrentStep(5);
+        setLocation(`/jobs/post?draft=${job.id}`, { replace: true });
+        return;
+      }
       const stagesCreated = pipelineStages.length === 0 || (!useDefaultPipeline && customStages.length > 0);
       toast({
         title: briefEnabled?"Job draft saved — review the brief next":"Job posted successfully!",
@@ -441,6 +524,8 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       }
     },
     onError: (error: Error) => {
+      // A refusal (4xx) created nothing. A lost connection or server error may have created the job: never resend blindly.
+      if (briefEnabled && !(error instanceof RateLimitError) && !(error instanceof ApiError && error.status >= 400 && error.status < 500)) { setCreateUncertain(true); return; }
       toast({
         title: "Failed to post job",
         description: error.message,
@@ -503,10 +588,6 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
   // Handle next step
   const handleNext = async () => {
     if (currentStep === 1) {
-      if (briefEnabled) {
-        if (validateStep(1)) setCurrentStep(2);
-        return;
-      }
       await handleExtractDetails();
       return;
     }
@@ -553,6 +634,23 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       const payload = await response.json() as JobExtractionResponse;
       const parsed = payload.extracted;
 
+      if (briefEnabled) {
+        // Fill only empty fields (or fields still holding an earlier autofill). Never change the JD.
+        const found: Record<string,string> = {title:parsed.title||'',location:parsed.location||'',type:parsed.type||'',
+          salaryMin:parsed.salaryMin||'',salaryMax:parsed.salaryMax||'',salaryPeriod:parsed.salaryPeriod||'',
+          educationRequirement:parsed.educationRequirement||'',experienceYears:parsed.experienceYears||''};
+        const merged=mergeAutofill(formData as unknown as Record<string,string>,found,autofilled.current,{type:'full-time',salaryPeriod:'per_month'});
+        setFormData(merged.values as unknown as typeof formData);
+        const foundSkills=dedupeStrings(parsed.skills), foundNice=dedupeStrings(parsed.goodToHaveSkills);
+        setSkills(prev=>mergeAutofillList(prev,foundSkills,autofilledLists.current.skills));
+        setGoodToHaveSkills(prev=>mergeAutofillList(prev,foundNice,autofilledLists.current.goodToHaveSkills));
+        autofilled.current={...autofilled.current,...(merged.written as Record<string,string>)};
+        autofilledLists.current={skills:foundSkills,goodToHaveSkills:foundNice};
+        setAutofillFailed(false);
+        setHasExtractedDetails(true);
+        setCurrentStep(2);
+        return;
+      }
       setFormData((prev) => ({
         ...prev,
         title: parsed.title || prev.title,
@@ -572,7 +670,8 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       setCurrentStep(2);
     } catch (error) {
       setHasExtractedDetails(false);
-      setExtractionError(error instanceof Error ? error.message : "Failed to extract details");
+      if (briefEnabled) setAutofillFailed(true);
+      setExtractionError(briefEnabled ? "We couldn't read the details from this JD. You can fill them in yourself — nothing is lost." : error instanceof Error ? error.message : "Failed to extract details");
     } finally {
       setIsExtracting(false);
     }
@@ -697,11 +796,11 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       {/* Step Indicator */}
       <div className="flex items-center justify-center">
         <div className="flex items-center gap-1">
-          {STEPS.map((step, index) => (
+          {steps.map((step, index) => (
             <div key={step.id} className="flex items-center">
               <button
                 onClick={() => {
-                  if (step.id < currentStep) {
+                  if (step.id < currentStep && currentStep !== 5) {
                     setCurrentStep(step.id);
                   }
                 }}
@@ -713,7 +812,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                     ? "bg-success/20 text-success-foreground hover:bg-green-200 cursor-pointer"
                     : "bg-muted text-muted-foreground"
                 )}
-                disabled={step.id > currentStep}
+                disabled={step.id > currentStep || currentStep === 5}
               >
                 <span
                   className={cn(
@@ -733,7 +832,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                 </span>
                 <span className="hidden md:block font-medium">{step.title}</span>
               </button>
-              {index < STEPS.length - 1 && (
+              {index < steps.length - 1 && (
                 <ChevronRight
                   className={cn(
                     "h-4 w-4 mx-1",
@@ -750,9 +849,9 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-foreground text-lg">
-            {STEPS[currentStep - 1]?.title}
+            {steps[currentStep - 1]?.title}
           </CardTitle>
-          <CardDescription>{STEPS[currentStep - 1]?.description}</CardDescription>
+          <CardDescription>{steps[currentStep - 1]?.description}</CardDescription>
         </CardHeader>
         <CardContent>
           {/* Step 1: Original JD */}
@@ -767,7 +866,7 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                         <Info className="h-4 w-4 text-muted-foreground cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
-                        <p>{briefEnabled ? 'Paste the JD, save the draft job, then draft or edit its brief for explicit approval.' : 'Paste the raw JD first. We will extract structured details from this and auto-fill the form for review.'}</p>
+                        <p>{briefEnabled ? 'We fill in the job details from the JD. You then review them, set up the team, and approve the hiring criteria before posting.' : 'Paste the raw JD first. We will extract structured details from this and auto-fill the form for review.'}</p>
                       </TooltipContent>
                     </Tooltip>
                   </Label>
@@ -805,13 +904,18 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
                   </div>
                 )}
                 {extractionError && (
-                  <p className="mt-2 flex items-center gap-1 text-sm text-destructive">
+                  <p role="alert" className="mt-2 flex items-center gap-1 text-sm text-destructive">
                     <AlertCircle className="h-3 w-3" />
                     {extractionError}
                   </p>
                 )}
+                {briefEnabled && autofillFailed && (
+                  <Button type="button" variant="outline" className="mt-2 min-h-[44px]" onClick={() => { if (validateStep(1)) { setExtractionError(null); setCurrentStep(2); } }}>
+                    Continue without autofill
+                  </Button>
+                )}
                 <p className="text-xs text-muted-foreground mt-1">
-                  {briefEnabled ? 'Enter the job details next. AI drafting is optional and available on the saved brief.' : 'We’ll extract the title, location, skills, experience, and other structured details from this JD.'}
+                  {briefEnabled ? 'We’ll fill in the job details from this JD. You review everything next. The JD is kept exactly as you paste it.' : 'We’ll extract the title, location, skills, experience, and other structured details from this JD.'}
                 </p>
               </div>
             </div>
@@ -890,8 +994,8 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
               </div>
 
               {hasExtractedDetails && (
-                <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success-foreground">
-                  Extracted details are ready. Review and edit anything before posting.
+                <div role="status" className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm text-success-foreground">
+                  {briefEnabled ? 'We filled in the empty fields from your JD. Anything you had already typed was left alone. Check everything and add what is missing.' : 'Extracted details are ready. Review and edit anything before posting.'}
                 </div>
               )}
 
@@ -1500,8 +1604,31 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
             </div>
           )}
 
+          {currentStep === 5 && draftJobId && savedDraft.isError && (
+            <p role="alert">This draft job couldn't be opened. Check that it is still yours and still a draft in My Jobs.</p>
+          )}
+          {currentStep === 5 && draftJobId && !draftHydrated && !savedDraft.isError && <p role="status">Loading your draft…</p>}
+          {currentStep === 5 && briefEnabled && createdJobId !== null && draftHydrated && (
+            <HiringCriteriaStepForCurrentUser jobId={createdJobId} jobStatus={draftJobId ? savedDraft.data?.status : 'draft'}
+              details={{ title: formData.title, location: formData.location, experienceYears: formData.experienceYears, skills, goodToHaveSkills }}
+              onSubmitted={() => {
+                queryClient.invalidateQueries({ queryKey: ["/api/my-jobs"] });
+                if (onSuccess) onSuccess(); else setLocation(`/jobs/${createdJobId}/applications`);
+              }} />
+          )}
+
+          {createUncertain && currentStep === 4 && (
+            <div role="alert" className="mt-4 space-y-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+              <p><strong>We couldn't confirm the job was saved.</strong> Check My Jobs before trying again, so you don't end up with two copies.</p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => window.open("/my-jobs", "_blank", "noopener")}>Open My Jobs</Button>
+                <Button type="button" variant="outline" className="min-h-[44px]" onClick={() => setCreateUncertain(false)}>It isn't there — let me save again</Button>
+              </div>
+            </div>
+          )}
+
           {/* Navigation Buttons */}
-          <div className="flex justify-between mt-6 pt-4 border-t border-border">
+          {currentStep < 5 && <div className="flex justify-between mt-6 pt-4 border-t border-border">
             <Button
               type="button"
               variant="outline"
@@ -1513,21 +1640,21 @@ export function JobPostingStepper({ onSuccess }: JobPostingStepperProps) {
 
             {currentStep < 4 ? (
               <Button type="button" onClick={handleNext} disabled={currentStep === 1 && isExtracting}>
-                {currentStep === 1 && !briefEnabled ? (isExtracting ? "Extracting..." : "Extract Details") : "Next"}
+                {currentStep === 1 && isExtracting ? (briefEnabled ? "Reading your JD…" : "Extracting...") : currentStep === 1 && !briefEnabled ? "Extract Details" : "Next"}
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             ) : (
-              <Button
+              currentStep < 5 && <Button
                 type="button"
                 onClick={handleSubmit}
-                disabled={jobMutation.isPending}
+                disabled={jobMutation.isPending || createUncertain}
                 className="bg-success hover:bg-success/80"
               >
-                {jobMutation.isPending ? (briefEnabled?"Saving...":"Posting...") : briefEnabled?"Save job draft":"Post Job"}
+                {jobMutation.isPending ? (briefEnabled?"Saving...":"Posting...") : briefEnabled?"Save draft & review criteria":"Post Job"}
                 <Check className="h-4 w-4 ml-2" />
               </Button>
             )}
-          </div>
+          </div>}
       </CardContent>
     </Card>
 

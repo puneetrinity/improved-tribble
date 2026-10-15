@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { acceptedSkillsShape, duplicateSkillNames, overlappingSkillCriteria } from '../../shared/skill-alternatives';
 import { resolveJobDescription } from '../../shared/jobDescription';
+import { reviewSelectionSchema } from '../../shared/brief-review';
 
 export const BRIEF_TABLES = ['job_brief_state', 'job_brief_versions', 'job_brief_events', 'job_brief_draft_requests'] as const;
 export const BRIEF_FUNCTIONS = [
@@ -10,7 +11,9 @@ export const BRIEF_FUNCTIONS = [
   'flow_job_brief_save(integer,integer,integer,uuid,bigint,jsonb)',
   'flow_job_brief_approve(integer,integer,integer,uuid,bigint,uuid,text)',
   'flow_job_brief_draft_claim(integer,integer,integer,uuid,bigint,text,text,text)',
+  'flow_job_brief_draft_claim(integer,integer,integer,uuid,bigint,text,text,text,text)',
   'flow_job_brief_draft_finish(uuid,uuid,jsonb)',
+  'flow_job_brief_draft_finish_review(uuid,uuid,jsonb,jsonb)',
 ] as const;
 export const BRIEF_VERSION = 3;
 export const MAX_JD_BYTES = 20_000;
@@ -21,6 +24,12 @@ export function jobBriefEnabled(env: NodeJS.ProcessEnv = process.env, worker = f
   if (raw !== undefined && raw !== 'true' && raw !== 'false') throw new Error('JOB_BRIEF_INVALID_CONFIGURATION');
   if (worker && raw === 'true') throw new Error('JOB_BRIEF_WEB_ONLY');
   return raw === 'true';
+}
+
+export function jobBriefAutoDraftEnabled(env:NodeJS.ProcessEnv=process.env):boolean {
+  const raw=env.FLOW_JOB_BRIEF_AUTO_DRAFT_ENABLED;
+  if(raw!==undefined && raw!=='true' && raw!=='false')throw new Error('JOB_BRIEF_AUTO_DRAFT_INVALID_CONFIGURATION');
+  return jobBriefEnabled(env) && raw==='true';
 }
 
 export const criterionClasses = ['must_have', 'preferred', 'disqualifier', 'evidence_required'] as const;
@@ -120,9 +129,10 @@ export const saveBriefSchema = z.object({
   requesterKind: z.enum(requesterKinds), reasonCode: z.enum(reasonCodes),
   note: z.string().max(300).optional(),
   sourceChoice: z.enum(['original_prose', 'description_prose', 'recruiter_edit', 'current_jd']),
+  reviewSelection: reviewSelectionSchema.optional(),
 }).strict();
 export const approveBriefSchema = z.object({ requestId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().safe(), versionId: z.string().uuid() }).strict();
-export const draftBriefSchema = z.object({ requestId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().safe() }).strict();
+export const draftBriefSchema = z.object({ requestId: z.string().uuid(), expectedRevision: z.number().int().nonnegative().safe(), mode:z.enum(['automatic','manual']).optional() }).strict();
 
 export function sourceHash(text: string): string { return createHash('sha256').update(text, 'utf8').digest('hex'); }
 export function canonicalJson(value: unknown): string {

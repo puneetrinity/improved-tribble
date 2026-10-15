@@ -268,7 +268,7 @@ export const jobs = pgTable("jobs", {
   clientId: integer("client_id").references(() => clients.id), // Optional client for agency use-cases
   createdAt: timestamp("created_at").defaultNow().notNull(),
   isActive: boolean("is_active").notNull().default(false), // Only active after admin approval
-  status: text("status").notNull().default('pending'), // pending, approved, declined
+  status: text("status").notNull().default('pending'), // draft (governed), pending, approved, declined
   reviewComments: text("review_comments"),
   expiresAt: timestamp("expires_at"),
   reviewedBy: integer("reviewed_by").references(() => users.id),

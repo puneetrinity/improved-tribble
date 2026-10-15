@@ -9,7 +9,7 @@ vi.mock('../draft',()=>({draftBrief:mocks.draft}));
 import {registerJobBriefRoutes} from '../routes';
 
 const requestId='10000000-0000-4000-8000-000000000001';
-describe('five registered brief routes',()=>{
+describe('registered brief routes',()=>{
   let app:ReturnType<typeof express>;let call:ReturnType<typeof vi.fn>;
   beforeEach(()=>{
     vi.stubEnv('FLOW_JOB_BRIEF_ENABLED','true');mocks.organization.mockResolvedValue({organization:{id:12}});
@@ -18,9 +18,9 @@ describe('five registered brief routes',()=>{
     registerJobBriefRoutes(app,((req:any,res:any,next:any)=>req.headers['x-test-csrf']==='yes'?next():res.status(403).json({code:'CSRF_REQUIRED'})) as any,{call} as unknown as BriefRepository);
   });
   afterEach(()=>{vi.unstubAllEnvs();vi.clearAllMocks();});
-  it('has exactly five distinct registrations',()=>{
+  it('has exactly six distinct registrations',()=>{
     const routes=(app as any)._router.stack.filter((r:any)=>r.route).map((r:any)=>Object.keys(r.route.methods)[0]+' '+r.route.path);
-    expect(routes).toEqual(['get /api/jobs/:id/brief','post /api/jobs/:id/brief/draft','patch /api/jobs/:id/brief','post /api/jobs/:id/brief/approve','get /api/jobs/:id/brief/history']);
+    expect(routes).toEqual(['get /api/jobs/:id/brief','post /api/jobs/:id/brief/draft','post /api/jobs/:id/brief/submit','patch /api/jobs/:id/brief','post /api/jobs/:id/brief/approve','get /api/jobs/:id/brief/history']);
   });
   it('disabled mode refuses before database or model dispatch',async()=>{
     vi.stubEnv('FLOW_JOB_BRIEF_ENABLED','false');
@@ -34,10 +34,18 @@ describe('five registered brief routes',()=>{
     expect(JSON.stringify(response.body)).not.toContain('eliteSchools');expect(call).toHaveBeenCalledWith('read',[12,9,3]);
   });
   it('requires CSRF on every mutation before execution',async()=>{
-    for(const [method,path]of [['post','draft'],['post','approve'],['patch','']] as const){
+    for(const [method,path]of [['post','draft'],['post','approve'],['post','submit'],['patch','']] as const){
       const result=await request(app)[method]('/api/jobs/9/brief'+(path?'/'+path:'')).set('x-test-actor','1').send({requestId});expect(result.status).toBe(403);
     }
     expect(call).not.toHaveBeenCalled();expect(mocks.draft).not.toHaveBeenCalled();
+  });
+  it('submits only an authenticated, revision-bound intent',async()=>{
+    const path='/api/jobs/9/brief/submit';
+    expect((await request(app).post(path).set('x-test-csrf','yes').send({requestId,expectedRevision:2})).status).toBe(401);
+    expect((await request(app).post(path).set('x-test-actor','1').set('x-test-csrf','yes').send({requestId})).status).toBe(400);
+    expect(call).not.toHaveBeenCalled();
+    expect((await request(app).post(path).set('x-test-actor','1').set('x-test-csrf','yes').send({requestId,expectedRevision:2})).status).toBe(200);
+    expect(call).toHaveBeenLastCalledWith('save',[12,9,3,requestId,2,{action:'submit'}]);
   });
   it('refuses oversized and open-ended mutation payloads',async()=>{
     expect((await request(app).patch('/api/jobs/9/brief').set('x-test-actor','1').set('x-test-csrf','yes').send({text:'x'.repeat(65537)})).status).toBe(413);

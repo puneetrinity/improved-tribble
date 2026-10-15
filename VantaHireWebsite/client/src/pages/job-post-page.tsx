@@ -48,6 +48,10 @@ export default function JobPostPage() {
     );
   }
 
+  // Resume a saved draft at the criteria step (?draft=<job id>). Never creates a second job.
+  const draftParam = new URLSearchParams(window.location.search).get("draft");
+  const draftJobId = draftParam && /^[1-9]\d{0,9}$/.test(draftParam) ? Number(draftParam) : undefined;
+
   return (
     <InternalPageShell>
       <InternalHero
@@ -62,9 +66,9 @@ export default function JobPostPage() {
         ]}
       />
 
-      <InternalPanel className="mx-auto w-full max-w-3xl p-4 sm:p-6">
+      <InternalPanel className="mx-auto w-full max-w-5xl p-4 sm:p-6">
         <div className="[&_.shadow-sm]:shadow-none [&_.shadow-sm]:border-[#EEF0F4]">
-          <JobPostingStepper />
+          <JobPostingStepper draftJobId={draftJobId} />
         </div>
       </InternalPanel>
     </InternalPageShell>

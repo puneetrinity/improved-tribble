@@ -5,7 +5,7 @@ import { getUserOrganization } from '../lib/organizationService';
 import type { CsrfMiddleware } from '../types/routes';
 import { jobBriefEnabled, MAX_REQUEST_BYTES } from './contracts';
 import { BriefError, BriefRepository, type BriefScope, scopeParameters } from './repository';
-import { approveBrief, readBrief, saveBrief } from './commands';
+import { approveBrief, readBrief, saveBrief, transitionJob } from './commands';
 import { draftBrief } from './draft';
 import { sourcingEnabled } from '../sourcing-authority/contracts';
 import { approveSourcingBrief } from '../sourcing-authority/commands';
@@ -41,6 +41,8 @@ function handler(fn:(req:Request,repository:BriefRepository,keys:BriefScope)=>Pr
 export function registerJobBriefRoutes(app:Express,csrf:CsrfMiddleware,repository=new BriefRepository(),sourcingRepository=new SourcingRepository()) {
   app.get('/api/jobs/:id/brief',available,requireAuth,handler((_req,repo,keys)=>readBrief(repo,keys),repository));
   app.post('/api/jobs/:id/brief/draft',available,requireAuth,csrf,handler((req,repo,keys)=>draftBrief(repo,keys,req.body),repository));
+  app.post('/api/jobs/:id/brief/submit',available,requireAuth,csrf,handler((req,repo,keys)=>
+    transitionJob(repo,keys,req.user!.role,{...req.body,action:'submit'}),repository));
   app.patch('/api/jobs/:id/brief',available,requireAuth,csrf,handler((req,repo,keys)=>saveBrief(repo,keys,req.body),repository));
   app.post('/api/jobs/:id/brief/approve',available,requireAuth,csrf,handler((req,repo,keys)=>
     sourcingEnabled()?approveSourcingBrief(sourcingRepository,keys,req.body):approveBrief(repo,keys,req.body),repository));

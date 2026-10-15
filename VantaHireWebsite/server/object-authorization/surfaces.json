@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 331,
+  "route_registration_census": 332,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
     {
@@ -830,7 +830,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "057d157b1959962037a680dfd9266f37e46d3a80fe35d50e333e19dc2ca44a84"
+      "sha256": "707635221b0adbe25f8cf2610e27faaba2e5297254be1d0c36cebc1bd32eb3ca"
     },
     {
       "file": "server/resume.routes.ts",
@@ -850,7 +850,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "df2da97565b042d755803efa88c3d42a10af35dd6c031de771e2ff035b454c2d"
+      "sha256": "d9cf107c1621e9390179c634e8df1d7bf1c6413fdd0df5e8b1d792e17b97ce89"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -858,7 +858,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "18743cef174a4ef9d7a225ebd08c08fe8a93b32f559e544239636668de1b0a11"
+      "sha256": "ebce72c2d5b504ee89d0518838a302e7f2b2392a29108cde7624a0edc6817df8"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -938,7 +938,7 @@
     },
     {
       "file": "server/storage.ts",
-      "sha256": "0aed7b614c05ce5e5e6e387bab39118c0ea4a89c1fe0d768fcce8c32adc81c81"
+      "sha256": "b361556678de9f1626cf6cbd7657b56eebc8da367dd100673f926ec7564f3908"
     },
     {
       "file": "server/tests/applicationReadAuthorization.pg.test.ts",
@@ -962,7 +962,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "54893c8a289fdc8002c241633f201e4ed0ee8ed1c1726c05932546989e33872b"
+      "sha256": "ff151b51679b8484673ad67f5a6e13e986db7104aa79a2e40dde28859d903d01"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -990,7 +990,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "d86c37525f428907dee9f43975ccee340e493f7a85f9f9193314f246da73160c"
+      "sha256": "08b548c14d8bcadacbf1a2d4feace0e189203aa0a3e7e87bbe7c94069da1b7f3"
     },
     {
       "file": "shared/forms.types.ts",
@@ -1010,7 +1010,7 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "22220d52dfac8ac8d848055158223e0274ca354fb04a95a1cb9ff0c7940ab7b8"
+      "sha256": "bdcc636d579f15b46f848fd674f370ccf3ea4a17244a2321e52d82c5fee26135"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
@@ -1018,7 +1018,7 @@
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "33da27c19d9e03f02861068c4133b0b89fb4086fac8b7aa2618e95ebb662a3d3"
+      "sha256": "20a10c7ca17f3e7c40b18db8b1b679e34533cbe2bb3ee5c8c33cc4173799ce4b"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1297,7 +1297,7 @@
     },
     {
       "file": "client/src/components/JobPostingStepper.tsx",
-      "sha256": "053c31d59777c911b055f3735e40fdf33da7b0653291c6c8d2382d0bfd3580f5"
+      "sha256": "f41f4c671639a1e1f61016212afb9fbd4021ea64f70efebef009cc1505bbd42a"
     },
     {
       "file": "server/schema-control/manifest.ts",
