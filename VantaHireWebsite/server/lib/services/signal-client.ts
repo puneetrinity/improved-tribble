@@ -309,6 +309,33 @@ export async function findContact(
   return normalizeContactResolutionResponse(body, res.status);
 }
 
+const GOVERNED_REMOTE_CODES=new Set([
+  'GOVERNED_DISABLED','GOVERNED_TENANT_REQUIRED','GOVERNED_BODY_TOO_LARGE',
+  'GOVERNED_INVALID_COMMAND','GOVERNED_UNAVAILABLE','GOVERNED_PREVIEW_UNAVAILABLE',
+]);
+const GOVERNED_FAILURES=new Set(['TIMEOUT','CONNECTION','REDIRECT','RESPONSE_TOO_LARGE','INVALID_JSON','INVALID_RESPONSE','UNAVAILABLE']);
+/** Only closed diagnostics survive this boundary; never retain the original error or body. */
+export class GovernedTransportError extends Error {
+  readonly diagnostic:string;
+  constructor(status:number|null,code:string) {
+    const remote=Number.isInteger(status) && status!>=300 && status!<=599;
+    const safe=remote
+      ? GOVERNED_REMOTE_CODES.has(code)||['AUTH_INVALID_TOKEN','AUTH_INVALID_CLAIM'].includes(code)?code:'UNLISTED'
+      : GOVERNED_FAILURES.has(code)?code:'UNAVAILABLE';
+    const diagnostic=remote?`REMOTE_${status}:${safe}`:`TRANSPORT:${safe}`;
+    super(diagnostic);this.name='GovernedTransportError';this.diagnostic=diagnostic;
+  }
+}
+export function governedTransportDiagnostic(error:unknown):string {
+  // Reconstruct even typed diagnostics so caller mutation cannot introduce arbitrary log text.
+  if(error instanceof GovernedTransportError) {
+    const match=/^REMOTE_(\d{3}):([A-Z_]+)$/.exec(error.diagnostic);
+    return match?new GovernedTransportError(Number(match[1]),match[2]!).diagnostic:
+      new GovernedTransportError(null,error.diagnostic.replace(/^TRANSPORT:/,'')).diagnostic;
+  }
+  return 'TRANSPORT:UNAVAILABLE';
+}
+
 /** Governed sourcing transport: fixed endpoints, bounded request/response and
  * no redirects. An uncertain response is replayed using the same durable ID. */
 export async function governedSignalPost(input: {
@@ -322,15 +349,31 @@ export async function governedSignalPost(input: {
   if(Buffer.byteLength(encoded,'utf8')>131072)throw Error('SOURCING_BODY_TOO_LARGE');
   const token=await signServiceJwt('signal',{tenantId:input.tenantId,
     scopes:input.kind==='source'?'jobs:source':'jobs:preview',requestId:input.requestId});
-  const response=await fetch(`${base.toString().replace(/\/+$/,'')}/api/v3/jobs/${encodeURIComponent(input.externalJobId)}/${input.kind}`,{
+  const deadline=AbortSignal.timeout(30000);
+  let response:Response;
+  try {response=await fetch(`${base.toString().replace(/\/+$/,'')}/api/v3/jobs/${encodeURIComponent(input.externalJobId)}/${input.kind}`,{
     method:'POST',headers:{'Content-Type':'application/json',Authorization:`Bearer ${token}`},
-    body:encoded,signal:AbortSignal.timeout(30000),redirect:'error',
-  });
-  if(!response.ok || !response.body) {await response.body?.cancel().catch(()=>undefined);throw Error('SOURCING_REMOTE_UNAVAILABLE');}
+    body:encoded,signal:deadline,redirect:'manual',
+  });}catch{throw new GovernedTransportError(null,deadline.aborted?'TIMEOUT':'CONNECTION');}
+  if(response.status>=300 && response.status<400){await response.body?.cancel().catch(()=>undefined);throw new GovernedTransportError(null,'REDIRECT');}
+  if(!response.body)throw new GovernedTransportError(response.ok?null:response.status,response.ok?'INVALID_RESPONSE':'UNLISTED');
   const reader=response.body.getReader(),chunks:Uint8Array[]=[];let bytes=0;
   try {
     while(true){const {done,value}=await reader.read();if(done)break;
-      bytes+=value.byteLength;if(bytes>131072)throw Error('SOURCING_RESPONSE_TOO_LARGE');chunks.push(value);}
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+      bytes+=value.byteLength;if(bytes>(response.ok?131072:4096))throw new GovernedTransportError(response.ok?null:response.status,response.ok?'RESPONSE_TOO_LARGE':'UNLISTED');chunks.push(value);}
+    let body:unknown;
+    try{body=JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+    catch{throw new GovernedTransportError(response.ok?null:response.status,response.ok?'INVALID_JSON':'UNLISTED');}
+    if(!response.ok){
+      const code=body && typeof body==='object'?(body as {error?:unknown}).error:undefined;
+      const safe=response.status===401 && code==='Invalid token'?'AUTH_INVALID_TOKEN':
+        response.status===403 && code==='Invalid token claim'?'AUTH_INVALID_CLAIM':
+        typeof code==='string' && GOVERNED_REMOTE_CODES.has(code)?code:'UNLISTED';
+      throw new GovernedTransportError(response.status,safe);
+    }
+    return body;
+  }catch(error){
+    if(error instanceof GovernedTransportError)throw error;
+    throw new GovernedTransportError(response.ok?null:response.status,deadline.aborted?'TIMEOUT':'CONNECTION');
   }finally{await reader.cancel().catch(()=>undefined);reader.releaseLock();}
 }

@@ -126,6 +126,16 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
   afterEach(async () => { await db?.query('ROLLBACK TO SAVEPOINT case_start'); });
   afterAll(async () => { await db?.query('ROLLBACK'); await db?.end(); });
 
+  it('persists closed remote diagnostics in the existing bounded retry receipt',async()=>{
+    const admitted=await admit(await quote());
+    const dispatch=await one('SELECT flow_sourcing_dispatch_claim($1) result',[randomUUID()]);
+    const receipt={kind:'retry',code:'SOURCING_BIND_UNCERTAIN:REMOTE_409:GOVERNED_DISABLED'};
+    await one('SELECT flow_sourcing_dispatch_finish($1,$2,$3) result',[admitted.id,dispatch.lease,receipt]);
+    const stored=(await db.query('SELECT state,receipt FROM sourcing_dispatch_outbox WHERE admission_id=$1',[admitted.id])).rows[0];
+    expect(stored).toEqual({state:'pending',receipt});
+    expect((await db.query('SELECT discover_request_id FROM sourcing_admissions WHERE id=$1',[admitted.id])).rows[0].discover_request_id).toBeNull();
+  });
+
   it('reuses the exact baseline composite unique index for both candidate FKs', async () => {
     const rows = (await db.query(`SELECT c.conname,i.relname FROM pg_constraint c JOIN pg_class i ON i.oid=c.conindid
       WHERE c.conname IN ('src_dec_cand_fk','src_item_cand_fk') ORDER BY c.conname`)).rows;
