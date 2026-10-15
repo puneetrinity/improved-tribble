@@ -32,6 +32,24 @@ describe('RC bounded progress UI',()=>{
   expect(host.textContent).not.toContain('has been notified');
   await render({...progress,state:'stalled',notificationDelivered:true});expect(host.textContent).toContain('has been notified');
  });
+ it('shows a queue that has not started as waiting, never finished, and without empty counts',async()=>{
+  await render({...progress,state:'queued',safeReason:'worker_queue',workStarted:false,processed:0,total:0});
+  expect(host.textContent).toContain('Skills check queued');expect(host.textContent).toContain('free worker');
+  expect(host.textContent).not.toMatch(/finished|profiles processed|%/);
+  expect(host.querySelector('[data-rc-tone]')?.getAttribute('data-rc-tone')).toBe('waiting');
+  expect(host.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBeNull();
+ });
+ it('shows a rate-window wait with work already done and keeps the processed count',async()=>{
+  await render({...progress,state:'queued',safeReason:'quota_window',workStarted:true,processed:2,total:5});
+  expect(host.textContent).toContain('Skills check waiting');expect(host.textContent).toContain('request window');
+  expect(host.textContent).toContain('already processed are kept');expect(host.textContent).toContain('2 of 5 profiles processed');
+  expect(host.textContent).not.toMatch(/finished|%|Run again|Try again/i);
+  const bar=host.querySelector('[role="progressbar"]')!;
+  expect(bar.getAttribute('aria-valuenow')).toBe('2');expect(bar.getAttribute('aria-valuemax')).toBe('5');
+ });
+ it('gives the close control a 44px minimum target',async()=>{
+  await render();expect(host.querySelector('button')!.className).toMatch(/min-h-\[44px\]/);
+ });
  it('makes unavailable status explicit without restarting or promising success',async()=>{
   await render(progress,true);expect(host.textContent).toContain('Status temporarily unavailable');
   expect(host.textContent).toContain('has not been restarted');expect(onRunAgain).not.toHaveBeenCalled();

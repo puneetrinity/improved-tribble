@@ -8,6 +8,8 @@ const failures: Record<string, number> = {
   BRIEF_APPROVAL_REQUIRED:409, BRIEF_SOURCE_REQUIRED:409, BRIEF_DRAFT_INFLIGHT:409,
   BRIEF_DRAFT_SETTLED:409, BRIEF_DRAFT_LIMIT:429,
   BRIEF_UPDATED_APPROVAL_REQUIRED:409,
+  BRIEF_FOUNDATIONS_REQUIRED:409, BRIEF_SUBMISSION_REQUIRED:409,
+  BRIEF_REVIEW_REQUIRED:409, BRIEF_REVIEW_CONFLICT:409, BRIEF_INVALID_REVIEW:400,
 };
 export function closedDatabaseError(error: unknown): BriefError {
   const e=error as {code?:string;message?:string};
@@ -21,8 +23,9 @@ const statements = {
   history:'SELECT public.flow_job_brief_history($1,$2,$3,$4,$5,$6) AS result',
   save:'SELECT public.flow_job_brief_save($1,$2,$3,$4,$5,$6::jsonb) AS result',
   approve:'SELECT public.flow_job_brief_approve($1,$2,$3,$4,$5,$6,$7) AS result',
-  claim:'SELECT public.flow_job_brief_draft_claim($1,$2,$3,$4,$5,$6,$7,$8) AS result',
+  claim:'SELECT public.flow_job_brief_draft_claim($1,$2,$3,$4,$5,$6,$7,$8,$9) AS result',
   finish:'SELECT public.flow_job_brief_draft_finish($1,$2,$3::jsonb) AS result',
+  finishReview:'SELECT public.flow_job_brief_draft_finish_review($1,$2,$3::jsonb,$4::jsonb) AS result',
 } as const;
 
 /** No network/model callback can run inside this bounded database transaction. */

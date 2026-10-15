@@ -16,7 +16,7 @@ import {SOURCING_TABLES,SOURCING_PRIVATE_NAMES,sourcingPrivilegesReady} from '..
 
 // Owner-private helpers share the same deny-runtime treatment as trigger functions.
 export const BRIEF_TRIGGER_FUNCTIONS=['flow_job_brief_immutable()','flow_lock_job_application_activity()','flow_job_brief_validate_v3(jsonb)'] as const;
-export const BRIEF_CATALOG_SHA256='c71cafce99884c6013c805a9e4f999a359e5f4ae9be3b0354a49211c3368d44d';
+export const BRIEF_CATALOG_SHA256='a1bc2f7e6bcbd433b4deb6b97707f2ebd8e2c5b3cb3d0e1313ae87b62b07c271';
 export const BRIEF_CATALOG_SQL=`WITH relations AS (
  SELECT c.oid,c.relname,c.relowner,c.relrowsecurity,c.relforcerowsecurity
  FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace

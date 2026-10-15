@@ -7,7 +7,7 @@ import { BriefError, BriefRepository, scopeParameters, type BriefScope } from '.
 export type BriefRead = {
   revision:string;currentJD:string|null;sourceHash:string|null;
   latest:Record<string,unknown>|null;approvedVersionId:string|null;approvedMaterialHash:string|null;
-  draft:Record<string,unknown>|null;
+  draft:Record<string,unknown>|null; reviewWorkspace?:Record<string,unknown>|null;
 };
 type PrivateRead=BriefRead & {originalJD:string|null;legacyDescription:string|null};
 
@@ -20,7 +20,7 @@ export async function readBrief(repository:BriefRepository,scope:BriefScope) {
   const distinct=new Set(sources.map(s=>s.text));
   return {
     revision:raw.revision,currentJD:raw.currentJD,sourceHash:raw.sourceHash,
-    latest:raw.latest,approvedVersionId:raw.approvedVersionId,approvedMaterialHash:raw.approvedMaterialHash,draft:raw.draft,
+    latest:raw.latest,approvedVersionId:raw.approvedVersionId,approvedMaterialHash:raw.approvedMaterialHash,draft:raw.draft,reviewWorkspace:raw.reviewWorkspace??null,
     source:{classifierVersion:1,initialized,selectionRequired:!initialized,
       ambiguous:!initialized && distinct.size!==1,choices:initialized?[]:sources,
       legacyStructured:!!raw.legacyDescription && resolveJobDescription({description:raw.legacyDescription}).resolution==='unavailable'},
@@ -40,6 +40,7 @@ export async function approveBrief(repository:BriefRepository,scope:BriefScope,i
 }
 
 const transitionSchema=z.discriminatedUnion('action',[
+  z.object({action:z.literal('submit'),requestId:z.string().uuid(),expectedRevision:z.number().int().nonnegative().safe()}).strict(),
   z.object({action:z.literal('moderate'),requestId:z.string().uuid(),status:z.enum(['approved','declined']),reviewComments:z.string().max(2000).optional()}).strict(),
   z.object({action:z.literal('publish'),requestId:z.string().uuid(),expectedRevision:z.number().int().nonnegative().safe().optional()}).strict(),
   z.object({action:z.literal('deactivate'),requestId:z.string().uuid(),expectedRevision:z.number().int().nonnegative().safe().optional(),reason:z.enum(['manual','filled','cancelled']).optional()}).strict(),
@@ -51,7 +52,7 @@ export async function transitionJob(repository:BriefRepository,scope:BriefScope,
   const expected='expectedRevision' in parsed?parsed.expectedRevision:undefined;
   const {expectedRevision:_ignored,...command}=rest as typeof rest & {expectedRevision?:number};
   if(actorRole!=='super_admin' && (parsed.action==='moderate' || expected===undefined)) throw new BriefError('BRIEF_REVISION_REQUIRED',400);
-  return repository.call('save',[...scopeParameters(scope),requestId,actorRole==='super_admin'?null:expected,command]);
+  return repository.call('save',[...scopeParameters(scope),requestId,actorRole==='super_admin' && parsed.action!=='submit'?null:expected,command]);
 }
 
 export const governedEditSchema=z.object({

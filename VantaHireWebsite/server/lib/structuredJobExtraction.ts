@@ -275,6 +275,34 @@ function normalizeTerm(value: string): string {
     .replace(/\s+/g, ' ');
 }
 
+/** Recover source spelling for display; normalization belongs to matching, not titles. */
+function sourceTitle(title: string, jd: string): string {
+  const escaped = [...title.trim()].map(c => '.*+?^${}()|[]'.includes(c) || c.charCodeAt(0) === 92 ? String.fromCharCode(92) + c : c).join('');
+  return (escaped ? jd.match(new RegExp(escaped, 'iu'))?.[0] : null) ?? title.trim();
+}
+
+/** Conservative fallback for an explicit experience statement, never company age. */
+function explicitExperienceYears(jd: string): number | null {
+  const words = ['zero','one','two','three','four','five','six','seven','eight','nine','ten',
+    'eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen','twenty'];
+  const pattern = new RegExp(`\\b(${words.join('|')}|\\d{1,2})\\s*\\+?\\s+years?\\s+(?:of\\s+)?(?:(?:relevant|professional|work|commercial)\\s+)?experience\\b`, 'gi');
+  const values: number[] = [];
+  for (const match of jd.matchAll(pattern)) {
+    // Do not turn the upper endpoint of a range, decimal or negative into a minimum.
+    const prefix = jd.slice(0, match.index);
+    const sentence = jd.slice(Math.max(prefix.lastIndexOf('.'), prefix.lastIndexOf('\n')) + 1)
+      .split(/[.\n]/, 1)[0];
+    if (/\b(no|not|without|optional|preferred|desirable|ideally|up to|at most|maximum|less than|fewer than)\b/i.test(sentence ?? '')) continue;
+    const previousWord = prefix.trimEnd().split(/\s+/).at(-1)?.toLowerCase();
+    if (previousWord && words.includes(previousWord)) continue;
+    if (/[.\d-]$|(?:\bto|\band|[-–—])\s*$/i.test(prefix)) continue;
+    const token = match[1]!.toLowerCase();
+    const value = words.includes(token) ? words.indexOf(token) : Number(token);
+    if (value <= 50) values.push(value);
+  }
+  return values.length === 1 ? values[0]! : null;
+}
+
 function uniqueTerms(values: Iterable<string>): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
@@ -367,6 +395,7 @@ function buildFallbackExtraction(rawDescription: string, hints: JobExtractionHin
   const mustHaveSkills = uniqueTerms(hints.skills ?? []);
   const niceToHaveSkills = uniqueTerms(hints.goodToHaveSkills ?? []);
   const roleTitle = hints.title?.trim() || 'Unknown Role';
+  const experienceYears = hints.experienceYears ?? explicitExperienceYears(rawDescription);
   const roleFamily = /devops|platform|sre/i.test(roleTitle)
     ? 'devops'
     : /frontend|ui|react|angular/i.test(roleTitle)
@@ -381,7 +410,7 @@ function buildFallbackExtraction(rawDescription: string, hints: JobExtractionHin
     seniority: /senior|lead|staff|principal/i.test(roleTitle) ? 'senior' : 'mid',
     location: hints.location?.trim() || '',
     country: /india/i.test(rawDescription) || /bangalore|bengaluru|mumbai|pune|hyderabad|delhi/i.test(rawDescription) ? 'india' : '',
-    experienceYears: hints.experienceYears ?? null,
+    experienceYears,
     mustHaveSkills,
     niceToHaveSkills,
     skillAliases: {},
@@ -393,7 +422,7 @@ function buildFallbackExtraction(rawDescription: string, hints: JobExtractionHin
     locationRequired: false,
     mustHaveGates: {
       seniorityMin: /senior|lead|staff|principal/i.test(roleTitle) ? 'senior' : null,
-      experienceMinYears: hints.experienceYears ?? null,
+      experienceMinYears: experienceYears,
       minMustHaveSkillsMatched: mustHaveSkills.length > 0 ? Math.min(2, mustHaveSkills.length) : null,
       locationRequired: false,
       rejectBuckets: [],
@@ -412,11 +441,8 @@ export async function extractStructuredJobPosting(
     const signalExpandedSkills = deriveAdjacentSkills(fallback);
     const extracted = {
       ...fallback,
-      niceToHaveSkills: uniqueTerms([...fallback.niceToHaveSkills, ...signalExpandedSkills]),
-      skillAliases: deriveSkillAliases({
-        ...fallback,
-        niceToHaveSkills: uniqueTerms([...fallback.niceToHaveSkills, ...signalExpandedSkills]),
-      }),
+      // Adjacent tools are discovery suggestions, never extracted requirements.
+      skillAliases: deriveSkillAliases(fallback),
     };
     return {
       extracted,
@@ -431,6 +457,8 @@ export async function extractStructuredJobPosting(
     'Be evidence-based and conservative.',
     'Do not invent skills, domains, pedigree, or exclusions that are not supported by the JD.',
     'Use lowercase normalized values for skills, domains, aliases, and buckets.',
+    'Preserve the original spelling and capitalization of the job title.',
+    'Convert explicitly stated experience such as "six years of experience" to 6. Do not infer experience from seniority or company age.',
     'Use null or empty arrays when unclear.',
     'Adjacent buckets should be high-confidence related talent pools, not broad speculation.',
     'Suppressed skills should only include clearly irrelevant technologies explicitly contrasted or excluded.',
@@ -490,7 +518,7 @@ export async function extractStructuredJobPosting(
     const parsed = extractedJobSchema.parse(coerced);
     const normalized: ExtractedStructuredJob = {
       ...parsed,
-      roleTitle: parsed.roleTitle.trim() || fallback.roleTitle,
+      roleTitle: sourceTitle(parsed.roleTitle.trim() || fallback.roleTitle, rawDescription),
       roleFamily: parsed.roleFamily || fallback.roleFamily,
       seniority: parsed.seniority || fallback.seniority,
       location: parsed.location.trim() || fallback.location,
@@ -512,11 +540,7 @@ export async function extractStructuredJobPosting(
     const signalExpandedSkills = deriveAdjacentSkills(normalized);
     const extracted: ExtractedStructuredJob = {
       ...normalized,
-      niceToHaveSkills: uniqueTerms([...normalized.niceToHaveSkills, ...signalExpandedSkills]),
-      skillAliases: deriveSkillAliases({
-        ...normalized,
-        niceToHaveSkills: uniqueTerms([...normalized.niceToHaveSkills, ...signalExpandedSkills]),
-      }),
+      skillAliases: deriveSkillAliases(normalized),
     };
 
     return {
@@ -529,11 +553,7 @@ export async function extractStructuredJobPosting(
     const signalExpandedSkills = deriveAdjacentSkills(fallback);
     const extracted = {
       ...fallback,
-      niceToHaveSkills: uniqueTerms([...fallback.niceToHaveSkills, ...signalExpandedSkills]),
-      skillAliases: deriveSkillAliases({
-        ...fallback,
-        niceToHaveSkills: uniqueTerms([...fallback.niceToHaveSkills, ...signalExpandedSkills]),
-      }),
+      skillAliases: deriveSkillAliases(fallback),
     };
     return {
       extracted,

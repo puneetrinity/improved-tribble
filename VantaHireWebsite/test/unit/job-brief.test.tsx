@@ -94,6 +94,36 @@ describe('brief recruiter UI',()=>{
     mocks.intent.mockResolvedValue({state:'failed',code:'BRIEF_MODEL_INVALID'});await render();await click('Draft brief with AI');
     expect(button('Add criterion').disabled).toBe(false);expect(host.textContent).toContain('You can edit manually');
   });
+  it.each([['BRIEF_MODEL_TRUNCATED','incomplete'],['BRIEF_MODEL_INVALID','validation'],['BRIEF_MODEL_TIMEOUT','timed out'],['BRIEF_DRAFT_STALE','JD changed'],['BRIEF_MODEL_FAILED','unavailable']])('explains %s immediately and on reload',async(code,text)=>{
+    mocks.query.mockReturnValue({data:{...brief,draft:{state:'failed',code}},isPending:false,isError:false,refetch:vi.fn()});
+    await render();expect(host.textContent).toContain(text);expect(mocks.intent).not.toHaveBeenCalled();
+    mocks.intent.mockResolvedValue({state:'failed',code});await click('Draft brief with AI');
+    expect(host.textContent).toContain(text);expect(button('Add criterion').disabled).toBe(false);
+  });
+  it('explains the draft limit without losing manual edits or calling save',async()=>{
+    await render();await change('Criterion 1 label','Edited label');
+    mocks.intent.mockRejectedValue(new Error('429: BRIEF_DRAFT_LIMIT private-marker'));
+    await click('Draft brief with AI');
+    expect(host.textContent).toContain('AI drafting limit reached');expect(host.textContent).not.toContain('private-marker');
+    expect((host.querySelector('[aria-label="Criterion 1 label"]') as HTMLInputElement).value).toBe('Edited label');
+    expect(button('Approve brief').disabled).toBe(true);expect(mocks.intent).toHaveBeenCalledTimes(1);
+    mocks.intent.mockResolvedValue({});await click('Save brief');expect(mocks.intent.mock.calls[1][2]).toBe('save-brief');
+  });
+  it('edit page: shows what the AI left out, add puts it in, save records it, approve has no extra step',async()=>{
+    const go={...criterion,id:'20000000-0000-4000-8000-000000000002',label:'Go',class:'preferred',requirement:{kind:'accepted_skills',primary:'Go',alternatives:[]}};
+    const H='a'.repeat(64);
+    const ws={contractVersion:1,extractionId:'30000000-0000-4000-8000-000000000003',sourceHash:H,extractionLimit:false,versionId:id,reviewHash:'d'.repeat(64),exclusionsConfirmed:false,dispositions:[],
+      items:[{id:'i1',text:'Python',priority:'required',topic:'skill',quote:'Python',sourceHash:H,span:{start:6,end:12},proposedCriterion:criterion,reason:null},
+        {id:'i2',text:'Go',priority:'preferred',topic:'skill',quote:'Go',sourceHash:H,span:{start:0,end:2},proposedCriterion:go,reason:'capacity'}]};
+    mocks.query.mockReturnValue({data:{...brief,reviewWorkspace:ws},isPending:false,isError:false,refetch:vi.fn()});
+    await render();
+    expect(host.textContent).toContain('Also in the JD, not included · 1');
+    expect(button('Approve brief').disabled).toBe(false);
+    await act(async()=>{(host.querySelector('[aria-label="Add “Go” to the criteria"]') as HTMLButtonElement).click();});
+    await click('Save brief');
+    const save=mocks.intent.mock.calls.find(c=>c[2]==='save-brief')![4];
+    expect(save.reviewSelection).toEqual({extractionId:ws.extractionId,dispositions:[{itemId:'i1',state:'included',criterionIds:[id]},{itemId:'i2',state:'included',criterionIds:[go.id]}]});
+  });
 });
 
 describe('ambiguous intent identity',()=>{
@@ -108,4 +138,5 @@ describe('ambiguous intent identity',()=>{
     await jobIntentRequest(3,9,'save','/synthetic',{expectedRevision:2,note:'one'});expect(mocks.api.mock.calls[1]?.[2].requestId).toBe(first);expect(sessionStorage.length).toBe(0);
     await jobIntentRequest(3,9,'save','/synthetic',{expectedRevision:2,note:'two'});expect(mocks.api.mock.calls[2]?.[2].requestId).not.toBe(first);
   });
+
 });

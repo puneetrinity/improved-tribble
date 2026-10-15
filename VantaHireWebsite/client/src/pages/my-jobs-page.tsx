@@ -52,12 +52,14 @@ export default function MyJobsPage() {
   const activeCount = jobs.filter(j => j.isActive).length;
   const inactiveCount = jobs.filter(j => !j.isActive).length;
   const pendingCount = jobs.filter(j => j.status === 'pending').length;
+  const draftCount = jobs.filter(j => j.status === 'draft').length;
 
   const subNavItems: SubNavItem[] = [
     { id: "all", label: myJobsPageCopy.tabs.all, count: jobs.length, icon: <LayoutGrid className="h-4 w-4" /> },
     { id: "active", label: myJobsPageCopy.tabs.active, count: activeCount, icon: <CheckCircle className="h-4 w-4" /> },
     { id: "inactive", label: myJobsPageCopy.tabs.inactive, count: inactiveCount, icon: <Archive className="h-4 w-4" /> },
     { id: "pending", label: myJobsPageCopy.tabs.pending, count: pendingCount, icon: <Clock className="h-4 w-4" /> },
+    ...(draftCount > 0 ? [{ id: "draft", label: "Drafts", count: draftCount, icon: <Clock className="h-4 w-4" /> }] : []),
   ];
 
   // Publish job mutation
@@ -104,7 +106,8 @@ export default function MyJobsPage() {
       activeTab === "all" ||
       (activeTab === "active" && job.isActive) ||
       (activeTab === "inactive" && !job.isActive) ||
-      (activeTab === "pending" && job.status === "pending");
+      (activeTab === "pending" && job.status === "pending") ||
+      (activeTab === "draft" && job.status === "draft");
 
     return matchesSearch && matchesTab;
   });
@@ -263,6 +266,11 @@ export default function MyJobsPage() {
                       <Eye className="mr-1 h-4 w-4" />
                       View Applications
                     </Button>
+                    {job.status === 'draft' && (
+                      <Button size="sm" onClick={() => setLocation(`/jobs/post?draft=${job.id}`)}>
+                        Continue posting
+                      </Button>
+                    )}
                     {job.status === 'approved' && !job.isActive && (
                       <Button
                         size="sm"

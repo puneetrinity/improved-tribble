@@ -18,7 +18,7 @@ import { registerAdminRoutes } from "./admin.routes";
 import { registerClientsRoutes } from "./clients.routes";
 import { registerJobsRoutes } from "./jobs.routes";
 import { registerJobBriefRoutes } from "./job-brief/routes";
-import { jobBriefEnabled } from "./job-brief/contracts";
+import { jobBriefEnabled, jobBriefAutoDraftEnabled } from "./job-brief/contracts";
 import { sourcingEnabled } from "./sourcing-authority/contracts";
 import { registerSourcingAuthorityRoutes } from "./sourcing-authority/routes";
 import { startSourcingAuthorityWorker } from "./sourcing-authority/worker";
@@ -56,6 +56,7 @@ import {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   jobBriefEnabled(); // Strict web-only configuration, before accepting requests.
+  jobBriefAutoDraftEnabled();
   sourcingEnabled();
   // Setup security middleware with environment-aware CSP
   const isDevelopment = process.env.NODE_ENV === 'development';
@@ -168,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({
       apolloAppId: process.env.APOLLO_APP_ID || null,
       jobBriefEnabled: jobBriefEnabled(),
+      jobBriefAutoDraftEnabled: jobBriefAutoDraftEnabled(),
       sourcingEnabled: sourcingEnabled(),
     });
   });

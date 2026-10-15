@@ -954,7 +954,7 @@ export class DatabaseStorage implements IStorage {
     // Insert with temporary slug, then update with unique slug using job ID
     const jobData = {
       ...job,
-      ...(jobBriefEnabled()?{currentJD:currentJdSchema.parse(job.originalJD),currentJDHash:sourceHash(currentJdSchema.parse(job.originalJD)),isActive:false,status:'pending'}:{}),
+      ...(jobBriefEnabled()?{currentJD:currentJdSchema.parse(job.originalJD),currentJDHash:sourceHash(currentJdSchema.parse(job.originalJD)),isActive:false,status:'draft'}:{}),
       slug: baseSlug, // Temporary, will be updated
       deadline: job.deadline ? job.deadline.toISOString().split('T')[0] : null
     };
@@ -1186,6 +1186,7 @@ export class DatabaseStorage implements IStorage {
     // Get current job state
     const currentJob = await this.getJob(id);
     if (!currentJob) return undefined;
+
 
     const now = new Date();
     const updates: Partial<Job> = {
@@ -1470,6 +1471,7 @@ export class DatabaseStorage implements IStorage {
     // Get current job state to track lifecycle transitions
     const currentJob = await this.getJob(id);
     if (!currentJob) return undefined;
+    if(currentJob.status==='draft') throw new Error('BRIEF_SUBMISSION_REQUIRED');
 
     const now = new Date();
     const updates: Partial<Job> = {

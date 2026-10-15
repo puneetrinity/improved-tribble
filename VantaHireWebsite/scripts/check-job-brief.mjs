@@ -50,7 +50,7 @@ export function verifyAuthority(read=path=>readFileSync(resolve(root,path),'utf8
     'job_activity_before_insert','job_activity_before_update','flow_job_brief_immutable',
   ]);
   if((sql.match(/CREATE FUNCTION public\.flow_job_brief_/g)||[]).length!==7) throw Error('brief_routine_inventory');
-  requireTokens('server/job-brief/draft.ts',['maxRetries:0','timeout:30_000','AbortSignal.timeout(35_000)',"repository.call('finish'"]);
+  requireTokens('server/job-brief/draft.ts',['maxRetries:0','BRIEF_PROVIDER_TIMEOUT_MS=40_000','BRIEF_DRAFT_LEASE_MS=60_000','BRIEF_SETTLEMENT_SQL_MS=7_000','timeout:budget','AbortSignal.timeout(budget)',"repository.call('finish'"]);
   requireTokens('server/job-brief/routes.ts',["'Cache-Control','private, no-store'","requireAuth,csrf","BRIEF_FEATURE_UNAVAILABLE"]);
   requireTokens('server/signal.routes.ts',['SOURCING_ACTIVATION_PENDING']);
   requireTokens('server/job-brief/commands.ts',["FOR UPDATE","actor_kind","'system'","interval '14 days'"]);
@@ -62,7 +62,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
     const {startVitest}=await import('vitest/node');const pg=process.argv.includes('--pg'),client=process.argv.includes('--client');
     const plugins=client?[(await import('@vitejs/plugin-react')).default()]:[];
     const v=await startVitest('test',[],{root,config:false,environment:client?'jsdom':'node',watch:false,
-      include:client?['test/unit/job-brief.test.tsx','test/unit/rc-skills-progress.test.tsx']:pg?['server/job-brief/__tests__/*.pg.test.ts']:['server/job-brief/__tests__/*.test.ts','test/contracts/skill-alternatives.test.ts'],
+      include:client?['test/unit/job-brief.test.tsx','test/unit/rc-skills-progress.test.tsx','test/unit/hiring-criteria-step.test.tsx','test/unit/brief-review-workspace.test.tsx','test/unit/job-autofill.test.ts','test/unit/job-intent.test.ts']:pg?['server/job-brief/__tests__/*.pg.test.ts']:['server/job-brief/__tests__/*.test.ts','test/contracts/skill-alternatives.test.ts'],
       exclude:pg?[]:['**/*.pg.test.ts'],fileParallelism:false,testTimeout:30000,hookTimeout:30000,
       alias:{'@shared':resolve(root,'shared'),'@':resolve(root,'client/src')}},{plugins});
     if(!v)process.exitCode=1;else await v.close();

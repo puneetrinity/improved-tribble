@@ -338,7 +338,8 @@ globalThis.fetch=async(input,init)=>{
                     'payload':{'schemaVersion':3,'compilerVersion':3,'taxonomyVersion':3,'criteria':[
                         {'id':str(uuid4()),'label':'Python','class':'must_have','subject':'skill','requirement':{'kind':'accepted_skills','primary':'Python','alternatives':['Python 3']},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}},
                         {'id':str(uuid4()),'label':'Backend role','class':'preferred','subject':'title','requirement':{'kind':'accepted_titles','values':['Backend Engineer','Backend Developer']},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}},
-                        {'id':str(uuid4()),'label':'Recorded experience','class':'must_have','subject':'experience_years','requirement':{'kind':'experience_range','minimum':6,'maximum':10},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}}]}}
+                        {'id':str(uuid4()),'label':'Recorded experience','class':'must_have','subject':'experience_years','requirement':{'kind':'experience_range','minimum':6,'maximum':10},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}},
+                        {'id':str(uuid4()),'label':'Location','class':'must_have','subject':'location','requirement':{'kind':'text','value':'Bengaluru'},'use':'assessment','evidenceKinds':['profile_evidence'],'provenance':{'kind':'recruiter_edit'}}]}}
                 saved=flow.execute('SELECT flow_job_brief_save(%s,%s,%s,%s,0,%s)',(org,job,actor,str(uuid4()),Jsonb(body))).fetchone()[0]
                 approval=self.post(client,f'/api/jobs/{job}/brief/approve',json={'requestId':str(uuid4()),'expectedRevision':1,'versionId':saved['versionId']})
                 assert approval.status_code==200,(approval.status_code,approval.text)

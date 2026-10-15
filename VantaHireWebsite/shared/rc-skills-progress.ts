@@ -13,11 +13,20 @@ export const signalRcProgressSchema=z.object({
   (value.workStarted||(value.processed===0&&value.total===0)):value.workStarted===undefined&&!['worker_queue','quota_window'].includes(value.safeReason)),'Invalid progress');
 export type SignalRcProgress=z.infer<typeof signalRcProgressSchema>;
 
-export function rcProgressPresentation(progress:SignalRcProgress|undefined,unavailable=false){
- if(unavailable)return {heading:'Status temporarily unavailable',message:'Your saved search has not been restarted. Status will refresh when available.'};
- if(progress?.state==='stalled')return {heading:'Search needs attention',message:'Saved work is retained for recovery. '+
+/** Visual tone only; copy below is the single source of truth for every RC status surface. */
+export type RcProgressTone='waiting'|'active'|'done'|'attention'|'failed'|'unknown';
+
+export function rcProgressPresentation(progress:SignalRcProgress|undefined,unavailable=false):{heading:string;message:string;tone:RcProgressTone}{
+ if(unavailable)return {tone:'unknown',heading:'Status temporarily unavailable',message:'Your saved search has not been restarted. Status will refresh when available.'};
+ if(progress?.state==='stalled')return {tone:'attention',heading:'Search needs attention',message:'Saved work is retained for recovery. '+
   (progress.notificationDelivered?'Support has been notified.':'Support notification is pending.')};
- if(progress?.state==='closed_unrecoverable')return {heading:'Search could not be completed',message:'Saved work is retained for review. This screen does not start another paid search.'};
- if(progress?.state==='complete'||progress?.state==='partial')return {heading:'Skills check finished',message:'Available skills are retained. Results appear once the shortlist has been saved.'};
- return {heading:'Enriching skills',message:'You can close this window while the search continues.'};
+ if(progress?.state==='closed_unrecoverable')return {tone:'failed',heading:'Search could not be completed',message:'Saved work is retained for review. This screen does not start another paid search.'};
+ if(progress?.state==='complete'||progress?.state==='partial')return {tone:'done',heading:'Skills check finished',message:'Available skills are retained. Results appear once the shortlist has been saved.'};
+ if(progress?.state==='queued'){
+  const kept=progress.workStarted?' Profiles already processed are kept.':'';
+  return progress.safeReason==='quota_window'
+   ?{tone:'waiting',heading:'Skills check waiting',message:'Waiting for the skills provider’s next request window. Nothing is lost while it waits.'+kept}
+   :{tone:'waiting',heading:'Skills check queued',message:'Waiting for a free worker. You can close this window while the search continues.'+kept};
+ }
+ return {tone:'active',heading:'Enriching skills',message:'You can close this window while the search continues.'};
 }

@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const hash=value=>createHash('sha256').update(value).digest('hex');
 export const frozenSourcingFiles={
-  'server/storage.ts':'0aed7b614c05ce5e5e6e387bab39118c0ea4a89c1fe0d768fcce8c32adc81c81',
+  'server/storage.ts':'b361556678de9f1626cf6cbd7657b56eebc8da367dd100673f926ec7564f3908',
   'server/lib/contactResolutionProcessor.ts':'3386ad52f9acac6be1abc8a81b6232d2aaed9b1ec663090a1b3e45016353c49b',
   // 5B-A4 permits only the relational privacy alias correction; all other
   // outreach bytes remain protected by this full-file fingerprint.

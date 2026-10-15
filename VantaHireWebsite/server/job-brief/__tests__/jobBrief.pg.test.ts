@@ -18,7 +18,11 @@ const ownerUrl=process.env.FLOW_BRIEF_OWNER_URL??'';
 const runtimeUrl=process.env.FLOW_BRIEF_RUNTIME_URL??'';
 const jd='Build Python services.';
 const criterion={id:'10000000-0000-4000-8000-000000000001',label:'Python',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'jd',sourceHash:sourceHash(jd),start:6,end:12}};
-const payload={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[criterion]};
+const foundations=[
+  {...criterion,id:'10000000-0000-4000-8000-000000000002',label:'Experience',subject:'experience_years',requirement:{kind:'minimum_years',minimum:3},provenance:{kind:'recruiter_edit'}},
+  {...criterion,id:'10000000-0000-4000-8000-000000000003',label:'Location',subject:'location',requirement:{kind:'text',value:'Bengaluru'},provenance:{kind:'recruiter_edit'}},
+];
+const payload={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[criterion,...foundations]};
 const save={action:'save_brief',currentJD:jd,payload,sourceChoice:'original_prose',requesterKind:'recruiter',reasonCode:'other'};
 function checkTarget(raw:string) {
   const u=new URL(raw);
@@ -79,6 +83,25 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
   it('reads an uninitialized job without creating state',async()=>{
     expect(await read()).toMatchObject({revision:'0',currentJD:null,latest:null});
     expect((await owner.query('SELECT count(*)::integer n FROM job_brief_state WHERE organization_id=90001 AND job_id=90001')).rows[0].n).toBe(0);
+  });
+  it('refuses approval without both foundations, including the direct SQL path',async()=>{
+    const saved=await saveVersion(randomUUID(),0,{...save,payload:{...payload,criteria:[criterion]}});
+    await expect(call('SELECT flow_job_brief_approve(90001,90001,90001,$1,1,$2,$3) result',
+      [randomUUID(),saved.versionId,sourceHash('approval')])).rejects.toThrow('BRIEF_FOUNDATIONS_REQUIRED');
+  });
+  it('submits an approved draft once, with replay and no publication',async()=>{
+    const jobId=(await owner.query("INSERT INTO jobs(organization_id,posted_by,title,location,type,description,original_jd,status,is_active) VALUES(90001,90001,'Draft test','Bengaluru','full-time','Build Python services.','Build Python services.','draft',false) RETURNING id")).rows[0].id;
+    const version=await call('SELECT flow_job_brief_save(90001,$1,90001,$2,0,$3) result',[jobId,randomUUID(),save]);
+    await call('SELECT flow_job_brief_approve(90001,$1,90001,$2,1,$3,$4) result',[jobId,randomUUID(),version.versionId,sourceHash('approval')]);
+    const request=randomUUID();const query='SELECT flow_job_brief_save(90001,$1,90001,$2,2,$3) result';
+    const args=[jobId,request,{action:'submit'}];
+    const submitted=await call(query,args);expect(submitted).toMatchObject({revision:'3',action:'submit'});
+    expect(await call(query,args)).toEqual(submitted);
+    expect((await runtime.query('SELECT status,is_active FROM jobs WHERE id=$1',[jobId])).rows[0]).toEqual({status:'pending',is_active:false});
+  });
+  it('does not let admin moderation bypass submission',async()=>{
+    const jobId=(await owner.query("INSERT INTO jobs(organization_id,posted_by,title,location,type,description,status,is_active) VALUES(90001,90001,'Draft test','Bengaluru','full-time','Test prose','draft',false) RETURNING id")).rows[0].id;
+    await expect(call('SELECT flow_job_brief_save(90001,$1,90004,$2,NULL,$3) result',[jobId,randomUUID(),{action:'moderate',status:'approved'}])).rejects.toThrow('BRIEF_SUBMISSION_REQUIRED');
   });
   it('uses identical pinned Unicode names in SQL and refuses direct duplicate saves',async()=>{
     for(const {input,expected} of unicodeFixtures.normalization){
@@ -248,7 +271,7 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
   });
   it('keeps the original approval on a cosmetic revision, invalidates on material change',async()=>{
     const first=await saveVersion();await call('SELECT flow_job_brief_approve(90001,90001,90001,$1,1,$2,$3) result',[randomUUID(),first.versionId,sourceHash('approve')]);
-    const cosmetic=await saveVersion(randomUUID(),2,{...save,note:'Typo cleanup',payload:{...payload,criteria:[{...criterion,label:' Python  '}]}});
+    const cosmetic=await saveVersion(randomUUID(),2,{...save,note:'Typo cleanup',payload:{...payload,criteria:[{...criterion,label:' Python  '},...foundations]}});
     expect(cosmetic.approvedVersionId).toBe(first.versionId);expect(cosmetic.versionId).not.toBe(first.versionId);
     const changed=await saveVersion(randomUUID(),3,{...save,payload:{...payload,criteria:[{...criterion,class:'preferred'}]}});
     expect(changed.approvedVersionId).toBeNull();
@@ -371,6 +394,25 @@ describe.skipIf(!enabled)('publication-cycle real row-lock ordering',()=>{
     }
     throw Error('Expected real row-lock contention');
   };
+  it('serializes two automatic requests: exactly one lease, no automatic retry after failure',async()=>{
+    await owner.query('UPDATE jobs SET current_jd=$2,current_jd_hash=$3 WHERE id=$1',[jobId,jd,sourceHash(jd)]);
+    const first=new Client({connectionString:runtimeUrl}),second=new Client({connectionString:runtimeUrl});
+    await first.connect();await second.connect();
+    const query="SELECT flow_job_brief_draft_claim(90001,$1,90001,$2,0,$3,'synthetic-model',$4,'automatic') result";
+    const request=randomUUID();
+    try {
+      await first.query('BEGIN');
+      const claim=(await first.query(query,[jobId,request,sourceHash(jd),sourceHash('auto-first')])).rows[0].result;
+      expect(claim.lease).toBeTruthy();
+      const pid=(await second.query('SELECT pg_backend_pid() pid')).rows[0].pid;
+      const waiting=second.query(query,[jobId,randomUUID(),sourceHash(jd),sourceHash('auto-second')]);
+      await blocked(pid);await first.query('COMMIT');
+      expect((await waiting).rows[0].result).toEqual({state:'skipped'});
+      await first.query('SELECT flow_job_brief_draft_finish($1,$2,$3)',[request,claim.lease,{state:'failed',code:'BRIEF_MODEL_FAILED'}]);
+      expect((await second.query(query,[jobId,randomUUID(),sourceHash(jd),sourceHash('auto-reload')])).rows[0].result).toEqual({state:'skipped'});
+      expect((await owner.query('SELECT count(*)::int n FROM job_brief_draft_requests WHERE job_id=$1',[jobId])).rows[0].n).toBe(1);
+    } finally {await first.query('ROLLBACK');await first.end();await second.end();}
+  });
   it('two actual INSERTs hold compatible SHARE locks, not an exclusive intake lock',async()=>{
     await owner.query('BEGIN');await intake.query('BEGIN');
     await insert(owner);await intake.query("SET LOCAL lock_timeout='200ms'");await insert(intake);
@@ -496,4 +538,86 @@ describe.skipIf(!enabled)('publication-cycle real row-lock ordering',()=>{
       await revoke.query('UPDATE organization_members SET seat_assigned=true WHERE organization_id=90001 AND user_id=90001');await revoke.end();
     }
   });
+});
+
+// Codex review: delayed connection acquisition and settlement judged against the ACTUAL database lease.
+// Real draftBrief + real SQL claim/settlement through a deliberately tiny pool; only the provider is a local fake.
+describe.skipIf(!enabled)('draft settlement against the real lease',()=>{
+  let owner:Client;
+  const content=JSON.stringify({items:[{text:'Python',priority:'required',topic:'skill',terms:['Python'],minimum:null,maximum:null,quote:'Python'}],overflow:false});
+  const groqWith=async(onCall:()=>Promise<void>|void)=>{
+    const { default: Groq }=await import('groq-sdk');
+    const fetch=async()=>{await onCall();return new Response(JSON.stringify({choices:[{index:0,finish_reason:'stop',message:{role:'assistant',content}}],usage:{prompt_tokens:5,completion_tokens:5}}),{status:200,headers:{'content-type':'application/json'}});};
+    let calls=0;
+    return {client:new Groq({apiKey:'synthetic-not-a-provider-key',baseURL:'https://fixture.invalid',fetch:(async(...a:unknown[])=>{calls++;return fetch();}) as unknown as typeof globalThis.fetch,maxRetries:5}),calls:()=>calls};
+  };
+  const freshJob=async()=>{
+    const jobId=(await owner.query("INSERT INTO jobs(organization_id,posted_by,title,location,type,description,original_jd,status,is_active) VALUES(90001,90001,'Lease test','Bengaluru','full-time',$1,$1,'draft',false) RETURNING id",[jd])).rows[0].id;
+    const rt=new Client({connectionString:runtimeUrl});await rt.connect();
+    try{await rt.query('SELECT flow_job_brief_save(90001,$1,90001,$2,0,$3::jsonb)',[jobId,randomUUID(),save]);}finally{await rt.end();}
+    return jobId as number;
+  };
+  const run=async(pool:Pool,jobId:number,requestId:string,client:unknown)=>{
+    const {draftBrief}=await import('../draft');const {BriefRepository}=await import('../repository');
+    return draftBrief(new BriefRepository(pool),{organizationId:90001,jobId,actorId:90001},{requestId,expectedRevision:1},{client:client as never,model:'synthetic-model'});
+  };
+  const row=async(requestId:string)=>(await owner.query('SELECT state,closed_code,lease_deadline>clock_timestamp() AS live FROM job_brief_draft_requests WHERE request_id=$1',[requestId])).rows[0];
+  const expire=(requestId:string)=>owner.query("UPDATE job_brief_draft_requests SET lease_deadline=clock_timestamp()-interval '1 second' WHERE request_id=$1",[requestId]);
+  beforeAll(async()=>{checkTarget(ownerUrl);checkTarget(runtimeUrl);owner=new Client({connectionString:ownerUrl});await owner.connect();});
+  afterAll(async()=>{await owner?.end();});
+
+  it('settles normally inside the lease',async()=>{
+    const jobId=await freshJob();const pool=new Pool({connectionString:runtimeUrl,max:2});
+    try{const g=await groqWith(()=>{});const requestId=randomUUID();
+      expect(await run(pool,jobId,requestId,g.client)).toMatchObject({state:'review_required'});
+      expect(await row(requestId)).toMatchObject({state:'review_required'});expect(g.calls()).toBe(1);
+    }finally{await pool.end();}
+  },30_000);
+
+  it('a connection wait at settlement is uncertain: replay reports running, then unknown after the lease; one provider call',async()=>{
+    const jobId=await freshJob();const pool=new Pool({connectionString:runtimeUrl,max:1,connectionTimeoutMillis:500});
+    let held:import('pg').PoolClient|undefined;
+    try{
+      const g=await groqWith(async()=>{held=await pool.connect();});   // the provider "answers" while the only connection is taken
+      const requestId=randomUUID();
+      await expect(run(pool,jobId,requestId,g.client)).rejects.toMatchObject({code:'BRIEF_UNAVAILABLE'});
+      held!.release();held=undefined;
+      expect(await row(requestId)).toMatchObject({state:'dispatched',live:true});
+      expect(await run(pool,jobId,requestId,g.client)).toMatchObject({state:'dispatched'});   // replay: no lease, no call
+      await expire(requestId);
+      expect(await run(pool,jobId,requestId,g.client)).toMatchObject({state:'unknown',code:'BRIEF_MODEL_UNKNOWN'});
+      expect(g.calls()).toBe(1);
+    }finally{held?.release();await pool.end();}
+  },30_000);
+
+  it('a result that arrives after the lease is recorded as unknown, never stored; one provider call',async()=>{
+    const jobId=await freshJob();const pool=new Pool({connectionString:runtimeUrl,max:2});
+    try{
+      const requestId=randomUUID();
+      const g=await groqWith(()=>expire(requestId).then(()=>undefined));   // provider took longer than the lease
+      // The database records the late attempt as unknown and does NOT keep the late model result or JD list.
+      expect(await run(pool,jobId,requestId,g.client)).toMatchObject({state:'unknown',code:'BRIEF_MODEL_UNKNOWN'});
+      expect((await owner.query('SELECT result IS NULL AS no_result,review_workspace IS NULL AS no_list FROM job_brief_draft_requests WHERE request_id=$1',[requestId])).rows[0]).toEqual({no_result:true,no_list:true});
+      expect(await run(pool,jobId,requestId,g.client)).toMatchObject({state:'unknown'});
+      expect(g.calls()).toBe(1);
+    }finally{await pool.end();}
+  },30_000);
+
+  it('settlement waiting briefly on a lock still settles; waiting past lock_timeout is retry-same-request',async()=>{
+    for(const [holdMs,expected] of [[1_000,'settled'],[3_000,'retry']] as const){
+      const jobId=await freshJob();const pool=new Pool({connectionString:runtimeUrl,max:2});
+      const locker=new Client({connectionString:ownerUrl});await locker.connect();
+      try{
+        const requestId=randomUUID();
+        const g=await groqWith(async()=>{await locker.query('BEGIN');await locker.query('SELECT id FROM jobs WHERE id=$1 FOR UPDATE',[jobId]);
+          setTimeout(()=>{void locker.query('COMMIT');},holdMs);});
+        const outcome=run(pool,jobId,requestId,g.client);
+        if(expected==='settled'){expect(await outcome).toMatchObject({state:'review_required'});}
+        else{await expect(outcome).rejects.toMatchObject({code:'BRIEF_RETRY_SAME_REQUEST'});
+          await new Promise(r=>setTimeout(r,holdMs));
+          expect(await run(pool,jobId,requestId,g.client)).toMatchObject({state:'dispatched'});}
+        expect(g.calls()).toBe(1);
+      }finally{await new Promise(r=>setTimeout(r,holdMs+200));await locker.end();await pool.end();}
+    }
+  },40_000);
 });

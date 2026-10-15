@@ -7,6 +7,14 @@ import { sourceHash } from '../../job-brief/contracts';
 import {sourcingHash} from '../contracts';
 import {compileSourcingQuery,digestBasisHash,sourcingBasisSchema,validateProviderGrant} from '../compiler';
 import {createRankingContract,rankingContractSchema} from '../ranking-contract';
+// Approval requires experience and location (brief foundations, migration 0018).
+const FOUNDATIONS = () => [
+  { id: randomUUID(), label: 'Experience', class: 'must_have', subject: 'experience_years', requirement: { kind: 'minimum_years', minimum: 3 },
+    use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' } },
+  { id: randomUUID(), label: 'Location', class: 'must_have', subject: 'location', requirement: { kind: 'text', value: 'Bengaluru' },
+    use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' } },
+];
+
 
 const enabled = process.env.FLOW_SOURCING_DISPOSABLE === '1';
 const url = process.env.FLOW_SOURCING_OWNER_URL ?? '';
@@ -28,7 +36,7 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
       payload: { schemaVersion: 3, compilerVersion: 3, taxonomyVersion: 3, criteria: [{
         id: randomUUID(), label: 'Python', class: 'must_have', subject: 'skill', requirement: { kind: 'accepted_skills', primary: 'Python', alternatives: [] },
         use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' },
-      }] },
+      }, ...FOUNDATIONS()] },
     }]);
     await one('SELECT flow_job_brief_approve($1,$2,$3,$4,1,$5,$6) result', [org, id, actor, randomUUID(), saved.versionId, hash]);
     // Controlled component fixture only. The product artifact writer is tested
@@ -69,7 +77,7 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     const raw={action:'grant',protocolVersion:1,flowRunId:admitted.id,artifactHash:artifact.queryHash,discoverRequestId:discover,executionAttemptId:execution,
       slot:'exact',rungId:'exact',providerInput:{version:1,limit:300,excludePersonIds:[],requirements:{title:artifact.jobContext.title,
         topSkills:['python'],seniorityLevel:'senior',domain:'Software',roleFamily:'backend',location:artifact.jobContext.location,
-        experienceYears:null,experienceYearsMax:null,education:null,titleSearchTerms:['backend engineer'],adjacentBuckets:[['platform engineer']],adjacentLocations:[]}}};
+        experienceYears:artifact.jobContext.experienceYears??null,experienceYearsMax:null,education:null,titleSearchTerms:['backend engineer'],adjacentBuckets:[['platform engineer']],adjacentLocations:[]}}};
     const {providerInputHash}=validateProviderGrant(artifact,raw,null),grantCommand={...raw,providerInputHash};
     const grant=()=>one('SELECT flow_sourcing_grant($1,$2,$3) result',[org,admitted.id,grantCommand]);
     return {admitted,artifact,grant,grantCommand,finish,receipt:(g:any,state:string,extra={})=>({action:'receipt',protocolVersion:1,
@@ -128,6 +136,9 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     {id:randomUUID(),label:'Role',class:'preferred',subject:'title',requirement:{kind:'accepted_titles',values:['Backend Engineer','Backend Developer']},
       use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}},
     {id:randomUUID(),label:'Experience',class:'must_have',subject:'experience_years',requirement:{kind:'experience_range',minimum:6,maximum:10},
+      use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}},
+    // Approval requires a location as well (brief foundations, migration 0018). Appended so indexes above stay.
+    {id:randomUUID(),label:'Location',class:'must_have',subject:'location',requirement:{kind:'text',value:'Bengaluru'},
       use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}},
   ]};}
   async function savePayload(payload:unknown,request=randomUUID()){
