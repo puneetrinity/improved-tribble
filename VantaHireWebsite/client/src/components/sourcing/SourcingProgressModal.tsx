@@ -16,7 +16,18 @@ import {
   XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {rcProgressPresentation,type SignalRcProgress} from '@shared/rc-skills-progress';
+import {rcProgressPresentation,type RcProgressTone,type SignalRcProgress} from '@shared/rc-skills-progress';
+
+// RC skills-check tones. Text colours keep >=4.5:1 on their badge backgrounds; the label
+// repeats the state in words so colour is never the only signal.
+const RC_TONE: Record<RcProgressTone, { label: string; badge: string; bar: string }> = {
+  waiting: { label: "Waiting", badge: "border-[#E3E6F0] bg-[#F1F4FA] text-[#334155]", bar: "bg-[#94A3B8]" },
+  active: { label: "In progress", badge: "border-[#CFE0FB] bg-[#EAF2FE] text-[#1D4ED8]", bar: "bg-[#4B8EF0]" },
+  done: { label: "Done", badge: "border-[#C8EEDA] bg-[#E7F6EE] text-[#166534]", bar: "bg-[#1FA463]" },
+  attention: { label: "Needs attention", badge: "border-amber-200 bg-amber-50 text-amber-800", bar: "bg-amber-500" },
+  failed: { label: "Stopped", badge: "border-red-200 bg-red-50 text-red-700", bar: "bg-[#DC2626]" },
+  unknown: { label: "Status unknown", badge: "border-[#E3E6F0] bg-[#F1F4FA] text-[#334155]", bar: "bg-[#94A3B8]" },
+};
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 // The state contract is owned by `useSourcingProgress` and is unchanged.
@@ -192,15 +203,67 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
   // Modal is closed by the hook after candidates are pre-fetched (unchanged behaviour).
 
   if (progress.rcProgress || progress.rcStatusUnavailable) {
-    const rc = progress.rcProgress;
-    const {heading,message}=rcProgressPresentation(rc,progress.rcStatusUnavailable);
+    const rc = progress.rcStatusUnavailable ? undefined : progress.rcProgress;
+    const {heading,message,tone}=rcProgressPresentation(rc,progress.rcStatusUnavailable);
+    const toneStyle = RC_TONE[tone];
+    // Counts only when work is actually sized; a queue with nothing sized yet shows no bar value.
+    const sized = !!rc && rc.total > 0;
+    const fill = sized ? (rc!.processed / rc!.total) * 100 : 0;
     return (
       <Dialog open={open} onOpenChange={value => { if (!value) onClose?.(); }}>
-        <DialogContent data-sourcing-progress-modal="" data-rc-progress="" className="max-w-md">
-          <DialogTitle>{heading}</DialogTitle>
-          {rc && <p>{rc.processed} of {rc.total} profiles processed. This is progress, not a count of matching skills.</p>}
-          <p>{message}</p>
-          <button type="button" onClick={onClose} className="rounded border px-3 py-2">Close</button>
+        <DialogContent
+          data-sourcing-progress-modal=""
+          data-rc-progress=""
+          data-rc-tone={tone}
+          className="w-full max-w-[380px] gap-0 overflow-hidden rounded-[14px] border-[#E3E6F0] p-0 motion-reduce:animate-none"
+        >
+          <div className="flex items-center justify-between px-[18px] pt-[18px]">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#687182]">
+              ealana · skills check
+            </p>
+            <Badge className={cn("text-[11px]", toneStyle.badge)}>{toneStyle.label}</Badge>
+          </div>
+          <div className="px-[18px] pt-3">
+            <DialogTitle className="text-[17px] font-semibold leading-snug text-[#0F172A]">{heading}</DialogTitle>
+            <div
+              role="progressbar"
+              aria-label="Skills check progress"
+              aria-valuemin={0}
+              aria-valuemax={sized ? rc!.total : undefined}
+              aria-valuenow={sized ? rc!.processed : undefined}
+              aria-valuetext={sized && rc ? `${rc.processed} of ${rc.total} profiles processed` : heading}
+              className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#E6EAF3]"
+            >
+              <div
+                className={cn(
+                  "h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none",
+                  toneStyle.bar,
+                  tone === "waiting" && !sized && "w-1/3 animate-pulse motion-reduce:animate-none",
+                )}
+                style={sized ? { width: `${fill}%` } : undefined}
+              />
+            </div>
+            {sized && (
+              <p className="mt-2 font-mono text-[12px] tabular-nums text-[#475569]">
+                {rc!.processed} of {rc!.total} profiles processed
+              </p>
+            )}
+            <p className="mt-2 text-[14px] leading-relaxed text-[#334155]">{message}</p>
+            {sized && (
+              <p className="mt-1 text-[12px] leading-relaxed text-[#64748B]">
+                This is progress, not a count of matching skills.
+              </p>
+            )}
+          </div>
+          <div className="flex justify-end px-[18px] pb-[18px] pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="min-h-[44px] min-w-[88px] cursor-pointer rounded-[10px] border border-[#E3E6F0] bg-white px-4 text-[14px] font-medium text-[#0F172A] transition-colors duration-200 hover:bg-[#F5F7FB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B8EF0] focus-visible:ring-offset-2"
+            >
+              Close
+            </button>
+          </div>
         </DialogContent>
       </Dialog>
     );
