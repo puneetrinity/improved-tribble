@@ -247,13 +247,16 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
     for(const entry of manifest.filter(e=>e.version<='0015'))copyFileSync(join(migrationsDir,entry.file),join(previous,entry.file));
     copyFileSync(join(migrationsDir,'catalog.lock.json'),join(previous,'catalog.lock.json'));
     const priorHash=lock.migrations['0016'];
-    delete lock.migrations['0016'];delete lock.migrations['0017'];writeFileSync(join(previous,'checksums.lock'),JSON.stringify(lock));
+    for(const version of Object.keys(lock.migrations)) if(version>'0015') delete lock.migrations[version];
+    writeFileSync(join(previous,'checksums.lock'),JSON.stringify(lock));
     expect((await runReleaseMigration({migrationsDir:previous,creds:credentials(),connect})).applied).toHaveLength(16);
     copyFileSync(join(migrationsDir,'0016_rubric_ranking.sql'),join(previous,'0016_rubric_ranking.sql'));
     lock.migrations['0016']=priorHash;writeFileSync(join(previous,'checksums.lock'),JSON.stringify(lock));
     expect(await runReleaseMigration({migrationsDir:previous,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:['0016']});
     expect(await runReleaseMigration({migrationsDir:previous,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:[]});
-    expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:['0017']});
+    // Every later migration (0017 onward) applies exactly once on top of 0016.
+    expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',
+      applied:manifest.filter(e=>e.version>'0016').map(e=>e.version)});
     expect(await runReleaseMigration({migrationsDir,creds:credentials(),connect})).toEqual({identityMode:'adopted',applied:[]});
     await provisionRuntimeRole({migrateUrl:databaseUrl,runtimeUrl:runtimeDatabaseUrl,runtimeRole:'flow_schema_control_test_runtime',
       expectedTargetId:targetId,connectMigration:connect,connectRuntime:async()=>{
@@ -304,6 +307,8 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0015", apply_mode: "adopted" },
         { version: "0016", apply_mode: "adopted" },
         { version: "0017", apply_mode: "adopted" },
+        { version: "0018", apply_mode: "adopted" },
+        { version: "0019", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +

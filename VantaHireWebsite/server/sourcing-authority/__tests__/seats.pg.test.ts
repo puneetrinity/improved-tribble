@@ -4,6 +4,14 @@ import {resolve} from 'node:path';
 import {Client} from 'pg';
 import {afterAll,beforeAll,describe,expect,it} from 'vitest';
 import {sourceHash} from '../../job-brief/contracts';
+// Approval requires experience and location (brief foundations, migration 0018).
+const FOUNDATIONS = () => [
+  { id: randomUUID(), label: 'Experience', class: 'must_have', subject: 'experience_years', requirement: { kind: 'minimum_years', minimum: 3 },
+    use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' } },
+  { id: randomUUID(), label: 'Location', class: 'must_have', subject: 'location', requirement: { kind: 'text', value: 'Bengaluru' },
+    use: 'assessment', evidenceKinds: ['profile_evidence'], provenance: { kind: 'recruiter_edit' } },
+];
+
 
 const enabled=process.env.FLOW_SOURCING_DISPOSABLE==='1';
 // Separate from the rollback-only component database: concurrent transactions
@@ -58,7 +66,7 @@ describe.skipIf(!enabled)('sourcing seats and simultaneous admissions',()=>{
         await db.query('INSERT INTO job_recruiters(job_id,recruiter_id,organization_id) VALUES($1,$2,$3)',[id,peer,org]);
         const saved=await one(db,'SELECT flow_job_brief_save($1,$2,$3,$4,0,$5) result',[org,id,actor,randomUUID(),{
           action:'save_brief',currentJD:'Build Python services.',sourceChoice:'original_prose',requesterKind:'recruiter',reasonCode:'other',
-          payload:{schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[{id:randomUUID(),label:'Python',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}}]},
+          payload:{schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[{id:randomUUID(),label:'Python',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}},...FOUNDATIONS()]},
         }]);
         await one(db,'SELECT flow_job_brief_approve($1,$2,$3,$4,1,$5,$6) result',[org,id,actor,randomUUID(),saved.versionId,hash]);
         await db.query("INSERT INTO sourcing_query_artifacts(id,organization_id,job_id,brief_version_id,material_hash,compiler_version,query_hash,input) SELECT $1,organization_id,job_id,approved_version_id,approved_material_hash,'1',$2,'{}'::jsonb FROM job_brief_state WHERE job_id=$3",[randomUUID(),hash,id]);
