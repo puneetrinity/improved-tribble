@@ -40,7 +40,7 @@ export type JobBrief={revision:string;currentJD:string|null;sourceHash:string|nu
   source:{initialized:boolean;ambiguous:boolean;choices:Array<{kind:'original_prose'|'description_prose';text:string}>}};
 export async function fetchJobBrief(jobId:number,signal?:AbortSignal):Promise<JobBrief> {
   const response=await fetch(`/api/jobs/${jobId}/brief`,{...(signal?{signal}:{}),credentials:'include',cache:'no-store'});
-  if(!response.ok) throw new Error('The job brief is unavailable. Check your job assignment and seat.');
+  if(!response.ok) throw new Error('We couldn’t load the hiring criteria. Check that you’re assigned to this job and have a seat.');
   return response.json();
 }
 export async function changeJobPublication(actorId:number,role:string,jobId:number,isActive:boolean,enabled:boolean) {

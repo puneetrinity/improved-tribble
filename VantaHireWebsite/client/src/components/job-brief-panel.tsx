@@ -20,12 +20,22 @@ function editablePayload(value:BriefPayload):BriefPayload {
     c.subject==='experience_years' ? {...c,use:'assessment'} : c)};
 }
 const label=(value:string)=>value.replaceAll('_',' ');
+const REASON_LABEL:Record<string,string>={clarification_typo:'Fixing a typo or wording',hm_client_feedback:'Hiring manager or client feedback',
+  role_scope_changed:'The role changed',seniority_changed:'Seniority changed',skills_changed:'Skills changed',location_changed:'Location changed',
+  compensation_changed:'Pay changed',sourcing_quality_volume:'Not enough good candidates',market_availability:'Hard to find in the market',
+  application_interview_evidence:'Learned from applications or interviews',policy_compliance:'Policy or compliance',other:'Other'};
+const CLASS_LABEL:Record<string,string>={must_have:'Must have',preferred:'Nice to have',disqualifier:'Red flag (for review only)',evidence_required:'Evidence to review manually'};
+const SUBJECT_LABEL:Record<string,string>={title:'Job title',seniority:'Seniority',experience_years:'Years of experience',skill:'Skill',domain:'Industry or domain',
+  function:'Function',location:'Location',certification:'Certification',language:'Language',education_requirement:'Education',relevant_work:'Relevant experience',
+  responsibility:'Responsibility',leadership:'Leadership',availability:'Availability',work_eligibility:'Work eligibility'};
+const SOURCE_LABEL:Record<string,string>={original_prose:'the description you first entered',description_prose:'the description on the job post',current_jd:'the saved description',recruiter_edit:'my own text'};
+const field='mt-1 block min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 function draftNotice(code:unknown):string {
-  const messages:Record<string,string>={BRIEF_MODEL_TRUNCATED:'The AI answer was incomplete.',
-    BRIEF_MODEL_INVALID:'The AI proposal did not pass validation.',BRIEF_MODEL_TIMEOUT:'AI drafting timed out.',
-    BRIEF_DRAFT_STALE:'The JD changed while the AI was drafting. Reload the saved brief.',
-    BRIEF_MODEL_FAILED:'AI drafting was unavailable.',BRIEF_MODEL_UNKNOWN:'The AI drafting outcome is unknown.'};
-  return (typeof code==='string' && Object.hasOwn(messages,code)?messages[code]:'No usable AI draft is available.')+' You can edit manually.';
+  const messages:Record<string,string>={BRIEF_MODEL_TRUNCATED:'The AI draft was incomplete.',
+    BRIEF_MODEL_INVALID:'We couldn’t use the AI draft.',BRIEF_MODEL_TIMEOUT:'The AI draft took too long.',
+    BRIEF_DRAFT_STALE:'The job description changed while the AI was drafting. Discard unsaved changes to reload it.',
+    BRIEF_MODEL_FAILED:'AI drafting isn’t available right now.',BRIEF_MODEL_UNKNOWN:'We couldn’t tell whether the AI draft finished. Please try again.'};
+  return (typeof code==='string' && Object.hasOwn(messages,code)?messages[code]:'No usable AI draft is available.')+' You can edit the requirements yourself.';
 }
 export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
   const query=useJobBrief(jobId,actorId,true);const cache=useQueryClient();
@@ -42,8 +52,8 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
       setPayload(start);
     }
   },[query.data,dirty]);
-  if(query.isPending) return <p role="status">Loading job brief…</p>;
-  if(query.isError || !query.data) return <p role="alert">The brief is unavailable. No changes have been saved.</p>;
+  if(query.isPending) return <p role="status">Loading hiring criteria…</p>;
+  if(query.isError || !query.data) return <p role="alert">We couldn’t load the hiring criteria. Nothing has been changed.</p>;
   const brief=query.data;
   const revision=Number(brief.revision);
   const refresh=async()=>{await cache.invalidateQueries({queryKey:['job-brief',actorId,jobId]});await cache.invalidateQueries({queryKey:['job-management',actorId,jobId]});};
@@ -52,12 +62,12 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
     try {
       if(operation==='initialize') {
         await jobIntentRequest(actorId,jobId,'initialize',`/api/jobs/${jobId}`,{currentJD:source,sourceChoice:choice,requesterKind:requester,reasonCode:reason,expectedRevision:revision});
-        setDirty(false);await refresh();setNotice('JD saved. You can now draft or write the brief.');
+        setDirty(false);await refresh();setNotice('Job description saved. You can now draft the criteria with AI or write them yourself.');
       } else if(operation==='draft') {
         const result=await jobIntentRequest(actorId,jobId,'draft',`/api/jobs/${jobId}/brief/draft`,{expectedRevision:revision},'POST');
-        if(result.state==='review_required') {setDirty(false);await query.refetch();setNotice('AI draft ready. Review the criteria and the requirements left out below, then save.');return;}
+        if(result.state==='review_required') {setDirty(false);await query.refetch();setNotice('AI draft ready. Check each criterion and anything left out below, then save.');return;}
         if(result.state!=='succeeded' || !result.result) {setNotice(draftNotice(result.code));await query.refetch();return;}
-        setPayload(result.result);setDirty(true);setNotice('AI proposal only. Review every criterion and save before approving.');
+        setPayload(result.result);setDirty(true);setNotice('AI proposal only — nothing is saved yet. Check every criterion and save before approving.');
       } else if(operation==='save') {
         const savedPayload={...payload,criteria:payload.criteria.map(c=>c.requirement.kind==='accepted_titles'
           ? {...c,requirement:{...c.requirement,values:c.requirement.values.map(v=>v.trim()).filter(Boolean)}} :
@@ -68,78 +78,102 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
           overlappingSkillCriteria(savedPayload.criteria).length) throw Error('SKILL_NAMES_INVALID');
         await jobIntentRequest(actorId,jobId,'save-brief',`/api/jobs/${jobId}/brief`,{currentJD:source,sourceChoice:source===brief.currentJD?'current_jd':choice,requesterKind:requester,reasonCode:reason,expectedRevision:revision,payload:savedPayload,
           ...(workspace?{reviewSelection:{extractionId:workspace.extractionId,dispositions:selectionFor(workspace,savedPayload)}}:{})});
-        setDirty(false);await refresh();setNotice('Brief saved. Approval is a separate action.');
+        setDirty(false);await refresh();setNotice('Changes saved. Approve the criteria when you are happy with them.');
       } else {
-        if(!brief.latest || dirty || brief.latest.payload.schemaVersion!==3) throw new Error('Save the updated brief before approving.');
+        if(!brief.latest || dirty || brief.latest.payload.schemaVersion!==3) throw new Error('Save your changes before approving.');
         await jobIntentRequest(actorId,jobId,'approve-brief',`/api/jobs/${jobId}/brief/approve`,{expectedRevision:revision,versionId:brief.latest.version_id},'POST');
-        await refresh();setNotice('Brief approved. This did not publish the job or start sourcing.');
+        await refresh();setNotice('Criteria approved. This did not publish the job or start a search.');
       }
     } catch(error) {setError(operation==='draft' && error instanceof Error && /\bBRIEF_DRAFT_LIMIT\b/.test(error.message)
-      ? 'AI drafting limit reached. Enter or edit the brief manually.'
+      ? 'You’ve reached the AI drafting limit. You can edit the requirements yourself.'
       : error instanceof Error && error.message==='SKILL_NAMES_INVALID'
-      ? 'Fix the skill names: at most 20 nonblank names per skill, no control characters, duplicates or shared names across skills.'
+      ? 'Fix the skill names: up to 20 names per skill, no blank or repeated names, and no name used by two skills.'
       : error instanceof Error && /BRIEF_REVIEW_CONFLICT|BRIEF_INVALID_REVIEW/.test(error.message)
-      ? 'The requirement list changed. Reload the saved brief, then save and approve again. Your edits are kept until you reload.'
-      : error instanceof Error && /BRIEF_UPDATED_APPROVAL_REQUIRED|Save the updated brief/.test(error.message)
-      ? 'Review, save and approve the updated brief. Your edits are kept.'
-      : 'The change was not confirmed. Your edits are kept. Refresh the brief after a conflict, or retry the same action after a connection failure.');}
+      ? 'The list of requirements changed elsewhere. Discard your unsaved changes to load it, then save and approve again. Your edits are kept until you do.'
+      : error instanceof Error && /BRIEF_UPDATED_APPROVAL_REQUIRED|Save your changes before approving/.test(error.message)
+      ? 'Save and approve the updated criteria. Your edits are kept.'
+      : 'We couldn’t confirm whether your changes were saved. Your edits are still here — try again, or discard unsaved changes if someone else changed the criteria.');}
     finally {setBusy(false);}
   };
   const setCriteria=(criteria:Criterion[])=>{setDirty(true);setPayload({...payload,criteria});};
   const update=(index:number,patch:Partial<Criterion>)=>setCriteria(payload.criteria.map((c,i)=>i===index?{...c,...patch,provenance:{kind:'recruiter_edit'}}:c));
 
-  return <section aria-label="Job brief" className="space-y-4 rounded-lg border p-4" id="job-brief">
-    <h2 className="text-xl font-semibold">Job brief and approval</h2>
-    {brief.latest && brief.latest.payload.schemaVersion!==3 && <p role="status">This older brief needs review. The proposed updated format is not saved or approved. Review skill names, save, then approve.</p>}
-    <p>{brief.approvedVersionId?`Approved version retained${brief.latest?.version_id!==brief.approvedVersionId?'; latest revision is cosmetic':''}.`:'No approved brief yet.'} Approval never publishes or starts sourcing.</p>
-    {error && <p role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
-    {!error && !notice && brief.draft && ['failed','stale','unknown'].includes(brief.draft.state) && <p role="status">{draftNotice(brief.draft.code)}</p>}
-    {!brief.source.initialized && <div><p>Select the actual JD or enter it below. Nothing is inferred from the old screening configuration.</p>
-      {brief.source.choices.map(c=><Button key={c.kind} type="button" variant="outline" onClick={()=>{setSource(c.text);setChoice(c.kind);setDirty(true);}}>Use {label(c.kind)}</Button>)}
-    </div>}
-    <label className="block">Current JD<Textarea aria-label="Current JD" value={source} onChange={e=>{setSource(e.target.value);setChoice('recruiter_edit');setDirty(true);}} rows={8}/></label>
-    <div className="flex flex-wrap gap-3">
-      <label>Change reason <select aria-label="Brief change reason" value={reason} onChange={e=>setReason(e.target.value)}>{reasons.map(r=><option key={r} value={r}>{label(r)}</option>)}</select></label>
-      <label>Requested by <select aria-label="Requested by" value={requester} onChange={e=>setRequester(e.target.value)}><option value="recruiter">Recruiter</option><option value="hiring_manager">Hiring manager input</option></select></label>
+  const approved=!!brief.approvedVersionId;
+  const changedSinceApproval=approved && (dirty || brief.latest?.version_id!==brief.approvedVersionId);
+  const status=!approved?'Not approved yet':changedSinceApproval?'Changes not approved yet':'Approved';
+  return <section aria-labelledby="job-brief-title" className="space-y-5 rounded-xl border border-border bg-card p-4 sm:p-6" id="job-brief">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h2 id="job-brief-title" className="text-xl font-semibold text-foreground">Hiring criteria</h2>
+        <p className="mt-1 text-sm text-muted-foreground">What we look for when finding and ranking candidates. Approving criteria doesn't publish the job or start a search.</p>
+      </div>
+      <span role="status" data-brief-status="" className={`rounded-full border px-3 py-1 text-sm font-medium ${status==='Approved'?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>{status}</span>
     </div>
-    <div className="flex flex-wrap gap-2"><Button type="button" disabled={busy || !source.trim()} onClick={()=>void invoke('initialize')}>Save JD</Button>
-      <Button type="button" variant="outline" disabled={busy || !brief.source.initialized || source!==brief.currentJD} onClick={()=>void invoke('draft')}>Draft brief with AI</Button></div>
-    <p>At most 12 criteria. Disqualifiers are review flags, not automatic exclusions. Unknown evidence is not a failure.</p>
-    <p>Experience is an eligibility exception: in-range candidates appear first. Candidates within 2 years either side appear separately only when every required skill is evidenced. Those further out or without usable dates are not shown. Internships do not count toward years. Results may contain fewer than 100 candidates.</p>
-    {payload.criteria.map((c,index)=><fieldset key={c.id} className="space-y-2 rounded border p-3"><legend>Criterion {index+1}</legend>
-      <label className="block">Label<Input aria-label={`Criterion ${index+1} label`} value={c.label} maxLength={120} onChange={e=>update(index,{label:e.target.value})}/></label>
-      <label>Class <select aria-label={`Criterion ${index+1} class`} value={c.class} onChange={e=>update(index,{class:e.target.value as Criterion['class']})}>{['must_have','preferred','disqualifier','evidence_required'].map(k=><option key={k} value={k}>{label(k)}</option>)}</select></label>{' '}
-      <label>Type <select aria-label={`Criterion ${index+1} type`} value={c.subject} onChange={e=>{
-        const subject=e.target.value as Criterion['subject'];update(index,{subject,use:'assessment',...(subject==='title'?{class:'preferred' as const}:{}),requirement:subject==='experience_years'?{kind:'minimum_years',minimum:0}:subject==='title'?{kind:'accepted_titles',values:['']}:subject==='skill'?{kind:'accepted_skills',primary:'',alternatives:[]}:{kind:'text',value:''},
-          evidenceKinds:['responsibility','leadership','availability'].includes(subject)?['recruiter_judgement']:subject==='work_eligibility'?['candidate_provided']:['profile_evidence']});
-      }}>{subjects.map(k=><option key={k} value={k}>{label(k)}</option>)}</select></label>
-      {c.requirement.kind==='accepted_skills' ? <div>
-        <label className="block">Skill name<Input aria-label={`Criterion ${index+1} requirement`} maxLength={120} value={c.requirement.primary}
-          onChange={e=>{if(c.requirement.kind==='accepted_skills')update(index,{requirement:{...c.requirement,primary:e.target.value}});}}/></label>
-        <label className="block">Also accepted (equivalent names only)
-          <Textarea aria-label={`Criterion ${index+1} accepted skills`} value={c.requirement.alternatives.join('\n')}
-            onChange={e=>{if(c.requirement.kind==='accepted_skills')update(index,{requirement:{...c.requirement,alternatives:e.target.value.split('\n')}});}}/>
-        </label>
-        <p>{1+skillAlternativesFromEditor(c.requirement.alternatives.join('\n')).length} of 20 names, including the skill name. Review suggestions before the same brief approval; each skill scores once.</p>
-        {(duplicateSkillNames({...c.requirement,alternatives:skillAlternativesFromEditor(c.requirement.alternatives.join('\n'))}) ||
-          overlappingSkillCriteria(payload.criteria).includes(c.id)) && <p role="alert">Duplicate skill name. Merge or edit names shared within or across skills.</p>}
-      </div> : c.requirement.kind==='accepted_titles' ? <label className="block">Accepted scoring titles (one per line, up to 20)
-        <Textarea aria-label={`Criterion ${index+1} accepted titles`} value={c.requirement.values.join('\n')} onChange={e=>update(index,{requirement:{kind:'accepted_titles',values:e.target.value.split('\n')}})}/>
-        <span>These titles earn points only after you approve this brief. They do not change the search title list.</span></label> :
-        c.requirement.kind==='minimum_years' || c.requirement.kind==='experience_range' ? <div>
-          <label>Minimum years<Input aria-label={`Criterion ${index+1} requirement`} type="number" min={0} max={80} step="any" value={Number.isFinite(c.requirement.minimum)?c.requirement.minimum:''}
-            onChange={e=>{const minimum=e.target.value===''?NaN:Number(e.target.value);update(index,{requirement:c.requirement.kind==='experience_range'?{...c.requirement,minimum}:{kind:'minimum_years',minimum}});}}/></label>
-          <label>Maximum years (optional)<Input aria-label={`Criterion ${index+1} maximum years`} type="number" min={0} max={80} step="any" value={c.requirement.kind==='experience_range'?c.requirement.maximum:''}
-            onChange={e=>update(index,{requirement:e.target.value===''?{kind:'minimum_years',minimum:'minimum' in c.requirement?c.requirement.minimum:0}:{kind:'experience_range',minimum:'minimum' in c.requirement?c.requirement.minimum:0,maximum:Number(e.target.value)}})}/></label>
-        </div> : <label className="block">Requirement<Input aria-label={`Criterion ${index+1} requirement`} value={c.requirement.value}
-          onChange={e=>update(index,{requirement:{kind:'text',value:e.target.value}})}/></label>}
-      <p>{c.evidenceKinds.includes('recruiter_judgement')?'Recruiter-judged; never automatically scored.':c.subject==='work_eligibility'?'Candidate-provided evidence only.':'Evidence required; missing information stays unknown.'}</p>
-      <Button type="button" variant="outline" onClick={()=>setCriteria(payload.criteria.filter((_,i)=>i!==index))}>Remove criterion {index+1}</Button>
-    </fieldset>)}
-    {workspace && <AlsoInJd workspace={workspace} payload={payload} canAdd={payload.criteria.length<12} disabled={busy} onAdd={c=>setCriteria([...payload.criteria,c])}/>}
-    <Button type="button" variant="outline" disabled={busy || payload.criteria.length>=12} onClick={()=>{setDirty(true);setPayload({...payload,criteria:[...payload.criteria,{id:crypto.randomUUID(),label:'',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'',alternatives:[]},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}}]});}}>Add criterion</Button>
-    <div className="flex flex-wrap gap-2"><Button type="button" disabled={busy || payload.criteria.length===0} onClick={()=>void invoke('save')}>Save brief</Button>
-      <Button type="button" disabled={busy || dirty || !brief.latest || brief.latest.payload.schemaVersion!==3} onClick={()=>void invoke('approve')}>Approve brief</Button>
-      <Button type="button" variant="outline" disabled={busy} onClick={()=>{setDirty(false);void query.refetch();}}>Reload saved brief</Button></div>
+    {brief.latest && brief.latest.payload.schemaVersion!==3 && <p role="status" className="text-sm">These criteria use an older format. Check the skill names, then save and approve.</p>}
+    {error && <p role="alert" className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
+    {notice && <p role="status" className="rounded-md border border-border bg-muted/40 p-3 text-sm">{notice}</p>}
+    {!error && !notice && brief.draft && ['failed','stale','unknown'].includes(brief.draft.state) && <p role="status" className="text-sm">{draftNotice(brief.draft.code)}</p>}
+
+    <div className="space-y-3">
+      <h3 className="text-base font-semibold">Job description</h3>
+      {!brief.source.initialized && <div className="space-y-2"><p className="text-sm text-muted-foreground">Choose which description to use, or paste it below.</p>
+        <div className="flex flex-wrap gap-2">{brief.source.choices.map(c=><Button key={c.kind} type="button" variant="outline" className="min-h-11" onClick={()=>{setSource(c.text);setChoice(c.kind);setDirty(true);}}>Use {SOURCE_LABEL[c.kind]??label(c.kind)}</Button>)}</div>
+      </div>}
+      <label className="block text-sm font-medium"><span className="sr-only">Job description</span><Textarea aria-label="Job description" value={source} onChange={e=>{setSource(e.target.value);setChoice('recruiter_edit');setDirty(true);}} rows={8}/></label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block text-sm font-medium">Why are you changing this?<select aria-label="Reason for change" className={field} value={reason} onChange={e=>setReason(e.target.value)}>{reasons.map(r=><option key={r} value={r}>{REASON_LABEL[r]??label(r)}</option>)}</select></label>
+        <label className="block text-sm font-medium">Who asked for it?<select aria-label="Requested by" className={field} value={requester} onChange={e=>setRequester(e.target.value)}><option value="recruiter">Me (recruiter)</option><option value="hiring_manager">Hiring manager</option></select></label>
+      </div>
+      <div className="flex flex-wrap gap-2"><Button type="button" className="min-h-11" disabled={busy || !source.trim()} onClick={()=>void invoke('initialize')}>Save job description</Button>
+        <Button type="button" variant="outline" className="min-h-11" disabled={busy || !brief.source.initialized || source!==brief.currentJD} onClick={()=>void invoke('draft')}>Draft criteria with AI</Button></div>
+    </div>
+
+    <div className="space-y-3">
+      <h3 className="text-base font-semibold">Requirements <span className="font-normal text-muted-foreground">· {payload.criteria.length} of 12</span></h3>
+      <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+        <li>Missing information earns no points. No points are deducted. Red flags are for your review; they never exclude anyone automatically.</li>
+        <li>People within your experience range are shown first. People within 2 years either side are shown separately, only if they have every required skill. Candidates more than 2 years outside the range, or without enough work-history dates to calculate experience, are not shown. Internships do not count toward years. You may see fewer than 100 people.</li>
+      </ul>
+      {payload.criteria.map((c,index)=><fieldset key={c.id} className="space-y-3 rounded-lg border border-border p-3 sm:p-4"><legend className="px-1 text-sm font-semibold">Requirement {index+1}</legend>
+        <label className="block text-sm font-medium">Name<Input aria-label={`Requirement ${index+1} label`} className="mt-1 min-h-11" value={c.label} maxLength={120} onChange={e=>update(index,{label:e.target.value})}/></label>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm font-medium">Importance<select aria-label={`Requirement ${index+1} class`} className={field} value={c.class} onChange={e=>update(index,{class:e.target.value as Criterion['class']})}>{['must_have','preferred','disqualifier','evidence_required'].map(k=><option key={k} value={k}>{CLASS_LABEL[k]}</option>)}</select></label>
+          <label className="block text-sm font-medium">What kind of requirement?<select aria-label={`Requirement ${index+1} type`} className={field} value={c.subject} onChange={e=>{
+            const subject=e.target.value as Criterion['subject'];update(index,{subject,use:'assessment',...(subject==='title'?{class:'preferred' as const}:{}),requirement:subject==='experience_years'?{kind:'minimum_years',minimum:0}:subject==='title'?{kind:'accepted_titles',values:['']}:subject==='skill'?{kind:'accepted_skills',primary:'',alternatives:[]}:{kind:'text',value:''},
+              evidenceKinds:['responsibility','leadership','availability'].includes(subject)?['recruiter_judgement']:subject==='work_eligibility'?['candidate_provided']:['profile_evidence']});
+          }}>{subjects.map(k=><option key={k} value={k}>{SUBJECT_LABEL[k]}</option>)}</select></label>
+        </div>
+        {c.requirement.kind==='accepted_skills' ? <div className="space-y-2">
+          <label className="block text-sm font-medium">Skill<Input aria-label={`Requirement ${index+1} requirement`} className="mt-1 min-h-11" maxLength={120} value={c.requirement.primary}
+            onChange={e=>{if(c.requirement.kind==='accepted_skills')update(index,{requirement:{...c.requirement,primary:e.target.value}});}}/></label>
+          <label className="block text-sm font-medium">Also accepted — any one counts (one per line)
+            <Textarea aria-label={`Requirement ${index+1} accepted skills`} className="mt-1" placeholder="e.g. Python (programming language)" value={c.requirement.alternatives.join('\n')}
+              onChange={e=>{if(c.requirement.kind==='accepted_skills')update(index,{requirement:{...c.requirement,alternatives:e.target.value.split('\n')}});}}/>
+          </label>
+          <p className="text-xs text-muted-foreground">{1+skillAlternativesFromEditor(c.requirement.alternatives.join('\n')).length} of 20 names. Each skill counts once, whichever name matches.</p>
+          {(duplicateSkillNames({...c.requirement,alternatives:skillAlternativesFromEditor(c.requirement.alternatives.join('\n'))}) ||
+            overlappingSkillCriteria(payload.criteria).includes(c.id)) && <p role="alert" className="text-sm text-red-700">This name is used twice. Remove it from one place.</p>}
+        </div> : c.requirement.kind==='accepted_titles' ? <label className="block text-sm font-medium">Job titles that count (one per line, up to 20)
+          <Textarea aria-label={`Requirement ${index+1} accepted titles`} className="mt-1" value={c.requirement.values.join('\n')} onChange={e=>update(index,{requirement:{kind:'accepted_titles',values:e.target.value.split('\n')}})}/>
+          <span className="mt-1 block text-xs font-normal text-muted-foreground">These titles add points once you approve. They don’t change which job titles we search for.</span></label> :
+          c.requirement.kind==='minimum_years' || c.requirement.kind==='experience_range' ? <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-medium">Minimum years<Input aria-label={`Requirement ${index+1} requirement`} className="mt-1 min-h-11" type="number" min={0} max={80} step="any" value={Number.isFinite(c.requirement.minimum)?c.requirement.minimum:''}
+              onChange={e=>{const minimum=e.target.value===''?NaN:Number(e.target.value);update(index,{requirement:c.requirement.kind==='experience_range'?{...c.requirement,minimum}:{kind:'minimum_years',minimum}});}}/></label>
+            <label className="block text-sm font-medium">Maximum years (optional)<Input aria-label={`Requirement ${index+1} maximum years`} className="mt-1 min-h-11" type="number" min={0} max={80} step="any" value={c.requirement.kind==='experience_range'?c.requirement.maximum:''}
+              onChange={e=>update(index,{requirement:e.target.value===''?{kind:'minimum_years',minimum:'minimum' in c.requirement?c.requirement.minimum:0}:{kind:'experience_range',minimum:'minimum' in c.requirement?c.requirement.minimum:0,maximum:Number(e.target.value)}})}/></label>
+          </div> : <label className="block text-sm font-medium">Requirement<Input aria-label={`Requirement ${index+1} requirement`} className="mt-1 min-h-11" value={c.requirement.value}
+            onChange={e=>update(index,{requirement:{kind:'text',value:e.target.value}})}/></label>}
+        {(c.evidenceKinds.includes('recruiter_judgement')||c.subject==='work_eligibility') && <p className="text-xs text-muted-foreground">{c.evidenceKinds.includes('recruiter_judgement')?'You judge this one; it is never scored automatically.':'Only what the candidate tells you counts.'}</p>}
+        <Button type="button" variant="outline" className="min-h-11" aria-label={`Remove requirement ${index+1}`} onClick={()=>setCriteria(payload.criteria.filter((_,i)=>i!==index))}>Remove</Button>
+      </fieldset>)}
+      {workspace && <AlsoInJd workspace={workspace} payload={payload} canAdd={payload.criteria.length<12} disabled={busy} onAdd={c=>setCriteria([...payload.criteria,c])}/>}
+      <Button type="button" variant="outline" className="min-h-11" disabled={busy || payload.criteria.length>=12} onClick={()=>{setDirty(true);setPayload({...payload,criteria:[...payload.criteria,{id:crypto.randomUUID(),label:'',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'',alternatives:[]},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}}]});}}>Add requirement</Button>
+    </div>
+
+    <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+      <Button type="button" className="min-h-11" disabled={busy || payload.criteria.length===0} onClick={()=>void invoke('save')}>Save changes</Button>
+      <Button type="button" className="min-h-11" disabled={busy || dirty || !brief.latest || brief.latest.payload.schemaVersion!==3} onClick={()=>void invoke('approve')}>Approve criteria</Button>
+      <Button type="button" variant="outline" className="min-h-11" disabled={busy} onClick={()=>{setDirty(false);void query.refetch();}}>Discard unsaved changes</Button>
+    </div>
   </section>;
 }

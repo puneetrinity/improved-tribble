@@ -29,85 +29,85 @@ describe('brief recruiter UI',()=>{
   });
   it('historical briefs need explicit save and reapproval without an automatic request',async()=>{
     mocks.query.mockReturnValue({data:{...brief,latest:{...brief.latest,payload:{...payload,schemaVersion:1,compilerVersion:1,taxonomyVersion:1,criteria:[{...criterion,requirement:{kind:'text',value:'Python'}}]}}},isPending:false,isError:false});
-    await render();expect(button('Approve brief').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
-    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload).toMatchObject({schemaVersion:3,compilerVersion:3,taxonomyVersion:3});
+    await render();expect(button('Approve criteria').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
+    await click('Save changes');expect(mocks.intent.mock.calls[0][4].payload).toMatchObject({schemaVersion:3,compilerVersion:3,taxonomyVersion:3});
     expect(mocks.intent).toHaveBeenCalledTimes(1);
   });
   it('shows editable scoring titles in the one approval flow, defaulting to preferred',async()=>{
-    await render();await change('Criterion 1 type','title');
-    await change('Criterion 1 accepted titles','Backend Engineer\n\nBackend Developer\n');
-    expect(button('Approve brief').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
-    expect(host.textContent).toContain('They do not change the search title list');
-    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload.criteria[0]).toMatchObject({
+    await render();await change('Requirement 1 type','title');
+    await change('Requirement 1 accepted titles','Backend Engineer\n\nBackend Developer\n');
+    expect(button('Approve criteria').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('which job titles we search for');
+    await click('Save changes');expect(mocks.intent.mock.calls[0][4].payload.criteria[0]).toMatchObject({
       subject:'title',class:'preferred',use:'assessment',requirement:{kind:'accepted_titles',values:['Backend Engineer','Backend Developer']}});
   });
   it('shows skill alternatives, drops blank editor lines only on save and requires reapproval',async()=>{
     await render();
-    await change('Criterion 1 requirement','AWS');
-    await change('Criterion 1 accepted skills','Amazon Web Services\n\nAmazon AWS\n');
-    expect(button('Approve brief').disabled).toBe(true);
+    await change('Requirement 1 requirement','AWS');
+    await change('Requirement 1 accepted skills','Amazon Web Services\n\nAmazon AWS\n');
+    expect(button('Approve criteria').disabled).toBe(true);
     expect(mocks.intent).not.toHaveBeenCalled();
-    await click('Save brief');
+    await click('Save changes');
     expect(mocks.intent.mock.calls[0][4].payload.criteria[0].requirement).toEqual({
       kind:'accepted_skills',primary:'AWS',alternatives:['Amazon Web Services','Amazon AWS']});
   });
   it('refuses duplicate skill names locally without a request',async()=>{
-    await render();await change('Criterion 1 accepted skills','python');
-    await click('Save brief');
+    await render();await change('Requirement 1 accepted skills','python');
+    await click('Save changes');
     expect(mocks.intent).not.toHaveBeenCalled();
     expect(host.textContent).toContain('Fix the skill names');
   });
   it('saves an explicit range and does not convert a cleared minimum into zero',async()=>{
-    await render();await change('Criterion 1 type','experience_years');
-    await change('Criterion 1 requirement','6');await change('Criterion 1 maximum years','10');
-    await click('Save brief');expect(mocks.intent.mock.calls[0][4].payload.criteria[0].requirement).toEqual({kind:'experience_range',minimum:6,maximum:10});
-    await change('Criterion 1 type','experience_years');await change('Criterion 1 maximum years','10');
-    await change('Criterion 1 requirement','');await click('Save brief');
+    await render();await change('Requirement 1 type','experience_years');
+    await change('Requirement 1 requirement','6');await change('Requirement 1 maximum years','10');
+    await click('Save changes');expect(mocks.intent.mock.calls[0][4].payload.criteria[0].requirement).toEqual({kind:'experience_range',minimum:6,maximum:10});
+    await change('Requirement 1 type','experience_years');await change('Requirement 1 maximum years','10');
+    await change('Requirement 1 requirement','');await click('Save changes');
     expect(Number.isNaN(mocks.intent.mock.calls[1][4].payload.criteria[0].requirement.minimum)).toBe(true);
     expect(host.textContent).toContain('Internships do not count');
   });
   it('approval sends only the saved version and never publishes or sources',async()=>{
-    await render();expect(mocks.intent).not.toHaveBeenCalled();await click('Approve brief');
+    await render();expect(mocks.intent).not.toHaveBeenCalled();await click('Approve criteria');
     expect(mocks.intent).toHaveBeenCalledExactlyOnceWith(3,9,'approve-brief','/api/jobs/9/brief/approve',{expectedRevision:2,versionId:id},'POST');
-    expect(host.textContent).toContain('This did not publish the job or start sourcing');
+    expect(host.textContent).toContain('This did not publish the job or start a search');
   });
   it('AI output stays an unsaved proposal with approval disabled',async()=>{
-    mocks.intent.mockResolvedValue({state:'succeeded',result:payload});await render();await click('Draft brief with AI');
-    expect(mocks.intent).toHaveBeenCalledTimes(1);expect(button('Approve brief').disabled).toBe(true);expect(host.textContent).toContain('AI proposal only');
-    await click('Save brief');expect(mocks.intent.mock.calls[1]?.[2]).toBe('save-brief');
+    mocks.intent.mockResolvedValue({state:'succeeded',result:payload});await render();await click('Draft criteria with AI');
+    expect(mocks.intent).toHaveBeenCalledTimes(1);expect(button('Approve criteria').disabled).toBe(true);expect(host.textContent).toContain('AI proposal only');
+    await click('Save changes');expect(mocks.intent.mock.calls[1]?.[2]).toBe('save-brief');
   });
   it('does not auto-select ambiguous legacy sources or call a model',async()=>{
     mocks.query.mockReturnValue({data:{...brief,currentJD:null,latest:null,source:{initialized:false,ambiguous:true,choices:[{kind:'original_prose',text:'First JD'},{kind:'description_prose',text:'Other JD'}]}},isPending:false,isError:false});
-    await render();expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');expect(button('Draft brief with AI').disabled).toBe(true);
-    await click('Use original prose');expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('First JD');expect(mocks.intent).not.toHaveBeenCalled();
+    await render();expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('');expect(button('Draft criteria with AI').disabled).toBe(true);
+    await click('Use the description you first entered');expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe('First JD');expect(mocks.intent).not.toHaveBeenCalled();
   });
   it('preserves edits on a refused save and does not approve them',async()=>{
-    await render();await click('Add criterion');await change('Criterion 2 label','Kafka');await change('Criterion 2 requirement','Kafka');
-    mocks.intent.mockRejectedValue(new Error('Conflict'));await click('Save brief');
-    expect(host.querySelectorAll('fieldset')).toHaveLength(2);expect(host.textContent).toContain('Your edits are kept');expect(button('Approve brief').disabled).toBe(true);
+    await render();await click('Add requirement');await change('Requirement 2 label','Kafka');await change('Requirement 2 requirement','Kafka');
+    mocks.intent.mockRejectedValue(new Error('Conflict'));await click('Save changes');
+    expect(host.querySelectorAll('fieldset')).toHaveLength(2);expect(host.textContent).toContain('Your edits are still here');expect(button('Approve criteria').disabled).toBe(true);
   });
   it('allows at most twelve criteria and keeps disqualifiers as flags',async()=>{
-    await render();for(let n=1;n<12;n++)await click('Add criterion');expect(button('Add criterion').disabled).toBe(true);
-    expect(host.querySelectorAll('fieldset')).toHaveLength(12);expect(host.textContent).toContain('Disqualifiers are review flags');
+    await render();for(let n=1;n<12;n++)await click('Add requirement');expect(button('Add requirement').disabled).toBe(true);
+    expect(host.querySelectorAll('fieldset')).toHaveLength(12);expect(host.textContent).toContain('Red flags are for your review');
   });
   it('keeps manual editing available after a failed AI attempt',async()=>{
-    mocks.intent.mockResolvedValue({state:'failed',code:'BRIEF_MODEL_INVALID'});await render();await click('Draft brief with AI');
-    expect(button('Add criterion').disabled).toBe(false);expect(host.textContent).toContain('You can edit manually');
+    mocks.intent.mockResolvedValue({state:'failed',code:'BRIEF_MODEL_INVALID'});await render();await click('Draft criteria with AI');
+    expect(button('Add requirement').disabled).toBe(false);expect(host.textContent).toContain('edit the requirements yourself');
   });
-  it.each([['BRIEF_MODEL_TRUNCATED','incomplete'],['BRIEF_MODEL_INVALID','validation'],['BRIEF_MODEL_TIMEOUT','timed out'],['BRIEF_DRAFT_STALE','JD changed'],['BRIEF_MODEL_FAILED','unavailable']])('explains %s immediately and on reload',async(code,text)=>{
+  it.each([['BRIEF_MODEL_TRUNCATED','incomplete'],['BRIEF_MODEL_INVALID','couldn’t use the AI draft'],['BRIEF_MODEL_TIMEOUT','took too long'],['BRIEF_DRAFT_STALE','job description changed'],['BRIEF_MODEL_FAILED','isn’t available']])('explains %s immediately and on reload',async(code,text)=>{
     mocks.query.mockReturnValue({data:{...brief,draft:{state:'failed',code}},isPending:false,isError:false,refetch:vi.fn()});
     await render();expect(host.textContent).toContain(text);expect(mocks.intent).not.toHaveBeenCalled();
-    mocks.intent.mockResolvedValue({state:'failed',code});await click('Draft brief with AI');
-    expect(host.textContent).toContain(text);expect(button('Add criterion').disabled).toBe(false);
+    mocks.intent.mockResolvedValue({state:'failed',code});await click('Draft criteria with AI');
+    expect(host.textContent).toContain(text);expect(button('Add requirement').disabled).toBe(false);
   });
   it('explains the draft limit without losing manual edits or calling save',async()=>{
-    await render();await change('Criterion 1 label','Edited label');
+    await render();await change('Requirement 1 label','Edited label');
     mocks.intent.mockRejectedValue(new Error('429: BRIEF_DRAFT_LIMIT private-marker'));
-    await click('Draft brief with AI');
-    expect(host.textContent).toContain('AI drafting limit reached');expect(host.textContent).not.toContain('private-marker');
-    expect((host.querySelector('[aria-label="Criterion 1 label"]') as HTMLInputElement).value).toBe('Edited label');
-    expect(button('Approve brief').disabled).toBe(true);expect(mocks.intent).toHaveBeenCalledTimes(1);
-    mocks.intent.mockResolvedValue({});await click('Save brief');expect(mocks.intent.mock.calls[1][2]).toBe('save-brief');
+    await click('Draft criteria with AI');
+    expect(host.textContent).toContain('AI drafting limit');expect(host.textContent).not.toContain('private-marker');
+    expect((host.querySelector('[aria-label="Requirement 1 label"]') as HTMLInputElement).value).toBe('Edited label');
+    expect(button('Approve criteria').disabled).toBe(true);expect(mocks.intent).toHaveBeenCalledTimes(1);
+    mocks.intent.mockResolvedValue({});await click('Save changes');expect(mocks.intent.mock.calls[1][2]).toBe('save-brief');
   });
   it('edit page: shows what the AI left out, add puts it in, save records it, approve has no extra step',async()=>{
     const go={...criterion,id:'20000000-0000-4000-8000-000000000002',label:'Go',class:'preferred',requirement:{kind:'accepted_skills',primary:'Go',alternatives:[]}};
@@ -117,10 +117,10 @@ describe('brief recruiter UI',()=>{
         {id:'i2',text:'Go',priority:'preferred',topic:'skill',quote:'Go',sourceHash:H,span:{start:0,end:2},proposedCriterion:go,reason:'capacity'}]};
     mocks.query.mockReturnValue({data:{...brief,reviewWorkspace:ws},isPending:false,isError:false,refetch:vi.fn()});
     await render();
-    expect(host.textContent).toContain('Also in the JD, not included · 1');
-    expect(button('Approve brief').disabled).toBe(false);
-    await act(async()=>{(host.querySelector('[aria-label="Add “Go” to the criteria"]') as HTMLButtonElement).click();});
-    await click('Save brief');
+    expect(host.textContent).toContain('Other requirements from the job description · 1');
+    expect(button('Approve criteria').disabled).toBe(false);
+    await act(async()=>{(host.querySelector('[aria-label="Add “Go” to the requirements"]') as HTMLButtonElement).click();});
+    await click('Save changes');
     const save=mocks.intent.mock.calls.find(c=>c[2]==='save-brief')![4];
     expect(save.reviewSelection).toEqual({extractionId:ws.extractionId,dispositions:[{itemId:'i1',state:'included',criterionIds:[id]},{itemId:'i2',state:'included',criterionIds:[go.id]}]});
   });

@@ -16,7 +16,7 @@ export type SourcingPreview={artifactId:string|null;id:string|null;state:string;
 
 export async function readSourcingCapability() {
   const response=await fetch('/api/client-config',{credentials:'include',cache:'no-store'});
-  if(!response.ok)throw Error('Sourcing settings are unavailable. Please retry.');
+  if(!response.ok)throw Error('We couldn’t load search settings. Please try again.');
   const value=await response.json();
   return {jobBriefEnabled:value.jobBriefEnabled===true,sourcingEnabled:value.sourcingEnabled===true};
 }
@@ -29,21 +29,21 @@ export async function readSourcing<T>(jobId:number,part:'admission'|'preview',si
 export function sourcingErrorMessage(code:unknown):string {
   switch(code) {
     case 'BRIEF_UPDATED_APPROVAL_REQUIRED':
-    case 'SOURCING_UPDATED_BRIEF_REQUIRED':return 'Review, save and approve the updated brief before sourcing.';
-    case 'SOURCING_DIGEST_UNAUTHORIZED':return 'Brief preparation is unavailable because the service credentials need attention. Contact your workspace administrator.';
-    case 'SOURCING_DIGEST_RATE_LIMITED':return 'Brief preparation was rate-limited. Retry preparation once when the service is available.';
+    case 'SOURCING_UPDATED_BRIEF_REQUIRED':return 'Review, save and approve the updated hiring criteria before searching.';
+    case 'SOURCING_DIGEST_UNAUTHORIZED':return 'We can’t prepare this search right now. Please contact your workspace administrator.';
+    case 'SOURCING_DIGEST_RATE_LIMITED':return 'We’re temporarily busy. Please try again shortly.';
     case 'SOURCING_ALLOWANCE_EXHAUSTED':return 'Neither the job poster nor you has a sourcing run available this month.';
     case 'SOURCING_ALREADY_ADMITTED':return 'This job already has its one sourcing run. Refresh to see its progress.';
     case 'SOURCING_PAYER_CHANGED':
     case 'SOURCING_WINDOW_CHANGED':
     case 'SOURCING_QUERY_STALE':
     case 'SOURCING_REVISION_CONFLICT':
-    case 'SOURCING_QUOTE_EXPIRED':return 'The allowance or brief changed. Review a fresh confirmation before starting.';
+    case 'SOURCING_QUOTE_EXPIRED':return 'Your allowance or hiring criteria changed. Please check and confirm again before starting.';
     case 'SOURCING_DIGEST_REQUIRED':
     case 'SOURCING_PREPARING':
-    case 'SOURCING_ARTIFACT_REQUIRED':return 'The approved brief is still being prepared. Please check again shortly.';
+    case 'SOURCING_ARTIFACT_REQUIRED':return 'Your search is still being prepared. Please check again shortly.';
     case 'SOURCING_ENTITLEMENT_REQUIRED':return 'Sourcing allowance is not configured. Contact your workspace administrator.';
-    default:return 'Sourcing is unavailable. Check the approved brief, published job and seat allowance; no automatic retry will spend a run.';
+    default:return 'Searching isn’t available right now. Check that the hiring criteria are approved, the job is published and you have searches left. We couldn’t confirm the search status. Please check again.';
   }
 }
 export function admissionCommand(quote:AdmissionQuote) {

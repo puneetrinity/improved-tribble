@@ -20,13 +20,13 @@ test.describe('governed sourcing built browser, real local routes',()=>{
     const mutations:string[]=[];
     page.on('request',request=>{if(request.method()!=='GET'&&/find-candidates|sourcing\/preview/.test(request.url()))mutations.push(request.url());});
     await page.goto(`/jobs/${fixture.job}/sourcing`);
-    await expect(page.getByText('Your experience and skills requirements may reduce the final list.',{exact:false}).first()).toBeVisible();
+    await expect(page.getByText('Experience and skill requirements narrow the final results.',{exact:false}).first()).toBeVisible();
     if(fixture.phase==='before'){
-      await page.getByRole('link',{name:'Edit brief',exact:true}).click();
-      const panel=page.getByRole('region',{name:'Job brief'});
+      await page.getByRole('link',{name:'Edit criteria',exact:true}).click();
+      const panel=page.getByRole('region',{name:'Hiring criteria'});
       await expect(panel).toBeVisible();
-      await expect(panel.getByLabel('Criterion 2 accepted titles')).toHaveValue('Backend Engineer\nBackend Developer');
-      await expect(panel.getByLabel('Criterion 3 maximum years')).toHaveValue('10');
+      await expect(panel.getByLabel('Requirement 2 accepted titles')).toHaveValue('Backend Engineer\nBackend Developer');
+      await expect(panel.getByLabel('Requirement 3 maximum years')).toHaveValue('10');
       expect(mutations).toEqual([]);
       await page.goto(`/jobs/${fixture.job}/sourcing`);
     }
@@ -34,14 +34,14 @@ test.describe('governed sourcing built browser, real local routes',()=>{
       const start=page.getByRole('button',{name:'Find Candidates',exact:true}).first();
       await expect(start).toBeEnabled({timeout:20000});
       await start.click();
-      const dialog=page.getByRole('dialog',{name:'Start this job’s sourcing run?'});
+      const dialog=page.getByRole('dialog',{name:'Start the search for this job?'});
       await expect(dialog).toBeVisible();
-      await expect(dialog).toContainText('remaining runs from your allowance');
-      await expect(dialog).toContainText('zero results does not return the run');
-      await expect(dialog.getByRole('button',{name:'Confirm Find candidates',exact:true})).toBeEnabled();
+      await expect(dialog).toContainText('remaining searches from your allowance');
+      await expect(dialog).toContainText('isn’t refunded if the search finds nobody');
+      await expect(dialog.getByRole('button',{name:'Start search',exact:true})).toBeEnabled();
       if(fixture.phase==='confirm'){
         const response=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith(`/api/jobs/${fixture.job}/find-candidates`));
-        await dialog.getByRole('button',{name:'Confirm Find candidates',exact:true}).click();
+        await dialog.getByRole('button',{name:'Start search',exact:true}).click();
         const admitted=await response;
         expect([200,202],await admitted.text()).toContain(admitted.status());
         // Synthetic disposable command only, used to prove exact-intent replay
@@ -50,7 +50,7 @@ test.describe('governed sourcing built browser, real local routes',()=>{
       }else await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
       await expect(dialog).toBeHidden();
     }else{
-      await expect(page.getByRole('button',{name:'Run already used',exact:true})).toBeDisabled({timeout:20000});
+      await expect(page.getByRole('button',{name:'Search already used',exact:true})).toBeDisabled({timeout:20000});
       if(fixture.nonempty){
         const results=await (await page.request.get(`/api/jobs/${fixture.job}/sourced-candidates`)).json();
         expect(results.rankingProtocol).toBe(2);expect(results.candidates).toHaveLength(2);
@@ -58,7 +58,7 @@ test.describe('governed sourcing built browser, real local routes',()=>{
         expect(results.candidates.map((c:any)=>c.ranking.N)).toEqual([7,4]);
         expect(results.candidates.every((c:any)=>c.ranking.D===7&&c.fitScore===null)).toBe(true);
         await expect(page.getByText('Synthetic Backend Fixture',{exact:true}).first()).toBeVisible();
-        await expect(page.getByText('Met 7 of 7 points',{exact:true}).first()).toBeVisible();
+        await expect(page.getByText('Score: 7 of 7',{exact:true}).first()).toBeVisible();
         await expect(page.getByText('Synthetic Range Fixture 2',{exact:true})).toHaveCount(0);
         await expect(page.getByText('Synthetic Range Fixture 3',{exact:true})).toHaveCount(0);
         await page.getByRole('button',{name:'Pass',exact:true}).first().click();

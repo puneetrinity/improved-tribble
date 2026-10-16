@@ -237,15 +237,18 @@ describe("SourcingProgressModal", () => {
         open
         progress={{ ...INITIAL_PROGRESS, phase: "discovery", percent: 15, message: HOOK_MESSAGE_FETCHING, devLogs: HOOK_LOGS }}
         onClose={() => {}}
+        showDevConsole
       />,
     );
     const modal = q(body, "[data-sourcing-progress-modal]")!;
-    act(() => buttonNamed(modal, /dev console/i)!.click());
+    act(() => buttonNamed(modal, /event log/i)!.click());
     expect(qa(modal, "[aria-expanded]").some((b) => b.getAttribute("aria-expanded") === "true")).toBe(true);
     const text = modal.textContent ?? "";
     expect(text).toContain("3 events");
     expect(text).toContain("Fetching up to 300 candidates");
-    expect(text).toContain("Searching the market (300 candidates, relaxed query)");
+    // The raw hook message is a log line: recruiters get the plain stage text instead.
+    expect(text).not.toContain("relaxed query)...");
+    expect(text).toContain("Looking across the market and the candidate profiles you already have.");
     expect(text).not.toMatch(VENDOR_WORDS);
     expect(neutralizeProviderText(HOOK_MESSAGE_PHASE_STARTED)).not.toMatch(VENDOR_WORDS);
     // an error that names the provider is neutralised too
@@ -283,6 +286,23 @@ describe("SourcingProgressModal", () => {
       root!.render(<SourcingProgressModal open progress={running} onClose={() => {}} />);
     });
     expect(clock()).toBe("0:00");
+  });
+
+  it("shows recruiters no event log and no raw pipeline lines, and lets stage labels wrap", () => {
+    const body = mount(
+      <SourcingProgressModal
+        open
+        progress={{ ...INITIAL_PROGRESS, phase: "discovery", percent: 5, message: "🚀 [PIPELINE] Sourcing job queued — waiting for worker", devLogs: HOOK_LOGS }}
+        onClose={() => {}}
+      />,
+    );
+    const modal = q(body, "[data-sourcing-progress-modal]")!;
+    expect(buttonNamed(modal, /event log|dev console/i)).toBeUndefined();
+    const text = modal.textContent ?? "";
+    expect(text).not.toContain("[PIPELINE]");
+    expect(text).not.toContain("waiting for worker");
+    expect(text).toContain("This usually takes a couple of minutes.");
+    for (const li of qa(modal, "li[data-stage]")) expect(li.innerHTML).not.toContain("truncate");
   });
 
   it("shows a truthful error state", () => {

@@ -239,7 +239,7 @@ export function CandidateCard({
             <span className="font-semibold text-lg leading-tight truncate shrink min-w-[100px] max-w-full">
               {name}
             </span>
-            {candidate.ranking?<Badge variant="outline">Met {candidate.ranking.N} of {candidate.ranking.D} points</Badge>:<FitBadge
+            {candidate.ranking?<Badge variant="outline">Score: {candidate.ranking.N} of {candidate.ranking.D}</Badge>:<FitBadge
               score={candidate.fitScore}
               matchStrength={candidate.matchStrength}
             />}
@@ -254,7 +254,7 @@ export function CandidateCard({
             )}
           </div>
           {candidate.ranking?.assessments.some(a=>a.state==='not_met')&&
-            <p className="text-sm font-medium">Known requirement not met — review the criterion evidence.</p>}
+            <p className="text-sm font-medium">Doesn’t meet at least one requirement — open the profile to see which.</p>}
 
           {/* Row 2: current role @ company */}
           {(currentTitle || company) && (
@@ -459,7 +459,7 @@ export function CandidateCard({
 
         {/* ── Shortlist button ── */}
         {governed?<div className="flex shrink-0 flex-col gap-2" onClick={e=>e.stopPropagation()}>
-          <Badge variant="outline">{candidate.state==='passed'?'Passed':isShortlisted?'Shortlisted':isHidden?'Legacy hidden':candidate.state==='converted'?'Applied':'Not decided'}</Badge>
+          <Badge variant="outline">{candidate.state==='passed'?'Passed':isShortlisted?'Shortlisted':isHidden?'Previously hidden':candidate.state==='converted'?'Applied':'Not decided'}</Badge>
           <Button size="sm" variant="outline" disabled={isUpdating||candidate.state==='converted'} onClick={onShortlist}>{isShortlisted?'Clear shortlist':'Shortlist'}</Button>
           <Button size="sm" variant="outline" disabled={isUpdating||candidate.state==='converted'} onClick={onPass}>Pass</Button>
           {candidate.state==='passed'&&<Button size="sm" variant="ghost" disabled={isUpdating} onClick={onClearDecision}>Clear decision</Button>}

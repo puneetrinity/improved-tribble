@@ -28,6 +28,7 @@ import {
   type SourcedCandidateForUI,
 } from "@/hooks/use-sourcing";
 import { SourcingProgressModal } from "@/components/sourcing/SourcingProgressModal";
+import { poolCardCopy } from "@/lib/sourcing-pool-copy";
 import { CandidateCard } from "@/components/sourcing/CandidateCard";
 import { CandidateDrawer } from "@/components/sourcing/CandidateDrawer";
 import {
@@ -201,21 +202,21 @@ export default function JobSourcingPage() {
   const quoteMutation=useMutation({mutationFn:()=>readSourcing<AdmissionQuote>(jobId!,'admission'),
     onSuccess:q=>{setGovernedMessage('');setAdmissionQuote(q);},onError:e=>setGovernedMessage(e.message)});
   const admission=useMutation({mutationFn:(q:AdmissionQuote)=>startGovernedSourcing(user!.id,jobId!,q),
-    onSuccess:()=>{setAdmissionQuote(null);setGovernedMessage('Sourcing admitted. This job cannot start another run.');openModal();invalidateSourcing();},
+    onSuccess:()=>{setAdmissionQuote(null);setGovernedMessage('Search started. Each job gets one search, so you can’t start another for this job.');openModal();invalidateSourcing();},
     onError:error=>{
       if(isApiError(error)&&['SOURCING_PAYER_CHANGED','SOURCING_WINDOW_CHANGED','SOURCING_QUERY_STALE','SOURCING_REVISION_CONFLICT','SOURCING_QUOTE_INVALID','SOURCING_QUOTE_EXPIRED'].includes(error.code??'')){
-        setAdmissionQuote(null);setGovernedMessage('The allowance or brief changed. Click Find candidates to review and confirm a fresh quote.');
+        setAdmissionQuote(null);setGovernedMessage('Your allowance or hiring criteria changed. Click Find candidates to check and confirm again.');
       }else if(isApiError(error)&&['SOURCING_ALREADY_ADMITTED','SOURCING_ALLOWANCE_EXHAUSTED','SOURCING_ENTITLEMENT_REQUIRED','SOURCING_DISABLED','SOURCING_TENANT_REQUIRED','SOURCING_INVALID_COMMAND'].includes(error.code??'')){
-        setAdmissionQuote(null);setGovernedMessage('Sourcing was refused: '+error.code+'. No new run was admitted.');
-      }else setGovernedMessage('The outcome is not yet known. Retry this same confirmation to reconcile; do not start another run.');
+        setAdmissionQuote(null);setGovernedMessage('We couldn’t start this search. (Reason: '+error.code+')');
+      }else setGovernedMessage('We couldn’t confirm the search status. Click Start search again to check.');
       invalidateSourcing();
     }});
   const preparation=useMutation({mutationFn:(payload:{action:'refresh';artifactId:string}|{action:'retry_preparation';briefVersionId:string})=>changePreparation(user!.id,jobId!,payload),
-    onSuccess:invalidateSourcing,onError:()=>setGovernedMessage('Preparation request refused. Refresh the status before retrying.')});
+    onSuccess:invalidateSourcing,onError:()=>setGovernedMessage('We couldn’t update the search. Refresh the page and try again.')});
   const decision=useMutation({mutationFn:({candidate,action,reasonCode}:{candidate:SourcedCandidateForUI;action:'shortlist'|'pass'|'clear';reasonCode?:string})=>{
-    if(!Number.isSafeInteger(candidate.decisionRevision))throw Error('Refresh this candidate before recording a decision.');
+    if(!Number.isSafeInteger(candidate.decisionRevision))throw Error('This candidate has changed. Refresh the page before deciding.');
     return recordSourcingDecision(user!.id,jobId!,candidate.id,candidate.decisionRevision!,action,reasonCode);
-  },onSuccess:invalidateSourcing,onError:()=>{setGovernedMessage('Decision not confirmed. Refresh before trying again; no replacement reason was inferred.');invalidateSourcing();}});
+  },onSuccess:invalidateSourcing,onError:()=>{setGovernedMessage('We couldn’t confirm your decision. Refresh the page and try again.');invalidateSourcing();}});
   const [briefSourcingNotice,setBriefSourcingNotice]=useState(false);
   const { update: updateState, isPending: updatePending } = useUpdateCandidateState(jobId);
   const { draftOutreach, isPending: draftingOutreach } = useDraftOutreach(jobId);
@@ -226,7 +227,7 @@ export default function JobSourcingPage() {
 
   // Open the progress modal first, then trigger sourcing
   const findCandidates = (opts: Record<string, unknown>) => {
-    if(!briefCapability){setGovernedMessage('Sourcing settings are unavailable. Please retry.');return;}
+    if(!briefCapability){setGovernedMessage('We couldn’t load search settings. Please try again.');return;}
     if(governed){quoteMutation.mutate();return;}
     if(briefCapability?.jobBriefEnabled===true) {setBriefSourcingNotice(true);return;}
     if (!opts.refresh) {
@@ -545,30 +546,50 @@ export default function JobSourcingPage() {
         const rc = status.rcStatusUnavailable ? undefined : status.rcProgress;
         const { heading, message } = rcProgressPresentation(rc, status.rcStatusUnavailable);
         return <div role="status" data-rc-status="" className="container mx-auto px-4 py-3">
-          {heading}. {rc && rc.total > 0 ? `${rc.processed} of ${rc.total} profiles processed. ` : ''}{message}
+          {heading}. {rc && rc.total > 0 ? `${rc.processed} of ${rc.total} profiles checked. ` : ''}{message}
         </div>;
       })()}
-      {briefSourcingNotice && <div role="status" className="container mx-auto px-4 py-3">Sourcing is not enabled for approved briefs yet. Your brief approval does not start a search.</div>}
+      {briefSourcingNotice && <div role="status" className="container mx-auto px-4 py-3">Searching isn’t turned on for this job yet. Approving the hiring criteria doesn’t start a search.</div>}
       {governedMessage&&<div role="status" className="container mx-auto px-4 py-3">{governedMessage}</div>}
-      {capability.isError&&<div role="alert">Sourcing settings unavailable. <Button onClick={()=>void capability.refetch()}>Retry settings</Button></div>}
-      {governed&&<div className="container mx-auto px-4 py-3" aria-live="polite">
-        <p>{preview.data?.state==='complete'?`${preview.data.countRelation==='gte'?'At least':'Approximately'} ${preview.data.count?.toLocaleString()} profiles match the search filters${preview.data.stale?' (stale)':''}`:'Pool size unavailable — this does not block sourcing.'}</p>
-        <p>Your experience and skills requirements may reduce the final list.</p>
-        {brief.data && <Button variant="outline" asChild><a href={`/jobs/${jobId}/edit#job-brief`}>Edit brief</a></Button>}
-        {preview.data?.observedAt&&<p>Checked {new Date(preview.data.observedAt).toLocaleString()}</p>}
-        {preview.data?.artifactId&&<Button variant="outline" disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'refresh',artifactId:preview.data!.artifactId!})}>Refresh pool size</Button>}
-        {preview.data?.allowanceResetAt&&<p>Monthly allowance resets {new Date(preview.data.allowanceResetAt).toLocaleString()}.</p>}
-        {preview.data?.admissionState==='cancelled_no_dispatch'&&<p>The previous attempt was cancelled before purchase and its allowance returned. You can confirm a new attempt.</p>}
-        {preview.data?.admissionState==='needs_attention'&&<p>This run needs operator review. Its reserved allowance has not been returned; do not start another purchase.</p>}
-        {!preview.data?.artifactId&&<p>{preview.isError?'Preparation status unavailable. Refresh to check; no work was started by this page.':
-          preview.data?.preparationCode==='QUERY_MAPPING_UNSUPPORTED'?`Edit unsupported search criteria: ${(preview.data.criterionIds??[]).join(', ')}.`:
-          preview.data?.preparationCode==='SOURCING_DIGEST_UNAUTHORIZED'?'Brief preparation needs service credential repair. Contact your administrator.':
-          preview.data?.preparationCode==='SOURCING_DIGEST_RATE_LIMITED'?'Brief preparation was rate-limited. Retry once when the service is available.':
-          preview.data?.preparation==='failed'?'Brief preparation failed.':preview.data?.preparation==='unknown'?'Preparation outcome unknown; administrator review required.':
-          preview.data?.preparation==='reserved'||preview.data?.preparation==='started'?'Preparing the approved brief. Find candidates becomes available when ready.':'No prepared approved brief is available.'}</p>}
-        {preview.data?.preparation==='failed'&&preview.data.preparationCode!=='QUERY_MAPPING_UNSUPPORTED'&&brief.data?.approvedVersionId&&<Button disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'retry_preparation',briefVersionId:brief.data!.approvedVersionId!})}>Retry preparation once</Button>}
-        {preview.isSuccess&&!preview.data?.preparation&&!preview.data?.artifactId&&brief.data?.approvedVersionId&&<Button disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'retry_preparation',briefVersionId:brief.data!.approvedVersionId!})}>Prepare approved brief</Button>}
-      </div>}
+      {capability.isError&&<div role="alert">We couldn’t load search settings. <Button onClick={()=>void capability.refetch()}>Try again</Button></div>}
+      {governed&&(()=>{
+        const p=preview.data;
+        const copy=poolCardCopy(p);const counted=copy.counted;
+        const labelFor=(id:string)=>brief.data?.latest?.payload.criteria.find(c=>c.id===id)?.label??null;
+        const unsupported=(p?.criterionIds??[]).map(labelFor).filter((v):v is string=>!!v);
+        const prep=!p?.artifactId?(preview.isError?"We couldn't confirm the search status. Please check again.":
+          p?.preparationCode==='QUERY_MAPPING_UNSUPPORTED'?`Some requirements can't be used to search yet${unsupported.length?`: ${unsupported.join(', ')}`:''}. Edit them to continue.`:
+          p?.preparationCode==='SOURCING_DIGEST_UNAUTHORIZED'?"We couldn't prepare this search. Please contact support.":
+          p?.preparationCode==='SOURCING_DIGEST_RATE_LIMITED'?'Preparing searches is busy right now. Try again in a few minutes.':
+          p?.preparation==='failed'?"We couldn't prepare this search.":p?.preparation==='unknown'?"This search's preparation needs a check by our team before you continue.":
+          p?.preparation==='reserved'||p?.preparation==='started'?'Getting your search ready. Find candidates turns on as soon as it is ready.':'Approve the hiring criteria to get this search ready.'):null;
+        return <section aria-labelledby="pool-card-title" aria-live="polite" data-pool-card="" className="container mx-auto max-w-6xl px-4 pt-4 sm:px-6">
+          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h2 id="pool-card-title" className="text-sm font-medium text-muted-foreground">Talent pool for this role</h2>
+                <p className="mt-1 text-lg font-semibold text-foreground">{copy.headline}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{copy.note}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {brief.data&&<Button variant="outline" className="min-h-11" asChild><a href={`/jobs/${jobId}/edit#job-brief`}>Edit criteria</a></Button>}
+                {p?.artifactId&&<Button variant="outline" className="min-h-11" disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'refresh',artifactId:p!.artifactId!})}>Refresh estimate</Button>}
+              </div>
+            </div>
+            {((counted&&p?.observedAt)||p?.allowanceResetAt)&&<p className="mt-3 text-xs text-muted-foreground">
+              {counted&&p?.observedAt&&<>Counted {new Date(p.observedAt).toLocaleString()}</>}
+              {counted&&p?.observedAt&&p?.allowanceResetAt&&' · '}
+              {p?.allowanceResetAt&&<>Search allowance resets {new Date(p.allowanceResetAt).toLocaleDateString()}</>}
+            </p>}
+            {p?.admissionState==='cancelled_no_dispatch'&&<p className="mt-3 text-sm text-foreground">Your last search was cancelled before it started, and the search was returned to your allowance. You can start a new one.</p>}
+            {p?.admissionState==='needs_attention'&&<p role="alert" className="mt-3 text-sm text-amber-800">Your last search needs a check by our team, and it hasn't been returned to your allowance yet. Please don't start another search.</p>}
+            {prep&&<p className="mt-3 text-sm text-foreground">{prep}</p>}
+            {(p?.preparation==='failed'&&p.preparationCode!=='QUERY_MAPPING_UNSUPPORTED'&&brief.data?.approvedVersionId||preview.isSuccess&&!p?.preparation&&!p?.artifactId&&brief.data?.approvedVersionId)&&
+              <Button className="mt-3 min-h-11" disabled={preparation.isPending} onClick={()=>preparation.mutate({action:'retry_preparation',briefVersionId:brief.data!.approvedVersionId!})}>
+                {p?.preparation==='failed'?'Try again':'Get search ready'}</Button>}
+          </div>
+        </section>;
+      })()}
       <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
         {/* Single job navigation, same placement as every other job page */}
         <JobSubNav jobId={jobId ?? 0} className="mb-4" />
@@ -607,10 +628,10 @@ export default function JobSourcingPage() {
             >
               {findPending || isRunning ? (
                 <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
-              ) : (
+              ) : governed&&governedRunBlocked&&hasRun ? null : (
                 <Search className="h-4 w-4 mr-1.5" />
               )}
-              {isRunning ? "Running..." : governed ? (governedRunBlocked&&hasRun?"Run already used":"Find Candidates") : hasRun ? "Find Candidates Again" : "Find Candidates"}
+              {isRunning ? "Running..." : governed ? (governedRunBlocked&&hasRun?"Search already used":"Find Candidates") : hasRun ? "Find Candidates Again" : "Find Candidates"}
             </Button>
           </div>
         </div>
@@ -739,7 +760,7 @@ export default function JobSourcingPage() {
           <div className="rounded-lg border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30 p-4 mb-4 flex items-center gap-3">
             <AlertCircle className="h-5 w-5 text-amber-600 shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Sourcing run expired</p>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-200">This search took too long</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 The search timed out. This can happen if results take longer than expected.
               </p>
@@ -768,7 +789,7 @@ export default function JobSourcingPage() {
 
         {isCompleted && counts.total === 0 && !candidatesLoading && (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-sm text-muted-foreground mb-4">{rubricRanked?"No candidates could be shown under the approved brief and available evidence. The completed sourcing run is still used.":"No matching candidates found for this role."}</p>
+            <p className="text-sm text-muted-foreground mb-4">{rubricRanked?"No candidates could be ranked against your approved requirements. This search has been used.":"No matching candidates found for this role."}</p>
             {!governed&&<Button variant="outline" size="sm" onClick={() => findCandidates({})} disabled={findPending}>
               Retry
             </Button>}
@@ -790,13 +811,13 @@ export default function JobSourcingPage() {
                 <>
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground">{rubricRanked?"Within approved range / unrestricted":"Top Matches"}</p>
+                      <p className="text-xs text-muted-foreground">{rubricRanked?"Within your experience range":"Top Matches"}</p>
                       <p className="text-base font-semibold">{bestMatches.length}</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
-                      <p className="text-xs text-muted-foreground">{rubricRanked?"Wider experience group":"Wider Search"}</p>
+                      <p className="text-xs text-muted-foreground">{rubricRanked?"Up to 2 years outside your range":"Wider Search"}</p>
                       <p className="text-base font-semibold">{broaderPool.length}</p>
                     </CardContent>
                   </Card>
@@ -804,7 +825,7 @@ export default function JobSourcingPage() {
               )}
             </div>
 
-            {rubricRanked&&allCandidates.length<100&&<p className="text-sm text-muted-foreground mb-4">{allCandidates.length} candidates are available under the approved brief and privacy rules. We do not pad the list or start another purchase to reach 100.</p>}
+            {rubricRanked&&allCandidates.length<100&&<p className="text-sm text-muted-foreground mb-4">{allCandidates.length} candidates ranked against your approved requirements and privacy rules. We don’t add weaker matches or run another paid search to reach 100.</p>}
             {!rubricRanked&&(qualityDebug || kpis) && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 p-3 mb-4">
                 <p className="text-xs font-medium text-slate-800 dark:text-slate-200">
@@ -893,7 +914,7 @@ export default function JobSourcingPage() {
                 <section>
                   <div className="flex items-center justify-between mb-2">
                     <h2 className="text-sm font-medium text-muted-foreground">
-                      {rubricRanked?"Wider experience range — all required skills evidenced":requestedLocation ? `Additional Candidates near ${requestedLocation}` : "Wider Search Results"}
+                      {rubricRanked?"Up to 2 years outside your range — has every required skill":requestedLocation ? `Additional Candidates near ${requestedLocation}` : "Wider Search Results"}
                     </h2>
                     <Badge variant="secondary">{currentBroaderPool.length}</Badge>
                   </div>
@@ -905,7 +926,7 @@ export default function JobSourcingPage() {
                     <section>
                       <div className="flex items-center justify-between mb-2">
                         <h2 className="text-sm font-medium text-muted-foreground">
-                          {rubricRanked?(allCandidates.some(c=>c.ranking?.eligibility==='in_range')?"Within approved range":"Candidates ranked against approved brief"):grouped.tierModel === "fallback"
+                          {rubricRanked?(allCandidates.some(c=>c.ranking?.eligibility==='in_range')?"Within your experience range":"Ranked against your hiring criteria"):grouped.tierModel === "fallback"
                             ? "Candidates"
                             : requestedLocation ? `Top Matches in ${requestedLocation}` : "Top Matches"}
                         </h2>
@@ -923,7 +944,7 @@ export default function JobSourcingPage() {
                         onClick={() => setShowBroader((v) => !v)}
                       >
                         {showBroader ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        {rubricRanked?"Wider experience range — all required skills evidenced":"Wider Search Results"} ({broaderPool.length})
+                        {rubricRanked?"Up to 2 years outside your range — has every required skill":"Wider Search Results"} ({broaderPool.length})
                       </button>
                       {showBroader && renderList(currentBroaderPool)}
                     </section>
@@ -983,10 +1004,10 @@ export default function JobSourcingPage() {
         isUpdating={updatePending||decision.isPending}
       />
       <Dialog open={admissionQuote!==null} onOpenChange={open=>{if(!open&&!admission.isPending)setAdmissionQuote(null);}}>
-        <DialogContent><DialogHeader><DialogTitle>Start this job’s sourcing run?</DialogTitle>
-          <DialogDescription>Uses 1 of {admissionQuote?.remaining} remaining runs from {admissionQuote?.payerUserId===user?.id?'your allowance':`${admissionQuote?.payerDisplayName}’s allowance`}. One run per job. Once the paid search may have started, a timeout or zero results does not return the run.</DialogDescription>
+        <DialogContent><DialogHeader><DialogTitle>Start the search for this job?</DialogTitle>
+          <DialogDescription>Uses 1 of {admissionQuote?.remaining} remaining searches from {admissionQuote?.payerUserId===user?.id?'your allowance':`${admissionQuote?.payerDisplayName}’s allowance`}. Each job gets one search. It isn’t refunded if the search finds nobody or takes too long.</DialogDescription>
         </DialogHeader><DialogFooter><Button variant="outline" disabled={admission.isPending} onClick={()=>setAdmissionQuote(null)}>Cancel</Button>
-          <Button disabled={admission.isPending} onClick={()=>admissionQuote&&admission.mutate(admissionQuote)}>{admission.isPending?'Confirming…':'Confirm Find candidates'}</Button>
+          <Button disabled={admission.isPending} onClick={()=>admissionQuote&&admission.mutate(admissionQuote)}>{admission.isPending?'Starting…':'Start search'}</Button>
         </DialogFooter></DialogContent>
       </Dialog>
 
@@ -1006,6 +1027,7 @@ export default function JobSourcingPage() {
         open={modalOpen}
         progress={progress}
         onClose={closeModal}
+        showDevConsole={user?.role === 'super_admin'}
         onRunAgain={() => {
           closeModal();
           findCandidates({});

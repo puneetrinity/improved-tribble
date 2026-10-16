@@ -131,7 +131,7 @@ export default function JobEditPage() {
   const updateJobMutation = useMutation({
     mutationFn: async (data: Partial<Job>) => {
       if(briefEnabled) {
-        if(!brief.data || user.role!=='recruiter') throw new Error('A seated recruiter on this job must edit the brief.');
+        if(!brief.data || user.role!=='recruiter') throw new Error('Only a recruiter assigned to this job can edit its hiring criteria.');
         const {description,...patch}=data;
         return jobIntentRequest(user.id,jobId!,'edit-job',`/api/jobs/${jobId}`,{...patch,currentJD:description,
           sourceChoice:'recruiter_edit',requesterKind:'recruiter',reasonCode:editReason,expectedRevision:Number(brief.data.revision)});
@@ -256,10 +256,10 @@ export default function JobEditPage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {briefEnabled && <label className="block">Why are the requirements changing?
-                  <select aria-label="Job edit reason" value={editReason} onChange={e=>setEditReason(e.target.value)}>
-                    <option value="role_scope_changed">Role scope changed</option><option value="clarification_typo">Clarification / typo</option>
-                    <option value="hm_client_feedback">Hiring manager / client feedback</option><option value="other">Other</option>
+                {briefEnabled && <label className="block text-sm font-medium">Why are you changing this job?
+                  <select aria-label="Job edit reason" className="mt-1 block min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-sm" value={editReason} onChange={e=>setEditReason(e.target.value)}>
+                    <option value="role_scope_changed">The role changed</option><option value="clarification_typo">Fixing a typo or wording</option>
+                    <option value="hm_client_feedback">Hiring manager or client feedback</option><option value="other">Other</option>
                   </select>
                 </label>}
                 <div className="space-y-2">
@@ -606,7 +606,7 @@ export default function JobEditPage() {
           </Card>
 
           {briefEnabled && user.role==='recruiter' && <JobBriefPanel jobId={jobId!} actorId={user.id}/>}
-          {briefEnabled && user.role!=='recruiter' && <p>A seated recruiter assigned to this job must edit and approve its brief. Admin moderation remains separate.</p>}
+          {briefEnabled && user.role!=='recruiter' && <p className="text-sm text-muted-foreground">Only a recruiter assigned to this job can edit and approve its hiring criteria.</p>}
           {/* Co-Recruiter Management */}
           <CoRecruiterManagement jobId={jobId!} className="shadow-sm" />
         </div>

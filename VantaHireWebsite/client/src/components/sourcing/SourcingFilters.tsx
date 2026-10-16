@@ -160,7 +160,7 @@ export function SourcingFilters({
                   <SelectItem value="new">New</SelectItem>
                   <SelectItem value="shortlisted">Shortlisted</SelectItem>
                   {governed&&<SelectItem value="passed">Passed</SelectItem>}
-                  <SelectItem value="hidden">{governed?'Legacy hidden':'Hidden'}</SelectItem>
+                  <SelectItem value="hidden">{governed?'Previously hidden':'Hidden'}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
