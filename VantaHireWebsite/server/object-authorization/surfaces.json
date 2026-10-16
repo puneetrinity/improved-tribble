@@ -850,7 +850,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "69211bd038beb612528bed75b25b077acf25741548df83fdccdd78f72ae626e3"
+      "sha256": "b5a9283beca6fae2ae02659bed67f90de3b7244148b2796efb0a89acf8e97553"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -1293,7 +1293,7 @@
     },
     {
       "file": "client/src/pages/job-edit-page.tsx",
-      "sha256": "10772c3e01689a5fb8eb2bd0a4ea7ea825b7dcbe81fd1fc563b43b65ef99ee24"
+      "sha256": "80fe5fd2fea5554ab2f16df6ad01c3bf4127799fb5764408944dc0eacfaa681f"
     },
     {
       "file": "client/src/components/JobPostingStepper.tsx",

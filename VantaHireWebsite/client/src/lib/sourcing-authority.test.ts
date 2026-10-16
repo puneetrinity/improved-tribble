@@ -12,7 +12,7 @@ afterEach(()=>{vi.unstubAllGlobals();vi.clearAllMocks();});
 describe('governed sourcing browser contract',()=>{
   it('does not guess legacy mode when configuration fails',async()=>{
     vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:false}));
-    await expect(readSourcingCapability()).rejects.toThrow('unavailable');
+    await expect(readSourcingCapability()).rejects.toThrow('load search settings');
   });
   it('uses only explicit true feature settings',async()=>{
     vi.stubGlobal('fetch',vi.fn().mockResolvedValue({ok:true,json:async()=>({jobBriefEnabled:true,sourcingEnabled:'true'})}));
@@ -48,11 +48,11 @@ describe('governed sourcing browser contract',()=>{
   });
   it('explains allowance exhaustion and requires renewed confirmation on payer changes',()=>{
     expect(sourcingErrorMessage('SOURCING_ALLOWANCE_EXHAUSTED')).toContain('Neither');
-    expect(sourcingErrorMessage('SOURCING_PAYER_CHANGED')).toContain('fresh confirmation');
+    expect(sourcingErrorMessage('SOURCING_PAYER_CHANGED')).toContain('confirm again');
     expect(sourcingErrorMessage('SOURCING_PREPARING')).toContain('prepared');
-    expect(sourcingErrorMessage('BRIEF_UPDATED_APPROVAL_REQUIRED')).toContain('approve the updated brief');
-    expect(sourcingErrorMessage('SOURCING_UPDATED_BRIEF_REQUIRED')).toContain('approve the updated brief');
-    expect(sourcingErrorMessage('SOURCING_DIGEST_UNAUTHORIZED')).toContain('credentials');
-    expect(sourcingErrorMessage('SOURCING_DIGEST_RATE_LIMITED')).toContain('rate-limited');
+    expect(sourcingErrorMessage('BRIEF_UPDATED_APPROVAL_REQUIRED')).toContain('approve the updated hiring criteria');
+    expect(sourcingErrorMessage('SOURCING_UPDATED_BRIEF_REQUIRED')).toContain('approve the updated hiring criteria');
+    expect(sourcingErrorMessage('SOURCING_DIGEST_UNAUTHORIZED')).toContain('contact your workspace administrator');
+    expect(sourcingErrorMessage('SOURCING_DIGEST_RATE_LIMITED')).toContain('temporarily busy');
   });
 });

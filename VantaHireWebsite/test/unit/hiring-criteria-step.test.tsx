@@ -353,12 +353,12 @@ describe('HiringCriteriaStep',()=>{
    apiRequest.mockImplementation(async(_m:string,url:string)=>url.endsWith('/brief')
      ?{json:async()=>({revision:'2',versionId:V2,reviewHash:'b'.repeat(64)})}:{json:async()=>({revision:'3'})});
    await render();
-   expect(host.textContent).toContain('Also in the JD, not included · 2');
-   expect(host.querySelector('[aria-label="Add “Mentors engineers weekly” to the criteria"]')).toBeNull();
+   expect(host.textContent).toContain('Other requirements from the job description · 2');
+   expect(host.querySelector('[aria-label="Add “Mentors engineers weekly” to the requirements"]')).toBeNull();
    expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(0);expect(host.querySelector('select[aria-label^="Exclude"]')).toBeNull();
    expect(button('Approve criteria').disabled).toBe(false);
-   await act(async()=>(host.querySelector('[aria-label="Add “Go” to the criteria"]') as HTMLButtonElement).click());
-   expect(host.textContent).toContain('Also in the JD, not included · 1');expect(host.textContent).toContain('Nice-to-have skills · 1');
+   await act(async()=>(host.querySelector('[aria-label="Add “Go” to the requirements"]') as HTMLButtonElement).click());
+   expect(host.textContent).toContain('Other requirements from the job description · 1');expect(host.textContent).toContain('Nice-to-have skills · 1');
    await act(async()=>button('Approve criteria').click());await settle(10);
    const save=apiRequest.mock.calls.find(c=>String(c[1]).endsWith('/brief'))![2];
    expect(save.reviewSelection.dispositions).toEqual([

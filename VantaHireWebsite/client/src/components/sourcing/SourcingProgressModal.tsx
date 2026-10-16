@@ -8,7 +8,6 @@ import {
   Database,
   ListChecks,
   Mail,
-  Phone,
   Search,
   Sparkles,
   Terminal,
@@ -85,6 +84,8 @@ interface SourcingProgressModalProps {
   onClose?: () => void;
   /** Optional: offered on the complete/error state; starts a fresh run. */
   onRunAgain?: () => void;
+  /** Internal diagnostics only (super admins). Recruiters never see the event log. */
+  showDevConsole?: boolean;
 }
 
 // ─── Stages ────────────────────────────────────────────────────────────────
@@ -95,10 +96,10 @@ interface SourcingProgressModalProps {
 type Stage = { phase: PipelinePhase; label: string; tip: string; icon: typeof Search };
 
 const STAGES: Stage[] = [
-  { phase: "discovery", label: "Searching the market and your talent memory", tip: "Looking across the market and the people already in your talent memory.", icon: Search },
+  { phase: "discovery", label: "Searching the market and saved candidate profiles", tip: "Looking across the market and the candidate profiles you already have.", icon: Search },
   { phase: "ranking", label: "Scoring candidates on fit", tip: "Ranking on experience, seniority and fit for this role.", icon: Sparkles },
-  { phase: "enriching", label: "Adding shortlist details", tip: "Filling in profile details for your top matches.", icon: Database },
-  { phase: "finalizing", label: "Assembling your shortlist", tip: "Saving your ranked shortlist.", icon: ListChecks },
+  { phase: "enriching", label: "Adding profile details", tip: "Filling in profile details for your top matches.", icon: Database },
+  { phase: "finalizing", label: "Preparing your results", tip: "Saving your ranked results.", icon: ListChecks },
 ];
 
 const ORDER: PipelinePhase[] = ["idle", "discovery", "ranking", "enriching", "finalizing", "complete"];
@@ -136,7 +137,7 @@ function formatElapsed(seconds: number): string {
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
-export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: SourcingProgressModalProps) {
+export function SourcingProgressModal({ open, progress, onClose, onRunAgain, showDevConsole = false }: SourcingProgressModalProps) {
   const [devOpen, setDevOpen] = useState(false);
   const devConsoleRef = useRef<HTMLDivElement>(null);
   const prevLogsLen = useRef(0);
@@ -196,7 +197,8 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
 
   const ringOffset = RING_CIRCUMFERENCE * (1 - displayPct / 100);
   const activeStage = STAGES.find((s) => s.phase === progress.phase);
-  const tip = neutralizeProviderText(progress.message) || activeStage?.tip || "Starting sourcing run…";
+  // The live pipeline message is a log line ("[PIPELINE] … queued"); recruiters see the stage in plain words.
+  const tip = activeStage?.tip ?? "Getting your search ready…";
   const errorText = neutralizeProviderText(progress.error ?? "") || "Something went wrong. You can run again.";
   const ringColor = isError ? "#DC2626" : isComplete ? "#1FA463" : "#4B8EF0";
 
@@ -215,9 +217,9 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
           data-sourcing-progress-modal=""
           data-rc-progress=""
           data-rc-tone={tone}
-          className="w-full max-w-[380px] gap-0 overflow-hidden rounded-[14px] border-[#E3E6F0] p-0 motion-reduce:animate-none"
+          className="w-full max-w-[440px] gap-0 overflow-hidden rounded-[14px] border-[#E3E6F0] p-0 motion-reduce:animate-none"
         >
-          <div className="flex items-center justify-between px-[18px] pt-[18px]">
+          <div className="flex items-center justify-between gap-2 pl-[18px] pr-14 pt-[18px]">
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#687182]">
               ealana · skills check
             </p>
@@ -231,7 +233,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
               aria-valuemin={0}
               aria-valuemax={sized ? rc!.total : undefined}
               aria-valuenow={sized ? rc!.processed : undefined}
-              aria-valuetext={sized && rc ? `${rc.processed} of ${rc.total} profiles processed` : heading}
+              aria-valuetext={sized && rc ? `${rc.processed} of ${rc.total} profiles checked` : heading}
               className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#E6EAF3]"
             >
               <div
@@ -245,13 +247,13 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
             </div>
             {sized && (
               <p className="mt-2 font-mono text-[12px] tabular-nums text-[#475569]">
-                {rc!.processed} of {rc!.total} profiles processed
+                {rc!.processed} of {rc!.total} profiles checked
               </p>
             )}
             <p className="mt-2 text-[14px] leading-relaxed text-[#334155]">{message}</p>
             {sized && (
               <p className="mt-1 text-[12px] leading-relaxed text-[#64748B]">
-                This is progress, not a count of matching skills.
+                This is how many profiles we checked, not how many have the skills you asked for.
               </p>
             )}
           </div>
@@ -272,7 +274,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
   return (
     <Dialog open={open} onOpenChange={() => { if ((isComplete || isError) && onClose) onClose(); }}>
       <DialogContent
-        className="w-full max-w-[380px] gap-0 overflow-hidden rounded-[14px] border-[#E3E6F0] p-0 motion-reduce:animate-none"
+        className="w-full max-w-[440px] gap-0 overflow-hidden rounded-[14px] border-[#E3E6F0] p-0 motion-reduce:animate-none"
         onPointerDownOutside={(e) => {
           // Prevent closing mid-run
           if (!isComplete && !isError) e.preventDefault();
@@ -281,7 +283,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
         data-sourcing-progress-modal=""
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-[18px] pt-[18px]">
+        <div className="flex items-center justify-between gap-2 pl-[18px] pr-14 pt-[18px]">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#687182]">
             ealana · discover
           </p>
@@ -330,10 +332,10 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
           </div>
           <div className="min-w-0">
             <DialogTitle className="font-satoshi text-[17px] font-bold leading-tight tracking-[-0.02em] text-[#17203A]">
-              {isComplete ? "Your shortlist is ready" : isError ? "Sourcing stopped" : "Finding your best-fit candidates"}
+              {isComplete ? "Your results are ready" : isError ? "Search stopped" : "Finding your best-fit candidates"}
             </DialogTitle>
-            <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-[#5F6675]" aria-live="polite">
-              {isError ? errorText : tip}
+            <p className="mt-1 text-[13px] leading-snug text-[#5F6675]" aria-live="polite">
+              {isError ? errorText : isComplete ? "Your ranked candidates are ready to review." : tip}
             </p>
           </div>
         </div>
@@ -349,7 +351,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
                 data-stage={stage.phase}
                 data-state={state}
                 className={cn(
-                  "flex items-center gap-3 rounded-[10px] px-2.5 py-2 text-[13px] transition-colors duration-300",
+                  "flex items-start gap-3 rounded-[10px] px-2.5 py-2 text-[13px] leading-snug transition-colors duration-300",
                   state === "active" && "bg-[#EBF2FE] text-[#17203A]",
                   state === "done" && "text-[#17203A]",
                   state === "todo" && "text-[#687182]",
@@ -367,9 +369,9 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
                 >
                   {state === "done" ? <Check className="h-3.5 w-3.5" /> : <Icon className={cn("h-3.5 w-3.5", state === "active" && "motion-safe:animate-pulse")} />}
                 </span>
-                <span className={cn("truncate", state === "active" && "font-semibold")}>{stage.label}</span>
+                <span className={cn("min-w-0 flex-1 pt-1", state === "active" && "font-semibold")}>{stage.label}</span>
                 {stage.phase === "enriching" && state === "active" && progress.totalToEnrich > 0 && (
-                  <span className="ml-auto font-mono text-[11px] tabular-nums text-[#5F6675]">
+                  <span className="shrink-0 pt-1 font-mono text-[11px] tabular-nums text-[#5F6675]">
                     {progress.enrichedCount}/{progress.totalToEnrich}
                   </span>
                 )}
@@ -391,7 +393,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
         {progress.candidates.length > 0 && (
           <div className="mx-[18px] mt-3 max-h-32 space-y-1 overflow-y-auto rounded-[10px] border border-[#EEF0F4] bg-[#FBFCFE] p-2">
             <p className="px-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[#687182]">
-              Shortlist details
+              Profile details
             </p>
             {progress.candidates.slice(-8).map((c, i) => (
               <div
@@ -405,7 +407,6 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
                 <span className="flex-1 truncate font-medium">{c.name}</span>
                 <User className={cn("h-3.5 w-3.5", c.foundProfile ? "text-[#17203A]" : "text-[#D5D9E4]")} aria-label={c.foundProfile ? "Profile found" : "Profile not found"} />
                 <Mail className={cn("h-3.5 w-3.5", c.foundEmail ? "text-[#17203A]" : "text-[#D5D9E4]")} aria-label={c.foundEmail ? "Email found" : "Email not found"} />
-                <Phone className={cn("h-3.5 w-3.5", c.foundPhone ? "text-[#17203A]" : "text-[#D5D9E4]")} aria-label={c.foundPhone ? "Phone found" : "Phone not found"} />
                 {c.status === "removed" && <Badge className="h-4 border-red-200 bg-red-50 py-0 text-[9px] text-red-700">Removed</Badge>}
                 {c.status === "replaced" && <Badge className="h-4 border-amber-200 bg-amber-100 py-0 text-[9px] text-amber-700">New</Badge>}
               </div>
@@ -431,7 +432,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
                 onClick={onClose}
                 className="min-h-11 flex-1 rounded-[10px] bg-[#2B6CD4] px-3 text-[13px] font-semibold text-white transition-colors duration-200 hover:bg-[#1E5BD8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B8EF0]/40"
               >
-                View your shortlist
+                View your results
               </button>
             </>
           ) : isError ? (
@@ -455,11 +456,12 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
               </button>
             </>
           ) : (
-            <p className="w-full text-center text-[11px] text-[#687182]">This usually takes under a minute.</p>
+            <p className="w-full text-center text-[12px] text-[#5F6675]">This usually takes a couple of minutes. You can keep this open.</p>
           )}
         </div>
 
-        {/* Dev console (unchanged behaviour; collapsed by default) */}
+        {/* Internal event log: super admins only (showDevConsole). Collapsed by default. */}
+        {showDevConsole && (
         <div className="border-t border-[#EEF0F4] px-[18px] py-2">
           <button
             type="button"
@@ -468,7 +470,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
             aria-expanded={devOpen}
           >
             <Terminal className="h-3.5 w-3.5" aria-hidden="true" />
-            Dev console
+            Event log (internal)
             {devOpen ? <ChevronDown className="h-3 w-3" aria-hidden="true" /> : <ChevronRight className="h-3 w-3" aria-hidden="true" />}
             <span className="font-normal tabular-nums">({progress.devLogs.length} events)</span>
           </button>
@@ -510,6 +512,7 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain }: S
             </div>
           )}
         </div>
+        )}
       </DialogContent>
     </Dialog>
   );

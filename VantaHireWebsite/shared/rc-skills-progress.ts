@@ -17,16 +17,16 @@ export type SignalRcProgress=z.infer<typeof signalRcProgressSchema>;
 export type RcProgressTone='waiting'|'active'|'done'|'attention'|'failed'|'unknown';
 
 export function rcProgressPresentation(progress:SignalRcProgress|undefined,unavailable=false):{heading:string;message:string;tone:RcProgressTone}{
- if(unavailable)return {tone:'unknown',heading:'Status temporarily unavailable',message:'Your saved search has not been restarted. Status will refresh when available.'};
- if(progress?.state==='stalled')return {tone:'attention',heading:'Search needs attention',message:'Saved work is retained for recovery. '+
-  (progress.notificationDelivered?'Support has been notified.':'Support notification is pending.')};
- if(progress?.state==='closed_unrecoverable')return {tone:'failed',heading:'Search could not be completed',message:'Saved work is retained for review. This screen does not start another paid search.'};
- if(progress?.state==='complete'||progress?.state==='partial')return {tone:'done',heading:'Skills check finished',message:'Available skills are retained. Results appear once the shortlist has been saved.'};
+ if(unavailable)return {tone:'unknown',heading:'Status temporarily unavailable',message:'Your search is still saved. We’ll update the status when we can.'};
+ if(progress?.state==='stalled')return {tone:'attention',heading:'Search needs attention',message:'Progress so far is saved. '+
+  (progress.notificationDelivered?'Support has been notified.':'We’re letting support know.')};
+ if(progress?.state==='closed_unrecoverable')return {tone:'failed',heading:'Search could not be completed',message:'Progress so far is saved. Closing this window won’t start or charge another search.'};
+ if(progress?.state==='complete'||progress?.state==='partial')return {tone:'done',heading:'Skills check finished',message:'Your results are being prepared.'};
  if(progress?.state==='queued'){
-  const kept=progress.workStarted?' Profiles already processed are kept.':'';
+  const kept=progress.workStarted?' Profiles already checked are kept.':'';
   return progress.safeReason==='quota_window'
-   ?{tone:'waiting',heading:'Skills check waiting',message:'Waiting for the skills provider’s next request window. Nothing is lost while it waits.'+kept}
-   :{tone:'waiting',heading:'Skills check queued',message:'Waiting for a free worker. You can close this window while the search continues.'+kept};
+   ?{tone:'waiting',heading:'Skills check waiting',message:'Skills checks are temporarily paused. They’ll continue automatically.'+kept}
+   :{tone:'waiting',heading:'Skills check queued',message:(progress.workStarted?'The skills check is waiting its turn to continue. You can close this window.':'Your search is waiting to start. You can close this window.')+kept};
  }
- return {tone:'active',heading:'Enriching skills',message:'You can close this window while the search continues.'};
+ return {tone:'active',heading:'Checking candidate skills',message:'You can close this window while the search continues.'};
 }

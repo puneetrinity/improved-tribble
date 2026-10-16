@@ -21,23 +21,23 @@ test.describe('5A built recruiter workflow',()=>{
     const jobId=base+(info.project.name==='Pixel 5'?1:0);
     const jd='Build reliable Python backend services. Work with PostgreSQL and maintain production software.';
     await page.goto(`/jobs/${jobId}/edit`);
-    const panel=page.getByRole('region',{name:'Job brief'});
+    const panel=page.getByRole('region',{name:'Hiring criteria'});
     await expect(panel).toBeVisible();
-    await expect(panel.getByRole('button',{name:'Approve brief',exact:true})).toBeDisabled();
-    await panel.getByRole('button',{name:'Use original prose'}).click();
+    await expect(panel.getByRole('button',{name:'Approve criteria',exact:true})).toBeDisabled();
+    await panel.getByRole('button',{name:'Use the description you first entered'}).click();
     await expect(panel.getByLabel('Current JD')).toHaveValue(jd);
-    await panel.getByRole('button',{name:'Save JD',exact:true}).click();
-    await expect(panel.getByText('JD saved. You can now draft or write the brief.')).toBeVisible();
-    await panel.getByRole('button',{name:'Add criterion',exact:true}).click();
-    await panel.getByLabel('Criterion 1 label').fill('Python');
-    await panel.getByLabel('Criterion 1 requirement').fill('Python');
-    await panel.getByRole('button',{name:'Save brief',exact:true}).click();
-    await expect(panel.getByText('Brief saved. Approval is a separate action.')).toBeVisible();
+    await panel.getByRole('button',{name:'Save job description',exact:true}).click();
+    await expect(panel.getByText('Job description saved. You can now draft the criteria with AI or write them yourself.')).toBeVisible();
+    await panel.getByRole('button',{name:'Add requirement',exact:true}).click();
+    await panel.getByLabel('Requirement 1 label').fill('Python');
+    await panel.getByLabel('Requirement 1 requirement').fill('Python');
+    await panel.getByRole('button',{name:'Save changes',exact:true}).click();
+    await expect(panel.getByText('Changes saved. Approve the criteria when you are happy with them.')).toBeVisible();
     const read=async()=>{const r=await page.request.get(`/api/jobs/${jobId}/brief`);expect(r.status()).toBe(200);return r.json();};
     expect((await read()).approvedVersionId).toBeNull();
     const before=await page.request.get(`/api/jobs/${jobId}`);expect((await before.json()).isActive).toBe(false);
-    await panel.getByRole('button',{name:'Approve brief',exact:true}).click();
-    await expect(panel.getByText('Brief approved. This did not publish the job or start sourcing.')).toBeVisible();
+    await panel.getByRole('button',{name:'Approve criteria',exact:true}).click();
+    await expect(panel.getByText('Criteria approved. This did not publish the job or start a search.')).toBeVisible();
     expect((await (await page.request.get(`/api/jobs/${jobId}`)).json()).isActive).toBe(false);
     const approved=await read();expect(approved.approvedVersionId).toBeTruthy();
     // Browser fetch supplies the secure localhost CSRF cookie; Playwright's
@@ -53,7 +53,7 @@ test.describe('5A built recruiter workflow',()=>{
     const html=await page.request.get(`/jobs/${jobId}`,{headers:{'user-agent':'Googlebot'}});expect(await html.text()).toContain(jd);expect(await html.text()).not.toMatch(/eliteSchools|rejectTitleRegex/);
     const source=await mutate({path:`/api/jobs/${jobId}/find-candidates`,method:'POST',data:{}});
     expect(source.status).toBe(503);expect(source.body).toMatchObject({code:'SOURCING_ACTIVATION_PENDING'});
-    await page.goto(`/jobs/${jobId}/edit`);await expect(page.getByRole('region',{name:'Job brief'})).toContainText('Approved version retained');
+    await page.goto(`/jobs/${jobId}/edit`);await expect(page.getByRole('region',{name:'Hiring criteria'})).toContainText('Approved');
     await page.screenshot({path:info.outputPath('approved-brief.png'),fullPage:true});
   });
   test('candidate, foreign recruiter and admin cannot read or approve the brief',async({page})=>{
@@ -71,7 +71,7 @@ test.describe('5A built recruiter workflow',()=>{
     const jd=Array(22).fill('Build reliable Python backend services with PostgreSQL and document production operations.').join(' ');
     await page.goto('/jobs/post');
     await page.getByLabel('Original Job Description').fill(jd);
-    await expect(page.getByRole('button',{name:'Analyze JD (AI)',exact:true})).toHaveCount(0);
+    await expect(page.getByRole('button',{name:'Draft criteria with AI',exact:true})).toHaveCount(0);
     await page.getByRole('button',{name:'Next',exact:true}).click();
     await page.getByLabel('Job Title').fill('Synthetic brief creation');
     await page.getByLabel('Location', {exact:false}).first().fill('Bengaluru');
@@ -90,7 +90,7 @@ test.describe('5A built recruiter workflow',()=>{
     },saved.request().postDataJSON());
     expect(invalidCreate).toEqual({status:400,body:{code:'BRIEF_EXPERIENCE_MAXIMUM_REFUSED'}});
     await expect(page).toHaveURL(new RegExp(`/jobs/${job.id}/edit`));
-    await expect(page.getByRole('region',{name:'Job brief'})).toBeVisible();
+    await expect(page.getByRole('region',{name:'Hiring criteria'})).toBeVisible();
     const brief=await page.request.get(`/api/jobs/${job.id}/brief`);
     expect(await brief.json()).toMatchObject({currentJD:jd,approvedVersionId:null,latest:null});
     expect(modelRequests).toEqual([]);

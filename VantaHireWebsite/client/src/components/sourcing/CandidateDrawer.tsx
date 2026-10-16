@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -9,6 +10,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
+  Check,
+  X as XIcon,
+  Minus,
+  CircleDashed,
   ExternalLink,
   Star,
   EyeOff,
@@ -63,6 +68,53 @@ interface CandidateDrawerProps {
   onDecision?: (action:'shortlist'|'pass'|'clear',reasonCode?:string)=>void;
 }
 
+// Plain-language view of the approved-criteria score. Presentation only: the ranking contract is unchanged.
+type RankingAssessment=NonNullable<SourcedCandidateForUI['ranking']>['assessments'][number];
+const EVIDENCE_SOURCE:[RegExp,string][]=[[/^employment/,'Work history'],[/location/,'Location on profile'],[/skill/,'Skills on profile'],
+  [/title/,'Job title on profile'],[/seniority/,'Seniority on profile'],[/education|degree|school/,'Education on profile'],
+  [/domain|industr/,'Industry on profile'],[/function/,'Job function on profile']];
+export function evidenceSources(refs:string[]):string[] {
+  return [...new Set(refs.map(ref=>EVIDENCE_SOURCE.find(([pattern])=>pattern.test(ref))?.[1]??'Profile'))];
+}
+export function criterionLabel(labels:string[]):string {
+  return labels.map(l=>l.trim().replace(/[.:]+$/,'')).join(' / ');
+}
+const MATCH_GROUPS:{key:'met'|'not_met'|'unknown'|'unscored';title:string;icon:typeof Check;tone:string}[]=[
+  {key:'met',title:'Matched',icon:Check,tone:'text-emerald-700'},
+  {key:'not_met',title:'Not met',icon:XIcon,tone:'text-red-700'},
+  {key:'unknown',title:'No evidence found',icon:Minus,tone:'text-muted-foreground'},
+  {key:'unscored',title:'Not scored (for your review)',icon:CircleDashed,tone:'text-muted-foreground'},
+];
+function matchGroup(a:RankingAssessment):'met'|'not_met'|'unknown'|'unscored' {return !a.mapped||a.weight===0?'unscored':a.state;}
+export function CriteriaMatchPanel({ranking}:{ranking:NonNullable<SourcedCandidateForUI['ranking']>}) {
+  return <section aria-labelledby="criteria-match-title" data-criteria-match="" className="space-y-3 rounded-lg border border-border p-4">
+    <div className="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 id="criteria-match-title" className="text-base font-semibold">How they match your criteria</h3>
+      <span className="text-sm font-medium">Score: {ranking.N} of {ranking.D}</span>
+    </div>
+    <p className="text-sm text-muted-foreground">Each matched requirement adds points. "No evidence found" means we couldn't tell either way. Unconfirmed requirements earn no points. No points are deducted. Equal scores are in no particular order.</p>
+    {MATCH_GROUPS.map(group=>{
+      const items=ranking.assessments.filter(a=>matchGroup(a)===group.key);
+      if(!items.length) return null;
+      const Icon=group.icon;
+      return <div key={group.key} data-match-group={group.key}>
+        <h4 className="text-sm font-semibold">{group.title} <span className="font-normal text-muted-foreground">· {items.length}</span></h4>
+        <ul className="mt-1 divide-y divide-border">
+          {items.map(a=><li key={a.criterionIds.join(':')} className="flex items-start gap-3 py-2 text-sm">
+            <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${group.tone}`} aria-hidden="true"/>
+            <div className="min-w-0 flex-1">
+              <p className="text-foreground">{criterionLabel(a.labels)}</p>
+              <p className="text-xs text-muted-foreground">{a.weight===3?'Must have':a.weight===1?'Nice to have':'Not scored'}
+                {group.key==='met'&&a.refs.length>0&&<> · Found in: {evidenceSources(a.refs).join(', ')}</>}</p>
+            </div>
+            {a.weight>0&&<span className="shrink-0 tabular-nums text-xs text-muted-foreground">{a.points} of {a.weight} points</span>}
+          </li>)}
+        </ul>
+      </div>;
+    })}
+  </section>;
+}
+
 function FitBadge({
   score,
   matchStrength,
@@ -114,6 +166,9 @@ export function CandidateDrawer({
   onDecision,
 }: CandidateDrawerProps) {
   const { findContact, isPending: contactPending } = useFindContact();
+  // Pass reasons stay folded until asked for, so the match details keep room on small screens.
+  const [showPassReasons, setShowPassReasons] = useState(false);
+  useEffect(() => { setShowPassReasons(false); }, [candidate?.id]);
 
   if (!candidate) return null;
 
@@ -287,7 +342,7 @@ export function CandidateDrawer({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {c.ranking?<Badge variant="outline">Met {c.ranking.N} of {c.ranking.D} points</Badge>:<FitBadge
+            {c.ranking?<Badge variant="outline">Score: {c.ranking.N} of {c.ranking.D}</Badge>:<FitBadge
               score={c.fitScore}
               matchStrength={c.matchStrength}
             />}
@@ -316,15 +371,7 @@ export function CandidateDrawer({
         </div>
 
         <div className="px-6 py-8 space-y-8">
-          {c.ranking&&<section aria-label="Approved brief evidence" className="space-y-2">
-            <h3 className="font-semibold">Approved brief evidence</h3>
-            <p className="text-sm text-muted-foreground">Met {c.ranking.N} of {c.ranking.D} points. Unknown and not met earn no points; neither subtracts points. Equal scores do not imply a meaningful order within a tie.</p>
-            {c.ranking.assessments.map(a=><div key={a.criterionIds.join(':')} className="text-sm border rounded p-2">
-              <span className="font-medium">{a.labels.join(' / ')}: {a.state.replace(/_/g,' ')}</span>
-              <span> · {a.points} points</span>
-              {a.refs.length>0&&<p className="text-xs text-muted-foreground">Evidence: {a.refs.join(', ')}</p>}
-            </div>)}
-          </section>}
+          {c.ranking&&<CriteriaMatchPanel ranking={c.ranking}/>}
           {/* About Summary */}
           {summary && (
             <Section title="About" icon={UserCheck}>
@@ -675,16 +722,17 @@ export function CandidateDrawer({
         </div>
 
         {/* Footer Actions (sticky — never scrolls) */}
-        <div className="p-6 bg-muted/30 border-t flex gap-3 flex-wrap">
+        <div className="p-4 sm:p-6 bg-muted/30 border-t flex gap-3 flex-wrap">
           {governed&&<>
-            <p className="w-full text-sm">Decision for this job: {c.state==='hidden'?'Legacy hidden (no recorded Pass)':c.state==='new'?'Not decided':c.state}. Decisions do not change ranking.</p>
+            <p className="w-full text-sm">Your decision: {c.state==='hidden'?'Previously hidden':c.state==='new'?'Not decided':c.state==='shortlisted'?'Shortlisted':c.state==='passed'?'Passed':c.state==='converted'?'Applied':c.state}. This doesn’t change the ranking.</p>
             <Button disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('shortlist')}>Shortlist</Button>
             <Button variant="outline" disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('pass')}>Pass</Button>
             {c.state!=='new'&&<Button variant="outline" disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('clear')}>Clear decision</Button>}
-            <div className="w-full flex flex-wrap gap-2" aria-label="Optional Pass reason">
-              <span className="w-full text-xs">Optional: Pass with a reason. Nothing is preselected.</span>
+            {c.state!=='converted'&&<Button variant="ghost" className="min-h-11" aria-expanded={showPassReasons} aria-controls="pass-reasons" onClick={()=>setShowPassReasons(v=>!v)}>{showPassReasons?'Hide reasons':'Pass with a reason…'}</Button>}
+            {showPassReasons&&<div id="pass-reasons" className="w-full flex flex-wrap gap-2" aria-label="Optional Pass reason">
+              <span className="w-full text-xs">Choose one. Nothing is preselected.</span>
               {([['skills_gap','Skills gap'],['experience_requirement','Experience requirement'],['role_seniority','Role / seniority'],['domain','Domain'],['location_work_arrangement','Location / work arrangement'],['compensation','Compensation'],['availability','Availability'],['insufficient_information','Insufficient information'],['other','Other']] as const).map(([reason,label])=><Button key={reason} size="sm" variant="outline" disabled={isUpdating||c.state==='converted'} onClick={()=>onDecision?.('pass',reason)}>{label}</Button>)}
-            </div>
+            </div>}
           </>}
           {!governed&&c.state === "new" && (
             <>
