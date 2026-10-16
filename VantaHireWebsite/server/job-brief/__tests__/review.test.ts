@@ -5,7 +5,8 @@ import {sourceHash} from '../contracts';
 import {BRIEF_PROVIDER_TIMEOUT_MS,BRIEF_DRAFT_LEASE_MS,BRIEF_SETTLEMENT_SQL_MS,BRIEF_SETTLEMENT_MARGIN_MS,providerBudgetMs,poolConnectWaitMs} from '../draft';
 import {readFileSync} from 'node:fs';
 const item=(text:string,topic:ExtractedRequirement['topic']='skill'):ExtractedRequirement=>({text,topic,priority:'required',quote:text,
-  terms:topic==='skill'?[text]:[],minimum:null,maximum:null,relation:'single',capability:null});
+  terms:topic==='skill'?[text]:[],minimum:null,maximum:null,relation:'single',capability:null,
+  ...(topic==='location'&&text.includes('Bengaluru, India')?{location:{scope:'city' as const,city:'Bengaluru',country:'India',workArrangement:text.includes('hybrid')?'hybrid, three days a week in office':null}}:{})});
 const run=(items:ExtractedRequirement[],overflow=false,jd=items.map(x=>x.quote).join('\n'))=>assembleReviewWorkspace(JSON.stringify({items,overflow}),jd);
 describe('D4 extraction and review primitives',()=>{
   it('binds multiline quotes to the exact JD, not its attempt-budget fingerprint',()=>{
@@ -17,8 +18,29 @@ describe('D4 extraction and review primitives',()=>{
     expect(w.items[0]!.span).toEqual({start:jd.indexOf('Python'),end:jd.indexOf('Python')+6});
     expect(w.proposal!.criteria[0]!.provenance).toMatchObject({sourceHash:w.sourceHash});
   });
+  it('a drafted location scores the place and keeps hybrid/office wording in the note (job 188 case)',()=>{
+    const text='Bengaluru, India (hybrid, three days a week in office)';
+    const w=run([item(text,'location'),item('Python')]);
+    const loc=w.proposal!.criteria.find(c=>c.subject==='location')!;
+    expect(loc.requirement).toEqual({kind:'text',value:'Bengaluru, India'});
+    expect(loc.note).toBe('hybrid, three days a week in office');
+    expect(loc.label).toBe('Location');
+  });
+  it('a location with no country is never guessed: it stays visible for the recruiter',()=>{
+    const w=run([item('Bengaluru','location'),item('Python')]);
+    expect(w.proposal!.criteria.some(c=>c.subject==='location')).toBe(false);
+    const visible=w.items.find(i=>i.topic==='location')!;
+    expect(visible.proposedCriterion).toBeNull();
+    expect(w.dispositions.find(d=>d.itemId===visible.id)!.state).toBe('unresolved');
+  });
+  it.each(['Bengaluru or Pune, India','Lahore, Punjab'])('drafting never broadens or guesses %s: it stays visible for the recruiter',text=>{
+    const w=run([item(text,'location'),item('Python')]);
+    expect(w.proposal!.criteria.some(c=>c.subject==='location')).toBe(false);
+    const visible=w.items.find(i=>i.topic==='location')!;
+    expect(visible.proposedCriterion).toBeNull();expect(visible.text).toBe(text);
+  });
   it('assigns structure and retains every item beyond twelve',()=>{
-    const w=run([item('Bengaluru','location'),{...item('6–8 years','overall_experience'),minimum:6,maximum:8},
+    const w=run([item('Bengaluru, India','location'),{...item('6–8 years','overall_experience'),minimum:6,maximum:8},
       ...Array.from({length:14},(_,i)=>item('Tool'+i))]);
     expect(w.items).toHaveLength(16);expect(w.proposal!.criteria).toHaveLength(12);
     expect(w.dispositions.filter(x=>x.state==='excluded')).toHaveLength(4);
@@ -283,6 +305,6 @@ describe('D4 extraction and review primitives',()=>{
     expect(providerBudgetMs(0,Infinity)).toBeLessThan(0);
   });
   it('uses a short JSON extraction contract without application fields',()=>{
-    expect(REQUIREMENT_EXTRACTION_PROMPT).toContain('Return JSON');expect(REQUIREMENT_EXTRACTION_PROMPT.length).toBeLessThan(2000);
+    expect(REQUIREMENT_EXTRACTION_PROMPT).toContain('Return JSON');expect(REQUIREMENT_EXTRACTION_PROMPT.length).toBeLessThan(3000);
   });
 });

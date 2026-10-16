@@ -9,6 +9,7 @@ import { useJobBrief, jobIntentRequest, readBriefCapability, type JobBrief, type
 import { readSourcing, readSourcingCapability, type SourcingPreview } from '../lib/sourcing-authority';
 import type { BriefPayload } from '../../../server/job-brief/contracts';
 import { acceptedSkillsShape, duplicateSkillNames, overlappingSkillCriteria, skillAlternativesFromEditor } from '../../../shared/skill-alternatives';
+import { locationProblemText, locationValueProblem, splitLocation } from '../../../shared/brief-location';
 
 type Criterion = BriefPayload['criteria'][number];
 export const MAX_CRITERIA = 12;
@@ -29,9 +30,13 @@ function experienceCriterion(minimum: number): Criterion {
   return { id: crypto.randomUUID(), label: 'Experience', class: 'must_have', subject: 'experience_years', use: 'assessment',
     evidenceKinds: ['profile_evidence'], requirement: { kind: 'minimum_years', minimum }, provenance: recruiter };
 }
-function locationCriterion(value: string): Criterion {
+/** Scored place in the value ("City, Country" or "Country"); hybrid/remote/office wording in the note. Never invents a
+ * place: without a country the recruiter's wording stays in the field and the screen asks for the country. */
+function locationCriterion(raw: string): Criterion {
+  const { place, note } = splitLocation(raw);
   return { id: crypto.randomUUID(), label: 'Location', class: 'must_have', subject: 'location', use: 'assessment',
-    evidenceKinds: ['profile_evidence'], requirement: { kind: 'text', value }, provenance: recruiter };
+    evidenceKinds: ['profile_evidence'], requirement: { kind: 'text', value: place ?? raw.trim() }, provenance: recruiter,
+    ...(place && note ? { note } : {}) };
 }
 function otherCriterion(): Criterion {
   return { id: crypto.randomUUID(), label: '', class: 'preferred', subject: 'relevant_work', use: 'assessment',
@@ -44,7 +49,8 @@ function otherCriterion(): Criterion {
  */
 export function withDetailFoundations(p: BriefPayload, d: CriteriaDetails, ws?: BriefReviewWorkspace | null): BriefPayload {
   // If the JD itself states conflicting values, the recruiter chooses; Details must not quietly pick one.
-  const conflicted = new Set<string>((ws?.items ?? []).filter((i) => i.reason === 'conflicting_foundation')
+  const conflicted = new Set<string>((ws?.items ?? []).filter((i) => i.reason === 'conflicting_foundation'
+    || (i.topic === 'location' && !i.proposedCriterion))
     .map((i) => (i.topic === 'overall_experience' ? 'experience_years' : i.topic)));
   const has = (subject: string) => conflicted.has(subject) || p.criteria.some((c) => c.subject === subject);
   const add: Criterion[] = [];
@@ -105,7 +111,7 @@ export function foundationsReady(payload: BriefPayload): boolean {
   const exp = s.experience[0]?.requirement; const loc = s.location[0]?.requirement;
   return s.experience.length === 1 && s.location.length === 1 && !!exp && 'minimum' in exp && Number.isFinite(exp.minimum) && exp.minimum >= 0
     && (exp.kind !== 'experience_range' || (Number.isFinite(exp.maximum) && exp.maximum >= exp.minimum))
-    && !!loc && loc.kind === 'text' && loc.value.trim().length > 0;
+    && !!loc && loc.kind === 'text' && locationValueProblem(loc.value) === null;
 }
 function cleaned(payload: BriefPayload): BriefPayload {
   return { ...payload, criteria: payload.criteria.map(c => {
@@ -337,6 +343,12 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
     if (!current) { edit([...payload.criteria, locationCriterion(value)]); return; }
     replace(current.id, { ...current, provenance: recruiter, requirement: { kind: 'text', value } });
   };
+  const setArrangement = (value: string) => {
+    const current = s.location[0];
+    if (!current) return;
+    const { note: _old, ...rest } = current;
+    replace(current.id, { ...rest, provenance: recruiter, ...(value.trim() ? { note: value.slice(0, 300) } : {}) });
+  };
 
   const approve = async () => {
     if (!base) return;
@@ -384,7 +396,9 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
   const expReq = s.experience[0]?.requirement;
   const locReq = s.location[0]?.requirement;
   const expMissing = !expReq || !('minimum' in expReq) || !Number.isFinite(expReq.minimum);
-  const locMissing = !locReq || locReq.kind !== 'text' || !locReq.value.trim();
+  const locProblem = !locReq || locReq.kind !== 'text' ? 'empty' as const : locationValueProblem(locReq.value);
+  const locMissing = locProblem !== null;
+  const locNote = s.location[0]?.note ?? '';
   const expRangeInvalid = expReq?.kind === 'experience_range' && (!Number.isFinite(expReq.maximum) || expReq.maximum < expReq.minimum);
   const sectionHead = (title: string, note: string) => <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title} <span className="font-normal normal-case tracking-normal">· {note}</span></h3>;
 
@@ -407,7 +421,7 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
       {used > MAX_CRITERIA && <p role="alert" className="text-sm text-destructive">Too many criteria. Remove some to get to {MAX_CRITERIA} — keep the ones that matter most.</p>}
 
       <div className="space-y-2">{sectionHead('Location & experience', '2 of 12 · always included')}
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="grid gap-1 text-sm font-medium">Minimum years of experience
             <Input className="min-h-[44px]" type="number" min={0} max={80} step="any" aria-describedby={expMissing ? 'exp-missing' : undefined} aria-invalid={expMissing}
               value={expReq && 'minimum' in expReq && Number.isFinite(expReq.minimum) ? expReq.minimum : ''} placeholder="Not stated in the JD — please add"
@@ -418,9 +432,14 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
               value={expReq?.kind === 'experience_range' ? expReq.maximum : ''} placeholder="No upper limit" onChange={e => setExperienceMax(e.target.value)} />
             {expRangeInvalid && <span id="exp-range" className="text-xs font-normal text-destructive">Must be at least the minimum.</span>}</label>
           <label className="grid gap-1 text-sm font-medium">Location
-            <Input className="min-h-[44px]" aria-describedby={locMissing ? 'loc-missing' : undefined} aria-invalid={locMissing} value={locReq?.kind === 'text' ? locReq.value : ''}
-              placeholder="Not stated in the JD — please add (e.g. Bengaluru, Remote)" onChange={e => setLocation(e.target.value)} />
-            {locMissing && <span id="loc-missing" className="text-xs font-normal text-destructive">Required. Use a city, region or Remote.</span>}</label>
+            <Input className="min-h-[44px]" aria-describedby={locMissing ? 'loc-missing' : 'loc-help'} aria-invalid={locMissing} value={locReq?.kind === 'text' ? locReq.value : ''}
+              placeholder="City, Country — e.g. Bengaluru, India" onChange={e => setLocation(e.target.value)} />
+            {locMissing ? <span id="loc-missing" className="text-xs font-normal text-destructive">Required. {locationProblemText(locReq?.kind === 'text' ? locReq.value : '', locProblem)}</span>
+              : <span id="loc-help" className="text-xs font-normal text-muted-foreground">Candidates are matched on this place.</span>}</label>
+          <label className="grid gap-1 text-sm font-medium">Work arrangement (optional)
+            <Input className="min-h-[44px]" maxLength={300} disabled={!s.location[0]} value={locNote} aria-describedby="arrangement-help"
+              placeholder="e.g. Hybrid, 3 days a week in office" onChange={e => setArrangement(e.target.value)} />
+            <span id="arrangement-help" className="text-xs font-normal text-muted-foreground">Shown with the brief; not used to match candidates.</span></label>
         </div>
       </div>
 

@@ -11,7 +11,7 @@ import {HiringCriteriaStep,starterCriteria,withDetailFoundations,starterPlan,sec
   from '../../client/src/components/hiring-criteria-step';
 
 const JD='We are hiring a Senior Backend Engineer in Bengaluru. Python and PostgreSQL are required. Kafka is nice to have.';
-const details={title:'Senior Backend Engineer',location:'Bengaluru',experienceYears:'6',skills:['Python','PostgreSQL','python'],goodToHaveSkills:['Kafka']};
+const details={title:'Senior Backend Engineer',location:'Bengaluru, India',experienceYears:'6',skills:['Python','PostgreSQL','python'],goodToHaveSkills:['Kafka']};
 const baseBrief={revision:'1',currentJD:JD,sourceHash:'a'.repeat(64),latest:null,approvedVersionId:null,approvedMaterialHash:null,draft:null,
   source:{classifierVersion:1,initialized:true,selectionRequired:false,ambiguous:false,choices:[],legacyStructured:false}};
 
@@ -40,7 +40,7 @@ describe('detail foundations',()=>{
   const ai=starterCriteria({...details,location:''});
   expect(sections(ai).location).toHaveLength(0);
   const filled=withDetailFoundations(ai,details);const s=sections(filled);
-  expect(s.location).toHaveLength(1);expect(s.location[0].requirement).toMatchObject({kind:'text',value:'Bengaluru'});
+  expect(s.location).toHaveLength(1);expect(s.location[0].requirement).toMatchObject({kind:'text',value:'Bengaluru, India'});
   expect(s.location[0].provenance.kind).toBe('recruiter_edit');expect(foundationsReady(filled)).toBe(true);
   expect(usedSlots(filled)).toBe(usedSlots(ai));
   expect(withDetailFoundations(filled,{...details,location:'Pune'})).toBe(filled);
@@ -60,6 +60,11 @@ describe('detail foundations',()=>{
   expect(withDetailFoundations(ai,{...details,experienceYears:'2',location:'Pune'})).toBe(ai);
   const bare=starterCriteria({...details,experienceYears:'',location:''});
   expect(withDetailFoundations(bare,{...details,experienceYears:'',location:'  '})).toBe(bare);
+ });
+ it('does not override an unsupported AI location with a broader Details value',()=>{
+  const ai=starterCriteria({...details,location:''});
+  const ws={items:[{topic:'location',text:'Bavaria, Germany',proposedCriterion:null,reason:'unsupported_mapping'}]} as any;
+  expect(withDetailFoundations(ai,{...details,location:'Germany'},ws)).toBe(ai);
  });
 });
 
@@ -87,8 +92,8 @@ describe('HiringCriteriaStep',()=>{
  });
  afterEach(async()=>{await act(async()=>root.unmount());host.remove();vi.unstubAllGlobals();sessionStorage.clear();vi.clearAllMocks();});
  const settle=async(ms=0)=>{for(let i=0;i<6;i++)await act(async()=>{await new Promise(r=>setTimeout(r,ms));});};
- const render=async()=>{const qc=new QueryClient({defaultOptions:{queries:{retry:false}}});
-  await act(async()=>root.render(<QueryClientProvider client={qc}><HiringCriteriaStep jobId={42} actorId={7} details={details} onSubmitted={onSubmitted}/></QueryClientProvider>));await settle();};
+ const render=async(d=details)=>{const qc=new QueryClient({defaultOptions:{queries:{retry:false}}});
+  await act(async()=>root.render(<QueryClientProvider client={qc}><HiringCriteriaStep jobId={42} actorId={7} details={d} onSubmitted={onSubmitted}/></QueryClientProvider>));await settle();};
  const button=(text:string)=>[...host.querySelectorAll('button')].find(b=>b.textContent===text) as HTMLButtonElement;
 
  it('shows labelled starter criteria when automatic drafting is off, with no model call',async()=>{
@@ -105,15 +110,73 @@ describe('HiringCriteriaStep',()=>{
 
  it('blocks approval until location is entered',async()=>{
   await render();
-  const loc=host.querySelector('input[placeholder^="Not stated in the JD — please add (e.g."]') as HTMLInputElement;
+  const loc=host.querySelector('input[placeholder^="City, Country"]') as HTMLInputElement;
   const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
   await act(async()=>{setter.call(loc,'');loc.dispatchEvent(new Event('input',{bubbles:true}));});
   expect(button('Approve criteria').disabled).toBe(true);
   expect(host.textContent).toContain('Add experience and location to approve');
   expect(loc.getAttribute('aria-invalid')).toBe('true');expect(loc.getAttribute('aria-describedby')).toBe('loc-missing');
   expect(host.querySelector('#loc-missing')?.textContent).toContain('Required');
-  await act(async()=>{setter.call(loc,'Remote');loc.dispatchEvent(new Event('input',{bubbles:true}));});
+  await act(async()=>{setter.call(loc,'India');loc.dispatchEvent(new Event('input',{bubbles:true}));});
   expect(button('Approve criteria').disabled).toBe(false);
+ });
+
+ it('does not interpret raw Details geography; preserves wording for review',async()=>{
+  await render({...details,location:'Bengaluru, India (hybrid, three days a week in office)'});
+  const loc=host.querySelector('input[placeholder^="City, Country"]') as HTMLInputElement;
+  const arr=host.querySelector('input[placeholder^="e.g. Hybrid"]') as HTMLInputElement;
+  expect(loc.value).toBe('Bengaluru, India (hybrid, three days a week in office)');expect(arr.value).toBe('');
+  expect(host.textContent).toContain('Put hybrid, remote or office details under Work arrangement');
+  expect(button('Approve criteria').disabled).toBe(true);
+ });
+
+ it('asks for the country instead of guessing one, and blocks approval until it is a place we can match',async()=>{
+  await render();
+  const loc=host.querySelector('input[placeholder^="City, Country"]') as HTMLInputElement;
+  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
+  for(const [value,text] of [['Bengaluru','End the location with a country'],['Bengaluru, India (hybrid)','Put hybrid, remote or office details under Work arrangement'],['Bengaluru or Pune, India','Use one place']] as const){
+   await act(async()=>{setter.call(loc,value);loc.dispatchEvent(new Event('input',{bubbles:true}));});
+   expect(button('Approve criteria').disabled).toBe(true);
+   expect(host.querySelector('#loc-missing')?.textContent).toContain(text);
+   expect(loc.value).toBe(value);
+  }
+  await act(async()=>{setter.call(loc,'Bengaluru, India');loc.dispatchEvent(new Event('input',{bubbles:true}));});
+  expect(button('Approve criteria').disabled).toBe(false);
+ });
+
+ it.each([['Bengaluru or Pune, India','Use one place'],['Lahore, Punjab','End the location with a country'],['Dubai, UAE','Write the country as "United Arab Emirates"']] as const)
+ ('Details location %s is shown as written with a fix, never changed, and blocks approval',async(raw,text)=>{
+  await render({...details,location:raw});
+  const loc=host.querySelector('input[placeholder^="City, Country"]') as HTMLInputElement;
+  expect(loc.value).toBe(raw);
+  expect(host.querySelector('#loc-missing')?.textContent).toContain(text);
+  expect(button('Approve criteria').disabled).toBe(true);
+ });
+
+ it('a typed alias the scorer cannot match gets the exact spelling to use',async()=>{
+  await render();
+  const loc=host.querySelector('input[placeholder^="City, Country"]') as HTMLInputElement;
+  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
+  await act(async()=>{setter.call(loc,'Dubai, UAE');loc.dispatchEvent(new Event('input',{bubbles:true}));});
+  expect(host.querySelector('#loc-missing')?.textContent).toContain('Write the country as "United Arab Emirates"');
+  expect(button('Approve criteria').disabled).toBe(true);
+  await act(async()=>{setter.call(loc,'Bengaluru, India.');loc.dispatchEvent(new Event('input',{bubbles:true}));});
+  expect(host.querySelector('#loc-missing')?.textContent).toContain('no full stop');
+ });
+
+ it('saves the place and the work arrangement together, then approves',async()=>{
+  apiRequest.mockImplementation(async(_m:string,url:string)=>{
+   if(url.endsWith('/brief'))return {json:async()=>({revision:'2',versionId:'11111111-1111-4111-8111-111111111111'})};
+   if(url.endsWith('/brief/approve'))return {json:async()=>({revision:'3',versionId:'11111111-1111-4111-8111-111111111111'})};
+   return {json:async()=>({})};});
+  await render();
+  const arr=host.querySelector('input[placeholder^="e.g. Hybrid"]') as HTMLInputElement;
+  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
+  await act(async()=>{setter.call(arr,'Hybrid, 3 days a week in office');arr.dispatchEvent(new Event('input',{bubbles:true}));});
+  await act(async()=>button('Approve criteria').click());await settle(10);
+  const saved=apiRequest.mock.calls.find(c=>c[1]==='/api/jobs/42/brief')![2];
+  const loc=saved.payload.criteria.find((c:any)=>c.subject==='location');
+  expect(loc.requirement).toEqual({kind:'text',value:'Bengaluru, India'});expect(loc.note).toBe('Hybrid, 3 days a week in office');
  });
 
  it('drafts automatically exactly once when the server switch is on, and shows the AI draft',async()=>{
@@ -315,8 +378,8 @@ describe('HiringCriteriaStep',()=>{
   const add=vi.spyOn(window,'addEventListener');
   await render();
   expect(add.mock.calls.some(c=>c[0]==='beforeunload')).toBe(false);
-  const loc=host.querySelector('input[placeholder^="Not stated in the JD — please add (e.g."]') as HTMLInputElement;
-  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(loc,'Remote');loc.dispatchEvent(new Event('input',{bubbles:true}));});
+  const loc=host.querySelector('input[placeholder^="City, Country"]') as HTMLInputElement;
+  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(loc,'India');loc.dispatchEvent(new Event('input',{bubbles:true}));});
   expect(add.mock.calls.some(c=>c[0]==='beforeunload')).toBe(true);add.mockRestore();
  });
 
