@@ -35,12 +35,17 @@ describe('model extraction boundary',()=>{
   it.each([
     ['relevant_work','Led at least two launches','Led at least two launches is required.'],
     ['language','Fluent German','Fluent German is required.'],
-    ['location','Bengaluru, hybrid three days per week','Bengaluru, hybrid three days per week is required.'],
   ])('preserves specific text for %s', (subject,value,quote)=>{
     const requirement={kind:'text',value};
     const out=run({criteria:[{...criterion,label:value,subject,requirement,quote}],unrepresented:[]},quote);
     expect(out.criteria[0]!.requirement).toEqual(requirement);
     expect(out.criteria[0]!.label).toBe(value);
+  });
+  it('location keeps the place to score and the work arrangement in the note',()=>{
+    const quote='Bengaluru, India, hybrid three days per week is required.';
+    const out=run({criteria:[{...criterion,label:'Location',subject:'location',requirement:{kind:'text',value:'Bengaluru, India, hybrid three days per week'},location:{scope:'city',city:'Bengaluru',country:'India',workArrangement:'hybrid three days per week'},quote}],unrepresented:[]},quote);
+    expect(out.criteria[0]!.requirement).toEqual({kind:'text',value:'Bengaluru, India'});
+    expect(out.criteria[0]!.note).toBe('hybrid three days per week');
   });
   it('preserves both ends of an experience range',()=>{
     const quote='8–12 years of experience required.';

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { acceptedSkillsShape, duplicateSkillNames, overlappingSkillCriteria } from '../../shared/skill-alternatives';
 import { resolveJobDescription } from '../../shared/jobDescription';
 import { reviewSelectionSchema } from '../../shared/brief-review';
+import { locationValueProblem } from '../../shared/brief-location';
 
 export const BRIEF_TABLES = ['job_brief_state', 'job_brief_versions', 'job_brief_events', 'job_brief_draft_requests'] as const;
 export const BRIEF_FUNCTIONS = [
@@ -119,7 +120,12 @@ export const briefPayloadSchema = z.object({
 });
 export type BriefPayload = z.infer<typeof briefPayloadSchema>;
 /** Historical versions remain readable; only an explicit v3 save can be approved. */
-export const currentBriefPayloadSchema = briefPayloadSchema.refine(v=>v.schemaVersion===BRIEF_VERSION, 'Review and save the updated brief');
+export const currentBriefPayloadSchema = briefPayloadSchema.refine(v=>v.schemaVersion===BRIEF_VERSION, 'Review and save the updated brief')
+  // New saves only: the scored location must be a place Discover can match ("Country" or "City, Country").
+  // Already-saved briefs are read with briefPayloadSchema and stay readable.
+  .superRefine((v,ctx)=>{for(const c of v.criteria) if(c.subject==='location'
+    && (c.requirement.kind!=='text' || locationValueProblem(c.requirement.value)!==null))
+    ctx.addIssue({code:z.ZodIssueCode.custom,message:'BRIEF_LOCATION_INVALID'});});
 export const currentJdSchema = z.string().min(1)
   .refine(v => Buffer.byteLength(v, 'utf8') <= MAX_JD_BYTES, 'JD exceeds byte limit')
   .refine(v => resolveJobDescription({ originalJD: v }).resolution !== 'unavailable', 'JD must be prose');

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { extractedLocationSchema } from './brief-location';
 
 /** Browser-safe D4 wire primitives; saved criteria remain the existing v3 contract. */
 export const REVIEW_CONTRACT_VERSION = 1 as const;
@@ -11,6 +12,7 @@ export const extractionItemSchema = z.object({
   text: text(500), priority: z.enum(['required', 'preferred', 'unclear']),
   topic: z.enum(['skill', 'title', 'overall_experience', 'location', 'language', 'education', 'certification', 'relevant_work', 'other']),
   quote: text(2000), terms: z.array(text(120)).max(20),
+  location: extractedLocationSchema.nullish(),
   /** How a skill item's terms relate. Omitted = single. Code re-checks it against the quoted JD wording. */
   relation: z.enum(['single', 'any_of', 'examples_of']).nullish().transform(v => v ?? 'single'),
   /** examples_of only: the broader capability the named tools illustrate. */

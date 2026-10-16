@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { requirementExtractionSchema, reviewSelectionSchema, type ExtractedRequirement, type ReviewDisposition, type ReviewItem as WireReviewItem } from '../../shared/brief-review';
+import { formatExtractedLocation, LOCATION_EXTRACTION_INSTRUCTIONS } from '../../shared/brief-location';
 import { currentBriefPayloadSchema, sourceHash, type BriefPayload } from './contracts';
 
 type Criterion = BriefPayload['criteria'][number];
@@ -145,6 +146,14 @@ function candidate(item: ExtractedRequirement, span: {start:number;end:number}, 
       const subject=TEXT_SUBJECT[item.topic as keyof typeof TEXT_SUBJECT];
       if(!subject)return null;
       c.subject=subject;
+      if(subject==='location') {
+        // The model interprets geography; code formats its typed fields only.
+        // Missing/unsupported extraction stays visible instead of parsing the prose here.
+        const {place,note}=formatExtractedLocation(item.location);
+        if(!place)return null;
+        c.label='Location';c.requirement={kind:'text',value:place};
+        if(note)c.note=note;
+      }
     }
   }
   if(foundation) c.class='must_have';
@@ -227,4 +236,5 @@ Choose the relation from the JD wording:
 - any_of: the JD lets the candidate choose ("A or B", "A/B", "one of A, B"); terms lists every choice.
 - examples_of: tools given as examples of a broader capability ("A or similar", "such as A", "e.g. A", "A or equivalent"); capability names it in a few words, terms lists examples. Never require an example on its own.
 - Skills all required together ("A and B", "A, B, C" without "or") are separate items, one per skill, quoting the same line.
-Title terms contain stated titles. Overall experience uses minimum/maximum; other experience is relevant_work text. Stated job location (with work mode) is location, required. Degrees are education. location/language/education/certification/relevant_work use text, empty terms, null numbers. Preserve quantities, language names, location/mode and qualifiers. Copy quotes without shortening. Use other/unclear only when meaning cannot be represented. Report all requirements, up to 64 items; set overflow true if more remain.`;
+Title terms contain stated titles. Overall experience uses minimum/maximum; other experience is relevant_work text. Stated job location (with work mode) is location, required. Degrees are education. location/language/education/certification/relevant_work use text, empty terms, null numbers. Preserve quantities, language names, location/mode and qualifiers. Copy quotes without shortening. Use other/unclear only when meaning cannot be represented. Report all requirements, up to 64 items; set overflow true if more remain.
+${LOCATION_EXTRACTION_INSTRUCTIONS}`;
