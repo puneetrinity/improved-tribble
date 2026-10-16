@@ -3,8 +3,9 @@ import { computeTotalExperienceYears } from "@/lib/sourcing-experience";
 import { Button } from "@/components/ui/button";
 import {
   Star, MapPin, Building, Briefcase, CheckCircle2,
-  Mail, Phone, Github, Twitter, Linkedin, Sparkles, Loader2,
+  Mail, Phone, Github, Twitter, Linkedin, Sparkles, Loader2, FileText,
 } from "lucide-react";
+import { allowsPublicContact, applicationHref, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
 import {
@@ -137,6 +138,10 @@ export function CandidateCard({
   );
 
   const name = candidate.crustdata?.basic_profile?.name || "Unknown Candidate";
+  // Past applicants: no LinkedIn, paid contact lookup or outreach; malformed origin fails closed.
+  const origin = readCandidateOrigin(candidate.candidateOrigin);
+  const publicContact = allowsPublicContact(origin);
+  const appHref = applicationHref(origin);
   const headline = candidate.crustdata?.basic_profile?.headline || null;
   const locationDisplay = candidate.crustdata?.basic_profile?.location?.full_location
     || candidate.crustdata?.basic_profile?.location?.raw || null;
@@ -243,6 +248,15 @@ export function CandidateCard({
               score={candidate.fitScore}
               matchStrength={candidate.matchStrength}
             />}
+            {origin.kind === "organization_candidate" && (
+              <Badge variant="outline" data-origin-badge="" className="text-xs bg-indigo-50 text-indigo-800 border-indigo-200 shrink-0">
+                <FileText className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+                Previous applicant
+              </Badge>
+            )}
+            {origin.kind === "invalid" && (
+              <Badge variant="outline" data-origin-badge="" className="text-xs shrink-0">Applicant details unavailable</Badge>
+            )}
             {candidate.engagementReady && !candidate.ranking && (
               <Badge
                 variant="outline"
@@ -302,7 +316,7 @@ export function CandidateCard({
             </p>
           )}
 
-          {shortlistMode && (
+          {shortlistMode && publicContact && (
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <div className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50/70 px-3 py-1.5 text-xs">
                 <Mail className="h-3.5 w-3.5 text-amber-700" />
@@ -378,7 +392,7 @@ export function CandidateCard({
           {/* Row 6: contact icons + freshness */}
           <div className="flex items-center justify-between pt-3 mt-2 border-t border-border/40">
             <div className="flex items-center gap-3">
-              {signals?.emailAvailable && (
+              {publicContact && signals?.emailAvailable && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span>
@@ -390,7 +404,7 @@ export function CandidateCard({
                   </TooltipContent>
                 </Tooltip>
               )}
-              {signals?.phoneAvailable && (
+              {publicContact && signals?.phoneAvailable && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span>
@@ -402,7 +416,7 @@ export function CandidateCard({
                   </TooltipContent>
                 </Tooltip>
               )}
-              {signals?.github && (
+              {publicContact && signals?.github && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <a
@@ -417,7 +431,7 @@ export function CandidateCard({
                   <TooltipContent side="top" className="text-xs">GitHub</TooltipContent>
                 </Tooltip>
               )}
-              {signals?.twitter && (
+              {publicContact && signals?.twitter && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <a
@@ -432,7 +446,7 @@ export function CandidateCard({
                   <TooltipContent side="top" className="text-xs">Twitter/X</TooltipContent>
                 </Tooltip>
               )}
-              {candidate.linkedinUrl && (
+              {publicContact && candidate.linkedinUrl && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <a
@@ -446,6 +460,14 @@ export function CandidateCard({
                   </TooltipTrigger>
                   <TooltipContent side="top" className="text-xs">Open LinkedIn</TooltipContent>
                 </Tooltip>
+              )}
+              {appHref && (
+                <Button asChild size="sm" variant="outline" className="min-h-11 text-xs">
+                  <a href={appHref} onClick={(e) => e.stopPropagation()}>
+                    <FileText className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+                    Open application
+                  </a>
+                </Button>
               )}
             </div>
 
