@@ -11,13 +11,13 @@ vi.mock('../../client/src/components/ui/sheet',()=>({
  SheetContent:({children,...props}:any)=><div {...props}>{children}</div>,
  SheetHeader:({children}:any)=><div>{children}</div>,
  SheetTitle:({children}:any)=><h2>{children}</h2>,
+ SheetDescription:({children}:any)=><p>{children}</p>,
 }));
 import {CandidateDrawer} from '../../client/src/components/sourcing/CandidateDrawer';
 
 describe('past-applicant origin reader (fails closed)',()=>{
  it('treats a missing origin as the historical public profile',()=>{
   expect(readCandidateOrigin(undefined)).toEqual({kind:'public_profile'});
-  expect(readCandidateOrigin(null)).toEqual({kind:'public_profile'});
   expect(readCandidateOrigin({version:1,kind:'public_profile'})).toEqual({kind:'public_profile'});
  });
  it('reads a valid applicant origin and builds the application link',()=>{
@@ -34,7 +34,7 @@ describe('past-applicant origin reader (fails closed)',()=>{
   ['zero id',{version:1,kind:'organization_candidate',applicationId:0,applicationJobId:7}],
   ['extra field',{version:1,kind:'organization_candidate',applicationId:41,applicationJobId:7,email:'x@y.z'}],
   ['public with extra field',{version:1,kind:'public_profile',linkedinUrl:'https://linkedin.com/in/x'}],
-  ['array',[]],['string','organization_candidate'],
+  ['array',[]],['string','organization_candidate'],['null (damaged)',null],
  ])('marks %s as invalid with no public contact',(_l,v)=>{
   const o=readCandidateOrigin(v);
   expect(o).toEqual({kind:'invalid'});expect(allowsPublicContact(o)).toBe(false);expect(applicationHref(o)).toBeNull();
@@ -99,5 +99,47 @@ describe('past-applicant card and detail panel',()=>{
   await drawer(malformed);
   expect(host.textContent).toContain('Contact details aren’t available for this result.');
   expect(host.textContent).not.toContain('person@example.com');expect(linkedin()).toHaveLength(0);
+ });
+});
+
+import {ColdOutreachSidebar} from '../../client/src/components/outreach/ColdOutreachSidebar';
+describe('cold outreach re-checks eligibility before sending',()=>{
+ let host:HTMLDivElement,root:Root;
+ beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;host=document.createElement('div');
+  document.body.append(host);root=createRoot(host);});
+ afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+ const a={...base,id:1,outreachCount:0},b={...base,id:2,outreachCount:0,crustdata:{basic_profile:{name:'Second Person'}}};
+ const drafts={campaignLabel:'First Campaign',campaignSummary:'s',drafts:[1,2].map(id=>({candidateId:id,name:'n'+id,email:`p${id}@example.com`,subject:'Hi',body:'<p>Hello</p>'}))};
+ const button=(label:string)=>[...host.querySelectorAll('button')].find(x=>x.textContent?.trim()===label) as HTMLButtonElement|undefined;
+ const render=(cands:any[],onDraft:any,onSend:any)=>act(async()=>root.render(<ColdOutreachSidebar open onOpenChange={()=>{}} candidates={cands}
+  campaignRound={1} onDraft={onDraft} onSend={onSend} isDrafting={false} isSending={false}/>));
+ it('never drafts for a past applicant',async()=>{
+  const onDraft=vi.fn().mockResolvedValue(drafts);
+  await render([a,{...b,candidateOrigin:{version:1,kind:'organization_candidate',applicationId:5,applicationJobId:1}}],onDraft,vi.fn());
+  await act(async()=>button('Start First Campaign')!.click());
+  expect(onDraft).toHaveBeenCalledTimes(1);expect(onDraft.mock.calls[0][0].candidateIds).toEqual([1]);
+ });
+ it('holds back a draft whose candidate became an applicant after drafting, and reports it',async()=>{
+  const onDraft=vi.fn().mockResolvedValue(drafts);
+  const onSend=vi.fn().mockResolvedValue({sent:1,failed:0,skipped:0,campaign:{campaignId:'x',campaignRound:1,audienceCount:1},results:[]});
+  await render([a,b],onDraft,onSend);
+  await act(async()=>button('Start First Campaign')!.click());
+  expect(onDraft.mock.calls[0][0].candidateIds).toEqual([1,2]);
+  // Candidate 2 applies while the drafts are open.
+  await render([a,{...b,candidateOrigin:{version:1,kind:'organization_candidate',applicationId:5,applicationJobId:1}}],onDraft,onSend);
+  expect(host.querySelector('[data-withheld-drafts]')?.textContent).toContain('1 draft won’t be sent');
+  await act(async()=>button('Send First Campaign')!.click());
+  expect(onSend).toHaveBeenCalledTimes(1);
+  expect(onSend.mock.calls[0][0].messages.map((m:any)=>m.candidateId)).toEqual([1]);
+  expect(host.textContent).toContain('1 not sent (no longer eligible)');
+ });
+ it('sends nothing when every draft became ineligible',async()=>{
+  const onDraft=vi.fn().mockResolvedValue({...drafts,drafts:drafts.drafts.slice(0,1)});const onSend=vi.fn();
+  await render([a],onDraft,onSend);
+  await act(async()=>button('Start First Campaign')!.click());
+  await render([{...a,candidateOrigin:null}],onDraft,onSend);
+  expect(button('Send First Campaign')!.disabled).toBe(true);
+  await act(async()=>button('Send First Campaign')!.click());
+  expect(onSend).not.toHaveBeenCalled();
  });
 });

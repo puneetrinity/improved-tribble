@@ -4,9 +4,9 @@
  * `shared/sourcing-candidate-origin.ts` lands. The server still enforces access;
  * these IDs are display links, never permission grants.
  *
- * Fail closed: a missing origin means the historical public profile, but a
- * malformed or unknown origin is 'invalid' and must show no LinkedIn, contact
- * or outreach controls.
+ * Fail closed: only an ABSENT origin means the historical public profile. null,
+ * malformed or unknown origins are 'invalid' and show no LinkedIn, contact or
+ * outreach controls.
  */
 export type SourcingCandidateOrigin =
   | { version: 1; kind: 'public_profile' }
@@ -20,8 +20,8 @@ export type ReadOrigin =
 const positiveInt = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0;
 
 export function readCandidateOrigin(value: unknown): ReadOrigin {
-  if (value === undefined || value === null) return { kind: 'public_profile' };
-  if (typeof value !== 'object' || Array.isArray(value)) return { kind: 'invalid' };
+  if (value === undefined) return { kind: 'public_profile' };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return { kind: 'invalid' };
   const v = value as Record<string, unknown>;
   if (v.version !== 1) return { kind: 'invalid' };
   if (v.kind === 'public_profile' && Object.keys(v).length === 2) return { kind: 'public_profile' };
