@@ -14,6 +14,42 @@ const digest = { topSkills: ['Python','Invented skill'], seniorityLevel: 'senior
   titleSearchTerms: ['Backend Engineer','Software Engineer'], adjacentBuckets: [['Platform Engineer']], adjacentLocations: [], tokenCount: 100, version: 3 };
 
 describe('durable preparation failure classification',()=>{
+  it('sends restored search guidance and nested fallback shape in the actual model request',async()=>{
+    const call=vi.fn(async(operation:string)=>operation==='digestFinish'?{state:'succeeded'}:{state:'ready'});
+    const create=vi.fn(async(..._args:unknown[])=>({choices:[{finish_reason:'stop',message:{content:JSON.stringify(digest)}}]}));
+    await executeDigestPreparation({call} as unknown as SourcingRepository,{organizationId:1,jobId:2,actorId:3,requestId:id,model:'fixture'},
+      {client:{chat:{completions:{create}}} as unknown as Groq,claim:{id,state:'started',lease:id,model:'fixture',basis,basisHash:digestBasisHash(basis)}});
+    expect(create).toHaveBeenCalledTimes(1);
+    const [request,options]=create.mock.calls[0] as [any,any];
+    expect(request).toMatchObject({model:'fixture',response_format:{type:'json_object'},max_tokens:4096});
+    expect(options).toMatchObject({maxRetries:0,timeout:30_000});
+    const prompt=request.messages.find((m:any)=>m.role==='system').content;
+    // Independent literals, not the exported constant: removing its use or
+    // damaging the array-of-arrays instruction must both fail this test.
+    for(const instruction of [
+      '3-6 literal job titles that people doing THIS role hold on LinkedIn',
+      'Include common variants and synonyms',
+      'NEVER generic catch-alls',
+      'Do NOT include seniority words (senior/junior/lead)',
+      'an array of 0-3 arrays (later search rungs), each an array of 1-4 literal LinkedIn titles',
+      'close, role-relevant adjacent',
+      'distinct from titleSearchTerms and from other buckets',
+      'each title 3-60 characters',
+      'The approved criteria override contradictory prose',
+      'Do not add skills or requirements not approved',
+    ])expect(prompt).toContain(instruction);
+    expect(JSON.parse(request.messages.find((m:any)=>m.role==='user').content)).toEqual(basis);
+    expect(call.mock.calls.map(([operation])=>operation)).toEqual(['digestFinish','artifactPut']);
+  });
+  it('refuses a flat fallback list without storing a purchasable query',async()=>{
+    const call=vi.fn(async(_operation:string,_args:unknown[])=>({state:'failed'}));
+    const create=vi.fn(async()=>({choices:[{finish_reason:'stop',message:{content:JSON.stringify({...digest,adjacentBuckets:['Platform Engineer']})}}]}));
+    await executeDigestPreparation({call} as unknown as SourcingRepository,{organizationId:1,jobId:2,actorId:3,requestId:id,model:'fixture'},
+      {client:{chat:{completions:{create}}} as unknown as Groq,claim:{id,state:'started',lease:id,model:'fixture',basis,basisHash:digestBasisHash(basis)}});
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(call).toHaveBeenCalledTimes(1);
+    expect(call).toHaveBeenCalledWith('digestFinish',[id,id,{state:'failed',code:'SOURCING_DIGEST_INVALID'}]);
+  });
   it.each([401,429,503])('settles provider HTTP %s without leaving preparation started',async status=>{
     const call=vi.fn(async(operation:string,args:unknown[])=>operation==='digestFinish'?args[2]:null);
     const create=vi.fn(async()=>{throw Object.assign(Error('private provider detail'),{status});});
