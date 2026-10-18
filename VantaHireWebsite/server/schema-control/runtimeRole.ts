@@ -52,6 +52,7 @@ interface DatabaseFingerprint {
 
 const DECISION_EVENT_TABLE = "public.decision_events";
 const DECISION_EVENT_SEQUENCE = "public.decision_event_sequence";
+const APPLICATION_SOURCE_TABLE = "public.application_source_records";
 const DECISION_OUTBOX_TABLE = "public.decision_projection_outbox";
 const DECISION_OUTBOX_SEQUENCE = "public.decision_projection_outbox_sequence";
 const DECISION_DELIVERY_TABLE = "public.decision_projection_delivery_state";
@@ -237,6 +238,17 @@ export async function assertRuntimeRoleContract(
               )
               OR
               (
+                c.relname = 'application_source_records'
+                AND has_table_privilege($1,c.oid,'INSERT')
+                AND NOT has_table_privilege($1,c.oid,'SELECT')
+                AND NOT has_table_privilege($1,c.oid,'UPDATE')
+                AND NOT has_table_privilege($1,c.oid,'DELETE')
+                AND NOT has_table_privilege($1,c.oid,'TRUNCATE')
+                AND NOT has_table_privilege($1,c.oid,'REFERENCES')
+                AND NOT has_table_privilege($1,c.oid,'TRIGGER')
+              )
+              OR
+              (
                 c.relname = 'decision_projection_delivery_state'
                 AND NOT has_table_privilege($1,c.oid,'SELECT')
                 AND NOT has_table_privilege($1,c.oid,'INSERT')
@@ -271,7 +283,7 @@ export async function assertRuntimeRoleContract(
               OR
               (
                 c.relname NOT IN (
-                  'decision_events','decision_projection_outbox','decision_projection_delivery_state',
+                  'decision_events','decision_projection_outbox','decision_projection_delivery_state','application_source_records',
                   'organization_candidate_references','application_resume_versions',
                   'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
                   'candidate_consent_events','candidate_consent_outbox',
@@ -470,6 +482,15 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
         await migration.query(`GRANT INSERT ON TABLE ${DECISION_EVENT_TABLE} TO ${ident}`);
         await migration.query(`REVOKE ALL PRIVILEGES ON SEQUENCE ${DECISION_EVENT_SEQUENCE} FROM ${ident}`);
         await migration.query(`GRANT USAGE ON SEQUENCE ${DECISION_EVENT_SEQUENCE} TO ${ident}`);
+      }
+
+      // Applicant source tracking is owner-only: the ordinary runtime may record
+      // a row with the application but never read, change or delete it.
+      // Conditional so manifests before 0020 remain provisionable.
+      const sourceRecords = await migration.query("SELECT to_regclass($1) AS source_table", [APPLICATION_SOURCE_TABLE]);
+      if (sourceRecords.rows[0]?.source_table) {
+        await migration.query(`REVOKE ALL PRIVILEGES ON TABLE ${APPLICATION_SOURCE_TABLE} FROM ${ident}`);
+        await migration.query(`GRANT INSERT ON TABLE ${APPLICATION_SOURCE_TABLE} TO ${ident}`);
       }
 
       // Wave 3B uses the same write-only boundary for immutable projection

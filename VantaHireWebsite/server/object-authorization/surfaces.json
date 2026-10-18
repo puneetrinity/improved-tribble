@@ -790,19 +790,19 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "7c12090fbce81aabbfc6eb1b1d2a8ebe0792ac62cf45cce278aeec9a96a4827e"
+      "sha256": "c3969963dacb9ffc074acfb667291d3db5a579460597971a5f0e2332b4b4204a"
     },
     {
       "file": "package.json",
-      "sha256": "c9de3726f183563a5952512355b9e3d9443f0528a4f3a703b86c1f75e5bb5be8"
+      "sha256": "5f1d8388370c02c78695074720b2c6bae1c24b4f16deebadc31e7161054b18cf"
     },
     {
       "file": "vitest.server.config.ts",
-      "sha256": "aa3987856637cb68b917feee6f8e2bbed626fe3f9426032bd16254f91d5536fe"
+      "sha256": "27f3e8aae976d6bd8eb22261c34267ede1ab28dd98e3a97c0eb8093333649a17"
     },
     {
       "file": "server/applications.routes.ts",
-      "sha256": "fc0775fd0affef38c3ac487d10a631eb949d96c80d89c8c85938d6cbf671613b"
+      "sha256": "488db8204c5c4f14349c8a0ac466e59593642d7489d65104ea32dd64abdae12f"
     },
     {
       "file": "server/communications.routes.ts",
@@ -850,7 +850,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "b5a9283beca6fae2ae02659bed67f90de3b7244148b2796efb0a89acf8e97553"
+      "sha256": "b66fd2af852258c60af2ae325672f7dfda997778dabfca2de35cef126a3e2dfa"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -962,7 +962,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "ff151b51679b8484673ad67f5a6e13e986db7104aa79a2e40dde28859d903d01"
+      "sha256": "e64e43d2c81e6d010a416b8a2019e1a6a4f8d69fa4341b7a75e0b2667ce47848"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -1010,15 +1010,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "bdcc636d579f15b46f848fd674f370ccf3ea4a17244a2321e52d82c5fee26135"
+      "sha256": "be5d7491da9128786bd498d109d8f17ed1833f31c036b3b2b8d602db8c160c87"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "e44f8ea819cc2cc5f3e5f2c62543a6b85ec1276ee3be8ddb2a0f2694cbf1323e"
+      "sha256": "ef745fd5aae89d4c5d7f79dc8d96db2675f5e58d5375906c077926463c4f85e1"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "20a10c7ca17f3e7c40b18db8b1b679e34533cbe2bb3ee5c8c33cc4173799ce4b"
+      "sha256": "462196f9149bc1849099e6f45bb839b166c2794d94a0d64974cf06729cf694fe"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",

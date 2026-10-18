@@ -1994,7 +1994,9 @@ function validateDecisionEventSpine(root, problems) {
     "NOT has_sequence_privilege($1,c.oid,'SELECT')", "NOT has_sequence_privilege($1,c.oid,'UPDATE')",
     "GRANT INSERT ON TABLE ${DECISION_EVENT_TABLE}", "GRANT USAGE ON SEQUENCE ${DECISION_EVENT_SEQUENCE}",
   ]) requireAnchor(problems, runtimeRole, anchor, `decision-event runtime-role anchor is missing: ${anchor}`);
-  if (count(runtimeRole, "NOT has_table_privilege($1,c.oid,'SELECT')") !== 2) {
+  // Three SELECT denials: decision events/outbox, delivery state and the
+  // owner-only application_source_records (insert-only runtime boundary).
+  if (count(runtimeRole, "NOT has_table_privilege($1,c.oid,'SELECT')") !== 3) {
     problems.push("decision-event runtime-role anchor is missing: NOT has_table_privilege($1,c.oid,'SELECT')");
   }
   for (const anchor of [

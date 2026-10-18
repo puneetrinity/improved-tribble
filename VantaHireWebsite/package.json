@@ -28,6 +28,7 @@
     "test:versioned-invitation-grants:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
     "test:unsafe-org-attribution-retirement:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/unsafeOrgAttributionRetirement.pg.test.ts",
     "test:decision-event-spine:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionEventSpine.pg.test.ts",
+    "test:application-source-records:pg": "vitest run --config vitest.server.config.ts server/tests/applicationSourceRecords.pg.test.ts --hookTimeout=120000",
     "test:decision-projection-outbox:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionProjectionOutbox.pg.test.ts --hookTimeout=60000",
     "test:decision-projection-delivery:pg": "vitest run --config vitest.server.config.ts server/lib/__tests__/decisionProjectionDelivery.pg.test.ts --hookTimeout=60000",
     "test:organization-candidate-intake": "vitest run --config vitest.server.config.ts server/lib/__tests__/candidatePortalResumeApplyContracts.test.ts",

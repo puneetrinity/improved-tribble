@@ -15,6 +15,7 @@ export default defineConfig({
       'server/tests/candidatePrivacy.pg.test.ts',
       'server/tests/applicationReadAuthorization.pg.test.ts',
       'server/tests/interviewIcsAuthorization.routes.test.ts',
+      'server/tests/applicationSourceRecords.pg.test.ts',
     ],
   },
   resolve: {
