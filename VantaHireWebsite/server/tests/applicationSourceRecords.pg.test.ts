@@ -22,6 +22,7 @@ const targetId = "flow-application-source-test-target";
 
 let owner: Client | undefined;
 let runtime: Client | undefined;
+let latestVersion = "";
 const runtimeRole = () => new URL(runtimeUrl).username;
 
 async function clientFor(url: string): Promise<Client> {
@@ -90,7 +91,9 @@ describe.skipIf(!enabled)("application_source_records exact-schema PostgreSQL", 
       creds: { migrateUrl: migrationUrl, expectedTargetId: targetId, environment: "development", allowFreshInitialization: true },
       connect: connectMigration,
     });
-    expect(release.applied.at(-1)).toBe("0020");
+    // 0020 owns this table; later migrations may follow, so readiness is checked against the actual tail.
+    expect(release.applied).toContain("0020");
+    latestVersion = release.applied.at(-1)!;
     await provision();
     owner = await clientFor(migrationUrl);
     runtime = await clientFor(runtimeUrl);
@@ -169,14 +172,14 @@ describe.skipIf(!enabled)("application_source_records exact-schema PostgreSQL", 
       has_table_privilege($1,'public.application_source_records','UPDATE') upd,
       has_table_privilege($1,'public.application_source_records','DELETE') del`, [runtimeRole()])).rows[0];
     expect(p).toEqual({ ins: true, sel: false, upd: false, del: false });
-    await expect(readiness()).resolves.toMatchObject({ version: "0020" });
+    await expect(readiness()).resolves.toMatchObject({ version: latestVersion });
   });
 
   it("readiness refuses a direct or inherited read grant", async () => {
     await owner!.query(`GRANT SELECT ON public.application_source_records TO ${runtimeRole()}`);
     await expect(readiness()).rejects.toThrow();
     await provision();
-    await expect(readiness()).resolves.toMatchObject({ version: "0020" });
+    await expect(readiness()).resolves.toMatchObject({ version: latestVersion });
     await owner!.query("DROP ROLE IF EXISTS app_source_reader_test");
     await owner!.query("CREATE ROLE app_source_reader_test NOLOGIN");
     await owner!.query("GRANT SELECT ON public.application_source_records TO app_source_reader_test");
@@ -188,7 +191,7 @@ describe.skipIf(!enabled)("application_source_records exact-schema PostgreSQL", 
       await owner!.query("REVOKE ALL ON public.application_source_records FROM app_source_reader_test");
       await owner!.query("DROP ROLE app_source_reader_test");
     }
-    await expect(readiness()).resolves.toMatchObject({ version: "0020" });
+    await expect(readiness()).resolves.toMatchObject({ version: latestVersion });
   });
 
   it("no server code reads the table; only the public apply route inserts into it", () => {

@@ -288,9 +288,11 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
   it('settles an exact lease once and never writes a version from a model result',async()=>{
     await saveVersion();const request=randomUUID();
     const claim=await call("SELECT flow_job_brief_draft_claim(90001,90001,90001,$1,1,$2,'synthetic-model',$3) result",[request,sourceHash(jd),sourceHash('draft')]);
-    const done=await call('SELECT flow_job_brief_draft_finish($1,$2,$3) result',[request,claim.lease,{state:'succeeded',result:payload,inputTokens:12,outputTokens:45}]);
+    // New claims record the current draft format (4), so the model result must be version 4.
+    const draft={...payload,schemaVersion:4,compilerVersion:4,taxonomyVersion:4};
+    const done=await call('SELECT flow_job_brief_draft_finish($1,$2,$3) result',[request,claim.lease,{state:'succeeded',result:draft,inputTokens:12,outputTokens:45}]);
     expect(done.state).toBe('succeeded');expect((await read()).revision).toBe('1');
-    await expect(call('SELECT flow_job_brief_draft_finish($1,$2,$3) result',[request,claim.lease,{state:'succeeded',result:payload}])).rejects.toThrow('BRIEF_DRAFT_SETTLED');
+    await expect(call('SELECT flow_job_brief_draft_finish($1,$2,$3) result',[request,claim.lease,{state:'succeeded',result:draft}])).rejects.toThrow('BRIEF_DRAFT_SETTLED');
   });
   it('closes late model proposals as stale after an edit',async()=>{
     await saveVersion();const request=randomUUID();
