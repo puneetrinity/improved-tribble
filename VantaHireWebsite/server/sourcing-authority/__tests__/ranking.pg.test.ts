@@ -132,6 +132,97 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     await expect(action()).rejects.toThrow(message);
     await db.query('ROLLBACK TO SAVEPOINT refused');
   }
+  it('binds applicant eligibility to the exact tenant, request and execution without returning applicant data',async()=>{
+    const f=await boundAdmission();
+    const identity={candidateId:randomUUID(),referenceId:randomUUID(),applicationId:123,applicationJobId:188,
+      resumeVersionId:randomUUID(),sourceId:randomUUID(),generationId:randomUUID(),sourceHash:'a'.repeat(64)};
+    const body={version:1,flowRunId:f.admitted.id,revisionId:randomUUID(),
+      requestId:f.grantCommand.discoverRequestId,externalJobId:95201,items:[{key:'one',identity}]};
+    const call=(tenant='sourcing-fixture-tenant',execution=f.grantCommand.executionAttemptId,value=body)=>
+      one('SELECT flow_sourcing_candidate_eligibility($1,$2,$3,$4::jsonb,$5) result',
+        [tenant,f.admitted.id,execution,value,'b'.repeat(64)]);
+    expect(await call()).toMatchObject({version:1,bodyHash:'b'.repeat(64),results:[{key:'one',decision:'not_found'}]});
+    await refusal(()=>call('another-tenant'),'SOURCING_CANDIDATE_BINDING');
+    await refusal(()=>call('sourcing-fixture-tenant',randomUUID()),'SOURCING_CANDIDATE_BINDING');
+    await refusal(()=>call('sourcing-fixture-tenant',f.grantCommand.executionAttemptId,{...body,externalJobId:95202}),
+      'SOURCING_CANDIDATE_BINDING');
+    await refusal(()=>call('sourcing-fixture-tenant',f.grantCommand.executionAttemptId,{...body,requestId:randomUUID()}),
+      'SOURCING_CANDIDATE_BINDING');
+  });
+  it('allows an acknowledged past application, then excludes a same-job application and stale privacy',async()=>{
+    const f=await boundAdmission();
+    await job(95202);
+    const crossPath=process.env.RESUME_XS_FIXTURE;
+    if(crossPath&&!/^\/tmp\/resume-xs-[a-z0-9-]+\.json$/.test(crossPath))throw Error('SYNTHETIC_FIXTURE_REQUIRED');
+    const transcript=crossPath?JSON.parse(readFileSync(crossPath,'utf8')):null;
+    if(transcript){expect(transcript.synthetic).toBe(true);expect(transcript.scope).toBe(`org_${org}`);}
+    const application=transcript?.response.results[0].identity.applicationId??95103;
+    await db.query(`INSERT INTO applications(id,job_id,organization_id,user_id,name,email,phone,resume_url)
+      VALUES($3,95202,$1,$2,'Synthetic applicant','synthetic@invalid.test','000','gs://test/resume')`,[org,peer,application]);
+    const identity=transcript?.response.results[0].identity??{candidateId:randomUUID(),referenceId:randomUUID(),applicationId:application,applicationJobId:95202,
+      resumeVersionId:randomUUID(),sourceId:randomUUID(),generationId:randomUUID(),sourceHash:'a'.repeat(64)};
+    await db.query(`INSERT INTO organization_candidate_references(reference_id,organization_id,application_id,job_id,origin_code,schema_version,created_at)
+      VALUES($1,$2,$3,95202,'candidate_applied',1,now())`,[identity.referenceId,org,application]);
+    await db.query(`INSERT INTO application_resume_versions(resume_version_id,reference_id,organization_id,application_id,job_id,
+      version,source_kind,source_observed_at,gcs_locator,content_sha256,byte_count,media_type,captured_at,created_at)
+      VALUES($1,$2,$3,$4,95202,1,'direct_upload',now(),'gs://test/resume',$5,1,'application/pdf',now(),now())`,
+      [identity.resumeVersionId,identity.referenceId,org,application,hash]);
+    await db.query(`INSERT INTO organization_candidate_memory_outbox(outbox_id,reference_id,resume_version_id,organization_id,application_id,job_id,
+      idempotency_key,state,next_attempt_at,memory_candidate_id,acknowledged_at,created_at,updated_at)
+      VALUES($1,$2,$3,$4,$5,95202,$6,'acknowledged',now(),$7,now(),now(),now())`,
+      [randomUUID(),identity.referenceId,identity.resumeVersionId,org,application,hash,identity.candidateId]);
+    const outbox=await one('SELECT flow_capture_candidate_index_catchup($1,$2,$3) result',
+      [org,identity.referenceId,identity.resumeVersionId]);
+    await db.query(`INSERT INTO candidate_index_delivery_state(outbox_id,state,accepted_source_id,accepted_command_digest,accepted_at)
+      VALUES($1,'accepted',$2,$3,now())`,[outbox,identity.sourceId,hash]);
+    await db.query(`INSERT INTO candidate_privacy_sync_state(consumer_name,status,last_success_at)
+      VALUES('flow','healthy',now()) ON CONFLICT(consumer_name) DO UPDATE SET status='healthy',last_success_at=now()`);
+    const body={version:1,flowRunId:f.admitted.id,revisionId:randomUUID(),requestId:f.grantCommand.discoverRequestId,
+      externalJobId:95201,items:[{key:'private',identity}]};
+    const call=()=>one('SELECT flow_sourcing_candidate_eligibility($1,$2,$3,$4::jsonb,$5) result',
+      ['sourcing-fixture-tenant',f.admitted.id,f.grantCommand.executionAttemptId,body,hash]);
+    expect((await call()).results).toEqual([{key:'private',decision:'allow'}]);
+    if(transcript){
+      const root=process.env.RESUME_XS_DISCOVER_ROOT;
+      if(root!=='/home/ews/wave5c-private-resume-discover')throw Error('EXPLICIT_LOCAL_PEER_REQUIRED');
+      const {privateResumeHit}=await import(`${root}/src/lib/sourcing/private-resume-contracts.ts`);
+      const {adaptPrivateResume}=await import(`${root}/src/lib/sourcing/rubric/private-resume-evidence.ts`);
+      const {scoreEvidence}=await import(`${root}/src/lib/sourcing/rubric/score.ts`);
+      const discoverContracts=await import(`${root}/src/lib/sourcing/rubric/contracts.ts`);
+      const {parsePrivateOrigin}=await import('../candidate-origin');
+      const {flattenCandidateForUI}=await import('../../lib/services/signal-contracts');
+      const hit=privateResumeHit.parse(transcript.response.results[0]);
+      const payload={schemaVersion:4,compilerVersion:4,taxonomyVersion:4,criteria:[
+        {id:randomUUID(),label:'Python',class:'must_have',subject:'skill',
+          requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},use:'assessment',
+          evidenceKinds:['candidate_provided','profile_evidence'],provenance:{kind:'recruiter_edit'}},
+        ...FOUNDATIONS().map(c=>({...c,evidenceKinds:['candidate_provided','profile_evidence']}))]};
+      const contract=createRankingContract(randomUUID(),hash,payload);
+      expect(discoverContracts.createRankingContract(contract.briefVersionId,hash,payload)).toEqual(contract);
+      const evidence=adaptPrivateResume({candidateId:identity.candidateId,organizationRef:String(org),resume:hit});
+      const scored=scoreEvidence(contract,evidence,'2026-10-18T00:00:00Z');
+      expect(scored.N).toBe(6); // Python + dated experience; no invented location.
+      expect(scored.D).toBe(9);
+      const parsed=parsePrivateOrigin({candidateOrigin:{...identity,version:1,kind:'organization_candidate'}})!;
+      const dto=flattenCandidateForUI({id:1,jobId:95201,signalCandidateId:identity.candidateId,
+        fitScore:null,fitBreakdown:null,sourceType:'pool',state:'shortlisted',
+        foundEmail:'must-not-leak@invalid.test',emailResolveStatus:'resolved',
+        candidateSummary:{candidateOrigin:parsed.display,privateResumeIdentity:identity,
+          linkedinUrl:'https://www.linkedin.com/in/must-not-leak'},lastSyncedAt:null,createdAt:null});
+      expect(dto.candidateOrigin).toEqual(parsed.display);
+      expect(JSON.stringify(dto)).not.toContain('must-not-leak');
+      expect(JSON.stringify(dto)).not.toContain(identity.sourceHash);
+      console.log('RESUME_CROSS_SYSTEM_PASS: signed Memory API -> Discover score 6/9 -> Flow eligibility/display; same-job and stale-privacy checks follow');
+    }
+    body.items[0].identity={...identity,sourceId:randomUUID()};
+    expect((await call()).results).toEqual([{key:'private',decision:'not_found'}]);
+    body.items[0].identity=identity;
+    await db.query(`INSERT INTO applications(job_id,organization_id,user_id,name,email,phone,resume_url)
+      VALUES(95201,$1,$2,'Same synthetic applicant','synthetic@invalid.test','000','gs://test/resume')`,[org,peer]);
+    expect((await call()).results).toEqual([{key:'private',decision:'same_job'}]);
+    await db.query("UPDATE candidate_privacy_sync_state SET last_success_at=now()-interval '5 minutes' WHERE consumer_name='flow'");
+    expect((await call()).results).toEqual([{key:'private',decision:'unavailable'}]);
+  });
   function rangePayload(){return {schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[
     {id:randomUUID(),label:'Role',class:'preferred',subject:'title',requirement:{kind:'accepted_titles',values:['Backend Engineer','Backend Developer']},
       use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'recruiter_edit'}},
@@ -185,6 +276,37 @@ describe.skipIf(!enabled)('rubric ranking Flow admission and delivery on real Po
     expect(dispatch.command.protocolVersion).toBe(2);
     expect(dispatch.command.rankingContract).toEqual(stored);
     await refusal(()=>db.query("UPDATE sourcing_admissions SET ranking_contract=NULL WHERE id=$1",[admitted.id]),'SOURCING_RANKING_IMMUTABLE');
+  });
+  it('retains explicit resume evidence through schema-4 save, approval and admission',async()=>{
+    const payload=rangePayload();
+    payload.schemaVersion=payload.compilerVersion=payload.taxonomyVersion=4;
+    for(const criterion of payload.criteria)criterion.evidenceKinds=['profile_evidence','candidate_provided'];
+    const saved=await savePayload(payload);
+    await one('SELECT flow_job_brief_approve($1,$2,$3,$4,3,$5,$6) result',[org,95201,actor,randomUUID(),saved.versionId,hash]);
+    await db.query(`INSERT INTO sourcing_query_artifacts(id,organization_id,job_id,brief_version_id,material_hash,compiler_version,query_hash,input)
+      SELECT $1,organization_id,job_id,approved_version_id,approved_material_hash,'1',$2,'{}'::jsonb FROM job_brief_state WHERE job_id=95201`,[randomUUID(),hash]);
+    const admitted=await admit(await quote());
+    expect(rankingContractSchema.parse(admitted.rankingContract)).toEqual(admitted.rankingContract);
+    expect(admitted.rankingContract.payload.schemaVersion).toBe(4);
+    expect(createRankingContract(saved.versionId,admitted.rankingContract.materialHash,payload)).toEqual(admitted.rankingContract);
+  });
+  it.each([null,{version:1,kind:'organization_candidate',applicationId:123,applicationJobId:456}])('shortlisting a private or malformed origin never queues contact: %j',async origin=>{
+    const candidate=await legacyCandidate();
+    await db.query('UPDATE job_sourced_candidates SET candidate_summary=$1 WHERE id=$2',[{candidateOrigin:origin},candidate]);
+    expect(await one('SELECT flow_sourcing_decide($1,$2,$3,$4,$5,$6) result',
+      [org,95201,actor,candidate,randomUUID(),{action:'shortlist',expectedRevision:0}])).toMatchObject({state:'shortlisted'});
+    expect(await one('SELECT email_resolve_status result FROM job_sourced_candidates WHERE id=$1',[candidate])).toBeNull();
+  });
+  it.each(['withdraw_global_matching','request_erasure'])('private decisions respect the scope of %s',async action=>{
+    const candidate=await legacyCandidate(),privacy=randomUUID();
+    await db.query('UPDATE job_sourced_candidates SET candidate_summary=$1 WHERE id=$2',
+      [{candidateOrigin:{version:1,kind:'organization_candidate',applicationId:123,applicationJobId:456}},candidate]);
+    await db.query("INSERT INTO candidate_privacy_requests(request_id,action,authority_type,actor_user_id,reason_code) VALUES($1,$2,'privacy_operator',$3,'verified_support_request')",[privacy,action,actor]);
+    await db.query("INSERT INTO candidate_privacy_subject_links(link_id,request_id,subject_type,job_sourced_candidate_id,organization_id) VALUES($1,$2,'job_sourced_candidate',$3,$4)",[randomUUID(),privacy,candidate,org]);
+    const result=await one('SELECT flow_sourcing_decide($1,$2,$3,$4,$5,$6) result',
+      [org,95201,actor,candidate,randomUUID(),{action:'shortlist',expectedRevision:0}]);
+    if(action==='request_erasure')expect(result).toBeNull();else expect(result).toMatchObject({state:'shortlisted'});
+    expect(await one('SELECT email_resolve_status result FROM job_sourced_candidates WHERE id=$1',[candidate])).toBeNull();
   });
   it('uses the same canonical bytes for fractional experience and Unicode labels before admission',async()=>{
     const payload=rangePayload();

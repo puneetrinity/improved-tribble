@@ -3,6 +3,23 @@ import { selectDisplayCandidateEmails } from '../../../shared/contactResolution'
 import { flattenCandidateForUI } from '../services/signal-contracts';
 
 describe('candidate contact display policy', () => {
+  it.each([null, {version:1,kind:'organization_candidate',applicationId:12,applicationJobId:3}])(
+    'hides contact controls and service provenance for non-public origins', (candidateOrigin) => {
+      const result=flattenCandidateForUI({id:1,jobId:2,signalCandidateId:'candidate-1',fitScore:0,
+        fitBreakdown:{},sourceType:'pool',state:'shortlisted',foundEmail:'paid@example.com',
+        foundEmails:['paid@example.com'],emailResolveStatus:'resolved',lastSyncedAt:null,createdAt:null,
+        candidateSummary:{candidateOrigin,privateResumeIdentity:{sourceHash:'internal-source-hash'},
+          candidate:{candidateOrigin:{generationId:'internal-generation'}},
+          linkedinUrl:'https://linkedin.com/in/example',cardSignals:{github:'profile',twitter:'profile'}}});
+      expect(result.foundEmail).toBeNull();
+      expect(result.foundEmails).toEqual([]);
+      expect(result.linkedinUrl).toBeNull();
+      expect(result.cardSignals?.github).toBeNull();
+      expect(result.cardSignals?.twitter).toBeNull();
+      expect(JSON.stringify(result)).not.toContain('internal-');
+      expect(JSON.stringify(result)).not.toContain('paid@example.com');
+      expect(JSON.stringify(result)).not.toContain('linkedin.com');
+    });
   it('hides every stored email after platform suppression', () => {
     expect(selectDisplayCandidateEmails({
       candidateState: 'shortlisted',

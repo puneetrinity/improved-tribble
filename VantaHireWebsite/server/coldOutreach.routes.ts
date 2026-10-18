@@ -9,6 +9,7 @@ import { calculateAiCost } from './lib/aiMatchingEngine';
 import { aiAnalysisRateLimit } from './rateLimit';
 import { getEmailService } from './simpleEmailService';
 import { generateColdOutreachDraft, isAIEnabled } from './aiJobAnalyzer';
+import {canContactSourcedCandidate} from './sourcing-authority/candidate-access';
 import {
   jobSourcedCandidates,
   organizations,
@@ -319,6 +320,7 @@ async function getCampaignState(jobId: number, organizationId: number) {
   };
 
   await Promise.all(eligibleCandidates.map(async (candidate) => {
+    if(!await canContactSourcedCandidate(organizationId,jobId,candidate.id))return;
     if (
       candidate.emailResolveStatus === 'suppressed'
       || candidate.appliedAt
@@ -517,6 +519,7 @@ export function registerColdOutreachRoutes(app: Express, csrfProtection: CsrfMid
         } as const;
 
         for (const candidate of candidates) {
+          if(!await canContactSourcedCandidate(organizationId,jobId,candidate.id))continue;
           await requireCandidatePrivacyAllowed(
             { type: 'job_sourced_candidate', id: candidate.id },
             { globalUse: true },

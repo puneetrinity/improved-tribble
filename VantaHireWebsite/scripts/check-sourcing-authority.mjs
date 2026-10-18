@@ -6,15 +6,18 @@ const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const hash=value=>createHash('sha256').update(value).digest('hex');
 export const frozenSourcingFiles={
   'server/storage.ts':'b361556678de9f1626cf6cbd7657b56eebc8da367dd100673f926ec7564f3908',
-  'server/lib/contactResolutionProcessor.ts':'3386ad52f9acac6be1abc8a81b6232d2aaed9b1ec663090a1b3e45016353c49b',
+  'server/lib/contactResolutionProcessor.ts':'8e0b9fc20c88deb4b9929dd61edd6b93287c90fba900d5b3931af7b32e643264',
   // 5B-A4 permits only the relational privacy alias correction; all other
   // outreach bytes remain protected by this full-file fingerprint.
-  'server/coldOutreach.routes.ts':'f9c4bc1295cbfd077ae24e80b8c24428c2e6d9d0f87a31c7560d54875de4fa8a',
+  'server/coldOutreach.routes.ts':'4e77eb2aaec06e9ee4a1d51812bc89fadb10673d53d0074c1ac7815ed1f105e6',
   'server/schema-migrations/0014_job_brief_authority.sql':'d21873a2c9e12a01cc95798ca3bc2a7a01864ca9f498feb846829cc55f5e49a2',
   'package-lock.json':'b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539',
   'server/candidate-index/search.ts':'eab5ded0878a5ea9125cc3d732b987c3b05576ffc774410a4f304cb4b6b55146',
 };
 export const sourcingAuthorityTokens={
+  'server/sourcing-authority/candidate-origin.ts':['candidateEligibilityIdentity.parse','readPrivateDecisions','SOURCING_PRIVATE_CHANGED'],
+  'server/lib/contactResolutionProcessor.ts':['canResolveSourcedContact','flow_sourcing_contact_allowed'],
+  'server/lib/outreachDelivery.ts':['canContactSourcedCandidate','Applicant is not eligible for cold outreach'],
   'server/schema-migrations/0016_rubric_ranking.sql':[
     'SOURCING_RANKING_IMMUTABLE','SOURCING_UPDATED_BRIEF_REQUIRED','SOURCING_RANKING_CONFLICT',
     "COLLATE \"C\"",'FOR NO KEY UPDATE','ranking_contract','ranking_revision','ranking_sha256',

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { extractedLocationSchema, formatExtractedLocation, LOCATION_EXTRACTION_INSTRUCTIONS } from '../../shared/brief-location';
 import { z } from 'zod';
-import { criterionClasses, criterionSubjects, sourceHash } from './contracts';
+import { BRIEF_VERSION, criterionClasses, criterionSubjects, sourceHash } from './contracts';
 import { parseDraftProposal } from './commands';
 
 export class ExtractionError extends Error {
@@ -42,11 +42,11 @@ export function assembleExtractedBrief(content:string,jd:string) {
     return {...c,id:randomUUID(),use:'assessment',
     class:c.subject==='title'?'preferred':c.class,
     evidenceKinds:['responsibility','leadership','availability'].includes(c.subject)?['recruiter_judgement']:
-      c.subject==='work_eligibility'?['candidate_provided']:['profile_evidence'],provenance:locate(quote),
+      c.subject==='work_eligibility'?['candidate_provided']:['profile_evidence','candidate_provided'],provenance:locate(quote),
     // Score only the place; keep work-arrangement wording in the note (same rule as the review path).
     ...(split?{requirement:{kind:'text' as const,value:split.place!},...(split.note?{note:split.note}:{})}:{})};});
   if(parsed.unrepresented.length || !criteria.length)throw new ExtractionError('extraction_incomplete');
-  try {return parseDraftProposal(JSON.stringify({schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria}),jd);}
+  try {return parseDraftProposal(JSON.stringify({schemaVersion:BRIEF_VERSION,compilerVersion:BRIEF_VERSION,taxonomyVersion:BRIEF_VERSION,criteria}),jd);}
   catch {throw new ExtractionError('final_validation_invalid');}
 }
 

@@ -8,6 +8,8 @@ import {sourcingEnabled,MAX_SOURCING_BODY_BYTES} from './contracts';
 import {SourcingRepository,SourcingError} from './repository';
 import {quoteSourcing,readSourcingPreview,requestSourcingPreview,handleSourcingMachineCommand} from './commands';
 import {verifySignalSourcingJwt} from '../lib/services/jwt-signer';
+import {verifySignalCandidateEligibilityJwt} from '../lib/services/jwt-signer';
+import {readCandidateEligibility} from './candidate-eligibility';
 
 function available(req:Request,res:Response,next:NextFunction) {
   res.set('Cache-Control','private, no-store');res.set('Vary','Cookie');
@@ -37,6 +39,26 @@ function handler(repository:SourcingRepository,fn:(repo:SourcingRepository,keys:
   };
 }
 export function registerSourcingAuthorityRoutes(app:Express,csrf:CsrfMiddleware,repository=new SourcingRepository()) {
+  app.post('/api/internal/sourcing/candidate-eligibility',async(req:Request,res:Response)=>{
+    const deadlineAt=Date.now()+5000;
+    res.set('Cache-Control','no-store');
+    if(Buffer.byteLength(JSON.stringify(req.body??null),'utf8')>65536){res.status(413).json({code:'SOURCING_BODY_TOO_LARGE'});return;}
+    const header=req.headers.authorization;
+    if(!header||!/^Bearer [^\s]+$/.test(header)){res.status(401).json({code:'SOURCING_MACHINE_AUTH_REQUIRED'});return;}
+    let claims:Awaited<ReturnType<typeof verifySignalCandidateEligibilityJwt>>;
+    try{claims=await verifySignalCandidateEligibilityJwt(header.slice(7));}
+    catch{res.status(401).json({code:'SOURCING_MACHINE_AUTH_INVALID'});return;}
+    try{
+      const {pool}=await import('../db');
+      res.json(await readCandidateEligibility(req.body,claims,pool,deadlineAt));
+    }catch(error){
+      if(error instanceof ZodError){res.status(400).json({code:'SOURCING_INVALID_COMMAND'});return;}
+      if(error instanceof Error&&error.message==='SOURCING_CANDIDATE_AUTH_INVALID'){
+        res.status(401).json({code:'SOURCING_MACHINE_AUTH_INVALID'});return;
+      }
+      res.status(503).json({code:'SOURCING_UNAVAILABLE'});
+    }
+  });
   app.get('/api/jobs/:id/sourcing/admission',available,requireAuth,handler(repository,quoteSourcing));
   app.get('/api/jobs/:id/sourcing/preview',available,requireAuth,handler(repository,readSourcingPreview));
   app.post('/api/jobs/:id/sourcing/preview',available,requireAuth,csrf,handler(repository,requestSourcingPreview));

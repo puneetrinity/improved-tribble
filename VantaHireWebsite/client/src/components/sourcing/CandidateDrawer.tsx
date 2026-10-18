@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { allowsPublicContact, applicationHref, candidateDisplayName, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import {
   Sheet,
   SheetContent,
@@ -34,6 +35,7 @@ import {
   Heart,
   Sparkles,
   Users,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
@@ -173,6 +175,11 @@ export function CandidateDrawer({
   if (!candidate) return null;
 
   const c = candidate;
+  // Past applicants: no LinkedIn, paid contact lookup or outreach; malformed origin fails closed.
+  const origin = readCandidateOrigin(c.candidateOrigin);
+  const name = candidateDisplayName(origin, c.crustdata?.basic_profile?.name, c.candidateSummary?.nameHint);
+  const publicContact = allowsPublicContact(origin);
+  const appHref = applicationHref(origin);
   const isShortlisted = c.state === "shortlisted";
   const isHidden = c.state === "hidden";
   const displayedEmails = selectDisplayCandidateEmails({
@@ -207,7 +214,6 @@ export function CandidateDrawer({
   const locLabel = locationLabelText(c.locationLabel);
   const dataConf = confidenceLabel(c.dataConfidence);
 
-  const name = c.crustdata?.basic_profile?.name || "Unknown Candidate";
   const headline = c.crustdata?.basic_profile?.headline || null;
   const summary = c.crustdata?.basic_profile?.summary || null;
   const location = c.crustdata?.basic_profile?.location?.full_location
@@ -280,7 +286,24 @@ export function CandidateDrawer({
                 </p>
               )}
               <div className="flex flex-wrap items-center gap-3 pt-1">
-                {c.linkedinUrl && (
+                {origin.kind === "organization_candidate" && (
+                  <Badge variant="outline" data-origin-badge="" className="text-xs bg-indigo-50 text-indigo-800 border-indigo-200">
+                    <FileText className="h-3.5 w-3.5 mr-1" aria-hidden="true" />
+                    Previous applicant
+                  </Badge>
+                )}
+                {origin.kind === "invalid" && (
+                  <Badge variant="outline" data-origin-badge="" className="text-xs">Applicant details unavailable</Badge>
+                )}
+                {appHref && (
+                  <Button asChild size="sm" variant="outline" className="min-h-11">
+                    <a href={appHref}>
+                      <FileText className="h-4 w-4 mr-1.5" aria-hidden="true" />
+                      Open application
+                    </a>
+                  </Button>
+                )}
+                {publicContact && c.linkedinUrl && (
                   <a
                     href={c.linkedinUrl}
                     target="_blank"
@@ -401,7 +424,16 @@ export function CandidateDrawer({
             </Section>
           )}
 
-          {/* Contact Details */}
+          {/* Contact Details — public profiles only; applicants are contacted through their application. */}
+          {!publicContact ? (
+            <Section title="Contact Information" icon={Mail}>
+              <p className="text-sm text-muted-foreground" data-contact-withheld="">
+                {origin.kind === "organization_candidate"
+                  ? "Contact them through their application. We don’t look up or buy an email for applicants."
+                  : "Contact details aren’t available for this result."}
+              </p>
+            </Section>
+          ) : (
           <Section title="Contact Information" icon={Mail}>
             <div className="grid grid-cols-1 gap-3">
               <div className="p-3 rounded-lg border bg-card flex items-center gap-3">
@@ -458,9 +490,10 @@ export function CandidateDrawer({
               </div>
             </div>
           </Section>
+          )}
 
           {/* Social Profiles */}
-          {Object.keys(socialHandles).length > 0 && (
+          {publicContact && Object.keys(socialHandles).length > 0 && (
             <Section title="Digital Identities" icon={UserCheck}>
               <div className="flex flex-wrap gap-3">
                 {Object.entries(socialHandles).map(([key, handle]: [string, any]) => {

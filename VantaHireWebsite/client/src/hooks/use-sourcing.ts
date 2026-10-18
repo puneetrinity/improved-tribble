@@ -12,6 +12,8 @@ export type MatchStrength = "strong" | "good" | "possible";
 export type LocationMatchType = "city_exact" | "city_alias" | "country_only" | "unknown_location" | "none";
 
 export interface SourcedCandidateForUI {
+  /** Proposed, versioned origin; read only through readCandidateOrigin (fails closed). */
+  candidateOrigin?: unknown;
   ranking?:import('../../../server/sourcing-authority/ranking-contract').RankedCandidate;
   id: number;
   jobId: number;
@@ -109,6 +111,8 @@ export interface SourcedCandidateForUI {
     skills: string[];
   } | null;
   candidateSummary: {
+    /** Applicants only: the name on their application in this organisation, set by the server. */
+    nameHint?: string;
     identities?: Array<{
       platform: string;
       confidence: number;

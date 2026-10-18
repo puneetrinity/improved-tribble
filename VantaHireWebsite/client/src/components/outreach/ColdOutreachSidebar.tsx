@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
 import { OutreachDraftCard, type OutreachDraftItem } from "@/components/outreach/OutreachDraftCard";
+import { allowsPublicContact, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 
 interface DraftPayload {
   candidateIds: number[];
@@ -150,7 +151,7 @@ export function ColdOutreachSidebar({
   const [drafts, setDrafts] = useState<OutreachDraftItem[]>([]);
   const [campaignLabel, setCampaignLabel] = useState("First Campaign");
   const [campaignSummary, setCampaignSummary] = useState("");
-  const [sendSummary, setSendSummary] = useState<{ sent: number; failed: number; skipped: number } | null>(null);
+  const [sendSummary, setSendSummary] = useState<{ sent: number; failed: number; skipped: number; withheld?: number } | null>(null);
 
   useEffect(() => {
     if (!open) {
@@ -166,21 +167,25 @@ export function ColdOutreachSidebar({
     setCampaignLabel(campaignRoundLabel(campaignRound));
   }, [open, campaignRound]);
 
+  // Cold outreach is for public profiles only; past applicants are contacted through their application.
   const eligibleCandidates = useMemo(
-    () => candidates.filter((candidate) =>
+    () => candidates.filter((candidate) => allowsPublicContact(readCandidateOrigin(candidate.candidateOrigin)) && (
       history?.eligibleByRound?.[campaignRound]?.candidateIds?.length
         ? history.eligibleByRound[campaignRound].candidateIds.includes(candidate.id)
-        : candidate.outreachCount === campaignRound - 1,
+        : candidate.outreachCount === campaignRound - 1),
     ),
     [candidates, campaignRound, history?.eligibleByRound],
   );
   const candidateIds = eligibleCandidates.map((candidate) => candidate.id);
   const canStartCampaign = candidateIds.length > 0;
+  // Re-checked at send time: anyone who became ineligible after drafting (e.g. applied) is held back.
+  const sendableDrafts = drafts.filter((draft) => candidateIds.includes(draft.candidateId));
+  const withheldDrafts = drafts.length - sendableDrafts.length;
   const sendingProgress = useMemo(() => {
     if (stage !== "sending" && stage !== "done") return 0;
-    if (!drafts.length) return 0;
-    return sendSummary ? ((sendSummary.sent + sendSummary.failed) / drafts.length) * 100 : 65;
-  }, [drafts.length, sendSummary, stage]);
+    if (!sendableDrafts.length) return 0;
+    return sendSummary ? ((sendSummary.sent + sendSummary.failed) / sendableDrafts.length) * 100 : 65;
+  }, [sendableDrafts.length, sendSummary, stage]);
 
   const handleGenerateDrafts = async () => {
     try {
@@ -215,12 +220,14 @@ export function ColdOutreachSidebar({
   };
 
   const handleSend = async () => {
+    if (sendableDrafts.length === 0) return;
+    const withheld = withheldDrafts;
     setStage("sending");
     try {
       const payload: SendPayload = {
         campaignId: crypto.randomUUID(),
         campaignRound,
-        messages: drafts.map((draft) => ({
+        messages: sendableDrafts.map((draft) => ({
           candidateId: draft.candidateId,
           subject: draft.subject,
           body: draft.body,
@@ -235,7 +242,7 @@ export function ColdOutreachSidebar({
       }
       const result = await onSend(payload);
 
-      setSendSummary({ sent: result.sent, failed: result.failed, skipped: result.skipped ?? 0 });
+      setSendSummary({ sent: result.sent, failed: result.failed, skipped: result.skipped ?? 0, withheld });
       setStage("done");
     } catch {
       setStage("review");
@@ -337,6 +344,11 @@ export function ColdOutreachSidebar({
                 </div>
                 <p className="mt-2 text-sm text-muted-foreground">{campaignSummary}</p>
               </div>
+              {withheldDrafts > 0 && (
+                <p role="status" data-withheld-drafts="" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  {withheldDrafts === 1 ? "1 draft won’t be sent" : `${withheldDrafts} drafts won’t be sent`}: they’re no longer eligible for outreach, for example because they applied.
+                </p>
+              )}
 
               {drafts.map((draft) => (
                 <OutreachDraftCard
@@ -382,6 +394,11 @@ export function ColdOutreachSidebar({
                     {sendSummary?.skipped ?? 0} skipped (no email found)
                   </Badge>
                 )}
+                {(sendSummary?.withheld ?? 0) > 0 && (
+                  <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                    {sendSummary?.withheld ?? 0} not sent (no longer eligible)
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">
                 Candidate outreach counters and campaign history were saved successfully.
@@ -413,7 +430,7 @@ export function ColdOutreachSidebar({
               </Button>
               <Button
                 type="button"
-                disabled={drafts.length === 0 || isSending}
+                disabled={sendableDrafts.length === 0 || isSending}
                 onClick={handleSend}
               >
                 {isSending && <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />}

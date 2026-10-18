@@ -266,6 +266,8 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
     try {
       const privileges=await runtime.query("SELECT has_table_privilege(current_user,'public.sourcing_admissions','SELECT,INSERT,UPDATE,DELETE') direct,has_function_privilege(current_user,'public.flow_sourcing_admit(integer,integer,integer,uuid,jsonb)','EXECUTE') admit,has_function_privilege(current_user,'public.flow_sourcing_enable(integer,uuid)','EXECUTE') enable");
       expect(privileges.rows[0]).toEqual({direct:false,admit:true,enable:false});
+      const resumePrivileges=await runtime.query("SELECT has_function_privilege(current_user,'public.flow_sourcing_candidate_eligibility(text,uuid,uuid,jsonb,text)','EXECUTE') eligibility,has_function_privilege(current_user,'public.flow_sourcing_contact_allowed(integer,integer,integer)','EXECUTE') contact,has_table_privilege(current_user,'public.sourcing_delivery_items','SELECT,INSERT,UPDATE,DELETE,TRUNCATE') direct");
+      expect(resumePrivileges.rows[0]).toEqual({eligibility:true,contact:true,direct:false});
       await assertSchemaReady({pg:{query:(text,params)=>runtime.query(text,params as any)},migrationsDir,
         environment:'development',expectedTargetId:targetId,criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS});
     }finally{await runtime.end();}
@@ -310,6 +312,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0018", apply_mode: "adopted" },
         { version: "0019", apply_mode: "adopted" },
         { version: "0020", apply_mode: "adopted" },
+        { version: "0021", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +

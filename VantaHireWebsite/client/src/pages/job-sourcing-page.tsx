@@ -29,6 +29,7 @@ import {
 } from "@/hooks/use-sourcing";
 import { SourcingProgressModal } from "@/components/sourcing/SourcingProgressModal";
 import { poolCardCopy } from "@/lib/sourcing-pool-copy";
+import { allowsPublicContact, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import { CandidateCard } from "@/components/sourcing/CandidateCard";
 import { CandidateDrawer } from "@/components/sourcing/CandidateDrawer";
 import {
@@ -256,7 +257,8 @@ export default function JobSourcingPage() {
   const rubricRanked=candidatesData?.rankingProtocol===2||allCandidates.some(c=>c.ranking);
   const counts = candidatesData?.counts ?? { total: 0, talentPool: 0, newlyDiscovered: 0 };
   const shortlistedCandidates = allCandidates.filter((candidate) => candidate.state === "shortlisted");
-  const shortlistedWithResolvedEmail = shortlistedCandidates.filter((candidate) => candidate.emailResolveStatus === "resolved" && candidate.foundEmail);
+  // Cold outreach is for public profiles only; past applicants are contacted through their application.
+  const shortlistedWithResolvedEmail = shortlistedCandidates.filter((candidate) => allowsPublicContact(readCandidateOrigin(candidate.candidateOrigin)) && candidate.emailResolveStatus === "resolved" && candidate.foundEmail);
   const shortlistCounts = {
     all: shortlistedCandidates.length,
     fresh: shortlistedCandidates.filter((candidate) => matchesShortlistOutreachFilter(candidate, "fresh")).length,

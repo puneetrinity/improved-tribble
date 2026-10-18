@@ -9,8 +9,8 @@ vi.mock('../../client/src/lib/job-brief',async importOriginal=>({...await import
 vi.mock('../../client/src/lib/queryClient',()=>({apiRequest:mocks.api}));
 import {JobBriefPanel} from '../../client/src/components/job-brief-panel';
 const id='10000000-0000-4000-8000-000000000001';
-const criterion={id,label:'Python',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},evidenceKinds:['profile_evidence'],use:'assessment',provenance:{kind:'recruiter_edit'}};
-const payload={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[criterion]};
+const criterion={id,label:'Python',class:'must_have',subject:'skill',requirement:{kind:'accepted_skills',primary:'Python',alternatives:[]},evidenceKinds:['profile_evidence','candidate_provided'],use:'assessment',provenance:{kind:'recruiter_edit'}};
+const payload={schemaVersion:4,compilerVersion:4,taxonomyVersion:4,criteria:[criterion]};
 const brief={revision:'2',currentJD:'Build Python services.',sourceHash:'a'.repeat(64),latest:{version_id:id,version_number:1,payload},approvedVersionId:null,draft:null,source:{initialized:true,ambiguous:false,choices:[]}};
 describe('brief recruiter UI',()=>{
   let host:HTMLDivElement;let root:Root;let cache:QueryClient;
@@ -30,8 +30,31 @@ describe('brief recruiter UI',()=>{
   it('historical briefs need explicit save and reapproval without an automatic request',async()=>{
     mocks.query.mockReturnValue({data:{...brief,latest:{...brief.latest,payload:{...payload,schemaVersion:1,compilerVersion:1,taxonomyVersion:1,criteria:[{...criterion,requirement:{kind:'text',value:'Python'}}]}}},isPending:false,isError:false});
     await render();expect(button('Approve criteria').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
-    await click('Save changes');expect(mocks.intent.mock.calls[0][4].payload).toMatchObject({schemaVersion:3,compilerVersion:3,taxonomyVersion:3});
+    await click('Save changes');expect(mocks.intent.mock.calls[0][4].payload).toMatchObject({schemaVersion:4,compilerVersion:4,taxonomyVersion:4});
     expect(mocks.intent).toHaveBeenCalledTimes(1);
+  });
+  it('a schema-3 brief loads unchanged, asks to save again, and only an explicit save adds resume evidence',async()=>{
+    const judged={...criterion,id:'10000000-0000-4000-8000-000000000002',label:'Leads a team',subject:'leadership',requirement:{kind:'text',value:'Leads a team'},evidenceKinds:['recruiter_judgement']};
+    const v3={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[{...criterion,evidenceKinds:['profile_evidence']},judged]};
+    mocks.query.mockReturnValue({data:{...brief,approvedVersionId:id,latest:{...brief.latest,payload:v3}},isPending:false,isError:false});
+    await render();
+    expect(host.textContent).toContain('To include previous applicants, review these requirements, then save and approve them again.');
+    expect(button('Approve criteria').disabled).toBe(true);expect(mocks.intent).not.toHaveBeenCalled();
+    await click('Save changes');
+    const saved=mocks.intent.mock.calls[0][4].payload;
+    expect(saved).toMatchObject({schemaVersion:4,compilerVersion:4,taxonomyVersion:4});
+    expect(saved.criteria[0].evidenceKinds).toEqual(['profile_evidence','candidate_provided']);
+    expect(saved.criteria[1].evidenceKinds).toEqual(['recruiter_judgement']);
+  });
+  it('new requirements accept resume evidence except judged ones and work eligibility',async()=>{
+    await render();
+    for(const [n,type,text] of [[2,'location','Berlin, Germany'],[3,'responsibility','Owns the API'],[4,'work_eligibility','Can work in Germany']] as const){
+      await click('Add requirement');await change(`Requirement ${n} type`,type);
+      await change(`Requirement ${n} label`,text);await change(`Requirement ${n} requirement`,text);
+    }
+    await click('Save changes');
+    const kinds=mocks.intent.mock.calls[0][4].payload.criteria.map((c:any)=>c.evidenceKinds);
+    expect(kinds).toEqual([['profile_evidence','candidate_provided'],['profile_evidence','candidate_provided'],['recruiter_judgement'],['candidate_provided']]);
   });
   it('shows editable scoring titles in the one approval flow, defaulting to preferred',async()=>{
     await render();await change('Requirement 1 type','title');

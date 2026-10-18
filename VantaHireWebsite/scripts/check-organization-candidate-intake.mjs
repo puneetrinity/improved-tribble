@@ -11,7 +11,7 @@ const frozenHashes = {
   "server/aiWorker.ts": "9d3e4650d7d33911160eb76a06ccaa0d81b2b8f306faaad4fb7c06fc1ffa0dce",
   "server/gcs-storage.ts": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802",
   "server/lib/applicationGraphSyncProcessor.ts": "c014dab9d22d4d5686b9611b986a080c7e65b1f2bad664059d22cbcc195b2f56",
-  "server/lib/services/jwt-signer.ts": "9abbfdb810b3717f925fdc49fec01772c55a3e8ba48d791599c1234bbdc3db2c",
+  "server/lib/services/jwt-signer.ts": "c33e30968cd75e3919cff56f4b33a9b7d3f85c17b74d262ef2269b203cdba811",
   "server/schema-migrations/0009_decision_projection_delivery_state.sql": "ce5999cab8bf087b838bdc05e4eca81d6012a1f044e957ff4ab196c41919f348",
   "server/storage.ts": "b361556678de9f1626cf6cbd7657b56eebc8da367dd100673f926ec7564f3908",
   "server/candidate-privacy/decision.ts": "02bd1b412deb3f89f8cd4646dae19a2a0825486acf0c09c109c247da83c38f52",

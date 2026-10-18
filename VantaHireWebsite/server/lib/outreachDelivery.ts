@@ -13,6 +13,7 @@ import type { EmailService } from '../simpleEmailService';
 import type { ContactRevalidationInput } from './contactResolutionCore';
 import { deliverWithRevalidatedContact } from './contactSendGuard';
 import { revalidateCandidateContact } from './contactResolutionProcessor';
+import {canContactSourcedCandidate} from '../sourcing-authority/candidate-access';
 import {
   appendOutreachComplianceFooter,
   buildBrevoCorrelationHeader,
@@ -139,6 +140,8 @@ export async function sendTrackedOutreachEmail(input: {
   wasEdited: boolean;
   sentBy: number;
 }): Promise<OutreachDeliveryResult> {
+  if(!await canContactSourcedCandidate(input.organizationId,input.jobId,input.sourcedCandidateId))
+    return {status:'skipped',reason:'candidate_ineligible'};
   try {
     await requireCandidatePrivacyAllowed(
       { type: 'job_sourced_candidate', id: input.sourcedCandidateId },
@@ -164,6 +167,9 @@ export async function sendTrackedOutreachEmail(input: {
         hashOutreachEmail(email),
         input.contact.signalCandidateId ?? null,
         async () => {
+        if(!await canContactSourcedCandidate(input.organizationId,input.jobId,input.sourcedCandidateId))
+          return {candidateIneligible:true as const,orgSuppressed:false as const,
+            platformSuppressed:false as const,contactUnavailable:false as const};
         try {
           await requireCandidatePrivacyAllowed(
             { type: 'job_sourced_candidate', id: input.sourcedCandidateId },
@@ -393,6 +399,13 @@ export async function sendTrackedOutreachEmail(input: {
         });
 
         let receipt;
+        // Fresh eligibility immediately before dispatch, not only when queued.
+        if (!await canContactSourcedCandidate(input.organizationId,input.jobId,input.sourcedCandidateId)) {
+          await db.update(sourcedCandidateOutreachLog).set({status:'failed',
+            errorMessage:'Applicant is not eligible for cold outreach'}).where(eq(sourcedCandidateOutreachLog.id,log.id));
+          return {candidateIneligible:true as const,orgSuppressed:false as const,
+            platformSuppressed:false as const,contactUnavailable:false as const};
+        }
         try {
           await requireCandidatePrivacyAllowed(
             { type: 'job_sourced_candidate', id: input.sourcedCandidateId },
