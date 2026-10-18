@@ -8,7 +8,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 export const FROZEN = {
   "package-lock.json": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539",
   "server/schema-migrations/catalog.lock.json": "999636b7722cc305b10f71b9a096cc75701400ff49aea91435f839cadf13b90c",
-  "server/applications.routes.ts": "fc0775fd0affef38c3ac487d10a631eb949d96c80d89c8c85938d6cbf671613b",
+  "server/applications.routes.ts": "488db8204c5c4f14349c8a0ac466e59593642d7489d65104ea32dd64abdae12f",
   "server/storage.ts": "b361556678de9f1626cf6cbd7657b56eebc8da367dd100673f926ec7564f3908",
   "server/ai.routes.ts": "0708edb56f17304257441a8f51111cffd06a7e449c5c01ffd4ac432df1360421",
   "server/profile.routes.ts": "e777114341fb77bdaac98cc3d661fc5920c4965999472790cd60eb4fd8422aa7",

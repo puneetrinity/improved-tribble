@@ -128,6 +128,7 @@ const FLOW_CORE_RELATIONS = [
   "public.decision_events",
   "public.decision_projection_outbox",
   "public.decision_projection_delivery_state",
+  "public.application_source_records",
   "public.organization_candidate_references",
   "public.application_resume_versions",
   "public.organization_candidate_memory_outbox",
@@ -678,6 +679,17 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  )
                  OR
                  (
+                   c.relname = 'application_source_records'
+                   AND has_table_privilege(current_user, c.oid, 'INSERT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'SELECT')
+                   AND NOT has_table_privilege(current_user, c.oid, 'UPDATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'DELETE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRUNCATE')
+                   AND NOT has_table_privilege(current_user, c.oid, 'REFERENCES')
+                   AND NOT has_table_privilege(current_user, c.oid, 'TRIGGER')
+                 )
+                 OR
+                 (
                    c.relname = 'decision_projection_delivery_state'
                    AND NOT has_table_privilege(current_user, c.oid, 'SELECT')
                    AND NOT has_table_privilege(current_user, c.oid, 'INSERT')
@@ -712,7 +724,7 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  OR
                  (
                    c.relname NOT IN (
-                     'decision_events','decision_projection_outbox','decision_projection_delivery_state',
+                     'decision_events','decision_projection_outbox','decision_projection_delivery_state','application_source_records',
                      'organization_candidate_references','application_resume_versions',
                      'organization_candidate_memory_outbox','candidate_consent_subjects','candidate_consent_sources',
                      'candidate_consent_events','candidate_consent_outbox',

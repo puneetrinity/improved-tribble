@@ -14,7 +14,7 @@ export const frozenFiles={
   "client/src/pages/jobs-page.tsx": "edaa1e14e6a0f578c5d20e098a0db68d9209130f94a57eb55ee882c5a1df3a77",
   "client/src/pages/application-management-page.tsx": "34bcbfd1b81bba4d90e9e32daf86ce915317ff59b81b9939b206d5429451a02d",
   "server/profile.routes.ts": "e777114341fb77bdaac98cc3d661fc5920c4965999472790cd60eb4fd8422aa7",
-  "server/applications.routes.ts": "fc0775fd0affef38c3ac487d10a631eb949d96c80d89c8c85938d6cbf671613b",
+  "server/applications.routes.ts": "488db8204c5c4f14349c8a0ac466e59593642d7489d65104ea32dd64abdae12f",
   "server/organization-candidates/application-intake.ts": "d04e2745b5bb1e5cf7eac59cd723e9c78af50d7f4f64859ecfb4fbf382c90d0f",
   "server/candidate-index/search.ts": "eab5ded0878a5ea9125cc3d732b987c3b05576ffc774410a4f304cb4b6b55146",
   "package-lock.json": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539",

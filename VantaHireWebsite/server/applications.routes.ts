@@ -46,6 +46,7 @@ import {
   type Job,
   type JobSourcedCandidate,
 } from '@shared/schema';
+import { readApplicationSource } from '@shared/application-source';
 import {
   uploadToGCS,
   deleteFromGCS,
@@ -557,6 +558,9 @@ export function registerApplicationsRoutes(
         coverLetter: req.body?.coverLetter,
         whatsappConsent: req.body?.whatsappConsent,
       });
+      // Owner-only record of where the applicant came from. Invalid or missing
+      // data is dropped silently and never blocks the application.
+      const applicationSource = readApplicationSource(req.body?.applicationSource);
 
       // Before duplicate disclosure, GCS, extraction, candidate-resume insert,
       // application insert, notifications or queueing.
@@ -779,6 +783,18 @@ export function registerApplicationsRoutes(
           }),
           ...(job.organizationId != null && { organizationId: job.organizationId }),
           }, tx, { admission: 'organization_private' });
+          if (applicationSource) {
+            // Optional owner-only tracking row. A savepoint isolates it: any
+            // failure rolls back this insert only and never the application.
+            try {
+              await tx.transaction(async (sp: any) => {
+                await sp.execute(sql`INSERT INTO public.application_source_records (application_id, record)
+                  VALUES (${created.id}, ${JSON.stringify(applicationSource)}::jsonb)`);
+              });
+            } catch {
+              console.warn('[apply] application source not recorded');
+            }
+          }
           await matchApplicationToSourcedCandidate({
             applicationId: created.id,
             applicationEmail: created.email,

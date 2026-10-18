@@ -25,6 +25,27 @@ import {
 import { CandidateSaveButton } from "@/components/candidate/CandidateSaveButton";
 import { CandidateJobStatusBadge } from "@/components/candidate/CandidateJobStatusBadge";
 import { candidatePrivateQueryKey } from "@/lib/candidate-query-keys";
+import { captureApplicationSource } from "@shared/application-source";
+
+// First landing per job per browser tab. Owner-only record of where applicants
+// came from; storage failures never affect the page or the application.
+const sourceKey = (jobId: string) => `ealana:application-source:${jobId}`;
+function rememberApplicationSource(jobId: string) {
+  try {
+    if (window.sessionStorage.getItem(sourceKey(jobId))) return;
+    const record = captureApplicationSource({ pageUrl: window.location.href, referrer: document.referrer, now: new Date() });
+    window.sessionStorage.setItem(sourceKey(jobId), JSON.stringify(record));
+  } catch {
+    /* storage unavailable: no source recorded */
+  }
+}
+function storedApplicationSource(jobId: string): string | null {
+  try {
+    return window.sessionStorage.getItem(sourceKey(jobId));
+  } catch {
+    return null;
+  }
+}
 
 // Types for audit log
 interface AuditLogEntry {
@@ -82,6 +103,10 @@ export default function JobDetailsPage() {
   const [match, params] = useRoute("/jobs/:id");
   const search = useSearch();
   const outreachAttributionToken = new URLSearchParams(search).get("outreach");
+  const routeJobId = params?.id;
+  useEffect(() => {
+    if (routeJobId) rememberApplicationSource(routeJobId);
+  }, [routeJobId]);
   const { toast } = useToast();
   const { user } = useAuth();
   const {data:briefCapability}=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
@@ -334,6 +359,10 @@ export default function JobDetailsPage() {
       }
       if (outreachAttributionToken) {
         formDataToSend.append("outreachAttributionToken", outreachAttributionToken);
+      }
+      const applicationSource = routeJobId ? storedApplicationSource(routeJobId) : null;
+      if (applicationSource) {
+        formDataToSend.append("applicationSource", applicationSource);
       }
       applicationMutation.mutate(formDataToSend);
     } catch (error) {
