@@ -9,7 +9,7 @@
 import type { Express, Request, Response, NextFunction } from 'express';
 import { db } from './db';
 import { eq, and, desc, asc, sql, inArray } from 'drizzle-orm';
-import { jobs, organizations, jobSourcingRuns, jobSourcedCandidates, recruiterFeedbackEvents, type JobSourcingRun, type JobSourcedCandidate } from '@shared/schema';
+import { applications, jobs, organizations, jobSourcingRuns, jobSourcedCandidates, recruiterFeedbackEvents, type JobSourcingRun, type JobSourcedCandidate } from '@shared/schema';
 import { requireRole } from './auth';
 import { requireSeat } from './auth';
 import { getUserOrganization, requireSignalTenantId } from './lib/organizationService';
@@ -38,6 +38,8 @@ import {
 } from './lib/services/signal-contracts';
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import {applicantContactBlocked,readSourcingCandidateOrigin} from '@shared/sourcing-candidate-origin';
+import {filterStoredPrivateCandidates} from './sourcing-authority/candidate-origin';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { jobBriefEnabled } from './job-brief/contracts';
 import {sourcingEnabled,MAX_SOURCING_BODY_BYTES} from './sourcing-authority/contracts';
@@ -51,8 +53,8 @@ import {
   requireCandidatePrivacyAllowed,
 } from './candidate-privacy/decision';
 
-const sourcedCandidatePrivacyAllowed = (qualifiedId = '"jobSourcedCandidates"."id"') => sql.raw(
-  privacyAllowedSql('job_sourced_candidate', qualifiedId, { globalUse: true }),
+const sourcedCandidatePrivacyAllowed = (qualifiedId = '"jobSourcedCandidates"."id"', globalUse=true) => sql.raw(
+  privacyAllowedSql('job_sourced_candidate', qualifiedId, { globalUse }),
 );
 
 function normalizeSkillList(skills: unknown): string[] {
@@ -743,7 +745,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           where: and(
             eq(jobSourcedCandidates.organizationId, organizationId),
             eq(jobSourcedCandidates.jobId, jobId),
-            sourcedCandidatePrivacyAllowed(),
+            sourcedCandidatePrivacyAllowed(undefined,false),
           ),
           orderBy: [desc(jobSourcedCandidates.fitScore), asc(jobSourcedCandidates.id)],
         }) as Promise<JobSourcedCandidate[]>,
@@ -758,17 +760,19 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       ]);
 
       const runMeta = (latestRunForMeta?.meta as Record<string, unknown>) ?? {};
-      const binding=sourcingEnabled()&&latestRunForMeta?await sourcingRepository.call<{protocolVersion?:number;contractHash?:string;
+      const binding=sourcingEnabled()&&latestRunForMeta?await sourcingRepository.call<{flowRunId?:string;executionAttemptId?:string;protocolVersion?:number;contractHash?:string;
         delivery?:{revisionId:string;outputHash:string;items:Array<{candidateId:string;ordinal:number;assessmentHash:string}>}|null}>('runBinding',
         [organizationId,jobId,latestRunForMeta.requestId]):null;
       const rankedRun=binding?.protocolVersion===2;
 
       // Flatten to UI shape and preserve Signal's assembly order when rank exists.
-      const stillAllowed = (await Promise.all(candidates.map(async (candidate) => {
+      const currentlyEligible=await filterStoredPrivateCandidates(db,organizationId,jobId,latestRunForMeta?.requestId??'',binding,candidates);
+      const stillAllowed = (await Promise.all(currentlyEligible.map(async (candidate) => {
         try {
+          const origin=readSourcingCandidateOrigin((candidate.candidateSummary as Record<string,unknown>|null)?.candidateOrigin);
           await requireCandidatePrivacyAllowed(
             { type: 'job_sourced_candidate', id: candidate.id },
-            { globalUse: true },
+            { globalUse: origin.kind!=='organization_candidate' },
           );
           return candidate;
         } catch (error) {
@@ -776,6 +780,27 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           throw error;
         }
       }))).filter((candidate): candidate is JobSourcedCandidate => candidate !== null);
+      // Read the current display name from this organisation's application, not
+      // from a public profile or an AI-generated resume summary. No email lane.
+      const applicationIds=stillAllowed.flatMap(candidate=>{
+        const origin=readSourcingCandidateOrigin((candidate.candidateSummary as Record<string,unknown>|null)?.candidateOrigin);
+        return origin.kind==='organization_candidate'?[origin.applicationId]:[];
+      });
+      if(applicationIds.length) {
+        const names=await db.select({id:applications.id,name:applications.name}).from(applications).where(and(
+          eq(applications.organizationId,organizationId),inArray(applications.id,applicationIds),
+          sql.raw(privacyAllowedSql('application','applications.id',{globalUse:false}))));
+        const byId=new Map<number,string>(names.map((a:{id:number;name:string})=>[a.id,a.name]));
+        for(const candidate of stillAllowed) {
+          const summary=candidate.candidateSummary as Record<string,unknown>;
+          const origin=readSourcingCandidateOrigin(summary.candidateOrigin);
+          if(origin.kind==='organization_candidate') {
+            if(!byId.has(origin.applicationId))throw Error('SOURCING_PRIVATE_CHANGED');
+            candidate.candidateSummary={...summary,nameHint:byId.get(origin.applicationId),
+              candidate:{...(summary.candidate as Record<string,unknown>),nameHint:byId.get(origin.applicationId)}};
+          }
+        }
+      }
       let enriched:SourcedCandidateForUI[];
       try {
         if(rankedRun) {
@@ -1143,7 +1168,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         // have leased, resolved, or suppressed the contact after the route's
         // initial authorization read; that current state must win.
         const lockedResult = await tx.execute(sql`
-          SELECT email_resolve_status, signal_candidate_id
+          SELECT email_resolve_status, signal_candidate_id, candidate_summary, converted_application_id, applied_at
           FROM job_sourced_candidates
           WHERE id = ${candidateId}
             AND job_id = ${jobId}
@@ -1154,6 +1179,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         const locked = lockedResult.rows?.[0] as {
           email_resolve_status?: unknown;
           signal_candidate_id?: unknown;
+          candidate_summary?:unknown;converted_application_id?:unknown;applied_at?:unknown;
         } | undefined;
         if (!locked) {
           throw new Error('Candidate disappeared during state transition');
@@ -1171,7 +1197,8 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
           signalTenantId,
           signalCandidateId: currentSignalCandidateId,
         });
-        const shouldStart = contactTransition.action === 'enqueue';
+        const shouldStart = contactTransition.action === 'enqueue'&&!applicantContactBlocked({
+          candidateSummary:locked.candidate_summary,convertedApplicationId:locked.converted_application_id,appliedAt:locked.applied_at});
         const shouldCancelPending = contactTransition.action === 'cancel_pending';
         const emailResolutionBlocker = contactTransition.action === 'fail'
           ? contactTransition.errorCode
@@ -1395,6 +1422,10 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
 
+      if(applicantContactBlocked(candidate)) {
+        res.status(409).json({error:'Use the existing application to contact this person',code:'APPLICANT_CONTACT_NOT_PURCHASED'});
+        return;
+      }
       const contactPlan = planManualContactResolution({
         candidateState: candidate.state,
         emailResolveStatus: candidate.emailResolveStatus,

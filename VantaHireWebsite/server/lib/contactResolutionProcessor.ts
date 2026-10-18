@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { jobSourcedCandidates, organizations } from '@shared/schema';
 import { db } from '../db';
+import {canResolveSourcedContact} from '../sourcing-authority/candidate-access';
 import { findContact } from './services/signal-client';
 import {
   revalidateContactResolution,
@@ -39,6 +40,8 @@ async function findContactWithPrivacyFence(
   signalCandidateId: string,
   externalJobId: string,
 ) {
+  if(!await canResolveSourcedContact(signalTenantId,signalCandidateId,externalJobId))
+    return {success:true,state:'not_found' as const,emails:[]};
   try {
     await requireNewCandidateIdentityAllowed([
       { identifier_type: 'signal_candidate_id', value: signalCandidateId },
@@ -50,6 +53,8 @@ async function findContactWithPrivacyFence(
     throw error;
   }
   const result = await findContact(signalTenantId, signalCandidateId, externalJobId);
+  if(!await canResolveSourcedContact(signalTenantId,signalCandidateId,externalJobId))
+    return {success:true,state:'not_found' as const,emails:[]};
   try {
     await requireNewCandidateIdentityAllowed([
       { identifier_type: 'signal_candidate_id', value: signalCandidateId },
@@ -80,11 +85,27 @@ function retryDelayMs(attempt: number): number {
 
 const contactResolutionStore: ContactResolutionStore = {
   async claimDue({ limit, now, leaseToken, leaseExpiresAt }) {
+    // Settle old applicant work; excluding it from claims alone leaves it pending forever.
+    await db.execute(sql`
+      WITH blocked AS (
+        SELECT id FROM job_sourced_candidates
+        WHERE email_resolve_status='pending' AND
+          NOT public.flow_sourcing_contact_allowed(organization_id,job_id,id)
+          AND (email_resolve_lease_expires_at IS NULL OR email_resolve_lease_expires_at<=${now})
+        ORDER BY id LIMIT ${limit} FOR UPDATE SKIP LOCKED
+      )
+      UPDATE job_sourced_candidates SET email_resolve_status='not_found',
+        found_email=NULL,found_emails='[]'::jsonb,email_resolve_lease_token=NULL,
+        email_resolve_lease_expires_at=NULL,email_resolve_next_attempt_at=NULL,
+        email_resolve_last_error_code='candidate_contact_ineligible',updated_at=${now}
+      WHERE id IN (SELECT id FROM blocked)
+    `);
     const result = await db.execute(sql`
       WITH due AS (
         SELECT id
         FROM job_sourced_candidates
         WHERE email_resolve_status = 'pending'
+          AND public.flow_sourcing_contact_allowed(organization_id,job_id,id)
           AND state = 'shortlisted'
           AND ${sql.raw(privacyAllowedSql(
             'job_sourced_candidate',
@@ -360,6 +381,7 @@ export async function enqueueCandidateContactResolution(candidateId: number): Pr
         email_resolved_at = NULL,
         updated_at = NOW()
     WHERE id = ${candidateId}
+      AND public.flow_sourcing_contact_allowed(organization_id,job_id,id)
       AND state = 'shortlisted'
       AND ${sql.raw(privacyAllowedSql(
         'job_sourced_candidate',

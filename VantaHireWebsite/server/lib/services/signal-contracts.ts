@@ -17,6 +17,7 @@
 /** Raw Signal source type values. Never map/transform before storage. */
 import {rankedCandidateSchema,type RankedCandidate} from '../../sourcing-authority/ranking-contract';
 import { z } from 'zod';
+import {readSourcingCandidateOrigin,type SourcingCandidateOrigin} from '../../../shared/sourcing-candidate-origin';
 
 export {signalRcProgressSchema,type SignalRcProgress} from '../../../shared/rc-skills-progress';
 export type SignalSourceType = 'pool_enriched' | 'pool' | 'discovered';
@@ -125,6 +126,7 @@ export interface SignalResultCandidateV3 {
   // --- NEW UNIFIED CARD SCHEMA ---
   candidate: {
     id: string;
+    candidateOrigin?:unknown;
     name: string | null;
     linkedinUrl: string | null;
     headline: string | null;
@@ -314,6 +316,7 @@ export interface SignalMatchStrengthBands {
 
 /** Flattened candidate shape for UI consumption. */
 export interface SourcedCandidateForUI {
+  candidateOrigin?:SourcingCandidateOrigin|null;
   ranking?:RankedCandidate;
   id: number;
   jobId: number;
@@ -603,7 +606,9 @@ export function flattenCandidateForUI(row: {
   const candidateState = (['new', 'shortlisted', 'hidden', 'converted', 'passed'].includes(row.state)
     ? row.state
     : 'new') as SourcedCandidateForUI['state'];
-  const contactVisible = candidateState === 'shortlisted';
+  const origin = readSourcingCandidateOrigin(rawCandidateSummary.candidateOrigin);
+  const publicProfile = origin.kind === 'public_profile';
+  const contactVisible = publicProfile && candidateState === 'shortlisted';
   const contactResolved = contactVisible && row.emailResolveStatus === 'resolved';
   const contactStatus = contactVisible && (
     row.emailResolveStatus === 'pending'
@@ -617,6 +622,22 @@ export function flattenCandidateForUI(row: {
   // Legacy Signal code copied provider emails into candidateSummary/searchMeta.
   // That blob is not qualified contact evidence and must never be an API lane.
   const cs = redactContactEvidence(rawCandidateSummary) as Record<string, unknown>;
+  // Immutable resume provenance is service authority, not a browser DTO.
+  delete cs.privateResumeIdentity;
+  if (cs.candidate && typeof cs.candidate === 'object') {
+    cs.candidate = {...cs.candidate as Record<string, unknown>};
+    delete (cs.candidate as Record<string, unknown>).candidateOrigin;
+  }
+  if(!publicProfile) {
+    for(const key of ['linkedinUrl','identities','identitySummary','searchMeta','snapshot'])delete cs[key];
+    const candidate=cs.candidate as Record<string,unknown>|undefined;
+    if(candidate)cs.candidate=Object.fromEntries(['id','nameHint','headlineHint','locationHint','companyHint','enrichmentStatus']
+      .filter(key=>candidate[key]!==undefined).map(key=>[key,candidate[key]]));
+    if(cs.cardSignals&&typeof cs.cardSignals==='object') {
+      const signals=cs.cardSignals as Record<string,unknown>;
+      cs.cardSignals={skillsTopN:signals.skillsTopN,summaryShort:signals.summaryShort};
+    }
+  }
   const rawRanking=!governedRanking?undefined:rankedCandidateSchema.parse(rawCandidateSummary.ranking);
   // Typed IDs/hashes/timestamps are not contact text. Redacting a numeric UUID
   // segment corrupts the envelope; only its human-readable evidence is cleaned.
@@ -638,6 +659,7 @@ export function flattenCandidateForUI(row: {
 
   return {
     ...(ranking?{ranking}:{}),
+    ...(rawCandidateSummary.candidateOrigin!==undefined?{candidateOrigin:origin.kind==='invalid'?null:origin}:{}),
     id: row.id,
     jobId: row.jobId,
     signalCandidateId: row.signalCandidateId,
@@ -678,7 +700,7 @@ export function flattenCandidateForUI(row: {
     ) as SourcedCandidateForUI['lastOutreachStatus'],
 
     crustdata: ((cs as any)?.candidate?.searchMeta?.crustdata as Record<string, unknown>) || null,
-    linkedinUrl: safeString(cs.linkedinUrl) ?? safeString((cs.candidate as any)?.linkedinUrl),
+    linkedinUrl: publicProfile ? safeString(cs.linkedinUrl) ?? safeString((cs.candidate as any)?.linkedinUrl) : null,
     profilePictureUrl: safeString(cs.profilePictureUrl) ?? safeString((cs.candidate as any)?.profilePictureUrl),
     enrichmentStatus: safeString(cs.enrichmentStatus),
     confidenceScore: typeof cs.confidenceScore === 'number' ? cs.confidenceScore : null,
@@ -695,8 +717,8 @@ export function flattenCandidateForUI(row: {
     cardSignals: (cs.cardSignals && typeof cs.cardSignals === 'object') ? {
       email: contactResolved ? safeString(row.foundEmail) : null,
       phone: null,
-      github: safeString((cs.cardSignals as any).github),
-      twitter: safeString((cs.cardSignals as any).twitter),
+      github: publicProfile ? safeString((cs.cardSignals as any).github) : null,
+      twitter: publicProfile ? safeString((cs.cardSignals as any).twitter) : null,
       skillsTopN: Array.isArray((cs.cardSignals as any).skillsTopN) ? (cs.cardSignals as any).skillsTopN : [],
       activeSeeker: Boolean((cs.cardSignals as any).activeSeeker),
       summaryShort: safeString((cs.cardSignals as any).summaryShort),

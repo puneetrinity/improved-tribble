@@ -152,7 +152,8 @@ export async function checkMemoryEligibility(input: {
 }
 
 export async function checkMemoryEligibilityBatch(input: {
-  subjects: Array<{ requestRef: string; identifiers: PrivacyIdentifier[] }>;
+  subjects: Array<{ requestRef: string; identifiers: PrivacyIdentifier[];
+    canonicalReference?:{candidate_tenant_id:string;candidate_id:string} }>;
   timeoutMs: number;
 }): Promise<Map<string, "allow" | "block_global" | "block_all" | "review">> {
   if (input.subjects.length < 1 || input.subjects.length > 200) {
@@ -166,6 +167,7 @@ export async function checkMemoryEligibilityBatch(input: {
         subjects: input.subjects.map((subject) => ({
           request_ref: subject.requestRef,
           identifiers: subject.identifiers,
+          ...(subject.canonicalReference?{canonical:subject.canonicalReference}:{}),
         })),
       }),
     },

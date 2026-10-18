@@ -12,6 +12,7 @@
 
 import { and, asc, eq, inArray, isNull, lt, lte, notInArray, or, sql } from 'drizzle-orm';
 import { db } from '../db';
+import {canContactSourcedCandidate} from '../sourcing-authority/candidate-access';
 import {
   candidateOutreachSchedules,
   jobSourcedCandidates,
@@ -217,7 +218,7 @@ async function fireScheduledCandidate(
       eq(jobSourcedCandidates.outreachCount, campaignRound - 1),
     ),
   });
-  if (!candidate || candidate.appliedAt) {
+  if (!candidate || candidate.appliedAt || !await canContactSourcedCandidate(organizationId,jobId,candidate.id)) {
     await cancel(candidate?.appliedAt ? 'candidate_applied' : 'candidate_not_eligible');
     return;
   }
@@ -700,6 +701,7 @@ export async function scheduleCandidateFollowUps(
       eq(jobSourcedCandidates.organizationId, organizationId),
       eq(jobSourcedCandidates.jobId, jobId),
       isNull(jobSourcedCandidates.appliedAt),
+      sql`public.flow_sourcing_contact_allowed(${organizationId}, ${jobId}, ${jobSourcedCandidates.id})`,
       or(
         isNull(jobSourcedCandidates.lastOutreachStatus),
         notInArray(jobSourcedCandidates.lastOutreachStatus, [

@@ -207,3 +207,27 @@ export async function verifySignalSourcingJwt(token:string):Promise<{
     throw Error('SOURCING_MACHINE_AUTH_INVALID');
   return {tenantId:payload.tenant_id,requestId:payload.request_id,executionAttemptId:payload.execution_attempt_id,jti:payload.jti};
 }
+
+/** A separate, body-bound read authority; grant and callback tokens are refused. */
+export async function verifySignalCandidateEligibilityJwt(token: string): Promise<{
+  tenantId: string; requestId: string; executionAttemptId: string; flowRunId: string; bodyHash: string;
+}> {
+  const { payload } = await jwtVerify(token, await getSignalPublicKey(), {
+    issuer: 'signal', audience: 'vantahire', algorithms: [ALGORITHM], clockTolerance: 5,
+  });
+  const uuid = (value: unknown): value is string => typeof value === 'string'
+    && /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value)
+    && value !== '00000000-0000-0000-0000-000000000000';
+  const opaque = (value: unknown): value is string => typeof value === 'string'
+    && value.length > 0 && value.length <= 200 && !!value.trim() && !/[\x00-\x1f\x7f]/.test(value);
+  if (payload.sub !== 'sourcing' || payload.scopes !== 'sourcing:candidates:read'
+    || !opaque(payload.tenant_id) || !opaque(payload.request_id) || !opaque(payload.jti)
+    || !uuid(payload.execution_attempt_id) || !uuid(payload.flow_run_id)
+    || typeof payload.body_hash !== 'string' || !/^[a-f0-9]{64}$/.test(payload.body_hash)
+    || typeof payload.iat !== 'number' || !Number.isInteger(payload.iat)
+    || typeof payload.exp !== 'number' || !Number.isInteger(payload.exp)
+    || payload.exp <= payload.iat || payload.exp - payload.iat > 300 || payload.iat > Date.now() / 1000 + 5)
+    throw Error('SOURCING_CANDIDATE_AUTH_INVALID');
+  return { tenantId: payload.tenant_id, requestId: payload.request_id,
+    executionAttemptId: payload.execution_attempt_id, flowRunId: payload.flow_run_id, bodyHash: payload.body_hash };
+}

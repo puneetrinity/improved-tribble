@@ -33,6 +33,10 @@ export const TAXONOMY_VERSION = 'rubric-taxonomy-v4' as const;
 export const ADAPTER_VERSION = 'rubric-evidence-v1' as const;
 export const LOCAL_MATCH_VERSION = 'rubric-local-match-v4' as const;
 export function rankingVersions(briefVersion: number) {
+  if (briefVersion === 4) return {
+    policyVersion: 'rubric-resume-evidence-v1' as const, taxonomyVersion: TAXONOMY_VERSION,
+    adapterVersion: 'rubric-evidence-v2' as const, localMatchVersion: LOCAL_MATCH_VERSION,
+  };
   if (briefVersion === 2) return {
     policyVersion: 'rubric-range-v1' as const, taxonomyVersion: 'rubric-taxonomy-v3' as const,
     adapterVersion: ADAPTER_VERSION, localMatchVersion: 'rubric-local-match-v3' as const,
@@ -67,19 +71,19 @@ export function rankingProjection(payload: BriefPayload): string {
 }
 const rankingContractBody = z.object({
   schemaVersion:z.literal(1), briefVersionId:z.string().uuid(), materialHash:hash,
-  policyVersion:z.enum(['rubric-range-v1', POLICY_VERSION]), taxonomyVersion:z.enum(['rubric-taxonomy-v3', TAXONOMY_VERSION]),
-  adapterVersion:z.literal(ADAPTER_VERSION), localMatchVersion:z.enum(['rubric-local-match-v3', LOCAL_MATCH_VERSION]),
+  policyVersion:z.enum(['rubric-range-v1', POLICY_VERSION,'rubric-resume-evidence-v1']), taxonomyVersion:z.enum(['rubric-taxonomy-v3', TAXONOMY_VERSION]),
+  adapterVersion:z.enum([ADAPTER_VERSION,'rubric-evidence-v2']), localMatchVersion:z.enum(['rubric-local-match-v3', LOCAL_MATCH_VERSION]),
   payload:briefPayloadSchema.refine(v=>v.schemaVersion>=2, 'Ranking requires a versioned sourcing brief'), projectionText:z.string().max(20000), projectionHash:hash,
 }).strict();
 export const rankingContractSchema = rankingContractBody.extend({contractHash:hash}).superRefine((v,ctx)=>{
   const {contractHash,...body}=v;
-  if (v.payload.schemaVersion !== 2 && v.payload.schemaVersion !== 3) {
+  if (![2,3,4].includes(v.payload.schemaVersion)) {
     ctx.addIssue({code:z.ZodIssueCode.custom,message:'Unsupported ranking brief version'});
     return;
   }
   const versions=rankingVersions(v.payload.schemaVersion);
   if (v.policyVersion!==versions.policyVersion || v.taxonomyVersion!==versions.taxonomyVersion ||
-      v.localMatchVersion!==versions.localMatchVersion) {
+      v.localMatchVersion!==versions.localMatchVersion || v.adapterVersion!==versions.adapterVersion) {
     ctx.addIssue({code:z.ZodIssueCode.custom,message:'Mixed ranking versions'});
   }
   if (rankingHash(body)!==contractHash || v.projectionText!==rankingProjection(v.payload) ||

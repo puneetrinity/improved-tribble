@@ -161,12 +161,12 @@ describe('contact safety deployment contracts', () => {
     const processorSource = read('../contactResolutionProcessor.ts');
     const signalRoutesSource = read('../../signal.routes.ts');
 
-    expect(processorSource).toContain("WHERE email_resolve_status = 'pending'\n          AND state = 'shortlisted'");
+    expect(processorSource).toContain("WHERE email_resolve_status = 'pending'\n          AND public.flow_sourcing_contact_allowed(organization_id,job_id,id)\n          AND state = 'shortlisted'");
     expect(
       processorSource.match(/eq\(jobSourcedCandidates\.state, 'shortlisted'\)/g),
     ).toHaveLength(3);
     expect(processorSource).toContain(
-      "WHERE id = ${candidateId}\n      AND state = 'shortlisted'",
+      "WHERE id = ${candidateId}\n      AND public.flow_sourcing_contact_allowed(organization_id,job_id,id)\n      AND state = 'shortlisted'",
     );
     expect(signalRoutesSource).toContain(
       "contactTransition.action === 'cancel_pending'",

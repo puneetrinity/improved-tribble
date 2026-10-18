@@ -7,7 +7,7 @@ import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
 const apiRequest=vi.fn();
 vi.mock('../../client/src/lib/queryClient',()=>({apiRequest:(...args:unknown[])=>apiRequest(...args)}));
 vi.mock('../../client/src/hooks/use-auth',()=>({useAuth:()=>({user:{id:7}})}));
-import {HiringCriteriaStep,starterCriteria,withDetailFoundations,starterPlan,sections,usedSlots,foundationsReady,skillCriterion,MAX_CRITERIA}
+import {HiringCriteriaStep,starterCriteria,withDetailFoundations,starterPlan,sections,usedSlots,foundationsReady,skillCriterion,MAX_CRITERIA,upgradedPayload,BRIEF_SCHEMA}
   from '../../client/src/components/hiring-criteria-step';
 
 const JD='We are hiring a Senior Backend Engineer in Bengaluru. Python and PostgreSQL are required. Kafka is nice to have.';
@@ -22,6 +22,22 @@ describe('hiring criteria helpers',()=>{
   expect(s.must.map(c=>c.requirement.kind==='accepted_skills'&&c.requirement.primary)).toEqual(['Python','PostgreSQL']);
   expect(s.nice).toHaveLength(1);expect(p.criteria.every(c=>c.provenance.kind==='recruiter_edit')).toBe(true);
   expect(foundationsReady(p)).toBe(true);expect(usedSlots(p)).toBe(5);
+ });
+ it('saves new briefs as schema 4 and lets resumes count as evidence for starter requirements',()=>{
+  const p=starterCriteria(details);
+  expect(p).toMatchObject({schemaVersion:4,compilerVersion:4,taxonomyVersion:4});expect(BRIEF_SCHEMA).toBe(4);
+  expect(p.criteria.every(c=>JSON.stringify(c.evidenceKinds)===JSON.stringify(['profile_evidence','candidate_provided']))).toBe(true);
+ });
+ it('upgrades an older brief only when asked, adding resume evidence only where a resume can count',()=>{
+  const old={schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria:[
+   {...skillCriterion('Python','must_have'),evidenceKinds:['profile_evidence']},
+   {...skillCriterion('x','preferred'),subject:'leadership',requirement:{kind:'text',value:'Leads'},evidenceKinds:['recruiter_judgement']},
+   {...skillCriterion('y','must_have'),subject:'work_eligibility',requirement:{kind:'text',value:'EU'},evidenceKinds:['candidate_provided']}]} as any;
+  const frozen=JSON.stringify(old);const up=upgradedPayload(old);
+  expect(JSON.stringify(old)).toBe(frozen);
+  expect(up).toMatchObject({schemaVersion:4,compilerVersion:4,taxonomyVersion:4});
+  expect(up.criteria.map(c=>c.evidenceKinds)).toEqual([['profile_evidence','candidate_provided'],['recruiter_judgement'],['candidate_provided']]);
+  const current=starterCriteria(details);expect(upgradedPayload(current)).toBe(current);
  });
  it('never invents experience or location and always reserves their two slots',()=>{
   const p=starterCriteria({...details,location:' ',experienceYears:''});
@@ -274,6 +290,26 @@ describe('HiringCriteriaStep',()=>{
   const submit=apiRequest.mock.calls.find(c=>String(c[1]).endsWith('/brief/submit'))!;
   expect(submit[0]).toBe('POST');expect(submit[2]).toMatchObject({expectedRevision:3});expect(submit[2].requestId).toMatch(/^[0-9a-f-]{36}$/);
   expect(onSubmitted).toHaveBeenCalledTimes(1);
+ });
+
+ it('an approved schema-3 brief loads as approved and unchanged; Update and approve saves schema 4 then approves',async()=>{
+  const vid='11111111-1111-4111-8111-111111111111',v3={...starterCriteria(details),schemaVersion:3,compilerVersion:3,taxonomyVersion:3,
+   criteria:starterCriteria(details).criteria.map(c=>({...c,evidenceKinds:['profile_evidence']}))};
+  brief={...brief,latest:{version_id:vid,version_number:1,payload:v3},approvedVersionId:vid};
+  apiRequest.mockImplementation(async(_m:string,url:string)=>{
+   if(url.endsWith('/brief'))return {json:async()=>({revision:'2',versionId:'22222222-2222-4222-8222-222222222222'})};
+   if(url.endsWith('/brief/approve'))return {json:async()=>({revision:'3'})};
+   return {json:async()=>({})};});
+  await render();
+  expect(apiRequest).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('To include previous applicants, review these requirements, then save and approve them again.');
+  expect(button('Post job').disabled).toBe(false);
+  await act(async()=>button('Update and approve').click());await settle(10);
+  expect(apiRequest.mock.calls.map(c=>c[1])).toEqual(['/api/jobs/42/brief','/api/jobs/42/brief/approve']);
+  const saved=apiRequest.mock.calls[0][2].payload;
+  expect(saved).toMatchObject({schemaVersion:4,compilerVersion:4,taxonomyVersion:4});
+  expect(saved.criteria.every((c:any)=>c.evidenceKinds.includes('candidate_provided'))).toBe(true);
+  expect(apiRequest.mock.calls[1][2]).toMatchObject({versionId:'22222222-2222-4222-8222-222222222222'});
  });
 
  it('does not navigate when the submission is unconfirmed, and retries with the same request id',async()=>{

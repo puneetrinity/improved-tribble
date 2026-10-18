@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { requirementExtractionSchema, reviewSelectionSchema, type ExtractedRequirement, type ReviewDisposition, type ReviewItem as WireReviewItem } from '../../shared/brief-review';
 import { formatExtractedLocation, LOCATION_EXTRACTION_INSTRUCTIONS } from '../../shared/brief-location';
-import { currentBriefPayloadSchema, sourceHash, type BriefPayload } from './contracts';
+import { BRIEF_VERSION, currentBriefPayloadSchema, sourceHash, type BriefPayload } from './contracts';
 
 type Criterion = BriefPayload['criteria'][number];
 export type ReviewItem = WireReviewItem<Criterion>;
 export class BriefReviewError extends Error {
   constructor(readonly code: 'BRIEF_INVALID_REVIEW'|'BRIEF_REVIEW_REQUIRED') { super(code); }
 }
-const payloadFor = (criteria: Criterion[]): BriefPayload => ({schemaVersion:3,compilerVersion:3,taxonomyVersion:3,criteria});
+const payloadFor = (criteria: Criterion[]): BriefPayload => ({schemaVersion:BRIEF_VERSION,compilerVersion:BRIEF_VERSION,taxonomyVersion:BRIEF_VERSION,criteria});
 function locate(jd: string, quote: string) {
   const start=jd.indexOf(quote),end=start+quote.length;
   const splits=(n:number)=>n>0 && n<jd.length && /[\uD800-\uDBFF]/.test(jd[n-1]!) && /[\uDC00-\uDFFF]/.test(jd[n]!);
@@ -118,7 +118,7 @@ function candidate(item: ExtractedRequirement, span: {start:number;end:number}, 
   if(item.topic==='other' || (item.priority==='unclear' && !foundation)) return null;
   if(!foundation && (NEGATION.test(item.quote) || NEGATION.test(item.text))) return null;
   const c: Criterion={id:randomUUID(),label:item.text.slice(0,120),class:item.priority==='preferred'?'preferred':'must_have',
-    subject:'relevant_work',requirement:{kind:'text',value:item.text},evidenceKinds:['profile_evidence'],
+    subject:'relevant_work',requirement:{kind:'text',value:item.text},evidenceKinds:['profile_evidence','candidate_provided'],
     use:'assessment',provenance:{kind:'jd',sourceHash:hash,...span}};
   if(item.topic==='overall_experience') {
     if(item.terms.length || item.minimum===null || (item.maximum!==null && item.maximum<item.minimum))return null;

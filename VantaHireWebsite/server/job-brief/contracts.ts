@@ -16,7 +16,7 @@ export const BRIEF_FUNCTIONS = [
   'flow_job_brief_draft_finish(uuid,uuid,jsonb)',
   'flow_job_brief_draft_finish_review(uuid,uuid,jsonb,jsonb)',
 ] as const;
-export const BRIEF_VERSION = 3;
+export const BRIEF_VERSION = 4;
 export const MAX_JD_BYTES = 20_000;
 export const MAX_REQUEST_BYTES = 65_536;
 
@@ -100,20 +100,20 @@ const criterion = z.object({
   }
 });
 export const briefPayloadSchema = z.object({
-  schemaVersion: z.union([z.literal(1),z.literal(2),z.literal(3)]), compilerVersion: z.union([z.literal(1),z.literal(2),z.literal(3)]), taxonomyVersion: z.union([z.literal(1),z.literal(2),z.literal(3)]),
+  schemaVersion: z.union([z.literal(1),z.literal(2),z.literal(3),z.literal(4)]), compilerVersion: z.union([z.literal(1),z.literal(2),z.literal(3),z.literal(4)]), taxonomyVersion: z.union([z.literal(1),z.literal(2),z.literal(3),z.literal(4)]),
   criteria: z.array(criterion).min(1).max(12),
 }).strict().superRefine((value, ctx) => {
   if (new Set(value.criteria.map(c => c.id)).size !== value.criteria.length) ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Duplicate criterion ID' });
   if (value.schemaVersion !== value.compilerVersion || value.schemaVersion !== value.taxonomyVersion) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Mixed brief versions'});
   for (const c of value.criteria) {
     if (value.schemaVersion < 3 && c.requirement.kind === 'accepted_skills') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Historical brief shape cannot change'});
-    if (value.schemaVersion === 3 && c.subject === 'skill' && c.requirement.kind !== 'accepted_skills') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Skill needs approved names'});
+    if (value.schemaVersion >= 3 && c.subject === 'skill' && c.requirement.kind !== 'accepted_skills') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Skill needs approved names'});
     if (value.schemaVersion === 1 && ['experience_range','accepted_titles'].includes(c.requirement.kind)) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Historical brief shape cannot change'});
     if (value.schemaVersion >= 2 && c.subject === 'title' && c.requirement.kind !== 'accepted_titles') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Title needs approved alternatives'});
-    if (value.schemaVersion >= 2 && c.subject === 'experience_years' && !c.evidenceKinds.includes('profile_evidence')) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Experience calculation requires profile employment evidence'});
+    if (value.schemaVersion >= 2 && c.subject === 'experience_years' && !c.evidenceKinds.includes('profile_evidence') && !(value.schemaVersion===4 && c.evidenceKinds.includes('candidate_provided'))) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Experience calculation requires dated employment evidence'});
     if (value.schemaVersion >= 2 && ['experience_years','title'].includes(c.subject) && c.use !== 'assessment') ctx.addIssue({code:z.ZodIssueCode.custom,message:'Scoring titles and experience are assessed after retrieval'});
   }
-  if (value.schemaVersion === 3 && overlappingSkillCriteria(value.criteria).length) ctx.addIssue({code:z.ZodIssueCode.custom,message:'A skill name appears under multiple criteria; merge or edit the skills'});
+  if (value.schemaVersion >= 3 && overlappingSkillCriteria(value.criteria).length) ctx.addIssue({code:z.ZodIssueCode.custom,message:'A skill name appears under multiple criteria; merge or edit the skills'});
   if (value.schemaVersion >= 2) for (const subject of ['title','experience_years']) {
     if (value.criteria.filter(c=>c.subject===subject).length>1) ctx.addIssue({code:z.ZodIssueCode.custom,message:'Duplicate title or experience criterion'});
   }

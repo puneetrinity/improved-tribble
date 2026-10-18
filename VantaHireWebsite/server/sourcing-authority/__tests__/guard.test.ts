@@ -9,6 +9,13 @@ describe('sourcing authority guard',()=>{
     expect(()=>checkSourcingAuthority((p:string)=>read(p)+(p===path?'\nchanged':''))).toThrow('sourcing_frozen');
   });
   for(const [path,tokens] of Object.entries(sourcingAuthorityTokens))for(const token of tokens as string[])it(`refuses authority removal: ${path} / ${token}`,()=>{
-    expect(()=>checkSourcingAuthority((p:string)=>p===path?read(p).split(token).join('REMOVED'):read(p))).toThrow('sourcing_authority');
+    let targetReads=0;
+    expect(()=>checkSourcingAuthority((p:string)=>{
+      if(p!==path)return read(p);
+      // Frozen drift is tested above. Supply the real bytes for that first read,
+      // then remove the token so this case independently exercises authority checks.
+      if(path in frozenSourcingFiles && targetReads++===0)return read(p);
+      return read(p).split(token).join('REMOVED');
+    })).toThrow('sourcing_authority:'+path+':'+token);
   });
 });

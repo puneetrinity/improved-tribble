@@ -1,9 +1,15 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 332,
+  "route_registration_census": 333,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
+    {
+      "method": "post",
+      "path": "/api/internal/sourcing/candidate-eligibility",
+      "reader": "readCandidateEligibility / flow_sourcing_candidate_eligibility",
+      "authority": "Dedicated signed sourcing:candidates:read token; exact body hash, tenant, request, execution and stored admission; read-only SQL"
+    },
     {
       "method": "get",
       "path": "/api/jobs/:id/sourcing/admission",
@@ -850,7 +856,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "b66fd2af852258c60af2ae325672f7dfda997778dabfca2de35cef126a3e2dfa"
+      "sha256": "69773c1ddcca0a427057ea801444733b9deaf32a0e4520711125b1893ea66d71"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -858,7 +864,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "ebce72c2d5b504ee89d0518838a302e7f2b2392a29108cde7624a0edc6817df8"
+      "sha256": "00919e906e57b0e5ae9ec98c13c36fe936543684e5937981e04d5deb86fd9a31"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -962,7 +968,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "e64e43d2c81e6d010a416b8a2019e1a6a4f8d69fa4341b7a75e0b2667ce47848"
+      "sha256": "f28cfe114d7ea683ae32e156aed645dc6a0f8de1956fda417db7d4e499c34ed4"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -1010,15 +1016,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "be5d7491da9128786bd498d109d8f17ed1833f31c036b3b2b8d602db8c160c87"
+      "sha256": "fdc2d1589024812d4df8dbb72bce0f38607f2df70608b10edddb640bf16d974f"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "ef745fd5aae89d4c5d7f79dc8d96db2675f5e58d5375906c077926463c4f85e1"
+      "sha256": "62076b0e267f5880ac53f1e55dfcd574e1037a49fd48342e536c61107a2f0fa9"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "462196f9149bc1849099e6f45bb839b166c2794d94a0d64974cf06729cf694fe"
+      "sha256": "caeeb15d125a4d616da27b66ea3373b488b9247b3d9e94addfd7efd8489c8420"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",

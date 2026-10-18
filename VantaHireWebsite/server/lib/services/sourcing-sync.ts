@@ -13,6 +13,7 @@ import {SourcingRepository} from '../../sourcing-authority/repository';
 import {rankedCandidateSchema} from '../../sourcing-authority/ranking-contract';
 import { loadCandidatePrivacyConfig } from '../../candidate-privacy/config';
 import { checkMemoryEligibilityBatch } from '../../candidate-privacy/memory-client';
+import {parsePrivateOrigin,verifyPrivateDelivery} from '../../sourcing-authority/candidate-origin';
 
 const ENRICHED_STATUSES = new Set(['completed', 'enriched']);
 const PENDING_STATUSES = new Set(['pending', 'queued']);
@@ -20,22 +21,26 @@ const FAILED_STATUSES = new Set(['failed', 'error']);
 
 async function filterPrivacyAllowedCandidates(
   candidates: SignalResultCandidateV3[],
+  organizationId:number,
 ): Promise<SignalResultCandidateV3[]> {
   if (candidates.length === 0) return [];
   const config = loadCandidatePrivacyConfig();
   const subjects = candidates.map((candidate) => ({
     candidate,
+    privateOrigin:parsePrivateOrigin(candidate.candidate),
     requestRef: randomUUID(),
   }));
   const decisions = await checkMemoryEligibilityBatch({
-    subjects: subjects.map(({ candidate, requestRef }) => ({
+    subjects: subjects.map(({ candidate, requestRef,privateOrigin }) => ({
       requestRef,
-      identifiers: [{ identifier_type: 'signal_candidate_id' as const, value: candidate.candidate.id }],
+      identifiers: privateOrigin?[]:[{ identifier_type: 'signal_candidate_id' as const, value: candidate.candidate.id }],
+      ...(privateOrigin?{canonicalReference:{candidate_tenant_id:`org_${organizationId}`,candidate_id:privateOrigin.identity.candidateId}}:{}),
     })),
     timeoutMs: config.memoryTimeoutMs,
   });
   return subjects
-    .filter(({ requestRef }) => decisions.get(requestRef) === 'allow')
+    .filter(({ requestRef,privateOrigin }) => decisions.get(requestRef) === 'allow'
+      || (privateOrigin&&decisions.get(requestRef)==='block_global'))
     .map(({ candidate }) => candidate);
 }
 
@@ -188,11 +193,13 @@ export async function upsertSignalCandidates(
 ): Promise<{ count: number; candidates: SignalResultCandidateV3[] }> {
   if (candidates.length === 0 && !governed) return { count: 0, candidates: [] };
 
-  const allowedCandidates = await filterPrivacyAllowedCandidates(candidates);
+  const allowedCandidates = await filterPrivacyAllowedCandidates(candidates,organizationId);
+  if(!governed&&allowedCandidates.some(candidate=>parsePrivateOrigin(candidate.candidate)))throw Error('SOURCING_PRIVATE_BINDING');
   if (allowedCandidates.length === 0 && !governed) return { count: 0, candidates: [] };
 
   // Build all row values for a single bulk INSERT
   const rows = allowedCandidates.map((c) => {
+    const origin=parsePrivateOrigin(c.candidate);
     const fitScore = normalizeFitScoreForStorage(c.fitScore ?? null);
     const searchSnippet = (c.candidate as unknown as { searchSnippet?: unknown }).searchSnippet ?? null;
     const searchMeta = (c.candidate as unknown as { searchMeta?: unknown }).searchMeta ?? null;
@@ -201,7 +208,8 @@ export async function upsertSignalCandidates(
 
     const summary = {
       ...(governed?.protocolVersion===2?{ranking:rankedCandidateSchema.parse(c.ranking)}:{}),
-      candidate: c.candidate,
+      candidate: origin?{...c.candidate,candidateOrigin:origin.display}:c.candidate,
+      ...(origin?{candidateOrigin:origin.display,privateResumeIdentity:origin.identity}:{}),
       sourcingContext: c.sourcingContext,
       cardSignals: c.cardSignals,
       nameHint: c.candidate.nameHint,
@@ -282,6 +290,7 @@ export async function upsertSignalCandidates(
       await transaction.execute(sql`SELECT public.flow_sourcing_org_state(${organizationId},true)`);
       const locked=await transaction.execute(buildSignalExecutionLockQuery(requestId,execution));
       if(locked.rows.length!==1)throw Error('SOURCING_DELIVERY_EXECUTION_STALE');
+      await verifyPrivateDelivery(transaction,organizationId,jobId,requestId,governed,allowedCandidates);
       if(rows.length)await transaction.execute(bulkSql);
       const command={requestId,executionAttemptId:governed.executionAttemptId,artifactHash:governed.artifactHash,
         revision:governed.revision,orderedSignalIds:governed.protocolVersion===2
@@ -306,7 +315,7 @@ export async function upsertSignalCandidates(
 
   // Fire per-candidate callbacks after the batch
   if (onCandidateUpserted) {
-    const publishableCandidates = await filterPrivacyAllowedCandidates(allowedCandidates);
+    const publishableCandidates = await filterPrivacyAllowedCandidates(allowedCandidates,organizationId);
     for (let i = 0; i < publishableCandidates.length; i++) {
       const c = publishableCandidates[i]!;
       onCandidateUpserted(c, c.sourcingContext?.rank ?? c.rank ?? i + 1);

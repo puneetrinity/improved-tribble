@@ -13,34 +13,46 @@ import { locationProblemText, locationValueProblem, splitLocation } from '../../
 
 type Criterion = BriefPayload['criteria'][number];
 export const MAX_CRITERIA = 12;
-const empty: BriefPayload = { schemaVersion: 3, compilerVersion: 3, taxonomyVersion: 3, criteria: [] };
+export const BRIEF_SCHEMA = 4 as const;
+const empty: BriefPayload = { schemaVersion: BRIEF_SCHEMA, compilerVersion: BRIEF_SCHEMA, taxonomyVersion: BRIEF_SCHEMA, criteria: [] };
 
 /** Values the recruiter already entered on the Details step. Used only as labelled suggestions. */
 export type CriteriaDetails = { title: string; location: string; experienceYears: string; skills: string[]; goodToHaveSkills: string[] };
 
 const recruiter = { kind: 'recruiter_edit' } as const;
+const JUDGED = ['responsibility', 'leadership', 'availability'];
+/** Same rule as the server's AI draft: judged criteria stay recruiter-only, work eligibility keeps its own rule,
+ * everything else can be met by a profile or by what the candidate provided (a previous applicant's resume). */
 const evidenceFor = (subject: Criterion['subject']): Criterion['evidenceKinds'] =>
-  ['responsibility', 'leadership', 'availability'].includes(subject) ? ['recruiter_judgement']
-    : subject === 'work_eligibility' ? ['candidate_provided'] : ['profile_evidence'];
+  JUDGED.includes(subject) ? ['recruiter_judgement']
+    : subject === 'work_eligibility' ? ['candidate_provided'] : ['profile_evidence', 'candidate_provided'];
+/** Explicit save of an older brief only. Never applied on load: an approved older brief stays as approved. */
+export function upgradedPayload(p: BriefPayload): BriefPayload {
+  if (p.schemaVersion >= BRIEF_SCHEMA) return p;
+  return { ...p, schemaVersion: BRIEF_SCHEMA, compilerVersion: BRIEF_SCHEMA, taxonomyVersion: BRIEF_SCHEMA,
+    criteria: p.criteria.map(c => c.evidenceKinds.includes('profile_evidence') && !c.evidenceKinds.includes('candidate_provided')
+      && !JUDGED.includes(c.subject) && c.subject !== 'work_eligibility'
+      ? { ...c, evidenceKinds: [...c.evidenceKinds, 'candidate_provided'] } : c) };
+}
 export function skillCriterion(name: string, cls: 'must_have' | 'preferred'): Criterion {
-  return { id: crypto.randomUUID(), label: name, class: cls, subject: 'skill', use: 'assessment', evidenceKinds: ['profile_evidence'],
+  return { id: crypto.randomUUID(), label: name, class: cls, subject: 'skill', use: 'assessment', evidenceKinds: evidenceFor('skill'),
     requirement: { kind: 'accepted_skills', primary: name, alternatives: [] }, provenance: recruiter };
 }
 function experienceCriterion(minimum: number): Criterion {
   return { id: crypto.randomUUID(), label: 'Experience', class: 'must_have', subject: 'experience_years', use: 'assessment',
-    evidenceKinds: ['profile_evidence'], requirement: { kind: 'minimum_years', minimum }, provenance: recruiter };
+    evidenceKinds: evidenceFor('experience_years'), requirement: { kind: 'minimum_years', minimum }, provenance: recruiter };
 }
 /** Scored place in the value ("City, Country" or "Country"); hybrid/remote/office wording in the note. Never invents a
  * place: without a country the recruiter's wording stays in the field and the screen asks for the country. */
 function locationCriterion(raw: string): Criterion {
   const { place, note } = splitLocation(raw);
   return { id: crypto.randomUUID(), label: 'Location', class: 'must_have', subject: 'location', use: 'assessment',
-    evidenceKinds: ['profile_evidence'], requirement: { kind: 'text', value: place ?? raw.trim() }, provenance: recruiter,
+    evidenceKinds: evidenceFor('location'), requirement: { kind: 'text', value: place ?? raw.trim() }, provenance: recruiter,
     ...(place && note ? { note } : {}) };
 }
 function otherCriterion(): Criterion {
   return { id: crypto.randomUUID(), label: '', class: 'preferred', subject: 'relevant_work', use: 'assessment',
-    evidenceKinds: ['profile_evidence'], requirement: { kind: 'text', value: '' }, provenance: recruiter };
+    evidenceKinds: evidenceFor('relevant_work'), requirement: { kind: 'text', value: '' }, provenance: recruiter };
 }
 
 /**
@@ -317,6 +329,7 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
   // Someone (another tab or teammate) saved a newer version than the one on screen.
   const changedElsewhere = !!base && (brief.latest?.version_id ?? null) !== base.versionId && Number(brief.revision) !== Number(base.revision);
   const reloadLatest = () => { setDirty(false); setOrigin(null); setBase(null); setSuggestions([]); setNotice(''); setError(''); };
+  const olderFormat = payload.schemaVersion < BRIEF_SCHEMA;
   const ready = foundationsReady(payload) && used <= MAX_CRITERIA && namesValid(cleaned(payload)) && payload.criteria.length > 0;
 
   const ws = workspaceFor(brief);
@@ -354,10 +367,11 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
     if (!base) return;
     setBusy(true); setError(''); setNotice('');
     try {
-      const saved = cleaned(payload);
+      const historical = payload.schemaVersion < BRIEF_SCHEMA;
+      const saved = cleaned(upgradedPayload(payload));
       if (!namesValid(saved)) throw Error('SKILL_NAMES_INVALID');
       let target = { versionId: base.versionId, revision: base.revision };
-      if (dirty || !base.versionId) {
+      if (dirty || !base.versionId || historical) {
         // Save exactly what is on screen against the revision it was loaded from; a newer revision conflicts.
         const result = await jobIntentRequest(actorId, jobId, 'save-brief', `/api/jobs/${jobId}/brief`, { currentJD: brief.currentJD, sourceChoice: 'current_jd',
           requesterKind: 'recruiter', reasonCode: 'other', expectedRevision: Number(base.revision), payload: saved,
@@ -411,6 +425,7 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
       {changedElsewhere && !busy && <div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
         <span><strong>These criteria were changed in another tab or by a teammate.</strong> Load the latest version before approving.{dirty ? ' Your unsaved edits here will be replaced.' : ''}</span>
         <Button type="button" variant="outline" className="min-h-[44px]" onClick={reloadLatest}>Load latest version</Button></div>}
+      {payload.schemaVersion === 3 && !dirty && <p role="status" className="rounded-md bg-muted/40 p-3 text-sm">To include previous applicants, review these requirements, then save and approve them again.</p>}
       {notice && <p role="status" className="text-sm">{notice}</p>}
       {retryable && !dirty && <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" className="min-h-[44px]" disabled={drafting} onClick={() => void retryDraft()}>
@@ -476,8 +491,8 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-        <Button type="button" className="min-h-[44px]" variant={approvedCurrent ? 'outline' : 'default'} disabled={busy || approvedCurrent || !ready || changedElsewhere || !base} onClick={() => void approve()}>
-          {busy ? 'Approving…' : approvedCurrent ? 'Criteria approved' : 'Approve criteria'}</Button>
+        <Button type="button" className="min-h-[44px]" variant={approvedCurrent && !olderFormat ? 'outline' : 'default'} disabled={busy || (approvedCurrent && !olderFormat) || !ready || changedElsewhere || !base} onClick={() => void approve()}>
+          {busy ? 'Approving…' : approvedCurrent ? (olderFormat ? 'Update and approve' : 'Criteria approved') : 'Approve criteria'}</Button>
         <Button type="button" className="min-h-[44px]" disabled={!approvedCurrent || busy || submitting} onClick={() => void submit()}>{submitting ? 'Posting…' : 'Post job'}</Button>
         <p className="w-full text-sm text-muted-foreground">{approvedCurrent ? 'Post job sends the job and these criteria to admin for approval, then opens the job’s applications page.'
           : !foundationsReady(payload) ? 'Add experience and location to approve.'

@@ -39,7 +39,7 @@ describe('brief real SDK transport contract',()=>{
   });
   it('produces only a validated proposal after the committed claim',async()=>{
     const f=fixture(()=>completion(JSON.stringify(payload)));
-    expect(await f.run()).toMatchObject({state:'succeeded',result:{schemaVersion:3,criteria:[{label:'Python',use:'assessment'}]}});
+    expect(await f.run()).toMatchObject({state:'succeeded',result:{schemaVersion:4,criteria:[{label:'Python',use:'assessment'}]}});
     expect(f.call.mock.calls.map(c=>c[0])).toEqual(['read','claim','finishReview']);expect(f.fetch).toHaveBeenCalledOnce();
   });
   it.each([429,500,503])('does not let SDK retry HTTP %i despite client defaults',async(status)=>{

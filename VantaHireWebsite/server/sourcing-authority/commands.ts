@@ -76,7 +76,10 @@ export async function approveSourcingBrief(repository:SourcingRepository,scope:B
 }
 export async function decideSourcing(repository:SourcingRepository,scope:BriefScope,candidateId:number,input:unknown) {
   const {requestId,...command}=sourcingDecisionSchema.parse(input);
-  await requireCandidatePrivacyAllowed({type:'job_sourced_candidate',id:candidateId},{globalUse:true});
+  // SQL resolves the stored origin under the decision lock and still refuses
+  // global opt-outs for public profiles. An organisation's applicant decision
+  // is private use; erasure and review remain blocked here and in SQL.
+  await requireCandidatePrivacyAllowed({type:'job_sourced_candidate',id:candidateId},{globalUse:false});
   const result=await repository.call('decide',[...scopeKeys(scope),candidateId,requestId,command]);
   if(!result) throw new SourcingError('SOURCING_NOT_FOUND',404);
   return result;

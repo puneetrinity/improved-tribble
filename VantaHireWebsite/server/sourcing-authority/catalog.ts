@@ -6,6 +6,8 @@ export const SOURCING_TABLES=[
   'sourcing_execution_grants','sourcing_deliveries','sourcing_delivery_items','sourcing_decision_events','sourcing_count_previews',
 ] as const;
 export const SOURCING_FUNCTIONS=[
+  'flow_sourcing_contact_allowed(integer,integer,integer)',
+  'flow_sourcing_candidate_eligibility(text,uuid,uuid,jsonb,text)',
   'flow_sourcing_org_state(integer,boolean)','flow_sourcing_quote(integer,integer,integer)',
   'flow_sourcing_admit(integer,integer,integer,uuid,jsonb)','flow_sourcing_digest_claim(integer,integer,integer,uuid,jsonb)',
   'flow_sourcing_digest_next(uuid)','flow_sourcing_digest_finish(uuid,uuid,jsonb)',
@@ -23,7 +25,7 @@ export const SOURCING_PRIVATE_FUNCTIONS=[
 ] as const;
 export const SOURCING_PRIVATE_NAMES=SOURCING_PRIVATE_FUNCTIONS.map(s=>s.slice(0,s.indexOf('(')));
 // Reproduced from the final disposable catalog before the build can pass readiness.
-export const SOURCING_CATALOG_SHA256='69e55d718b039a7cf44a1bcb56789e8d57aa9bc5f500c7fb841d4e100c8a980e';
+export const SOURCING_CATALOG_SHA256='d6fe47add089ba67ca004c1a0b1f657ad6190b006b292628261d06fa8ce62f77';
 export const SOURCING_CATALOG_SQL=`WITH relations AS (
  SELECT c.* FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname='public' AND c.relname LIKE 'sourcing_%' AND c.relkind IN ('r','p')

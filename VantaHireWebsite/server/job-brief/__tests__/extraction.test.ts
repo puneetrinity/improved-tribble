@@ -7,8 +7,8 @@ const run=(value:unknown,source=jd)=>assembleExtractedBrief(JSON.stringify(value
 describe('model extraction boundary',()=>{
   it('assigns mechanical fields and exact source positions without changing input',()=>{
     const before=JSON.stringify(input),out=run(input);expect(JSON.stringify(input)).toBe(before);
-    expect(out.criteria[0]).toMatchObject({label:'Python',use:'assessment',evidenceKinds:['profile_evidence'],provenance:{kind:'jd',start:0,end:19}});
-    expect(out.criteria[0]!.id).toMatch(/^[0-9a-f-]{36}$/);expect(out.schemaVersion).toBe(3);
+    expect(out.criteria[0]).toMatchObject({label:'Python',use:'assessment',evidenceKinds:['profile_evidence','candidate_provided'],provenance:{kind:'jd',start:0,end:19}});
+    expect(out.criteria[0]!.id).toMatch(/^[0-9a-f-]{36}$/);expect(out.schemaVersion).toBe(4);
   });
   it('uses first exact repeated quote',()=>expect(run(input,jd+' '+jd).criteria[0]!.provenance).toMatchObject({start:0,end:19}));
   it('does not invent foundations',()=>expect(run(input).criteria.map(c=>c.subject)).toEqual(['skill']));

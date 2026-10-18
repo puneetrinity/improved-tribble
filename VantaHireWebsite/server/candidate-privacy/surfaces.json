@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "1fd11125ab50a686663f48a72d89d6b1ea5a8493367521db54242f89293c66ac",
+  "source_census_sha256": "253f4f6c200a940e15bd48ca8cbe6490abafcfd2624be6bd08f50fa156e9158a",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/candidate-history/contracts.ts",
@@ -60,6 +60,7 @@
     "client/src/components/kanban/ApplicationDetailPanel.tsx"
   ],
   "sources": [
+    { "file": "server/sourcing-authority/candidate-access.ts", "classification": "fenced" },
     { "file": "server/sourcing-authority/commands.ts", "classification": "fenced" },
     { "file": "server/schema-migrations/0015_governed_sourcing.sql", "classification": "fenced" },
     { "file": "client/src/lib/sourcing-authority.ts", "classification": "ui_consumer" },
@@ -167,6 +168,17 @@
     { "file": "client/src/pages/terms-of-service-page.tsx", "classification": "excluded" }
   ],
   "surfaces": [
+    {
+      "id": "sourcing-applicant-contact-authority",
+      "file": "server/sourcing-authority/candidate-access.ts",
+      "symbol": "canContactSourcedCandidate",
+      "models": ["jobSourcedCandidates"],
+      "direction": "provider-outbound",
+      "privacy_action": ["contact"],
+      "organization_scope": "Stored organisation and job, never browser origin flags",
+      "enforcement": "Fresh scoped row; absent, applicant or malformed origin refuses contact; existing privacy dispatch fence remains required",
+      "anchors": ["eq(jobSourcedCandidates.organizationId,organizationId)", "eq(jobSourcedCandidates.jobId,jobId)", "!!row&&!applicantContactBlocked(row)"]
+    },
     {
       "id": "organization-private-history-contract",
       "file": "server/candidate-history/contracts.ts",
@@ -546,8 +558,8 @@
       "direction": "read_write",
       "privacy_action": ["withdraw_global_matching", "request_erasure"],
       "organization_scope": "owning_org_job",
-      "enforcement": "Scoped route lookup precedes healthy global-use privacy observation; fixed owner routine rechecks current seat, assignment, candidate keys and local privacy before atomically recording the decision and contact queue state. No Memory preference feedback.",
-      "anchors": ["requireCandidatePrivacyAllowed", "globalUse:true", "repository.call('decide'"]
+      "enforcement": "Scoped route lookup precedes healthy private-use privacy observation. Fixed SQL rechecks stored origin, blocks public global opt-outs and all erasures/reviews, current seat, assignment and candidate keys; applicants never queue contact. No Memory preference feedback.",
+      "anchors": ["requireCandidatePrivacyAllowed", "globalUse:false", "repository.call('decide'"]
     },
     {
       "id": "governed-sourcing-decision-sql",
