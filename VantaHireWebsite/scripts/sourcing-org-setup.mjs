@@ -25,7 +25,7 @@ export async function main(args=process.argv.slice(2),env=process.env){
       const result=await preview(r,io);await writeJson(opts['--output'],result.plan);
       console.log(JSON.stringify({state:'preview',sha256:result.sha256,organizationId:r.organizationId,
         seats:result.plan.snapshot.flow.ent?.capacity??r.entitlement.capacity,runsPerSeat:5,
-        existingUsage:result.plan.snapshot.flow.usage,expiresAt:result.plan.expiresAt,paidCalls:0}));
+        existingUsage:result.plan.snapshot.flow.usage,expiresAt:result.plan.expiresAt,paidCalls:0,warnings:result.warnings}));
     }else{
       const result=await apply(input,opts['--approve-sha256'],io);await writeJson(opts['--output'],result);
       console.log(JSON.stringify(result));if(result.state!=='ready')process.exitCode=1;

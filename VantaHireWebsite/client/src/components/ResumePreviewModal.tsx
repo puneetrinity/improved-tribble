@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { Download, ExternalLink, FileText, AlertCircle, CheckCircle, XCircle, Sparkles, Brain } from "lucide-react";
+import { Download, ExternalLink, FileText, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 
 interface ResumePreviewModalProps {
   applicationId: number | null;
@@ -13,9 +13,6 @@ interface ResumePreviewModalProps {
   resumeUrl: string | null;
   resumeFilename?: string | null;
   status?: string | undefined;
-  aiFitScore?: number | null | undefined;
-  aiFitLabel?: string | null | undefined;
-  aiFitReasons?: string[] | null | undefined;
   resumeText?: string | null;
   open: boolean;
   onClose: () => void;
@@ -32,9 +29,6 @@ export function ResumePreviewModal({
   resumeUrl,
   resumeFilename,
   status,
-  aiFitScore,
-  aiFitLabel,
-  aiFitReasons,
   resumeText,
   open,
   onClose,
@@ -98,17 +92,6 @@ export function ResumePreviewModal({
     }
   };
 
-  const getFitBadgeColor = (label: string) => {
-    const colorMap: Record<string, string> = {
-      'Exceptional': 'bg-success/10 text-success-foreground border-success/30',
-      'Strong': 'bg-info/10 text-info-foreground border-info/30',
-      'Good': 'bg-primary/10 text-primary border-primary/30',
-      'Partial': 'bg-warning/10 text-warning-foreground border-warning/30',
-      'Low': 'bg-destructive/10 text-destructive border-destructive/30',
-    };
-    return colorMap[label] || 'bg-muted text-muted-foreground border-border';
-  };
-
   const displayFilename = resumeFilename || resumeUrl?.split('/').pop() || 'Resume';
 
   return (
@@ -125,12 +108,6 @@ export function ResumePreviewModal({
                 {status && (
                   <Badge className={getStatusColor(status)}>
                     {status}
-                  </Badge>
-                )}
-                {aiFitLabel && aiFitScore !== null && aiFitScore !== undefined && (
-                  <Badge variant="outline" className={`${getFitBadgeColor(aiFitLabel)} font-medium`}>
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    {aiFitLabel} ({aiFitScore})
                   </Badge>
                 )}
               </div>
@@ -229,23 +206,6 @@ export function ResumePreviewModal({
           {/* Right: Review Panel */}
           <div className="w-80 flex flex-col bg-muted/50">
             <div className="p-4 flex-1 overflow-auto">
-              {/* AI Fit Analysis */}
-              {aiFitReasons && Array.isArray(aiFitReasons) && aiFitReasons.length > 0 && (
-                <div className="mb-4 p-3 bg-primary/5 rounded-lg border-l-4 border-primary">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Brain className="w-4 h-4 text-primary" />
-                    <span className="text-primary font-medium text-sm">AI Analysis</span>
-                  </div>
-                  <ul className="text-muted-foreground text-sm space-y-1">
-                    {aiFitReasons.slice(0, 4).map((reason: string, idx: number) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <span className="text-primary mt-0.5">•</span>
-                        <span>{reason}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
 
               {/* Review Notes */}
               <div className="mb-4">

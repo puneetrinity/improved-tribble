@@ -856,7 +856,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "c96150ae39773377243bfe5a1735591aa0cfc54b7805f20fb8e4f12acebc7954"
+      "sha256": "4a3990cea3553e30cf909d5c56eed15ebd170856f5cdac28edee70df74928fac"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -976,7 +976,7 @@
     },
     {
       "file": "client/src/pages/application-management-page.tsx",
-      "sha256": "5a251fff0837b52cbfc86f79a772824c5532479147d05fab5c38065d3022d5e2"
+      "sha256": "9dd8882d51724de52d41c17480de267faebb3b8906968c950139ba3df1ae86ce"
     },
     {
       "file": "client/src/pages/admin-forms-page.tsx",
@@ -984,11 +984,11 @@
     },
     {
       "file": "client/src/pages/client-shortlist-page.tsx",
-      "sha256": "88a05ced490861103b5697bbb700165c5c33c9885cdf3aaf56bddf714762ca28"
+      "sha256": "07e5f7c26aa791165b7cbafdc49dda34e9e63c8bb96b8a948e8f58456b65c418"
     },
     {
       "file": "client/src/pages/applications-page.tsx",
-      "sha256": "054c34c73bb211832e11b167fdf75a628f1833101676a20086af8e1b9154886b"
+      "sha256": "7112cdbb846a399523ae83e70d65bdc16d70b479ac17f3b05500e9d337f4cb07"
     },
     {
       "file": "client/src/lib/internal-copy.ts",
@@ -1327,7 +1327,7 @@
     },
     {
       "file": "client/src/components/ResumePreviewModal.tsx",
-      "sha256": "05803ec5341695786c9a29fba713cbaff1e06f39989cc87d06818c1c224d1adb"
+      "sha256": "5b14bef0dd8e78d0807f1a09e6623fd1974b9996c1a153dd6b524ea0b590d4a4"
     }
   ]
 }

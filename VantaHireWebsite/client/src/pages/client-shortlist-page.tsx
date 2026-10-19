@@ -298,22 +298,6 @@ export default function ClientShortlistPage() {
                       <Label className="text-xs font-medium text-primary">
                         AI Summary
                       </Label>
-                      {candidate.aiFitLabel && (
-                        <Badge
-                          variant="outline"
-                          className={`text-xs ${
-                            candidate.aiFitLabel === 'Strong'
-                              ? 'border-success/30 bg-success/10 text-success-foreground'
-                              : candidate.aiFitLabel === 'Good'
-                              ? 'border-info/30 bg-info/10 text-info-foreground'
-                              : candidate.aiFitLabel === 'Fair'
-                              ? 'border-warning/30 bg-warning/10 text-warning-foreground'
-                              : 'border-destructive/30 bg-destructive/10 text-destructive'
-                          }`}
-                        >
-                          {candidate.aiFitLabel} Fit
-                        </Badge>
-                      )}
                     </div>
                     <p className="text-sm text-foreground whitespace-pre-wrap">
                       {candidate.aiSummary}

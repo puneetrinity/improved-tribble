@@ -1117,8 +1117,6 @@ export default function ApplicationManagementPage() {
         'Status',
         'Pipeline Stage',
         'Applied Date',
-        'AI Fit Score',
-        'AI Fit Label',
         'Rating',
         'Tags',
         'Resume URL'
@@ -1132,8 +1130,6 @@ export default function ApplicationManagementPage() {
         escapeCsv(app.status),
         escapeCsv(getStageName(app.currentStage)),
         escapeCsv(app.appliedAt ? new Date(app.appliedAt).toISOString() : ''),
-        escapeCsv(app.aiFitScore),
-        escapeCsv(app.aiFitLabel),
         escapeCsv(app.rating),
         escapeCsv(app.tags?.join('; ')),
         escapeCsv(app.resumeUrl)

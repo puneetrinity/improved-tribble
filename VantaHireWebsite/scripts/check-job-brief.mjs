@@ -12,7 +12,7 @@ export const frozenFiles={
   "server/seoUtils.ts": "5a3ae83946f386f346043ff02e926aeb65eb5caebdfa4ffcc8ec2e54e6a72ea2",
   "client/src/lib/seoHelpers.ts": "2b71b7a1736fce5affc7cac36ca61ac015f100e9f82acba32f02ae8a75933407",
   "client/src/pages/jobs-page.tsx": "edaa1e14e6a0f578c5d20e098a0db68d9209130f94a57eb55ee882c5a1df3a77",
-  "client/src/pages/application-management-page.tsx": "5a251fff0837b52cbfc86f79a772824c5532479147d05fab5c38065d3022d5e2",
+  "client/src/pages/application-management-page.tsx": "9dd8882d51724de52d41c17480de267faebb3b8906968c950139ba3df1ae86ce",
   "server/profile.routes.ts": "e777114341fb77bdaac98cc3d661fc5920c4965999472790cd60eb4fd8422aa7",
   "server/applications.routes.ts": "488db8204c5c4f14349c8a0ac466e59593642d7489d65104ea32dd64abdae12f",
   "server/organization-candidates/application-intake.ts": "d04e2745b5bb1e5cf7eac59cd723e9c78af50d7f4f64859ecfb4fbf382c90d0f",
@@ -62,7 +62,7 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
     const {startVitest}=await import('vitest/node');const pg=process.argv.includes('--pg'),client=process.argv.includes('--client');
     const plugins=client?[(await import('@vitejs/plugin-react')).default()]:[];
     const v=await startVitest('test',[],{root,config:false,environment:client?'jsdom':'node',watch:false,
-      include:client?['test/unit/job-brief.test.tsx','test/unit/rc-skills-progress.test.tsx','test/unit/sourcing-candidate-origin.test.tsx','test/unit/hiring-criteria-step.test.tsx','test/unit/brief-review-workspace.test.tsx','test/unit/job-autofill.test.ts','test/unit/job-intent.test.ts']:pg?['server/job-brief/__tests__/*.pg.test.ts']:['server/job-brief/__tests__/*.test.ts','test/contracts/skill-alternatives.test.ts'],
+      include:client?['test/unit/my-jobs-deactivate.test.tsx','test/unit/job-brief.test.tsx','test/unit/rc-skills-progress.test.tsx','test/unit/sourcing-candidate-origin.test.tsx','test/unit/hiring-criteria-step.test.tsx','test/unit/brief-review-workspace.test.tsx','test/unit/job-autofill.test.ts','test/unit/job-intent.test.ts']:pg?['server/job-brief/__tests__/*.pg.test.ts']:['server/job-brief/__tests__/*.test.ts','test/contracts/skill-alternatives.test.ts'],
       exclude:pg?[]:['**/*.pg.test.ts'],fileParallelism:false,testTimeout:30000,hookTimeout:30000,
       alias:{'@shared':resolve(root,'shared'),'@':resolve(root,'client/src')}},{plugins});
     if(!v)process.exitCode=1;else await v.close();

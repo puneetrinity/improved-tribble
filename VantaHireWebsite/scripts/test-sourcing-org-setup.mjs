@@ -52,6 +52,21 @@ export function fixture(){
   return {r,io,calls,get f(){return f;},get d(){return d;}};
 }
 test('preview is read only and declares five runs per seat through existing capacity',async()=>{const x=fixture();const p=await preview(x.r,x.io);assert.equal(p.sha256,hash(p.plan));assert.deepEqual(x.calls,[]);assert.equal(p.plan.request.entitlement.capacity,1);});
+test('preview warns in plain language for no members, an admin seat, or an unseated recruiter',async()=>{
+  for(const members of [[],[{user_id:1,seat_assigned:true,user_role:'super_admin'}],[{user_id:1,seat_assigned:false,user_role:'recruiter'}]]){
+    const x=fixture();x.f.members=members;const p=await preview(x.r,x.io);
+    assert.deepEqual(p.warnings,['No recruiter has a seat in this organisation. Assign a seat to a recruiter before they can search for candidates.']);
+    assert.deepEqual(x.calls,[]);assert.deepEqual(x.f.members,members);
+    // Advisory only: explicitly approved setup remains possible without changing membership.
+    assert.equal((await apply(p.plan,p.sha256,x.io)).state,'ready');assert.deepEqual(x.f.members,members);
+  }
+});
+test('a seated recruiter removes warning; changing their role invalidates the approved plan',async()=>{
+  const x=fixture();x.f.members=[{user_id:1,seat_assigned:true,user_role:'recruiter'}];
+  const p=await preview(x.r,x.io);assert.deepEqual(p.warnings,[]);
+  x.f.members[0].user_role='super_admin';
+  assert.equal((await apply(p.plan,p.sha256,x.io)).state,'refused');assert.deepEqual(x.calls,[]);
+});
 test('prepare before enable; replay has no writes and does not change usage',async()=>{const x=fixture(),p=await preview(x.r,x.io);assert.equal((await apply(p.plan,p.sha256,x.io)).state,'ready');assert.deepEqual(x.calls,['probe','prepare','probe','enable']);x.calls.length=0;assert.equal((await apply(p.plan,p.sha256,x.io)).replayed,true);assert.deepEqual(x.calls,['probe']);assert.deepEqual(x.f.usage,[]);});
 for(const phase of ['prepare','enable'])test('lost '+phase+' response replays without second write',async()=>{const x=fixture(),p=await preview(x.r,x.io),target=phase==='prepare'?x.io.discover:x.io.flow,original=target[phase];target[phase]=async(...args)=>{await original(...args);throw Error('lost');};assert.equal((await apply(p.plan,p.sha256,x.io)).state,'verify_before_resume');target[phase]=original;assert.equal((await apply(p.plan,p.sha256,x.io)).state,'ready');assert.equal(x.calls.filter(v=>v===phase).length,1);});
 test('failed Memory check cannot prepare or enable',async()=>{const x=fixture(),p=await preview(x.r,x.io);x.io.probe=async()=>{throw Error('SETUP_MEMORY_AUTH_FAILED');};const y=await apply(p.plan,p.sha256,x.io);assert.equal(y.state,'refused');assert.deepEqual(x.calls,[]);});

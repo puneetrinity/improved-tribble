@@ -2,6 +2,12 @@ import {parseRequest,hash,assertSame,verifyPlan,fail} from './contracts.mjs';
 import {validateFlow,expectedEntitlement} from './flow.mjs';
 import {validateDiscover,discoverReady,desiredDiscover} from './discover.mjs';
 
+export function setupWarnings(flow){
+  return flow.members.some(m=>m.seat_assigned===true&&m.user_role==='recruiter')?[]:[
+    'No recruiter has a seat in this organisation. Assign a seat to a recruiter before they can search for candidates.',
+  ];
+}
+
 export async function preview(request,io,now=Date.now()){
   const r=parseRequest(request);
   await io.config(r); // configuration attestation only; no signing or HTTP in preview
@@ -9,7 +15,7 @@ export async function preview(request,io,now=Date.now()){
   validateFlow(r,snapshot.flow,now);validateDiscover(r,snapshot.discover);
   if(snapshot.flow.state?.enabled&&!discoverReady(r,snapshot.discover))fail('SETUP_ACTIVE_ORG_REQUIRES_MAINTENANCE');
   const plan={version:1,createdAt:now,expiresAt:now+900000,request:r,snapshot};
-  return {plan,sha256:hash(plan)};
+  return {plan,sha256:hash(plan),warnings:setupWarnings(snapshot.flow)};
 }
 function readyFlow(r,current,original){
   const e=expectedEntitlement(r,original);
