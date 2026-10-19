@@ -1,5 +1,6 @@
 import { useState } from "react";
 import Layout from "@/components/Layout";
+import { INTERNAL_HEADER_ACTION_BUTTONS, INTERNAL_HEADER_PADDING, INTERNAL_HERO, INTERNAL_TITLE } from "@/lib/internal-page-theme";
 import {
   useOrganization,
   useOrganizationMembers,
@@ -299,10 +300,10 @@ export default function OrgTeamPage() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{orgTeamPageCopy.header.title}</h1>
-          <p className="text-muted-foreground">
+        <div data-internal-header="page" className={`${INTERNAL_HERO} ${INTERNAL_HEADER_PADDING} ${INTERNAL_HEADER_ACTION_BUTTONS} flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between`}>
+          <div className="min-w-0">
+            <h1 className={INTERNAL_TITLE}>{orgTeamPageCopy.header.title}</h1>
+          <p className="mt-1 text-[13px] text-[#5F6675]">
             {orgTeamPageCopy.header.subtitle}
           </p>
         </div>

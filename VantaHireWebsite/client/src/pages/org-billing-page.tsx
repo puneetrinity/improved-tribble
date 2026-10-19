@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { initiateCashfreeCheckout } from "@/lib/cashfree";
 import {
   useSubscription,
@@ -307,12 +308,7 @@ export default function OrgBillingPage() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{orgBillingPageCopy.header.title}</h1>
-        <p className="text-muted-foreground">
-          {orgBillingPageCopy.header.subtitle}
-        </p>
-      </div>
+      <PageHeader title={orgBillingPageCopy.header.title} description={orgBillingPageCopy.header.subtitle} className="mb-0" />
 
       {returnedOrderId && (
         <Card className={

@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
 import { Save, AlertCircle, IndianRupee, GraduationCap, Sparkles, Briefcase, Tag, Plus, X, Info, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +24,7 @@ import { CoRecruiterManagement } from "@/components/CoRecruiterManagement";
 import { jobEditPageCopy } from "@/lib/internal-copy";
 import { JobBriefPanel } from '@/components/job-brief-panel';
 import { jobIntentRequest, readBriefCapability, useJobBrief } from '@/lib/job-brief';
+import { CollapsibleSection } from "@/components/internal/CollapsibleSection";
 
 const MIN_DESCRIPTION_WORDS = 200;
 const countWords = (value: string): number =>
@@ -63,6 +64,14 @@ export default function JobEditPage() {
   const capability=useQuery({queryKey:['job-brief-capability'],queryFn:readBriefCapability});
   const briefEnabled=capability.data?.jobBriefEnabled===true;
   const brief=useJobBrief(jobId,user?.id,briefEnabled && user?.role==='recruiter');
+  // Look-only: which page sections are expanded. Criteria start open until approved.
+  const [detailsOpen,setDetailsOpen]=useState(true);
+  const [criteriaOpenChoice,setCriteriaOpenChoice]=useState<boolean|null>(null);
+  const criteriaApproved=!!brief.data?.approvedVersionId && brief.data?.latest?.version_id===brief.data?.approvedVersionId;
+  // The panel reports its live status (including unsaved edits); until then use the saved state.
+  const [panelStatus,setPanelStatus]=useState<string|null>(null);
+  const criteriaStatus=panelStatus ?? (!brief.data?.approvedVersionId?'Not approved yet':criteriaApproved?'Approved':'Changes not approved yet');
+  const criteriaOpen=criteriaOpenChoice ?? !criteriaApproved;
   const [editReason,setEditReason]=useState('role_scope_changed');
 
   useEffect(() => {
@@ -196,8 +205,8 @@ export default function JobEditPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 pb-10 pt-5">
-          <div className="max-w-4xl mx-auto space-y-4">
+        <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4">
+          <div className="w-full space-y-4">
             <PageHeaderSkeleton />
           </div>
         </div>
@@ -208,7 +217,7 @@ export default function JobEditPage() {
   if (!job) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
+        <div className="mx-auto w-full max-w-[1500px] px-4 py-8">
           <Card className="shadow-sm">
             <CardContent className="p-8 text-center">
               <h3 className="text-xl font-semibold text-foreground mb-2">{jobEditPageCopy.empty.title}</h3>
@@ -222,8 +231,8 @@ export default function JobEditPage() {
 
   return (
     <Layout>
-      <div className={`container mx-auto px-4 pb-10 pt-5 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="max-w-4xl mx-auto">
+      <div className={`mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="w-full space-y-4">
           {/* Compact header: breadcrumb back-context + job title; the single job navigation follows */}
           <PageHeader
             title={job.title}
@@ -244,17 +253,14 @@ export default function JobEditPage() {
                 {jobEditPageCopy.empty.back}
               </Button>
             }
-            className="mb-3"
+            className="mb-0"
           />
-          <JobSubNav jobId={jobId!} className="mb-4" />
+          <JobSubNav jobId={jobId!} />
 
-          {/* Edit Form */}
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-foreground">{jobEditPageCopy.form.title}</CardTitle>
-              <CardDescription>{jobEditPageCopy.form.description}</CardDescription>
-            </CardHeader>
-            <CardContent>
+          {/* Edit Form — its own collapsible section, separate from hiring criteria */}
+          <CollapsibleSection id="job-details-section" eyebrow="Job posting" title={jobEditPageCopy.form.title} open={detailsOpen} onOpenChange={setDetailsOpen}>
+            <div className="p-4 sm:p-5">
+              <p className="mb-5 text-sm text-muted-foreground">{jobEditPageCopy.form.description}</p>
               <form onSubmit={handleSubmit} className="space-y-6">
                 {briefEnabled && <label className="block text-sm font-medium">Why are you changing this job?
                   <select aria-label="Job edit reason" className="mt-1 block min-h-11 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-sm" value={editReason} onChange={e=>setEditReason(e.target.value)}>
@@ -602,10 +608,23 @@ export default function JobEditPage() {
                   </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
+            </div>
+          </CollapsibleSection>
 
-          {briefEnabled && user.role==='recruiter' && <JobBriefPanel jobId={jobId!} actorId={user.id}/>}
+          {briefEnabled && user.role==='recruiter' && (
+            <CollapsibleSection
+              id="hiring-criteria-section"
+              eyebrow="Who we look for"
+              title="Hiring criteria"
+              open={criteriaOpen}
+              onOpenChange={setCriteriaOpenChoice}
+              status={brief.data ? (
+                <span className={`rounded-full border px-2.5 py-0.5 text-xs font-semibold ${criteriaStatus==='Approved'?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>{criteriaStatus}</span>
+              ) : null}
+            >
+              <JobBriefPanel jobId={jobId!} actorId={user.id} embedded onStatusChange={setPanelStatus}/>
+            </CollapsibleSection>
+          )}
           {briefEnabled && user.role!=='recruiter' && <p className="text-sm text-muted-foreground">Only a recruiter assigned to this job can edit and approve its hiring criteria.</p>}
           {/* Co-Recruiter Management */}
           <CoRecruiterManagement jobId={jobId!} className="shadow-sm" />

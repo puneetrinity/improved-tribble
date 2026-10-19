@@ -1355,7 +1355,7 @@ export default function ApplicationManagementPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-none"
+                  className="rounded-[9px]"
                   onClick={() => {
                     if (selectedApplications.length === 0) {
                       toast({
@@ -1382,7 +1382,7 @@ export default function ApplicationManagementPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-none"
+                  className="rounded-[9px]"
                   onClick={() => {
                     if (selectedApplications.length === 0) {
                       toast({
@@ -1398,14 +1398,14 @@ export default function ApplicationManagementPage() {
                   <Calendar className="mr-2 h-4 w-4" />
                   {applicationManagementCopy.actions.batchInterview}
                 </Button>
-                <Button variant="outline" size="sm" className="rounded-none" onClick={() => setBulkImportDialogOpen(true)}>
+                <Button variant="outline" size="sm" className="rounded-[9px]" onClick={() => setBulkImportDialogOpen(true)}>
                   <Upload className="mr-2 h-4 w-4" />
                   Import Resumes
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="rounded-none"
+                  className="rounded-[9px]"
                   onClick={() => handleExportCSV()}
                   disabled={!applications || applications.length === 0}
                 >
@@ -1415,7 +1415,7 @@ export default function ApplicationManagementPage() {
               </div>
 
               <div className="flex justify-start xl:justify-end">
-                <Button size="sm" className="rounded-none" onClick={() => setAddCandidateModalOpen(true)}>
+                <Button size="sm" className="rounded-[9px]" onClick={() => setAddCandidateModalOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   {applicationManagementCopy.actions.addCandidate}
                 </Button>

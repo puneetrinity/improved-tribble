@@ -114,7 +114,14 @@ const Layout = ({ children, noFooter }: LayoutProps) => {
 
   if (flowContext) {
     return (
-      <div className="min-h-screen w-full overflow-x-hidden bg-[radial-gradient(circle_at_top_left,rgba(75,142,240,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(52,209,122,0.10),transparent_24%),linear-gradient(180deg,#F7F9FF_0%,#EEF3FB_55%,#F5F8FF_100%)] text-foreground ats-theme">
+      <div
+        className={`min-h-screen w-full overflow-x-hidden text-foreground ats-theme ${isRecruiter || isAdmin ? "recruiter-workspace " : ""}${
+          // Recruiter workspace uses the dashboard's plain white page (look only).
+          isRecruiter || isAdmin
+            ? "bg-white"
+            : "bg-[radial-gradient(circle_at_top_left,rgba(75,142,240,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(52,209,122,0.10),transparent_24%),linear-gradient(180deg,#F7F9FF_0%,#EEF3FB_55%,#F5F8FF_100%)]"
+        }`}
+      >
         <SidebarProvider
           defaultOpen
           className="overflow-x-hidden"

@@ -48,7 +48,11 @@ function draftNotice(code:unknown):string {
     BRIEF_MODEL_FAILED:'AI drafting isn’t available right now.',BRIEF_MODEL_UNKNOWN:'We couldn’t tell whether the AI draft finished. Please try again.'};
   return (typeof code==='string' && Object.hasOwn(messages,code)?messages[code]:'No usable AI draft is available.')+' You can edit the requirements yourself.';
 }
-export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
+export function JobBriefPanel({jobId,actorId,embedded=false,onStatusChange}:{jobId:number;actorId:number;
+  /** Inside a page section that already shows the title and status (look only). */
+  embedded?:boolean;
+  /** Reports the same status this panel shows, including unsaved edits. */
+  onStatusChange?:(status:string)=>void}) {
   const query=useJobBrief(jobId,actorId,true);const cache=useQueryClient();
   const [payload,setPayload]=useState<BriefPayload>(empty);const [source,setSource]=useState('');
   const [choice,setChoice]=useState('recruiter_edit');const [reason,setReason]=useState('other');
@@ -63,6 +67,10 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
       setPayload(start);
     }
   },[query.data,dirty]);
+  // Same rule as the visible status below (includes unsaved edits); runs before early returns.
+  const liveStatus=query.data?(!query.data.approvedVersionId?'Not approved yet'
+    :(dirty||query.data.latest?.version_id!==query.data.approvedVersionId)?'Changes not approved yet':'Approved'):null;
+  useEffect(()=>{if(liveStatus)onStatusChange?.(liveStatus);},[liveStatus,onStatusChange]);
   if(query.isPending) return <p role="status">Loading hiring criteria…</p>;
   if(query.isError || !query.data) return <p role="alert">We couldn’t load the hiring criteria. Nothing has been changed.</p>;
   const brief=query.data;
@@ -112,13 +120,13 @@ export function JobBriefPanel({jobId,actorId}:{jobId:number;actorId:number}) {
   const approved=!!brief.approvedVersionId;
   const changedSinceApproval=approved && (dirty || brief.latest?.version_id!==brief.approvedVersionId);
   const status=!approved?'Not approved yet':changedSinceApproval?'Changes not approved yet':'Approved';
-  return <section aria-labelledby="job-brief-title" className="space-y-5 rounded-xl border border-border bg-card p-4 sm:p-6" id="job-brief">
+  return <section aria-labelledby="job-brief-title" className={embedded?"space-y-5 p-4 sm:p-5":"space-y-5 rounded-xl border border-border bg-card p-4 sm:p-6"} id="job-brief">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0">
-        <h2 id="job-brief-title" className="text-xl font-semibold text-foreground">Hiring criteria</h2>
+        <h2 id="job-brief-title" className={embedded?"sr-only":"text-xl font-semibold text-foreground"}>Hiring criteria</h2>
         <p className="mt-1 text-sm text-muted-foreground">What we look for when finding and ranking candidates. Approving criteria doesn't publish the job or start a search.</p>
       </div>
-      <span role="status" data-brief-status="" className={`rounded-full border px-3 py-1 text-sm font-medium ${status==='Approved'?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>{status}</span>
+      <span role="status" data-brief-status="" className={`${embedded?'sr-only ':''}rounded-full border px-3 py-1 text-sm font-medium ${status==='Approved'?'border-emerald-200 bg-emerald-50 text-emerald-800':'border-amber-200 bg-amber-50 text-amber-800'}`}>{status}</span>
     </div>
     {brief.latest && brief.latest.payload.schemaVersion===3 && <p role="status" className="text-sm">To include previous applicants, review these requirements, then save and approve them again.</p>}
     {brief.latest && brief.latest.payload.schemaVersion<3 && <p role="status" className="text-sm">These criteria use an older format. Check the skill names, then save and approve.</p>}

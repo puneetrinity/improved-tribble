@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useRoute, useLocation } from 'wouter';
 import { ArrowLeft, Loader2, RefreshCw, Upload } from 'lucide-react';
 import Layout from '@/components/Layout';
+import { INTERNAL_HEADER_ACTION_BUTTONS, INTERNAL_HEADER_PADDING, INTERNAL_HERO, INTERNAL_TITLE } from "@/lib/internal-page-theme";
 import { JobSubNav } from '@/components/JobSubNav';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -95,7 +96,7 @@ export default function BulkResumeImportPage() {
   if (!batchId) {
     return (
       <Layout>
-        <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4">
           <JobSubNav jobId={jobId} />
           <Card className="mt-6">
             <CardContent className="flex flex-col items-center py-12 gap-4">
@@ -116,7 +117,7 @@ export default function BulkResumeImportPage() {
   if (batchQuery.isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4">
           <JobSubNav jobId={jobId} />
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -130,7 +131,7 @@ export default function BulkResumeImportPage() {
   if (batchQuery.isError || !batch) {
     return (
       <Layout>
-        <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4">
           <JobSubNav jobId={jobId} />
           <Card className="mt-6">
             <CardContent className="flex flex-col items-center py-12 gap-4">
@@ -154,13 +155,13 @@ export default function BulkResumeImportPage() {
 
   return (
     <Layout>
-      <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
+      <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4">
         <JobSubNav jobId={jobId} className="mb-4" />
 
-        {/* Page header — compact, actions on the same row */}
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        {/* Page header — same compact header panel as the other workspace pages */}
+        <div data-internal-header="page" className={`${INTERNAL_HERO} ${INTERNAL_HEADER_PADDING} ${INTERNAL_HEADER_ACTION_BUTTONS} mb-3 flex flex-wrap items-start justify-between gap-3`}>
           <div className="min-w-0">
-            <h1 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.02em] md:text-[26px]">{bulkResumeImportPageCopy.header.title}</h1>
+            <h1 className={INTERNAL_TITLE}>{bulkResumeImportPageCopy.header.title}</h1>
             <p className="text-sm text-muted-foreground">
               Batch #{batchId} &middot; {batch.fileCount} file{batch.fileCount !== 1 ? 's' : ''}
             </p>

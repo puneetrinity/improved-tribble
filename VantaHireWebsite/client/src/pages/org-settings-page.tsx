@@ -4,6 +4,7 @@ import {
   useUpdateOrganization,
 } from "@/hooks/use-organization";
 import Layout from "@/components/Layout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -158,12 +159,7 @@ export default function OrgSettingsPage() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">{orgSettingsPageCopy.header.title}</h1>
-        <p className="text-muted-foreground">
-          {orgSettingsPageCopy.header.subtitle}
-        </p>
-      </div>
+      <PageHeader title={orgSettingsPageCopy.header.title} description={orgSettingsPageCopy.header.subtitle} className="mb-0" />
 
       {/* General Settings */}
       <Card>

@@ -219,8 +219,8 @@ export default function JobAnalyticsPage() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 pb-10 pt-5">
-          <div className="max-w-6xl mx-auto space-y-4">
+        <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4">
+          <div className="w-full space-y-4">
             <PageHeaderSkeleton />
           </div>
         </div>
@@ -231,7 +231,7 @@ export default function JobAnalyticsPage() {
   if (!job) {
     return (
       <Layout>
-        <div className="container mx-auto px-4 py-8">
+        <div className="mx-auto w-full max-w-[1500px] px-4 py-8">
           <Card className="shadow-sm">
             <CardContent className="p-8 text-center">
               <h3 className="text-xl font-semibold text-foreground mb-2">{jobAnalyticsPageCopy.header.notFoundTitle}</h3>
@@ -245,8 +245,8 @@ export default function JobAnalyticsPage() {
 
   return (
     <Layout>
-      <div className={`container mx-auto px-4 pb-10 pt-5 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
-        <div className="max-w-6xl mx-auto">
+      <div className={`mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4 transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+        <div className="w-full">
           {/* Compact header: breadcrumb back-context + job title; the single job navigation follows */}
           <PageHeader
             title={job.title}

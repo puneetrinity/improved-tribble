@@ -83,7 +83,7 @@ export function JobSubNav({
       className={cn(
         variant === "inline"
           ? "border-b border-border/70 bg-transparent"
-          : "rounded-[12px] border border-border bg-white",
+          : "rounded-[12px] border border-[#E3E6F0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]",
         className,
       )}
     >
