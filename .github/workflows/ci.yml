@@ -10,6 +10,35 @@ permissions:
   contents: read
 
 jobs:
+  organisation-setup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: VantaHireWebsite
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: VantaHireWebsite/package-lock.json
+      - run: npm ci
+      - run: node scripts/test-sourcing-org-setup.mjs
+      - name: Prepare separate disposable owner databases
+        run: |
+          sudo systemctl start postgresql
+          sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE org_setup_owner_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'fixture-only';
+          CREATE ROLE org_setup_runtime_test NOLOGIN NOSUPERUSER NOBYPASSRLS;
+          CREATE DATABASE org_setup_flow_test OWNER org_setup_owner_test;
+          CREATE DATABASE org_setup_discover_test OWNER org_setup_owner_test;
+          SQL
+      - name: Verify one-action setup, partial commit and replay
+        env:
+          ORG_SETUP_TEST_FLOW_URL: postgresql://org_setup_owner_test:fixture-only@127.0.0.1:5432/org_setup_flow_test
+          ORG_SETUP_TEST_DISCOVER_URL: postgresql://org_setup_owner_test:fixture-only@127.0.0.1:5432/org_setup_discover_test
+        run: node scripts/test-sourcing-org-setup-postgres.mjs
   sourcing-production-collation:
     runs-on: ubuntu-latest
     timeout-minutes: 15
