@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  INTERNAL_BODY,
   INTERNAL_EYEBROW,
   INTERNAL_HEADER_PADDING,
   INTERNAL_HERO,
@@ -9,6 +8,7 @@ import {
   INTERNAL_STAT_CHIP,
   INTERNAL_TITLE,
   INTERNAL_TOUCH_ACTIONS,
+  INTERNAL_HEADER_ACTION_BUTTONS,
 } from "@/lib/internal-page-theme";
 import { cn } from "@/lib/utils";
 
@@ -58,14 +58,15 @@ export function InternalHero({
   } as const;
   const toneCls = TONES[tone];
 
+  // Dashboard-style header (same panel, eyebrow, title + badge row and
+  // right-hand actions as the recruiter dashboard). The tone-coloured icon
+  // keeps each page's layer colour (Flow / Discover / Memory) unchanged.
   return (
     <section
       data-internal-header="hero"
       className={cn(INTERNAL_HERO, INTERNAL_HEADER_PADDING, "relative", className)}
     >
-      <div className="pointer-events-none absolute -right-20 -top-28 h-44 w-44 rounded-full bg-[rgba(75,142,240,0.14)] blur-3xl" />
-
-      <div className="relative flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           {Icon ? (
             <div
@@ -78,26 +79,24 @@ export function InternalHero({
             </div>
           ) : null}
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <p className={INTERNAL_EYEBROW}>{eyebrow}</p>
-              {badge ? (
-                <div className={cn("inline-flex rounded-full border px-2.5 py-0.5 font-dm text-[11px] font-semibold", toneCls.badge)}>
-                  {badge}
-                </div>
-              ) : null}
-            </div>
-            <h1 className={cn(INTERNAL_TITLE, "mt-0.5 [text-wrap:balance]")}>{title}</h1>
-            {subtitle ? (
-              <p className={cn(INTERNAL_BODY, "mt-1 line-clamp-2 max-w-2xl")}>{subtitle}</p>
+          <p className={INTERNAL_EYEBROW}>{eyebrow}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-2.5">
+            <h1 className={cn(INTERNAL_TITLE, "[text-wrap:balance]")}>{title}</h1>
+            {badge ? (
+              <div className={cn("inline-flex rounded-full border px-2.5 py-0.5 text-xs font-semibold", toneCls.badge)}>
+                {badge}
+              </div>
             ) : null}
+          </div>
           </div>
         </div>
 
         {actions ? (
           <div
             className={cn(
-              "relative flex shrink-0 flex-wrap items-center gap-2 md:justify-end",
+              "flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center xl:justify-end",
               INTERNAL_TOUCH_ACTIONS,
+              INTERNAL_HEADER_ACTION_BUTTONS,
             )}
           >
             {actions}
@@ -105,8 +104,12 @@ export function InternalHero({
         ) : null}
       </div>
 
+      {subtitle ? (
+        <p className="mt-3 line-clamp-2 max-w-2xl text-[13px] text-[#5F6675]">{subtitle}</p>
+      ) : null}
+
       {stats.length > 0 ? (
-        <dl className="relative mt-2.5 flex flex-wrap gap-1.5">
+        <dl className="mt-3 flex flex-wrap gap-1.5">
           {stats.map((stat) => (
             <div key={stat.label} className={INTERNAL_STAT_CHIP}>
               <dt className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[#687182]">

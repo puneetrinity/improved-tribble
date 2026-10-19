@@ -9,6 +9,7 @@ import {readSourcingCapability,readSourcing,startGovernedSourcing,changePreparat
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from '@/components/ui/dialog';
 import {isApiError} from '@/lib/queryClient';
 import Layout from "@/components/Layout";
+import { INTERNAL_HEADER_ACTION_BUTTONS, INTERNAL_HEADER_PADDING, INTERNAL_HERO, INTERNAL_TITLE } from "@/lib/internal-page-theme";
 import { JobSubNav } from "@/components/JobSubNav";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -547,12 +548,12 @@ export default function JobSourcingPage() {
         // One copy source with the progress dialog; a queued search must never read as finished.
         const rc = status.rcStatusUnavailable ? undefined : status.rcProgress;
         const { heading, message } = rcProgressPresentation(rc, status.rcStatusUnavailable);
-        return <div role="status" data-rc-status="" className="container mx-auto px-4 py-3">
+        return <div role="status" data-rc-status="" className="mx-auto w-full max-w-[1500px] px-4 py-3">
           {heading}. {rc && rc.total > 0 ? `${rc.processed} of ${rc.total} profiles checked. ` : ''}{message}
         </div>;
       })()}
-      {briefSourcingNotice && <div role="status" className="container mx-auto px-4 py-3">Searching isn’t turned on for this job yet. Approving the hiring criteria doesn’t start a search.</div>}
-      {governedMessage&&<div role="status" className="container mx-auto px-4 py-3">{governedMessage}</div>}
+      {briefSourcingNotice && <div role="status" className="mx-auto w-full max-w-[1500px] px-4 py-3">Searching isn’t turned on for this job yet. Approving the hiring criteria doesn’t start a search.</div>}
+      {governedMessage&&<div role="status" className="mx-auto w-full max-w-[1500px] px-4 py-3">{governedMessage}</div>}
       {capability.isError&&<div role="alert">We couldn’t load search settings. <Button onClick={()=>void capability.refetch()}>Try again</Button></div>}
       {governed&&(()=>{
         const p=preview.data;
@@ -565,8 +566,8 @@ export default function JobSourcingPage() {
           p?.preparationCode==='SOURCING_DIGEST_RATE_LIMITED'?'Preparing searches is busy right now. Try again in a few minutes.':
           p?.preparation==='failed'?"We couldn't prepare this search.":p?.preparation==='unknown'?"This search's preparation needs a check by our team before you continue.":
           p?.preparation==='reserved'||p?.preparation==='started'?'Getting your search ready. Find candidates turns on as soon as it is ready.':'Approve the hiring criteria to get this search ready.'):null;
-        return <section aria-labelledby="pool-card-title" aria-live="polite" data-pool-card="" className="container mx-auto max-w-6xl px-4 pt-4 sm:px-6">
-          <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        return <section aria-labelledby="pool-card-title" aria-live="polite" data-pool-card="" className="mx-auto w-full max-w-[1500px] px-4 pt-4">
+          <div className={`${INTERNAL_HERO} p-4 sm:p-5`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <h2 id="pool-card-title" className="text-sm font-medium text-muted-foreground">Talent pool for this role</h2>
@@ -592,14 +593,12 @@ export default function JobSourcingPage() {
           </div>
         </section>;
       })()}
-      <div className="container mx-auto max-w-6xl px-4 pb-10 pt-4 sm:px-6">
-        {/* Single job navigation, same placement as every other job page */}
-        <JobSubNav jobId={jobId ?? 0} className="mb-4" />
-
-        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+      <div className="mx-auto w-full max-w-[1500px] px-4 pb-10 pt-4">
+        {/* Same header panel as the other job pages, then the single job navigation */}
+        <div data-internal-header="page" className={`${INTERNAL_HERO} ${INTERNAL_HEADER_PADDING} ${INTERNAL_HEADER_ACTION_BUTTONS} mb-4 flex flex-wrap items-start justify-between gap-3`}>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h1 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.02em] md:text-[26px]">
+              <h1 className={INTERNAL_TITLE}>
                 <span className="mr-2 inline-block h-2 w-2 rounded-full bg-[#4B8EF0] align-middle" aria-hidden="true" />
                 {jobSourcingPageCopy.header.title}
               </h1>
@@ -637,6 +636,8 @@ export default function JobSourcingPage() {
             </Button>
           </div>
         </div>
+
+        <JobSubNav jobId={jobId ?? 0} className="mb-4" />
 
         {isRunning && (
           <Progress

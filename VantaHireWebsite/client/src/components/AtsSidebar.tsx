@@ -43,6 +43,7 @@ import {
   Home,
   Inbox,
   LogOut,
+  Mail,
   PanelLeftClose,
   PanelLeftOpen,
   Search,
@@ -170,7 +171,7 @@ export default function AtsSidebar({
     {
       label: atsShellCopy.routes.email.label,
       path: "/admin/email-templates",
-      icon: Sparkles,
+      icon: Mail,
       visible: isRecruiter || isAdmin,
       active: matchesPath(location, "/admin/email-templates"),
     },
@@ -299,7 +300,8 @@ export default function AtsSidebar({
       <SidebarContent
         className={cn(
           "overflow-x-hidden bg-transparent px-0 py-3 group-data-[collapsible=icon]:overflow-hidden group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-2",
-          orgManagementOpen ? "overflow-y-auto" : "overflow-hidden"
+          // Scrolls when Org management is open, without a visible scrollbar.
+          orgManagementOpen ? "overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" : "overflow-hidden"
         )}
       >
         <SidebarGroup className="gap-2 p-0">

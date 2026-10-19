@@ -67,9 +67,9 @@ const buttonNamed = (scope: ParentNode, name: RegExp) =>
   qa<HTMLButtonElement>(scope, "button").find((b) => name.test((b.textContent ?? "").trim()));
 
 describe("density tokens", () => {
-  it("pins the compact header geometry (22px mobile / 26px desktop title, ≤20px vertical padding)", () => {
-    expect(INTERNAL_TITLE).toContain("text-[22px]");
-    expect(INTERNAL_TITLE).toContain("md:text-[26px]");
+  it("pins the compact header geometry (dashboard 18px title, ≤20px vertical padding)", () => {
+    // Same title size as the recruiter dashboard header (DASHBOARD_TITLE).
+    expect(INTERNAL_TITLE).toContain("text-[18px]");
     expect(INTERNAL_TITLE).not.toMatch(/text-\[3\d px\]|text-3xl|text-4xl/);
     expect(INTERNAL_HEADER_PADDING).toContain("md:py-4");
     expect(INTERNAL_PAGE_CONTAINER).toContain("py-4");
@@ -97,8 +97,7 @@ describe("InternalHero", () => {
     const header = q(body, '[data-internal-header="hero"]')!;
     expect(header).toBeTruthy();
     const h1 = q(header, "h1")!;
-    expect(h1.className).toContain("text-[22px]");
-    expect(h1.className).toContain("md:text-[26px]");
+    expect(h1.className).toContain("text-[18px]");
     expect(buttonNamed(header, /^Find candidates$/)).toBeTruthy();
     expect(q(header, "dl")).toBeTruthy();
     expect(qa(header, "dl > div").length).toBe(2);
@@ -121,8 +120,7 @@ describe("PageHeader", () => {
     const current = qa(nav, "span").find((s) => s.getAttribute("aria-current") === "page");
     expect(current?.textContent).toBe("Applications");
     const h1 = q(body, "h1")!;
-    expect(h1.className).toContain("text-[22px]");
-    expect(h1.className).toContain("md:text-[26px]");
+    expect(h1.className).toContain("text-[18px]");
     expect(h1.className).not.toMatch(/md:text-3xl/);
     expect(buttonNamed(body, /^Export$/)).toBeTruthy();
   });

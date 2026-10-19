@@ -13,6 +13,7 @@ import { User, Building, MapPin, Linkedin, Globe, Save, X, Phone } from "lucide-
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { profileSettingsPageCopy } from "@/lib/internal-copy";
 import Layout from "@/components/Layout";
+import { PageHeader } from "@/components/layout/PageHeader";
 import BrandedLoadingScreen from "@/components/internal/BrandedLoadingScreen";
 
 interface UserProfile {
@@ -143,17 +144,10 @@ export default function ProfileSettingsPage() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-4 py-8">
-        <div className="max-w-2xl mx-auto">
-          {/* Header */}
-          <div className="mb-8 pt-8">
-            <h1 className="text-2xl md:text-3xl font-semibold text-foreground mb-2">
-              {profileSettingsPageCopy.header.title}
-            </h1>
-            <p className="text-muted-foreground">
-              {profileSettingsPageCopy.header.subtitle}
-            </p>
-          </div>
+      <div className="max-w-7xl mx-auto p-6">
+        <div>
+          {/* Header — same compact header as the other workspace pages */}
+          <PageHeader title={profileSettingsPageCopy.header.title} description={profileSettingsPageCopy.header.subtitle} />
 
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Basic Info Card */}

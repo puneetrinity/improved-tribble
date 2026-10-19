@@ -334,6 +334,18 @@
   }
 }
 
+/* Recruiter workspace: default-size card titles match the dashboard panel
+   title (Satoshi 18px). Titles with their own size, and the dashboard
+   itself, are left unchanged. Look only. */
+.recruiter-workspace [data-card-title].text-2xl:not(.recruiter-dashboard [data-card-title]) {
+  font-family: var(--font-satoshi), sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #0F172A;
+}
+
 @media (max-width: 767px) {
   .recruiter-dashboard .kpi-label { font-size: 10px; }
   .recruiter-dashboard .kpi-value { font-size: 24px; }

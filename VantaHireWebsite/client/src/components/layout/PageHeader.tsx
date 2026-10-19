@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import { Link } from "wouter";
 import { ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { INTERNAL_TOUCH_ACTIONS } from "@/lib/internal-page-theme";
+import { INTERNAL_HEADER_ACTION_BUTTONS, INTERNAL_HEADER_PADDING, INTERNAL_HERO, INTERNAL_TITLE, INTERNAL_TOUCH_ACTIONS } from "@/lib/internal-page-theme";
 
 interface BreadcrumbItem {
   label: string;
@@ -52,12 +52,12 @@ export function PageHeader({
   className
 }: PageHeaderProps) {
   return (
-    <div data-internal-header="page" className={cn("mb-4", className)}>
+    <div data-internal-header="page" className={cn(INTERNAL_HERO, INTERNAL_HEADER_PADDING, "mb-4", className)}>
       {/* Breadcrumbs */}
       {breadcrumbs && breadcrumbs.length > 0 && (
         <nav
           aria-label="Breadcrumb"
-          className="mb-1.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground"
+          className="mb-1.5 flex flex-wrap items-center gap-1 text-xs text-[#687182]"
         >
           {breadcrumbs.map((item, index) => {
             const isCurrent = index === breadcrumbs.length - 1;
@@ -85,8 +85,8 @@ export function PageHeader({
         </nav>
       )}
 
-      {/* Title row */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-6">
+      {/* Title row — dashboard header layout: title left, actions right */}
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           {Icon && (
             <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
@@ -94,14 +94,14 @@ export function PageHeader({
             </div>
           )}
           <div className="min-w-0">
-            <h1 className="text-[22px] font-semibold leading-[1.15] tracking-[-0.02em] text-foreground md:text-[26px] [text-wrap:balance]">
-              {title}
-            </h1>
-            {description && (
-              <p className="mt-1 line-clamp-2 max-w-3xl text-sm text-muted-foreground">
-                {description}
-              </p>
-            )}
+          <h1 className={cn(INTERNAL_TITLE, "[text-wrap:balance]")}>
+            {title}
+          </h1>
+          {description && (
+            <p className="mt-1 line-clamp-2 max-w-3xl text-[13px] text-[#5F6675]">
+              {description}
+            </p>
+          )}
           </div>
         </div>
 
@@ -109,8 +109,9 @@ export function PageHeader({
         {actions && (
           <div
             className={cn(
-              "flex shrink-0 flex-wrap items-center gap-2 md:justify-end",
+              "flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center xl:justify-end",
               INTERNAL_TOUCH_ACTIONS,
+              INTERNAL_HEADER_ACTION_BUTTONS,
             )}
           >
             {actions}

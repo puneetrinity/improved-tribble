@@ -856,7 +856,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "f3a75bebc308ae971df790a02a966c32efd70c8d96b24a08b5eecb90e68aed2e"
+      "sha256": "c96150ae39773377243bfe5a1735591aa0cfc54b7805f20fb8e4f12acebc7954"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -976,7 +976,7 @@
     },
     {
       "file": "client/src/pages/application-management-page.tsx",
-      "sha256": "8127db21520fc63811bbffcbfe442e1209e890d291639fdb991c1e26a0585cce"
+      "sha256": "5a251fff0837b52cbfc86f79a772824c5532479147d05fab5c38065d3022d5e2"
     },
     {
       "file": "client/src/pages/admin-forms-page.tsx",
@@ -1056,7 +1056,7 @@
     },
     {
       "file": "client/src/pages/org-billing-page.tsx",
-      "sha256": "a85d1a64605b7d8756f6e2dc9c9e23ae9082f6fb259df519e970aa5370e33d6c"
+      "sha256": "8ae27d3770bb636646669282218cdebeed71f69c9e8cec86191bbb36b2ccfe65"
     },
     {
       "file": "client/src/pages/admin-super-dashboard.tsx",
@@ -1299,7 +1299,7 @@
     },
     {
       "file": "client/src/pages/job-edit-page.tsx",
-      "sha256": "80fe5fd2fea5554ab2f16df6ad01c3bf4127799fb5764408944dc0eacfaa681f"
+      "sha256": "86e8cba571a60d30fdb91340e2ed9adece8d30d72d6e45df07cf05b76233d24b"
     },
     {
       "file": "client/src/components/JobPostingStepper.tsx",
