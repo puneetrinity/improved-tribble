@@ -54,114 +54,6 @@ interface JobWithAnalytics {
   };
 }
 
-interface SimilarCandidate {
-  applicationId: number;
-  candidateName: string;
-  candidateEmail: string;
-  sourceJobId: number;
-  sourceJobTitle: string;
-  aiFitScore: number | null;
-  aiFitLabel: string | null;
-  currentStage: number | null;
-}
-
-function SimilarCandidatesSection({ jobId }: { jobId: number }) {
-  const [, setLocation] = useLocation();
-  const [showCandidates, setShowCandidates] = useState(false);
-
-  const { data: similarCandidates = [], isLoading: similarLoading } = useQuery<SimilarCandidate[]>({
-    queryKey: ["/api/jobs", jobId, "ai-similar-candidates"],
-    queryFn: async () => {
-      const res = await fetch(`/api/jobs/${jobId}/ai-similar-candidates?minFitScore=70`, {
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error("Failed to fetch similar candidates");
-      return res.json();
-    },
-    enabled: showCandidates,
-  });
-
-  if (!showCandidates) {
-    return (
-      <div className="mt-4 pt-4 border-t border-border">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowCandidates(true)}
-          className="w-full border-primary/30 text-primary hover:bg-primary/10"
-        >
-          <Sparkles className="h-4 w-4 mr-2" />
-          Load AI-Suggested Candidates from Other Roles
-        </Button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-4 pt-4 border-t border-border">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-          <Users className="h-4 w-4 text-primary" />
-          Suggested Candidates from Other Roles
-        </h4>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowCandidates(false)}
-          className="text-xs"
-        >
-          Hide
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground mb-3">
-        High-fit candidates from your other jobs (AI-based)
-      </p>
-      {similarLoading ? (
-        <div className="text-sm text-muted-foreground py-4">Loading suggestions...</div>
-      ) : similarCandidates.length === 0 ? (
-        <div className="text-sm text-muted-foreground py-4 bg-muted/50 rounded-md p-3">
-          No high-fit candidates found yet from other roles.
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {similarCandidates.map((c) => (
-            <div
-              key={c.applicationId}
-              className="flex items-center justify-between p-3 border border-border rounded-md bg-muted/50 hover:bg-muted transition-colors"
-            >
-              <div className="flex-1">
-                <div className="font-medium text-foreground text-sm">
-                  {c.candidateName}{" "}
-                  <span className="text-muted-foreground text-xs font-normal">({c.candidateEmail})</span>
-                </div>
-                <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                  <span>From: {c.sourceJobTitle}</span>
-                  {c.aiFitScore !== null && (
-                    <>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <Sparkles className="h-3 w-3 text-primary" />
-                        Fit: {c.aiFitScore}
-                      </span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setLocation(`/jobs/${c.sourceJobId}/applications`)}
-                className="ml-3"
-              >
-                View
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function JobAnalyticsDashboard() {
   const { user } = useAuth();
@@ -623,8 +515,6 @@ export default function JobAnalyticsDashboard() {
                         </div>
                       )}
 
-                      {/* AI Similar Candidates Section */}
-                      <SimilarCandidatesSection jobId={job.id} />
                     </CardContent>
                   </Card>
                 ))}

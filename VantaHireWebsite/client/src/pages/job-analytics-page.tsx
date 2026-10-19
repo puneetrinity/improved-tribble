@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { Redirect } from "wouter";
-import { Eye, MousePointer, TrendingUp, Users, Clock, CheckCircle, XCircle, Sparkles, Calendar, AlertTriangle, Bell, ExternalLink, Send, ThumbsUp, Pause, ThumbsDown, ArrowLeft } from "lucide-react";
+import { Eye, MousePointer, TrendingUp, Users, Clock, CheckCircle, XCircle, Calendar, AlertTriangle, Bell, ExternalLink, Send, ThumbsUp, Pause, ThumbsDown, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -167,14 +167,6 @@ export default function JobAnalyticsPage() {
   const reviewedApplications = applications.filter(a => a.status !== 'submitted').length;
   const shortlistedApplications = applications.filter(a => a.status === 'shortlisted').length;
   const rejectedApplications = applications.filter(a => a.status === 'rejected').length;
-
-  // AI Fit distribution
-  const aiFitData = [
-    { name: "Strong", value: applications.filter(a => a.aiFitLabel === 'Strong').length, color: COLORS.strong },
-    { name: "Good", value: applications.filter(a => a.aiFitLabel === 'Good').length, color: COLORS.good },
-    { name: "Fair", value: applications.filter(a => a.aiFitLabel === 'Fair').length, color: COLORS.fair },
-    { name: "Weak", value: applications.filter(a => a.aiFitLabel === 'Weak').length, color: COLORS.weak },
-  ].filter(d => d.value > 0);
 
   // Stage distribution for bar chart
   const sortedStages = [...pipelineStages].sort((a, b) => (a.order - b.order) || (a.id - b.id));
@@ -555,75 +547,6 @@ export default function JobAnalyticsPage() {
             </Card>
           </div>
 
-          {/* AI Fit Distribution */}
-          <Card className="shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                AI Fit Analysis
-              </CardTitle>
-              <CardDescription>How candidates score on AI-based job fit analysis</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {aiFitData.length > 0 ? (
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={aiFitData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={90}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {aiFitData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: "white",
-                            border: "1px solid #e2e8f0",
-                            borderRadius: "8px",
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex flex-col justify-center space-y-4">
-                    {aiFitData.map((item) => (
-                      <div key={item.name} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div
-                            className="w-4 h-4 rounded-full"
-                            style={{ backgroundColor: item.color }}
-                          />
-                          <span className="text-sm font-medium text-foreground">{item.name} Fit</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-lg font-bold text-foreground">{item.value}</span>
-                          <span className="text-sm text-muted-foreground">
-                            ({totalApplications > 0 ? Math.round((item.value / totalApplications) * 100) : 0}%)
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="h-48 flex items-center justify-center text-muted-foreground">
-                  <div className="text-center">
-                    <Sparkles className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                    <p>No AI fit scores available yet</p>
-                    <p className="text-xs mt-1">AI scoring is applied when applications are submitted</p>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Client Feedback Analytics */}
           {clientAnalytics && clientAnalytics.totalShortlists > 0 && (

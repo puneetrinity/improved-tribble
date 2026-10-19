@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Eye, Users, Search, Sparkles, Brain, AlertCircle, MessageCircle } from "lucide-react";
+import { Eye, Users, Search, MessageCircle } from "lucide-react";
 import { PageHeaderSkeleton, FilterBarSkeleton, ApplicationListSkeleton } from "@/components/skeletons";
 import { ResumePreviewModal } from "@/components/ResumePreviewModal";
 import { applicationsPageCopy } from "@/lib/internal-copy";
@@ -163,27 +163,6 @@ export default function ApplicationsPage() {
       case 'rejected': return 'bg-destructive/10 text-destructive border-destructive/30';
       default: return 'bg-muted text-muted-foreground border-border';
     }
-  };
-
-  const getFitBadge = (score: number | null | undefined, label: string | null | undefined) => {
-    if (score === null || score === undefined || label === null || label === undefined) return null;
-
-    const colorMap: Record<string, string> = {
-      'Exceptional': 'bg-success/10 text-success-foreground border-success/30',
-      'Strong': 'bg-info/10 text-info-foreground border-info/30',
-      'Good': 'bg-primary/10 text-primary border-primary/30',
-      'Partial': 'bg-warning/10 text-warning-foreground border-warning/30',
-      'Low': 'bg-destructive/10 text-destructive border-destructive/30',
-    };
-
-    const colorClass = colorMap[label] || 'bg-muted text-muted-foreground border-border';
-
-    return (
-      <Badge variant="outline" className={`${colorClass} font-medium`}>
-        <Sparkles className="w-3 h-3 mr-1" />
-        {label} ({score})
-      </Badge>
-    );
   };
 
   // Filter applications
@@ -351,7 +330,6 @@ export default function ApplicationsPage() {
                               {application.feedbackCount} {applicationsPageCopy.list.feedbackLabel}
                             </Badge>
                           )}
-                          {getFitBadge(application.aiFitScore, application.aiFitLabel)}
                           <Button
                             variant="outline"
                             size="sm"
@@ -372,31 +350,7 @@ export default function ApplicationsPage() {
                         </div>
                       )}
 
-                      {/* AI Fit Analysis */}
-                      {application.aiFitScore !== null && application.aiFitScore !== undefined && application.aiFitReasons && Array.isArray(application.aiFitReasons) ? (
-                        <div className="pt-2 border-t border-border">
-                          <div className="p-3 bg-primary/5 rounded-lg border-l-4 border-primary">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Brain className="w-4 h-4 text-primary" />
-                              <span className="text-primary font-medium text-sm">{applicationsPageCopy.list.aiFitAnalysis}</span>
-                            </div>
-                            <ul className="text-muted-foreground text-sm space-y-1">
-                              {(application.aiFitReasons as string[]).slice(0, 3).map((reason: string, idx: number): JSX.Element => (
-                                <li key={idx} className="flex items-start gap-2">
-                                  <span className="text-primary mt-0.5">•</span>
-                                  <span>{reason}</span>
-                                </li>
-                              ))}
-                            </ul>
-                            {application.aiStaleReason && (
-                              <p className="text-warning-foreground text-xs mt-2 flex items-center gap-1">
-                                <AlertCircle className="w-3 h-3" />
-                                {applicationsPageCopy.list.staleScorePrefix} ({application.aiStaleReason})
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
+                      {/* Candidate-generated AI fit is not shown to recruiters: candidates can score any resume against any job. */}
               </div>
             ))
           )}
@@ -412,9 +366,6 @@ export default function ApplicationsPage() {
         resumeUrl={resumePreviewApp?.resumeUrl ?? null}
         resumeFilename={resumePreviewApp?.resumeFilename ?? null}
         status={resumePreviewApp?.status}
-        aiFitScore={resumePreviewApp?.aiFitScore}
-        aiFitLabel={resumePreviewApp?.aiFitLabel}
-        aiFitReasons={resumePreviewApp?.aiFitReasons as string[] | null}
         resumeText={resumeText}
         open={!!resumePreviewApp}
         onClose={() => {

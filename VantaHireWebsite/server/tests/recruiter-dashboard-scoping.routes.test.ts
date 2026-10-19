@@ -375,6 +375,24 @@ describe('recruiter dashboard endpoint scoping', () => {
     expect(result.body.viewer.dashboardScope).toBe('recruiter');
   });
 
+  it('never shows candidate-generated AI fit on Candidates to Review cards', async () => {
+    // Fixture application 101 has aiFitScore 90 / aiFitLabel 'Strong' and qualifies for review.
+    const app = await buildApp();
+    selectQueue.push([]);
+
+    const result = await invokeRoute(app, 'get', '/api/recruiter-dashboard/actions');
+
+    expect(result.status).toBe(200);
+    const review = result.body.sections.find((section: any) => section.id === 'candidatesToReview');
+    expect(review.items).toHaveLength(1);
+    const [card] = review.items;
+    expect(card.applicationId).toBe(101);
+    expect(card.title).toBe('Review Priya Sharma');
+    expect(card.subtitle).toBe('Backend Engineer · Waiting 2d');
+    expect(card).not.toHaveProperty('badge');
+    expect(JSON.stringify(card)).not.toMatch(/strong|fit/i);
+  });
+
   it('returns recruiter-scoped dashboard kpis with a consistent card contract', async () => {
     storageMock.getJobsByUser.mockResolvedValue([
       {

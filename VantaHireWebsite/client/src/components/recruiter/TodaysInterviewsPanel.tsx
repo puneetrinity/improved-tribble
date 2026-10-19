@@ -308,11 +308,6 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
                     <div className="interview-role mt-0.5 truncate text-[13px] font-normal leading-[1.35] text-[#6B7280]">
                       {item.jobTitle}
                     </div>
-                    {item.aiFitLabel && (
-                      <span className="mt-2 inline-flex rounded-[6px] bg-[#EEF5FF] px-2.5 py-1 text-[11px] font-medium leading-none text-[#4B8EF0]">
-                        {item.aiFitLabel}
-                      </span>
-                    )}
                   </div>
                 </div>
 
