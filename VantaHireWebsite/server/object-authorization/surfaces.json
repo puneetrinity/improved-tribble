@@ -856,7 +856,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "69773c1ddcca0a427057ea801444733b9deaf32a0e4520711125b1893ea66d71"
+      "sha256": "f3a75bebc308ae971df790a02a966c32efd70c8d96b24a08b5eecb90e68aed2e"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -976,7 +976,7 @@
     },
     {
       "file": "client/src/pages/application-management-page.tsx",
-      "sha256": "34bcbfd1b81bba4d90e9e32daf86ce915317ff59b81b9939b206d5429451a02d"
+      "sha256": "8127db21520fc63811bbffcbfe442e1209e890d291639fdb991c1e26a0585cce"
     },
     {
       "file": "client/src/pages/admin-forms-page.tsx",
@@ -992,7 +992,7 @@
     },
     {
       "file": "client/src/lib/internal-copy.ts",
-      "sha256": "0626fd138f044a0b0e94a59b869d315ad2623be3c06688e9f7552e282323a422"
+      "sha256": "e5c58fb892910bcc9265409db2dad87c00fd182d0fd90d748afcdcede256e073"
     },
     {
       "file": "shared/schema.ts",
@@ -1016,15 +1016,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "fdc2d1589024812d4df8dbb72bce0f38607f2df70608b10edddb640bf16d974f"
+      "sha256": "4e1e12f08380e2b4d74d6f95f23a0d63cf1bb76e457e82bf1c05c100581c00b1"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "62076b0e267f5880ac53f1e55dfcd574e1037a49fd48342e536c61107a2f0fa9"
+      "sha256": "363ecd0c128963593341e7fb0077ec82ce5270e6519bf9d2a0bf7802acb8c2d9"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "caeeb15d125a4d616da27b66ea3373b488b9247b3d9e94addfd7efd8489c8420"
+      "sha256": "8c9e3bc3daa82ad75bc487ec45905546279cdc7ecc6f30381206578fa4eacc95"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
