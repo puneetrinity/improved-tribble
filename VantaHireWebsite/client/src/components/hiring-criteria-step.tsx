@@ -318,8 +318,8 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
   </div>;
   if (query.isError || !query.data) return <p role="alert">The hiring criteria are unavailable. Your job draft is saved. <Button type="button" variant="outline" onClick={() => void query.refetch()}>Retry</Button></p>;
   const brief = query.data;
-  if (jobStatus !== 'draft') return <section aria-label="Hiring criteria" className="space-y-3">
-    <p role="status" className="rounded-md bg-success/10 p-3 text-sm"><strong>Sent for admin approval.</strong> This job and its criteria are waiting for admin approval. It becomes visible to candidates once approved and published.</p>
+  if (jobStatus !== 'draft' && jobStatus !== 'pending') return <section aria-label="Hiring criteria" className="space-y-3">
+    <p role="status" className="rounded-md bg-muted p-3 text-sm">Open the job to check its publication status and manage applications.</p>
     <Button type="button" className="min-h-[44px]" onClick={onSubmitted}>Open the job</Button>
   </section>;
   const s = sections(payload);
@@ -395,16 +395,17 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
     setSubmitting(true); setError(''); setNotice('');
     try {
       // Same request identity is reused after an uncertain response; never navigate before confirmation.
-      await jobIntentRequest(actorId, jobId, 'submit-brief', `/api/jobs/${jobId}/brief/submit`, { expectedRevision: Number(brief.revision) }, 'POST');
+      // Do not reuse a pre-upgrade admin-submission receipt as a publication receipt.
+      await jobIntentRequest(actorId, jobId, 'publish-brief', `/api/jobs/${jobId}/brief/submit`, { expectedRevision: Number(brief.revision) }, 'POST');
       await cache.invalidateQueries({ queryKey: ['job-brief', actorId, jobId] });
+      await cache.invalidateQueries({ queryKey: ['job-management', actorId] });
       onSubmitted();
     } catch (e) {
       const text = e instanceof Error ? e.message : '';
- if (/\bBRIEF_SUBMISSION_REQUIRED\b/.test(text)) { onSubmitted(); return; } // already sent: an earlier attempt succeeded
-      setError(/\bBRIEF_(APPROVAL_REQUIRED|UPDATED_APPROVAL_REQUIRED)\b/.test(text) ? 'Approve the current criteria before posting the job.'
+      setError(/\bBRIEF_(APPROVAL_REQUIRED|UPDATED_APPROVAL_REQUIRED)\b/.test(text) ? 'Check the job status and approve the current criteria before publishing.'
         : /\bBRIEF_FOUNDATIONS_REQUIRED\b/.test(text) ? 'Add the experience and location criteria, then approve again.'
-        : /\bBRIEF_REVISION_CONFLICT\b/.test(text) ? 'This job changed in another tab. Reload the page, check the criteria, then post again.'
-        : 'We couldn’t confirm the job was posted. Try Post job again — it won’t be sent twice.');
+        : /\bBRIEF_REVISION_CONFLICT\b/.test(text) ? 'This job changed in another tab. Reload the page, check the criteria, then publish again.'
+        : 'We couldn’t confirm the job was published. Try Publish job again to check the same request.');
     } finally { setSubmitting(false); }
   };
   const expReq = s.experience[0]?.requirement;
@@ -418,7 +419,7 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
 
   return <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
     <section aria-label="Hiring criteria" className="min-w-0 space-y-5">
-      <p role="status" className="rounded-md bg-success/10 p-3 text-sm"><strong>Draft saved.</strong> Not sent to admin yet — that happens when you post the job.</p>
+      <p role="status" className="rounded-md bg-success/10 p-3 text-sm"><strong>Draft saved.</strong> Not public yet. Publish the job when you are ready.</p>
       <p className="text-muted-foreground">These decide who we look for. Edit anything, then approve.</p>
       {origin === 'starter' && <p role="status" className="rounded-md bg-warning/10 p-3 text-sm"><strong>From your job details — not checked against the JD.</strong> These come only from the fields you filled in, so they can miss requirements. Review them against the JD.</p>}
       {origin === 'ai' && <p role="status" className="rounded-md bg-primary/10 p-3 text-sm"><strong>Drafted by AI from your JD.</strong> Check every line before approving.</p>}
@@ -493,10 +494,10 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
       <div className="flex flex-wrap items-center gap-3 border-t pt-4">
         <Button type="button" className="min-h-[44px]" variant={approvedCurrent && !olderFormat ? 'outline' : 'default'} disabled={busy || (approvedCurrent && !olderFormat) || !ready || changedElsewhere || !base} onClick={() => void approve()}>
           {busy ? 'Approving…' : approvedCurrent ? (olderFormat ? 'Update and approve' : 'Criteria approved') : 'Approve criteria'}</Button>
-        <Button type="button" className="min-h-[44px]" disabled={!approvedCurrent || busy || submitting} onClick={() => void submit()}>{submitting ? 'Posting…' : 'Post job'}</Button>
-        <p className="w-full text-sm text-muted-foreground">{approvedCurrent ? 'Post job sends the job and these criteria to admin for approval, then opens the job’s applications page.'
+        <Button type="button" className="min-h-[44px]" disabled={!approvedCurrent || busy || submitting} onClick={() => void submit()}>{submitting ? 'Publishing…' : 'Publish job'}</Button>
+        <p className="w-full text-sm text-muted-foreground">{approvedCurrent ? 'Publish job makes this job public and available for applications. You can then start a candidate search.'
           : !foundationsReady(payload) ? 'Add experience and location to approve.'
-          : 'Approve the criteria to post the job.'}
+          : 'Approve the criteria to publish the job.'}
           {suggestions.length > 0 && ` ${suggestions.length} suggested skill${suggestions.length === 1 ? ' is' : 's are'} not included.`}</p>
       </div>
     </section>

@@ -66,7 +66,7 @@ import { JobSubNav } from "@/components/JobSubNav";
 import { InternalHero } from "@/components/internal/InternalHero";
 import { UploadDialog } from "@/components/bulk-import/UploadDialog";
 import { describeBulkFailures, type BulkFailureDetail } from "@/lib/bulk-action-failures";
-import { applicationManagementCopy } from "@/lib/internal-copy";
+import { applicationManagementCopy, jobPublicationLabel } from "@/lib/internal-copy";
 
 export default function ApplicationManagementPage() {
   const [match, params] = useRoute("/jobs/:id/applications");
@@ -1230,18 +1230,20 @@ export default function ApplicationManagementPage() {
     actionFilter.length > 0 || (hasTriggeredAISummaryFilters && selectedApplications.length > 0);
 
   const jobStatusBadge =
-    job?.status === "approved"
+    job?.status === "approved" && job.isActive
       ? {
-          label: "Active",
+          label: jobPublicationLabel(job),
           className: "border-emerald-200 bg-emerald-50 text-emerald-700",
         }
+      : job?.status === "approved"
+        ? { label: jobPublicationLabel(job), className: "border-border bg-muted text-foreground" }
       : job?.status === "pending"
         ? {
-            label: applicationManagementCopy.header.pendingApprovalTitle,
+            label: jobPublicationLabel(job),
             className: "border-amber-200 bg-amber-50 text-amber-700",
           }
         : {
-            label: job?.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : "Unknown",
+            label: jobPublicationLabel(job),
             className: "border-border bg-muted text-foreground",
           };
 

@@ -3,6 +3,7 @@ import {act} from 'react-dom/test-utils';
 import {createRoot,type Root} from 'react-dom/client';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
+import {jobPublicationLabel} from '../../client/src/lib/internal-copy';
 
 const apiRequest=vi.fn();
 vi.mock('../../client/src/lib/queryClient',()=>({apiRequest:(...args:unknown[])=>apiRequest(...args)}));
@@ -16,6 +17,14 @@ const baseBrief={revision:'1',currentJD:JD,sourceHash:'a'.repeat(64),latest:null
   source:{classifierVersion:1,initialized:true,selectionRequired:false,ambiguous:false,choices:[],legacyStructured:false}};
 
 describe('hiring criteria helpers',()=>{
+ it.each([
+  [{status:'approved',isActive:true},'Active'],
+  [{status:'approved',isActive:false},'Not live'],
+  [{status:'pending',isActive:false},'Not published'],
+  [{status:'declined',isActive:true},'Declined'],
+  [{status:'draft',isActive:false},'Draft'],
+  [null,'Unknown'],
+ ] as const)('labels the actual publication state: %j', (job,label)=>expect(jobPublicationLabel(job)).toBe(label));
  it('builds starter criteria only from details, deduplicated, with experience and location',()=>{
   const p=starterCriteria(details);const s=sections(p);
   expect(s.experience).toHaveLength(1);expect(s.location).toHaveLength(1);
@@ -119,7 +128,7 @@ describe('HiringCriteriaStep',()=>{
   expect(host.querySelector('[aria-label="Remove Python"]')).not.toBeNull();
   expect([...host.querySelectorAll('label')].some(l=>l.textContent?.startsWith('Skill'))).toBe(true);
   expect(apiRequest).not.toHaveBeenCalled();
-  expect(button('Post job').disabled).toBe(true);
+  expect(button('Publish job').disabled).toBe(true);
   expect(host.textContent).toContain('Available after you approve the criteria');
   expect(host.textContent).not.toMatch(/crustdata/i);
  });
@@ -266,7 +275,8 @@ describe('HiringCriteriaStep',()=>{
   expect(button('Try the AI draft again')).toBeUndefined();
  });
 
- it('saves then approves, shows the persistent pool card, then enables Post job; never starts sourcing',async()=>{
+ it('saves then approves, shows the persistent pool card, then enables Publish job; never starts sourcing',async()=>{
+  const invalidate=vi.spyOn(QueryClient.prototype,'invalidateQueries');
   apiRequest.mockImplementation(async(_m:string,url:string)=>{
    if(url.endsWith('/brief')){brief={...brief,revision:'2',latest:{version_id:'11111111-1111-4111-8111-111111111111',version_number:1,payload:starterCriteria(details)}};}
    if(url.endsWith('/brief/approve')){brief={...brief,revision:'3',approvedVersionId:brief.latest.version_id};
@@ -285,11 +295,15 @@ describe('HiringCriteriaStep',()=>{
   expect(host.textContent).toContain('No sourcing has started');
   expect(host.textContent).toContain('When you start sourcing from Find candidates');
   expect(calls.some(c=>/sourcing\/(start|admission|runs)/.test(c))).toBe(false);
-  expect(button('Post job').disabled).toBe(false);
-  await act(async()=>button('Post job').click());await settle();
+  expect(button('Publish job').disabled).toBe(false);
+  expect(host.textContent).toContain('makes this job public');
+  expect(host.textContent).not.toContain('admin approval');
+  await act(async()=>button('Publish job').click());await settle();
   const submit=apiRequest.mock.calls.find(c=>String(c[1]).endsWith('/brief/submit'))!;
   expect(submit[0]).toBe('POST');expect(submit[2]).toMatchObject({expectedRevision:3});expect(submit[2].requestId).toMatch(/^[0-9a-f-]{36}$/);
   expect(onSubmitted).toHaveBeenCalledTimes(1);
+  expect(invalidate).toHaveBeenCalledWith({queryKey:['job-management',7]});
+  invalidate.mockRestore();
  });
 
  it('an approved schema-3 brief loads as approved and unchanged; Update and approve saves schema 4 then approves',async()=>{
@@ -303,7 +317,7 @@ describe('HiringCriteriaStep',()=>{
   await render();
   expect(apiRequest).not.toHaveBeenCalled();
   expect(host.textContent).toContain('To include previous applicants, review these requirements, then save and approve them again.');
-  expect(button('Post job').disabled).toBe(false);
+  expect(button('Publish job').disabled).toBe(false);
   await act(async()=>button('Update and approve').click());await settle(10);
   expect(apiRequest.mock.calls.map(c=>c[1])).toEqual(['/api/jobs/42/brief','/api/jobs/42/brief/approve']);
   const saved=apiRequest.mock.calls[0][2].payload;
@@ -316,19 +330,19 @@ describe('HiringCriteriaStep',()=>{
   brief={...baseBrief,revision:'3',latest:{version_id:'11111111-1111-4111-8111-111111111111',version_number:1,payload:starterCriteria(details)},approvedVersionId:'11111111-1111-4111-8111-111111111111'};
   apiRequest.mockRejectedValueOnce(new TypeError('Failed to fetch')).mockResolvedValueOnce({json:async()=>({action:'submit'})});
   await render();
-  await act(async()=>button('Post job').click());await settle();
+  await act(async()=>button('Publish job').click());await settle();
   expect(onSubmitted).not.toHaveBeenCalled();
-  expect(host.textContent).toContain('it won’t be sent twice');
-  await act(async()=>button('Post job').click());await settle();
+  expect(host.textContent).toContain('check the same request');
+  await act(async()=>button('Publish job').click());await settle();
   const ids=apiRequest.mock.calls.filter(c=>String(c[1]).endsWith('/brief/submit')).map(c=>c[2].requestId);
   expect(ids).toHaveLength(2);expect(ids[0]).toBe(ids[1]);expect(onSubmitted).toHaveBeenCalledTimes(1);
  });
 
- it('treats an already-submitted job as confirmed success',async()=>{
+ it('does not mistake a state refusal for confirmed publication',async()=>{
   brief={...baseBrief,revision:'3',latest:{version_id:'11111111-1111-4111-8111-111111111111',version_number:1,payload:starterCriteria(details)},approvedVersionId:'11111111-1111-4111-8111-111111111111'};
   apiRequest.mockRejectedValue(new Error('409: {"code":"BRIEF_SUBMISSION_REQUIRED"}'));
-  await render();await act(async()=>button('Post job').click());await settle();
-  expect(onSubmitted).toHaveBeenCalledTimes(1);expect(host.querySelector('[role=alert]')).toBeNull();
+  await render();await act(async()=>button('Publish job').click());await settle();
+  expect(onSubmitted).not.toHaveBeenCalled();expect(host.querySelector('[role=alert]')).not.toBeNull();
  });
 
  it('lists overflowing starter skills as suggestions, adds one on click, and says how many are not included',async()=>{
@@ -419,11 +433,11 @@ describe('HiringCriteriaStep',()=>{
   expect(add.mock.calls.some(c=>c[0]==='beforeunload')).toBe(true);add.mockRestore();
  });
 
- it('shows a submitted job as sent, without approve or post controls',async()=>{
+ it('lets a previously pending job be reviewed and explicitly published',async()=>{
   const qc=new QueryClient({defaultOptions:{queries:{retry:false}}});
   await act(async()=>root.render(<QueryClientProvider client={qc}><HiringCriteriaStep jobId={42} actorId={7} details={details} onSubmitted={onSubmitted} jobStatus="pending"/></QueryClientProvider>));await settle();
-  expect(host.textContent).toContain('Sent for admin approval');expect(host.textContent).not.toContain('Draft saved');
-  expect(button('Post job')).toBeUndefined();expect(apiRequest).not.toHaveBeenCalled();
+  expect(host.textContent).toContain('Not public yet');expect(host.textContent).not.toContain('admin approval');
+  expect(button('Publish job').disabled).toBe(true);expect(apiRequest).not.toHaveBeenCalled();
  });
 
  it('waits on an in-flight (dispatched) draft without a second call or a failure label',async()=>{
@@ -441,6 +455,6 @@ describe('HiringCriteriaStep',()=>{
    throw new Error('BRIEF_FOUNDATIONS_REQUIRED');});
   await render();await act(async()=>button('Approve criteria').click());await settle();
   expect(host.textContent).toContain('Add the experience and location criteria, then approve again');
-  expect(button('Post job').disabled).toBe(true);
+  expect(button('Publish job').disabled).toBe(true);
  });
 });

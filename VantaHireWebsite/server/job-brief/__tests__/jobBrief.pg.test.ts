@@ -89,19 +89,64 @@ describe.skipIf(!enabled)('brief restricted-role PostgreSQL contract',()=>{
     await expect(call('SELECT flow_job_brief_approve(90001,90001,90001,$1,1,$2,$3) result',
       [randomUUID(),saved.versionId,sourceHash('approval')])).rejects.toThrow('BRIEF_FOUNDATIONS_REQUIRED');
   });
-  it('submits an approved draft once, with replay and no publication',async()=>{
+  it.each(['submit','publish'])('publishes an approved draft with %s, no admin step, and idempotent replay',async(action)=>{
     const jobId=(await owner.query("INSERT INTO jobs(organization_id,posted_by,title,location,type,description,original_jd,status,is_active) VALUES(90001,90001,'Draft test','Bengaluru','full-time','Build Python services.','Build Python services.','draft',false) RETURNING id")).rows[0].id;
     const version=await call('SELECT flow_job_brief_save(90001,$1,90001,$2,0,$3) result',[jobId,randomUUID(),save]);
     await call('SELECT flow_job_brief_approve(90001,$1,90001,$2,1,$3,$4) result',[jobId,randomUUID(),version.versionId,sourceHash('approval')]);
     const request=randomUUID();const query='SELECT flow_job_brief_save(90001,$1,90001,$2,2,$3) result';
-    const args=[jobId,request,{action:'submit'}];
-    const submitted=await call(query,args);expect(submitted).toMatchObject({revision:'3',action:'submit'});
+    const args=[jobId,request,{action}];
+    const submitted=await call(query,args);expect(submitted).toMatchObject({revision:'3',action});
     expect(await call(query,args)).toEqual(submitted);
-    expect((await runtime.query('SELECT status,is_active FROM jobs WHERE id=$1',[jobId])).rows[0]).toEqual({status:'pending',is_active:false});
+    expect((await runtime.query('SELECT status,is_active,reactivation_count,reviewed_by FROM jobs WHERE id=$1',[jobId])).rows[0]).toEqual({status:'approved',is_active:true,reactivation_count:0,reviewed_by:null});
+    expect((await runtime.query('SELECT count(*)::int n FROM job_audit_log WHERE job_id=$1',[jobId])).rows[0].n).toBe(1);
+  });
+  it('publishes a legacy pending job only on explicit recruiter action',async()=>{
+    const jobId=(await owner.query("INSERT INTO jobs(organization_id,posted_by,title,location,type,description,original_jd,status,is_active) VALUES(90001,90001,'Pending test','Bengaluru','full-time','Build Python services.','Build Python services.','pending',false) RETURNING id")).rows[0].id;
+    const version=await call('SELECT flow_job_brief_save(90001,$1,90001,$2,0,$3) result',[jobId,randomUUID(),save]);
+    await call('SELECT flow_job_brief_approve(90001,$1,90001,$2,1,$3,$4) result',[jobId,randomUUID(),version.versionId,sourceHash('approval')]);
+    expect((await runtime.query('SELECT is_active FROM jobs WHERE id=$1',[jobId])).rows[0].is_active).toBe(false);
+    await call('SELECT flow_job_brief_save(90001,$1,90001,$2,2,$3) result',[jobId,randomUUID(),{action:'submit'}]);
+    expect((await runtime.query('SELECT status,is_active FROM jobs WHERE id=$1',[jobId])).rows[0]).toEqual({status:'approved',is_active:true});
+  });
+  it('keeps admin takedown effective: a recruiter cannot republish a declined job',async()=>{
+    const version=await saveVersion();
+    await call('SELECT flow_job_brief_approve(90001,90001,90001,$1,1,$2,$3) result',[randomUUID(),version.versionId,sourceHash('approval')]);
+    await saveVersion(randomUUID(),2,{action:'publish'});
+    await call('SELECT flow_job_brief_save(90001,90001,90004,$1,NULL,$2) result',[randomUUID(),{action:'moderate',status:'declined'}]);
+    expect((await runtime.query('SELECT status,is_active FROM jobs WHERE id=90001')).rows[0]).toEqual({status:'declined',is_active:false});
+    for(const action of ['submit','publish']) {
+      await runtime.query('SAVEPOINT refused_publish');
+      await expect(saveVersion(randomUUID(),4,{action})).rejects.toThrow('BRIEF_APPROVAL_REQUIRED');
+      await runtime.query('ROLLBACK TO SAVEPOINT refused_publish');
+    }
   });
   it('does not let admin moderation bypass submission',async()=>{
     const jobId=(await owner.query("INSERT INTO jobs(organization_id,posted_by,title,location,type,description,status,is_active) VALUES(90001,90001,'Draft test','Bengaluru','full-time','Test prose','draft',false) RETURNING id")).rows[0].id;
     await expect(call('SELECT flow_job_brief_save(90001,$1,90004,$2,NULL,$3) result',[jobId,randomUUID(),{action:'moderate',status:'approved'}])).rejects.toThrow('BRIEF_SUBMISSION_REQUIRED');
+  });
+  it.each(['submit','publish'])('keeps org, actor, approval and revision fences on %s',async(action)=>{
+    const version=await saveVersion();
+    for(const actor of [90002,90003]) {
+      expect(await call('SELECT flow_job_brief_save(90001,90001,$1,$2,1,$3) result',[actor,randomUUID(),{action}])).toBeNull();
+    }
+    expect(await call('SELECT flow_job_brief_save(90002,90001,90001,$1,1,$2) result',[randomUUID(),{action}])).toBeNull();
+    await runtime.query('SAVEPOINT no_approval');
+    await expect(saveVersion(randomUUID(),1,{action})).rejects.toThrow('BRIEF_APPROVAL_REQUIRED');
+    await runtime.query('ROLLBACK TO SAVEPOINT no_approval');
+    await call('SELECT flow_job_brief_approve(90001,90001,90001,$1,1,$2,$3) result',[randomUUID(),version.versionId,sourceHash('approval')]);
+    await runtime.query('SAVEPOINT old_revision');
+    await expect(saveVersion(randomUUID(),1,{action})).rejects.toThrow('BRIEF_REVISION_CONFLICT');
+    await runtime.query('ROLLBACK TO SAVEPOINT old_revision');
+    expect((await runtime.query('SELECT is_active FROM jobs WHERE id=90001')).rows[0].is_active).toBe(false);
+  });
+  it('refuses both publication entrypoints when the recruiter has no seat',async()=>{
+    await owner.query('UPDATE organization_members SET seat_assigned=false WHERE organization_id=90001 AND user_id=90001');
+    try {
+      for(const action of ['submit','publish']) expect(await saveVersion(randomUUID(),0,{action})).toBeNull();
+      expect((await runtime.query('SELECT is_active FROM jobs WHERE id=90001')).rows[0].is_active).toBe(false);
+    } finally {
+      await owner.query('UPDATE organization_members SET seat_assigned=true WHERE organization_id=90001 AND user_id=90001');
+    }
   });
   it('uses identical pinned Unicode names in SQL and refuses direct duplicate saves',async()=>{
     for(const {input,expected} of unicodeFixtures.normalization){

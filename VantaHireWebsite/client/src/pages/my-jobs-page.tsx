@@ -13,7 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Eye, Briefcase, Plus, Play, Search, LayoutGrid, CheckCircle, Clock, Archive } from "lucide-react";
 import { PageHeaderSkeleton, FilterBarSkeleton, JobListSkeleton } from "@/components/skeletons";
 import { SubNav, type SubNavItem } from "@/components/SubNav";
-import { myJobsPageCopy } from "@/lib/internal-copy";
+import { myJobsPageCopy, jobPublicationLabel } from "@/lib/internal-copy";
 import {
   InternalEmptyState,
   InternalHero,
@@ -240,7 +240,7 @@ export default function MyJobsPage() {
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                     <Badge className={getStatusColor(job.status)}>
-                      {job.status}
+                      {jobPublicationLabel(job)}
                     </Badge>
                     {job.isActive && (
                       <Badge className="border-info/30 bg-info/10 text-info-foreground">
@@ -266,9 +266,9 @@ export default function MyJobsPage() {
                       <Eye className="mr-1 h-4 w-4" />
                       View Applications
                     </Button>
-                    {job.status === 'draft' && (
+                    {(job.status === 'draft' || job.status === 'pending') && (
                       <Button size="sm" onClick={() => setLocation(`/jobs/post?draft=${job.id}`)}>
-                        Continue posting
+                        Review and publish
                       </Button>
                     )}
                     {job.status === 'approved' && !job.isActive && (

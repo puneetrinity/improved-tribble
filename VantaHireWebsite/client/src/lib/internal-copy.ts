@@ -270,7 +270,7 @@ export const myJobsPageCopy = {
     all: "All Jobs",
     active: "Active",
     inactive: "Inactive",
-    pending: "Pending Review",
+    pending: "Not published",
   },
   searchPlaceholder: "Search by title, company, or location...",
   list: {
@@ -278,11 +278,11 @@ export const myJobsPageCopy = {
     description: "Manage your posted job opportunities",
   },
   empty: {
-    pendingSingle: "Your job is pending approval",
+    pendingSingle: "Your job is not published yet",
     pendingMultiplePrefix: "You have",
-    pendingMultipleSuffix: "jobs pending approval",
-    pendingDescription: "Jobs will appear here once approved by an admin. You'll be notified when they're ready.",
-    viewPending: "View Pending Jobs",
+    pendingMultipleSuffix: "jobs not published yet",
+    pendingDescription: "Open My Jobs, choose Review and publish, and approve the current requirements before publishing.",
+    viewPending: "View Unpublished Jobs",
     postAnother: "Post Another Job",
     filtered: "No jobs match your filters",
     none: "No job postings yet",
@@ -382,12 +382,18 @@ export const profileSettingsPageCopy = {
   },
 } as const;
 
+export function jobPublicationLabel(job: { status?: string | undefined; isActive?: boolean | undefined } | null | undefined): string {
+  if (job?.status === 'approved') return job.isActive === true ? 'Active' : 'Not live';
+  if (job?.status === 'pending') return 'Not published';
+  return job?.status ? job.status.charAt(0).toUpperCase() + job.status.slice(1) : 'Unknown';
+}
+
 export const applicationManagementCopy = {
   header: {
     subtitlePrefix: 'Review and manage applications for',
-    pendingApprovalTitle: 'Pending Approval',
+    pendingApprovalTitle: 'Not published',
     pendingApprovalDescription:
-      'This job is waiting for admin approval. It will become visible to candidates once approved. You can still prepare by setting up pipeline stages and reviewing any existing applications.',
+      'This job is not public yet. In My Jobs, choose Review and publish to check the requirements and publish it.',
     postedPrefix: 'Posted',
     applicationsLabel: 'Applications',
   },
