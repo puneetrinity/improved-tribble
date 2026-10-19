@@ -6,6 +6,7 @@ import { INTERNAL_PRIMARY_BUTTON } from "@/lib/internal-page-theme";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -42,6 +43,8 @@ export default function MyJobsPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [deactivateJob, setDeactivateJob] = useState<JobWithCounts | null>(null);
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
 
   // Fetch recruiter's jobs
   const { data: jobs = [], isLoading: jobsLoading } = useQuery<JobWithCounts[]>({
@@ -81,6 +84,26 @@ export default function MyJobsPage() {
         description: error.message,
         variant: "destructive",
       });
+    },
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: async (jobId: number) => {
+      if (!user || !briefCapability) throw new Error('Not ready');
+      return changeJobPublication(user.id, user.role, jobId, false, briefCapability.jobBriefEnabled);
+    },
+    onSuccess: (_result, jobId) => {
+      setDeactivateJob(null);
+      setDeactivateError(null);
+      // Refresh lists, job details and brief revision after the existing server action.
+      queryClient.invalidateQueries({ queryKey: ["/api/my-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/jobs/${jobId}`] });
+      queryClient.invalidateQueries({ queryKey: ['job-brief'] });
+      toast({ title: 'Job deactivated', description: 'The job is no longer public. Your existing applications are still available.' });
+    },
+    onError: () => {
+      setDeactivateError('We couldn’t confirm that the job was deactivated. Refresh the page to check its status before trying again.');
     },
   });
 
@@ -282,6 +305,12 @@ export default function MyJobsPage() {
                         {publishJobMutation.isPending ? 'Publishing...' : 'Publish'}
                       </Button>
                     )}
+                    {job.isActive && (user?.role === 'recruiter' || user?.role === 'super_admin') && (
+                      <Button variant="outline" size="sm" disabled={deactivateMutation.isPending || !briefCapability}
+                        onClick={() => { setDeactivateError(null); setDeactivateJob(job); }}>
+                        Deactivate
+                      </Button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -289,6 +318,27 @@ export default function MyJobsPage() {
           )}
         </div>
       </InternalPanel>
+      <AlertDialog open={deactivateJob !== null} onOpenChange={(open) => {
+        if (!open && !deactivateMutation.isPending) { setDeactivateJob(null); setDeactivateError(null); }
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Deactivate this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              “{deactivateJob?.title}” will no longer be public or accept new applications.
+              Your existing applications will stay available. Any candidate search already running will continue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deactivateError && <p role="alert" className="text-sm text-destructive">{deactivateError}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deactivateMutation.isPending}>Keep job active</AlertDialogCancel>
+            <Button disabled={deactivateMutation.isPending || !deactivateJob || !briefCapability || !!deactivateError}
+              onClick={() => { if (deactivateJob) deactivateMutation.mutate(deactivateJob.id); }}>
+              {deactivateMutation.isPending ? 'Deactivating…' : 'Deactivate job'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </InternalPageShell>
   );
 }

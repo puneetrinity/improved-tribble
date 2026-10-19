@@ -40,7 +40,9 @@ export async function readFlow(db,r){
     ${date('valid_until')} valid_until,capacity,origin,evidence_sha256,supersedes_id FROM sourcing_entitlements WHERE id=$1`,[r.entitlement.id])).rows[0]??null;
   const state=(await db.query(`SELECT enabled,revision::text revision,entitlement_id,capacity,high_water,${date('anchor')} anchor FROM sourcing_org_state WHERE organization_id=$1`,[r.organizationId])).rows[0]??null;
   const slots=(await db.query('SELECT slot_number,active,current_user_id FROM sourcing_seat_slots WHERE organization_id=$1 ORDER BY slot_number',[r.organizationId])).rows;
-  const members=(await db.query('SELECT user_id,seat_assigned FROM organization_members WHERE organization_id=$1 ORDER BY user_id',[r.organizationId])).rows;
+  const members=(await db.query(`SELECT m.user_id,m.seat_assigned,u.role AS user_role
+    FROM organization_members m JOIN users u ON u.id=m.user_id
+    WHERE m.organization_id=$1 ORDER BY m.user_id`,[r.organizationId])).rows;
   const usage=(await db.query(`SELECT slot_id,${date('starts_at')} starts_at,limit_count,reserved,captured FROM sourcing_allowance_windows WHERE organization_id=$1 ORDER BY slot_id,starts_at`,[r.organizationId])).rows;
   const pending=(await db.query(`SELECT
     (SELECT count(*) FROM sourcing_admissions WHERE organization_id=$1 AND state NOT IN ('delivered','cancelled_no_dispatch'))+

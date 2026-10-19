@@ -53,6 +53,18 @@ try{
   const policy=(await d.query('SELECT signal_rc_set_policy($1) p',[{version:1,action:'rates',policy:{id:rcPolicyId,rcAccountHash:'a'.repeat(64),rcFetchCreditsMax:1,rpm:450,enabled:true}}])).rows[0].p;
   const r={version:1,operationId:randomUUID(),organizationId:99001,subscriptionId:99001,operator:'fixture',reason:'component test',approvalEvidenceHash:'b'.repeat(64),environment:'development',flowTargetId,discoverTargetId,flowOrigin:'http://127.0.0.1:5000',discoverOrigin:'http://127.0.0.1:5001',memoryOrigin:'http://127.0.0.1:5002',configEvidenceHash:'c'.repeat(64),rcPolicyId,rcPolicyHash:policy.policyHash,entitlement:{mode:'grant',id:randomUUID(),anchor:'2026-01-01T00:00:00.123456Z',validFrom:'2026-01-01T00:00:00.123456Z',validUntil:'2099-01-01T00:00:00.000000Z',capacity:1}};
   let probes=0;const io={flow:makeFlow(f),discover:makeDiscover(d),config:async()=>{},probe:async()=>{probes++;}};
+  // Use the global user role, not organization_members.role ('owner' is not recruiter authority).
+  assert.deepEqual((await preview(r,io)).warnings,[]);
+  const recruiterPlan=await preview(r,io);
+  await f.query("UPDATE users SET role='super_admin' WHERE id=99001");
+  assert.equal((await preview(r,io)).warnings.length,1);
+  assert.equal((await apply(recruiterPlan.plan,recruiterPlan.sha256,io)).state,'refused');
+  assert.equal(probes,0);
+  await f.query("UPDATE users SET role='recruiter' WHERE id=99001");
+  await f.query('UPDATE organization_members SET seat_assigned=false WHERE user_id=99001');
+  assert.equal((await preview(r,io)).warnings.length,1);
+  await f.query('UPDATE organization_members SET seat_assigned=true WHERE user_id=99001');
+  assert.deepEqual((await preview(r,io)).warnings,[]);ok();
   // Exact reviewed owner stop procedure, synthetic organisation only.
   async function stop(){
     await f.query('BEGIN');try{
