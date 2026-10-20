@@ -29,6 +29,7 @@ import {
   type SourcedCandidateForUI,
 } from "@/hooks/use-sourcing";
 import { SourcingProgressModal } from "@/components/sourcing/SourcingProgressModal";
+import { pickSourcingNotice, useSourcingStatusToast } from "@/components/sourcing/sourcing-status-toast";
 import { poolCardCopy } from "@/lib/sourcing-pool-copy";
 import { allowsPublicContact, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import { CandidateCard } from "@/components/sourcing/CandidateCard";
@@ -53,7 +54,6 @@ import { jobSourcingPageCopy } from "@/lib/internal-copy";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ColdOutreachSidebar } from "@/components/outreach/ColdOutreachSidebar";
 import { FunnelChart } from "@/components/dashboards/FunnelChart";
-import { rcProgressPresentation } from "@shared/rc-skills-progress";
 
 type SortKey = "rank" | "fitScore" | "source" | "freshness";
 type ShortlistOutreachFilter = "all" | "fresh" | "first_sent" | "second_sent" | "completed";
@@ -542,19 +542,18 @@ export default function JobSourcingPage() {
     );
   };
 
+  useSourcingStatusToast(`job:${jobId}:run:${status?.requestId ?? "none"}`, pickSourcingNotice({
+    capabilityError: capability.isError,
+    onCapabilityRetry: () => void capability.refetch(),
+    rcProgress: status?.rcProgress,
+    rcStatusUnavailable: status?.rcStatusUnavailable,
+    runStatus,
+    governedMessage,
+    briefSourcingNotice,
+  }));
+
   return (
     <Layout>
-      {(status?.rcProgress || status?.rcStatusUnavailable) && (() => {
-        // One copy source with the progress dialog; a queued search must never read as finished.
-        const rc = status.rcStatusUnavailable ? undefined : status.rcProgress;
-        const { heading, message } = rcProgressPresentation(rc, status.rcStatusUnavailable);
-        return <div role="status" data-rc-status="" className="mx-auto w-full max-w-[1500px] px-4 py-3">
-          {heading}. {rc && rc.total > 0 ? `${rc.processed} of ${rc.total} profiles checked. ` : ''}{message}
-        </div>;
-      })()}
-      {briefSourcingNotice && <div role="status" className="mx-auto w-full max-w-[1500px] px-4 py-3">Searching isn’t turned on for this job yet. Approving the hiring criteria doesn’t start a search.</div>}
-      {governedMessage&&<div role="status" className="mx-auto w-full max-w-[1500px] px-4 py-3">{governedMessage}</div>}
-      {capability.isError&&<div role="alert">We couldn’t load search settings. <Button onClick={()=>void capability.refetch()}>Try again</Button></div>}
       {governed&&(()=>{
         const p=preview.data;
         const copy=poolCardCopy(p);const counted=copy.counted;
