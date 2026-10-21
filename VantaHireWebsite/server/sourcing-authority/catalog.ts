@@ -1,6 +1,7 @@
 import type {PgLike} from '../schema-control/ledger';
 
 export const SOURCING_TABLES=[
+  'sourcing_extra_grants','sourcing_extra_balances','sourcing_extra_events','sourcing_admission_funding',
   'sourcing_org_state','sourcing_entitlements','sourcing_seat_slots','sourcing_seat_events','sourcing_allowance_windows',
   'sourcing_query_artifacts','sourcing_digest_requests','sourcing_admissions','sourcing_account_events','sourcing_dispatch_outbox',
   'sourcing_execution_grants','sourcing_deliveries','sourcing_delivery_items','sourcing_decision_events','sourcing_count_previews',
@@ -19,13 +20,16 @@ export const SOURCING_FUNCTIONS=[
   'flow_sourcing_preview_claim(uuid)','flow_sourcing_preview_finish(uuid,uuid,jsonb)',
 ] as const;
 export const SOURCING_PRIVATE_FUNCTIONS=[
+  'flow_sourcing_extra_snapshot(integer,integer)','flow_sourcing_extra_manage(integer,integer,uuid,jsonb,text)',
+  'flow_sourcing_funding_quote(integer,integer,uuid,timestamp with time zone)',
+  'flow_sourcing_funding_reserve(integer,uuid,jsonb)','flow_sourcing_funding_finish(integer,uuid,text)',
   'flow_sourcing_ranking_immutable()',
   'flow_sourcing_immutable()','flow_sourcing_seat_sync()','flow_sourcing_reconcile(integer)','flow_sourcing_enable(integer,uuid)',
   'flow_sourcing_window(timestamp with time zone,timestamp with time zone)','flow_sourcing_canonical(jsonb)',
 ] as const;
 export const SOURCING_PRIVATE_NAMES=SOURCING_PRIVATE_FUNCTIONS.map(s=>s.slice(0,s.indexOf('(')));
 // Reproduced from the final disposable catalog before the build can pass readiness.
-export const SOURCING_CATALOG_SHA256='d6fe47add089ba67ca004c1a0b1f657ad6190b006b292628261d06fa8ce62f77';
+export const SOURCING_CATALOG_SHA256='5217df060750cb91d4066422b5d0b450fffc55a95d1f8dc5da45c1c7b4879182';
 export const SOURCING_CATALOG_SQL=`WITH relations AS (
  SELECT c.* FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname='public' AND c.relname LIKE 'sourcing_%' AND c.relkind IN ('r','p')

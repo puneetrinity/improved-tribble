@@ -268,6 +268,13 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
       expect(privileges.rows[0]).toEqual({direct:false,admit:true,enable:false});
       const resumePrivileges=await runtime.query("SELECT has_function_privilege(current_user,'public.flow_sourcing_candidate_eligibility(text,uuid,uuid,jsonb,text)','EXECUTE') eligibility,has_function_privilege(current_user,'public.flow_sourcing_contact_allowed(integer,integer,integer)','EXECUTE') contact,has_table_privilege(current_user,'public.sourcing_delivery_items','SELECT,INSERT,UPDATE,DELETE,TRUNCATE') direct");
       expect(resumePrivileges.rows[0]).toEqual({eligibility:true,contact:true,direct:false});
+      const extraPrivileges=await runtime.query(`SELECT
+        bool_and(NOT has_table_privilege(current_user,t,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')) denied
+        FROM unnest(ARRAY['sourcing_extra_grants','sourcing_extra_balances','sourcing_extra_events','sourcing_admission_funding']) t`);
+      expect(extraPrivileges.rows[0]).toEqual({denied:true});
+      expect((await runtime.query(`SELECT has_function_privilege(current_user,
+        'flow_sourcing_extra_manage(integer,integer,uuid,jsonb,text)','EXECUTE') manage,
+        has_function_privilege(current_user,'flow_sourcing_funding_reserve(integer,uuid,jsonb)','EXECUTE') reserve`)).rows[0]).toEqual({manage:false,reserve:false});
       await assertSchemaReady({pg:{query:(text,params)=>runtime.query(text,params as any)},migrationsDir,
         environment:'development',expectedTargetId:targetId,criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS});
     }finally{await runtime.end();}
@@ -314,6 +321,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0020", apply_mode: "adopted" },
         { version: "0021", apply_mode: "adopted" },
         { version: "0022", apply_mode: "adopted" },
+        { version: "0023", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +

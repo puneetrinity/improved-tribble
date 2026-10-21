@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { canonicalJson, sourceHash } from '../job-brief/contracts';
+import {searchFundingSchema} from '../../shared/sourcing-funding';
 
 export const SOURCING_PROTOCOL_VERSION = 1;
 export const SOURCING_COMPILER_VERSION = '1';
@@ -56,6 +57,7 @@ export function callbackBindingMatches(raw:unknown,binding:{flowRunId:string;art
 }
 
 export const sourcingAdmissionSchema = z.object({
+  expectedFunding:searchFundingSchema,
   requestId: idSchema,
   expectedRevision: revisionSchema,
   briefVersionId: idSchema,

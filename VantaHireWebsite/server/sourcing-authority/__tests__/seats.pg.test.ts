@@ -76,10 +76,19 @@ describe.skipIf(!enabled)('sourcing seats and simultaneous admissions',()=>{
   }
   const quote=(f:Awaited<ReturnType<typeof fixture>>,job=f.jobs[0])=>one(db,'SELECT flow_sourcing_quote($1,$2,$3) result',[f.org,job,f.actor]);
   const admit=(c:Client,f:Awaited<ReturnType<typeof fixture>>,job:number,q:any,request=randomUUID())=>one(c,'SELECT flow_sourcing_admit($1,$2,$3,$4,$5) result',[f.org,job,f.actor,request,{
+    ...(q.funding?.kind==='extra'?{expectedFunding:q.funding}:{}),
     expectedRevision:q.revision,briefVersionId:q.briefVersionId,materialHash:q.materialHash,artifactId:q.artifactId,expectedPayerSlotId:q.payerSlotId,expectedWindowStart:q.windowStart,quoteExpiresAt:q.expiresAt,
   }]);
-  it.each(['cancel','receipt'] as const)('cancel/receipt race serializes with %s first, never refunding a captured run',async first=>{
-    const f=await fixture(),q=await quote(f),adm=await admit(db,f,f.jobs[0],q);
+  async function grantExtra(f:Awaited<ReturnType<typeof fixture>>,quantity=1){
+    const q=await quote(f);
+    await db.query(`INSERT INTO sourcing_allowance_windows(organization_id,slot_id,starts_at,ends_at,entitlement_id,captured)
+      SELECT $1,$2,$3,$4,entitlement_id,5 FROM sourcing_org_state WHERE organization_id=$1`,[f.org,q.payerSlotId,q.windowStart,q.windowEnd]);
+    const snapshot=await one(db,"SELECT encode(sha256(convert_to(flow_sourcing_extra_snapshot($1,$2)::text,'UTF8')),'hex') result",[f.org,f.actor]);
+    return one(db,'SELECT flow_sourcing_extra_manage($1,$2,$3,$4,$5) result',[f.org,f.actor,randomUUID(),{action:'issue',quantity,
+      validFrom:new Date(Date.now()-1000).toISOString(),validUntil:new Date(Date.now()+3600000).toISOString(),operatorLabel:'test operator',reason:'concurrency test'},snapshot]);
+  }
+  it.each([['cancel',false],['receipt',false],['cancel',true],['receipt',true]] as const)('cancel/receipt race serializes with %s first (extras=%s), never refunding a captured run',async(first,useExtra)=>{
+    const f=await fixture(),extra=useExtra?await grantExtra(f):null,q=await quote(f),adm=await admit(db,f,f.jobs[0],q);
     const dispatch=await one(db,'SELECT flow_sourcing_dispatch_claim($1) result',[randomUUID()]);
     const requestId=randomUUID(),executionAttemptId=randomUUID(),grantId=randomUUID();
     await one(db,'SELECT flow_sourcing_dispatch_finish($1,$2,$3) result',[adm.id,dispatch.lease,{kind:'bound',requestId,
@@ -112,7 +121,10 @@ describe.skipIf(!enabled)('sourcing seats and simultaneous admissions',()=>{
       const events=(await db.query('SELECT kind FROM sourcing_account_events WHERE admission_id=$1 ORDER BY kind',[adm.id])).rows.map(r=>r.kind);
       expect(events).toContain(first==='cancel'?'release':'capture');
       expect(events).not.toContain(first==='cancel'?'capture':'release');
-      expect((await db.query('SELECT reserved,captured FROM sourcing_allowance_windows WHERE organization_id=$1',[f.org])).rows)
+      if(extra){
+        expect((await db.query('SELECT reserved,captured FROM sourcing_extra_balances WHERE grant_id=$1',[extra.grantId])).rows).toEqual([{reserved:0,captured:first==='cancel'?0:1}]);
+        expect((await db.query('SELECT reserved,captured FROM sourcing_allowance_windows WHERE organization_id=$1',[f.org])).rows).toEqual([{reserved:0,captured:5}]);
+      }else expect((await db.query('SELECT reserved,captured FROM sourcing_allowance_windows WHERE organization_id=$1',[f.org])).rows)
         .toEqual([{reserved:0,captured:first==='cancel'?0:1}]);
     } finally {await winner.query('ROLLBACK');await loser.query('ROLLBACK');}
   });
@@ -154,4 +166,38 @@ describe.skipIf(!enabled)('sourcing seats and simultaneous admissions',()=>{
     expect(await admit(clients[0],f,f.jobs[0],q)).toBeNull();
     expect((await db.query('SELECT count(*)::integer n FROM sourcing_admissions WHERE organization_id=$1',[f.org])).rows[0].n).toBe(0);
   });
+  it('six independent admissions competing for one extra search reserve exactly one',async()=>{
+    const f=await fixture(),g=await grantExtra(f),quotes=await Promise.all(f.jobs.map(j=>quote(f,j)));
+    const results=await Promise.allSettled(clients.map((c,n)=>admit(c,f,f.jobs[n],quotes[n])));
+    expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+    for(const r of results)if(r.status==='rejected')expect(r.reason.message).toContain('SOURCING_ALLOWANCE_EXHAUSTED');
+    expect((await db.query('SELECT reserved,captured FROM sourcing_extra_balances WHERE grant_id=$1',[g.grantId])).rows).toEqual([{reserved:1,captured:0}]);
+    expect((await db.query('SELECT reserved,captured FROM sourcing_allowance_windows WHERE organization_id=$1',[f.org])).rows).toEqual([{reserved:0,captured:5}]);
+  });
+  it('concurrent replays of an extra-funded intent return one admission and charge once',async()=>{
+    const f=await fixture(),g=await grantExtra(f),q=await quote(f),id=randomUUID();
+    const results=await Promise.all(clients.map(c=>admit(c,f,f.jobs[0],q,id)));
+    expect(new Set(results.map(r=>r.id)).size).toBe(1);
+    expect((await db.query("SELECT count(*)::integer n FROM sourcing_extra_events WHERE grant_id=$1 AND kind='reserve'",[g.grantId])).rows[0].n).toBe(1);
+  });
+  it.each(['admit','revoke'] as const)('revocation versus admission serializes with %s first',async first=>{
+    const f=await fixture(),g=await grantExtra(f),q=await quote(f);
+    const snapshot=await one(db,"SELECT encode(sha256(convert_to(flow_sourcing_extra_snapshot($1,$2)::text,'UTF8')),'hex') result",[f.org,f.actor]);
+    const revokeId=randomUUID(),body={action:'revoke',grantId:g.grantId,operatorLabel:'test operator',reason:'concurrent revoke'};
+    const invoke=(c:Client,kind:string)=>kind==='admit'?admit(c,f,f.jobs[0],q):one(c,'SELECT flow_sourcing_extra_manage($1,$2,$3,$4,$5) result',[f.org,f.actor,revokeId,body,snapshot]);
+    const [winner,loser]=clients,pid=(await loser.query('SELECT pg_backend_pid() pid')).rows[0].pid;
+    await winner.query('BEGIN');await loser.query('BEGIN');
+    try{
+      await invoke(winner,first);
+      const pending=invoke(loser,first==='admit'?'revoke':'admit').then(value=>({value,error:null}),error=>({value:null,error}));
+      let blocked=false;
+      for(let i=0;i<50;i++){blocked=(await db.query('SELECT cardinality(pg_blocking_pids($1))>0 blocked',[pid])).rows[0].blocked;if(blocked)break;await new Promise(r=>setTimeout(r,10));}
+      expect(blocked).toBe(true);await winner.query('COMMIT');
+      expect((await pending).error?.message).toBe(first==='admit'?'SOURCING_REVISION_CONFLICT':'SOURCING_ALLOWANCE_EXHAUSTED');
+      await loser.query('ROLLBACK');
+      expect((await db.query('SELECT reserved,captured,revoked_at IS NOT NULL revoked FROM sourcing_extra_balances WHERE grant_id=$1',[g.grantId])).rows[0])
+        .toEqual({reserved:first==='admit'?1:0,captured:0,revoked:first==='revoke'});
+    }finally{await winner.query('ROLLBACK');await loser.query('ROLLBACK');}
+  });
+
 });
