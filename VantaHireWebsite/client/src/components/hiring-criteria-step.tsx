@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/use-auth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { Plus, X } from 'lucide-react';
+import { Check, Info, Plus, Sparkles, X } from 'lucide-react';
 import { AlsoInJd, initialCriteria, selectionFor } from './brief-review-workspace';
 import { useJobBrief, jobIntentRequest, readBriefCapability, type JobBrief, type BriefReviewWorkspace } from '../lib/job-brief';
 import { readSourcing, readSourcingCapability, type SourcingPreview } from '../lib/sourcing-authority';
@@ -190,22 +190,31 @@ function PoolCard({ jobId, actorId, brief, outdated }: { jobId: number; actorId:
     </>;
   } else if (p && (p.preparation === 'failed' || p.preparation === 'unknown')) body = <p>We couldn't prepare the pool check for this brief. You can still post the job and check again from Find candidates.</p>;
   else body = <p className="flex items-center gap-2"><span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-primary motion-reduce:animate-none" />Checking matching profiles…</p>;
-  return <aside aria-live="polite" aria-label="Pool size" className="space-y-2 rounded-lg border bg-muted/40 p-4 lg:sticky lg:top-4">
-    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pool size for your approved brief</h3>{body}
+  return <aside aria-live="polite" aria-label="Matching profiles" className="space-y-2 self-start rounded-lg border bg-muted/40 p-4 lg:sticky lg:top-4">
+    <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Matching profiles</h3>{body}
   </aside>;
 }
 
-function SkillRow({ c, onChange, onRemove }: { c: Criterion; onChange: (c: Criterion) => void; onRemove: () => void }) {
-  if (c.requirement.kind !== 'accepted_skills') return null;
-  const req = c.requirement;
-  return <div className="grid items-end gap-2 rounded-md border p-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-    <label className="grid gap-1 text-xs font-medium text-muted-foreground">Skill
-      <Input className="min-h-[44px] text-sm text-foreground" value={req.primary} maxLength={120} aria-invalid={!req.primary.trim()}
-        onChange={e => onChange({ ...c, label: e.target.value, provenance: recruiter, requirement: { ...req, primary: e.target.value } })} /></label>
-    <label className="grid gap-1 text-xs font-medium text-muted-foreground">Also accepted (any one counts, comma-separated)
-      <Input className="min-h-[44px] text-sm text-foreground" placeholder="e.g. K8s" value={req.alternatives.join(', ')}
-        onChange={e => onChange({ ...c, provenance: recruiter, requirement: { ...req, alternatives: e.target.value.split(',').map(v => v.trimStart()) } })} /></label>
-    <Button type="button" variant="ghost" className="min-h-[44px]" aria-label={`Remove ${req.primary || 'this skill'}`} onClick={onRemove}><X className="h-4 w-4" aria-hidden />Remove</Button>
+export function SkillRow({ c, onChange, onRemove }: { c: Criterion; onChange: (c: Criterion) => void; onRemove: () => void }) {
+  const req = c.requirement.kind === 'accepted_skills' ? c.requirement : null;
+  // Opened by the recruiter, or forced open whenever the criterion currently holds alternatives — including ones
+  // that arrive later under the same criterion id (e.g. "Load latest version"), so none are ever hidden from review.
+  const [opened, setOpened] = useState(false);
+  if (!req) return null;
+  const showOthers = opened || req.alternatives.some(a => a.trim());
+  return <div className="space-y-1 rounded-md border p-2">
+    <div className="flex items-end gap-2">
+      <label className="grid flex-1 gap-1 text-xs font-medium text-muted-foreground">Skill
+        <Input className="min-h-[44px] text-sm text-foreground" value={req.primary} maxLength={120} aria-invalid={!req.primary.trim()}
+          onChange={e => onChange({ ...c, label: e.target.value, provenance: recruiter, requirement: { ...req, primary: e.target.value } })} /></label>
+      <Button type="button" variant="ghost" className="min-h-[44px]" aria-label={`Remove ${req.primary || 'this skill'}`} onClick={onRemove}><X className="h-4 w-4" aria-hidden />Remove</Button>
+    </div>
+    {showOthers
+      ? <label className="grid gap-1 text-xs font-medium text-muted-foreground">Accepted alternatives (any one of these counts, comma-separated)
+          <Input className="min-h-[44px] text-sm text-foreground" placeholder="e.g. K8s" value={req.alternatives.join(', ')}
+            onChange={e => { setOpened(true); onChange({ ...c, provenance: recruiter, requirement: { ...req, alternatives: e.target.value.split(',').map(v => v.trimStart()) } }); }} /></label>
+      : <Button type="button" variant="link" className="h-auto min-h-[44px] px-0 text-sm" onClick={() => setOpened(true)}
+          aria-label={`Add accepted alternatives for ${req.primary || 'this skill'}`}><Plus className="h-4 w-4" aria-hidden />Accepted alternatives</Button>}
   </div>;
 }
 
@@ -415,14 +424,27 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
   const locMissing = locProblem !== null;
   const locNote = s.location[0]?.note ?? '';
   const expRangeInvalid = expReq?.kind === 'experience_range' && (!Number.isFinite(expReq.maximum) || expReq.maximum < expReq.minimum);
-  const sectionHead = (title: string, note: string) => <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">{title} <span className="font-normal normal-case tracking-normal">· {note}</span></h3>;
+  const sectionHead = (title: string, count?: number) => <h3 className="text-base font-semibold text-foreground">{title}
+    {count !== undefined && <span className="ml-1 font-normal text-muted-foreground">· {count}</span>}</h3>;
+  const nextHelp = approvedCurrent ? 'Publish job makes this job public and available for applications. You can then start a candidate search.'
+    : !foundationsReady(payload) ? 'Add experience and location to approve.'
+    : 'Approve the criteria to publish the job.';
 
   return <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
-    <section aria-label="Hiring criteria" className="min-w-0 space-y-5">
-      <p role="status" className="rounded-md bg-success/10 p-3 text-sm"><strong>Draft saved.</strong> Not public yet. Publish the job when you are ready.</p>
-      <p className="text-muted-foreground">These decide who we look for. Edit anything, then approve.</p>
-      {origin === 'starter' && <p role="status" className="rounded-md bg-warning/10 p-3 text-sm"><strong>From your job details — not checked against the JD.</strong> These come only from the fields you filled in, so they can miss requirements. Review them against the JD.</p>}
-      {origin === 'ai' && <p role="status" className="rounded-md bg-primary/10 p-3 text-sm"><strong>Drafted by AI from your JD.</strong> Check every line before approving.</p>}
+    <section aria-label="Hiring criteria" className="min-w-0 space-y-6">
+      <header className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold">Who are you looking for?</h2>
+          <p className="text-sm text-muted-foreground">We use these to find and rank candidates. Draft saved. Not public yet.</p>
+        </div>
+        <p className={`rounded-full border px-3 py-1 text-sm font-medium tabular-nums ${used > MAX_CRITERIA ? 'border-destructive text-destructive' : ''}`}
+          aria-describedby="criteria-count-help">{used} of {MAX_CRITERIA} criteria used</p>
+        <span id="criteria-count-help" className="sr-only">Experience and location always count as two. A skill and its other names count as one.</span>
+      </header>
+      {origin === 'starter' && <p role="status" className="flex gap-2 rounded-md bg-warning/10 p-3 text-sm"><Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span><strong>From your job details — not checked against the JD.</strong> Compare with the JD before approving.</span></p>}
+      {origin === 'ai' && <p role="status" className="flex gap-2 rounded-md bg-primary/10 p-3 text-sm"><Sparkles className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+        <span><strong>Drafted by AI from your JD.</strong> Check each line before approving.</span></p>}
       {changedElsewhere && !busy && <div role="alert" className="flex flex-wrap items-center gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
         <span><strong>These criteria were changed in another tab or by a teammate.</strong> Load the latest version before approving.{dirty ? ' Your unsaved edits here will be replaced.' : ''}</span>
         <Button type="button" variant="outline" className="min-h-[44px]" onClick={reloadLatest}>Load latest version</Button></div>}
@@ -433,71 +455,87 @@ export function HiringCriteriaStep({ jobId, actorId, details, onSubmitted, jobSt
           {drafting ? 'Drafting…' : 'Try the AI draft again'}</Button>
         <span className="text-xs text-muted-foreground">One more try is allowed for this JD.</span></div>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-      <p className="text-sm"><strong className="tabular-nums">{used} of {MAX_CRITERIA} criteria used.</strong> Experience and location are always included. A skill and its accepted alternatives count as one.</p>
       {used > MAX_CRITERIA && <p role="alert" className="text-sm text-destructive">Too many criteria. Remove some to get to {MAX_CRITERIA} — keep the ones that matter most.</p>}
 
-      <div className="space-y-2">{sectionHead('Location & experience', '2 of 12 · always included')}
+      <div className="space-y-3">{sectionHead('Basics')}
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-sm font-medium">Minimum years of experience
-            <Input className="min-h-[44px]" type="number" min={0} max={80} step="any" aria-describedby={expMissing ? 'exp-missing' : undefined} aria-invalid={expMissing}
-              value={expReq && 'minimum' in expReq && Number.isFinite(expReq.minimum) ? expReq.minimum : ''} placeholder="Not stated in the JD — please add"
-              onChange={e => setExperience(e.target.value)} />
-            {expMissing && <span id="exp-missing" className="text-xs font-normal text-destructive">Required. Enter 0 for entry-level roles.</span>}</label>
-          <label className="grid gap-1 text-sm font-medium">Maximum years (optional)
-            <Input className="min-h-[44px]" type="number" min={0} max={80} step="any" disabled={expMissing} aria-describedby={expRangeInvalid ? 'exp-range' : undefined} aria-invalid={expRangeInvalid}
-              value={expReq?.kind === 'experience_range' ? expReq.maximum : ''} placeholder="No upper limit" onChange={e => setExperienceMax(e.target.value)} />
-            {expRangeInvalid && <span id="exp-range" className="text-xs font-normal text-destructive">Must be at least the minimum.</span>}</label>
-          <label className="grid gap-1 text-sm font-medium">Location
+          <fieldset className="grid gap-1">
+            <legend className="mb-1 text-sm font-medium">Years of experience</legend>
+            <div className="flex items-start gap-2">
+              <label className="grid flex-1 gap-1 text-xs font-medium text-muted-foreground">Minimum years
+                <Input className="min-h-[44px] text-sm text-foreground" type="number" min={0} max={80} step="any" aria-describedby={expMissing ? 'exp-missing' : undefined} aria-invalid={expMissing}
+                  value={expReq && 'minimum' in expReq && Number.isFinite(expReq.minimum) ? expReq.minimum : ''} placeholder="e.g. 3"
+                  onChange={e => setExperience(e.target.value)} /></label>
+              <span aria-hidden className="mt-8 text-sm text-muted-foreground">to</span>
+              <label className="grid flex-1 gap-1 text-xs font-medium text-muted-foreground">Maximum years (optional)
+                <Input className="min-h-[44px] text-sm text-foreground" type="number" min={0} max={80} step="any" disabled={expMissing} aria-describedby={expRangeInvalid ? 'exp-range' : undefined} aria-invalid={expRangeInvalid}
+                  value={expReq?.kind === 'experience_range' ? expReq.maximum : ''} placeholder="No limit" onChange={e => setExperienceMax(e.target.value)} /></label>
+            </div>
+            {expMissing && <span id="exp-missing" className="text-xs text-destructive">Required. Enter 0 for entry-level roles.</span>}
+            {expRangeInvalid && <span id="exp-range" className="text-xs text-destructive">Must be at least the minimum.</span>}
+          </fieldset>
+          <label className="grid content-start gap-1 text-sm font-medium">Location
             <Input className="min-h-[44px]" aria-describedby={locMissing ? 'loc-missing' : 'loc-help'} aria-invalid={locMissing} value={locReq?.kind === 'text' ? locReq.value : ''}
               placeholder="City, Country — e.g. Bengaluru, India" onChange={e => setLocation(e.target.value)} />
             {locMissing ? <span id="loc-missing" className="text-xs font-normal text-destructive">Required. {locationProblemText(locReq?.kind === 'text' ? locReq.value : '', locProblem)}</span>
               : <span id="loc-help" className="text-xs font-normal text-muted-foreground">Candidates are matched on this place.</span>}</label>
-          <label className="grid gap-1 text-sm font-medium">Work arrangement (optional)
+          <label className="grid gap-1 text-sm font-medium sm:col-span-2">Work arrangement (optional)
             <Input className="min-h-[44px]" maxLength={300} disabled={!s.location[0]} value={locNote} aria-describedby="arrangement-help"
               placeholder="e.g. Hybrid, 3 days a week in office" onChange={e => setArrangement(e.target.value)} />
-            <span id="arrangement-help" className="text-xs font-normal text-muted-foreground">Shown with the brief; not used to match candidates.</span></label>
+            <span id="arrangement-help" className="text-xs font-normal text-muted-foreground">Shown with the job; not used to match candidates.</span></label>
         </div>
       </div>
 
-      {([['must', 'Must-have skills', 'must_have'], ['nice', 'Nice-to-have skills', 'preferred']] as const).map(([key, title, cls]) =>
-        <div key={key} className="space-y-2">{sectionHead(title, `${s[key].length} · each skill counts as 1`)}
+      {([['must', 'Must have', 'must_have'], ['nice', 'Nice to have', 'preferred']] as const).map(([key, title, cls]) =>
+        <div key={key} className="space-y-2">{sectionHead(title, s[key].length)}
           {s[key].map(c => <SkillRow key={c.id} c={c} onChange={n => replace(c.id, n)} onRemove={() => remove(c.id)} />)}
-          <Button type="button" variant="outline" className="min-h-[44px]" disabled={used >= MAX_CRITERIA} onClick={() => add(skillCriterion('', cls))}>Add {cls === 'must_have' ? 'must-have' : 'nice-to-have'} skill</Button>
+          <Button type="button" variant="outline" className="min-h-[44px]" disabled={used >= MAX_CRITERIA} onClick={() => add(skillCriterion('', cls))}>
+            <Plus className="h-4 w-4" aria-hidden />Add {cls === 'must_have' ? 'must-have' : 'nice-to-have'} skill</Button>
         </div>)}
 
       {ws && <AlsoInJd workspace={ws} payload={payload} canAdd={used < MAX_CRITERIA} disabled={busy} onAdd={c => add(c)} />}
       {!ws && suggestions.length > 0 && <div className="space-y-2 rounded-md border border-dashed p-3" aria-label="Suggested skills">
-        {sectionHead('Suggested from your job details', `${suggestions.length} · not included yet`)}
-        <p className="text-sm text-muted-foreground">Your job details list more skills than fit in {MAX_CRITERIA} criteria. Add the ones that matter most. The rest stay listed here, so nothing is dropped without you seeing it.</p>
+        <h3 className="text-base font-semibold">Found in your job details <span className="font-normal text-muted-foreground">· {suggestions.length} not added</span></h3>
+        <p className="text-sm text-muted-foreground">Add the ones that matter most. Anything you don't add stays listed here.</p>
         <ul className="flex flex-wrap gap-2">{suggestions.map(sg => <li key={`${sg.cls}:${sg.name}`}>
           <Button type="button" variant="outline" className="min-h-[44px] rounded-full" disabled={used >= MAX_CRITERIA}
             aria-label={`Add ${sg.name} as ${sg.cls === 'must_have' ? 'must-have' : 'nice-to-have'} skill`}
             onClick={() => { add(skillCriterion(sg.name, sg.cls)); setSuggestions(list => list.filter(x => x !== sg)); }}>
-            <Plus className="h-4 w-4" aria-hidden />{sg.name} <span className="ml-1 text-xs text-muted-foreground">{sg.cls === 'must_have' ? 'must-have' : 'nice-to-have'}</span></Button></li>)}</ul>
-        {used >= MAX_CRITERIA && <p className="text-sm text-muted-foreground">All {MAX_CRITERIA} slots are used. Remove a criterion to add another.</p>}
+            <Plus className="h-4 w-4" aria-hidden />{sg.name} <span className="ml-1 text-xs text-muted-foreground">{sg.cls === 'must_have' ? 'must have' : 'nice to have'}</span></Button></li>)}</ul>
+        {used >= MAX_CRITERIA && <p className="text-sm text-muted-foreground">All {MAX_CRITERIA} criteria are used. Remove one to add another.</p>}
       </div>}
 
-      <div className="space-y-2">{sectionHead('Other requirements', `${s.other.length} · e.g. title, certifications, mentoring`)}
+      <div className="space-y-2">{sectionHead('Anything else', s.other.length)}
+        <p className="text-sm text-muted-foreground">For example a job title, certification or mentoring experience.</p>
         {s.other.map(c => <div key={c.id} className="grid gap-2 rounded-md border p-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
           {c.requirement.kind === 'text' ? <Input aria-label="Requirement" className="min-h-[44px]" value={c.requirement.value} maxLength={500}
             onChange={e => replace(c.id, { ...c, label: e.target.value.slice(0, 120), provenance: recruiter, requirement: { kind: 'text', value: e.target.value } })} />
             : <p className="self-center text-sm">{c.label}</p>}
-          <select aria-label="Must-have or preferred" className="min-h-[44px] rounded-md border bg-background px-2" value={c.class}
+          <select aria-label="How important" className="min-h-[44px] rounded-md border bg-background px-2 text-sm" value={c.class}
             onChange={e => replace(c.id, { ...c, class: e.target.value as Criterion['class'], provenance: recruiter })} disabled={c.subject === 'title'}>
-            <option value="must_have">Must-have</option><option value="preferred">Preferred</option><option value="disqualifier">Review flag</option>
+            <option value="must_have">Must have</option><option value="preferred">Nice to have</option><option value="disqualifier">Red flag (for review only)</option>
           </select>
           <Button type="button" variant="ghost" className="min-h-[44px]" aria-label={`Remove ${c.label || 'this requirement'}`} onClick={() => remove(c.id)}><X className="h-4 w-4" aria-hidden />Remove</Button>
         </div>)}
-        <Button type="button" variant="outline" className="min-h-[44px]" disabled={used >= MAX_CRITERIA} onClick={() => add({ ...otherCriterion(), subject: 'relevant_work', evidenceKinds: evidenceFor('relevant_work') })}>Add other requirement</Button>
+        <Button type="button" variant="outline" className="min-h-[44px]" disabled={used >= MAX_CRITERIA} onClick={() => add({ ...otherCriterion(), subject: 'relevant_work', evidenceKinds: evidenceFor('relevant_work') })}>
+          <Plus className="h-4 w-4" aria-hidden />Add requirement</Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t pt-4">
-        <Button type="button" className="min-h-[44px]" variant={approvedCurrent && !olderFormat ? 'outline' : 'default'} disabled={busy || (approvedCurrent && !olderFormat) || !ready || changedElsewhere || !base} onClick={() => void approve()}>
-          {busy ? 'Approving…' : approvedCurrent ? (olderFormat ? 'Update and approve' : 'Criteria approved') : 'Approve criteria'}</Button>
-        <Button type="button" className="min-h-[44px]" disabled={!approvedCurrent || busy || submitting} onClick={() => void submit()}>{submitting ? 'Publishing…' : 'Publish job'}</Button>
-        <p className="w-full text-sm text-muted-foreground">{approvedCurrent ? 'Publish job makes this job public and available for applications. You can then start a candidate search.'
-          : !foundationsReady(payload) ? 'Add experience and location to approve.'
-          : 'Approve the criteria to publish the job.'}
+      <div className="space-y-3 border-t pt-4">
+        <ol aria-label="Steps to publish" className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+          <li className={approvedCurrent ? 'text-muted-foreground' : 'font-medium'}>
+            {approvedCurrent ? <Check className="mr-1 inline h-4 w-4 text-success" aria-hidden /> : <span aria-hidden className="mr-1">1.</span>}
+            Approve criteria{approvedCurrent && <span className="sr-only"> (done)</span>}</li>
+          <li className={approvedCurrent ? 'font-medium' : 'text-muted-foreground'}><span aria-hidden className="mr-1">2.</span>Publish job</li>
+        </ol>
+        <div className="flex flex-wrap items-center gap-3">
+          {approvedCurrent
+            ? <Button type="button" className="min-h-[44px]" disabled={busy || submitting} onClick={() => void submit()}>{submitting ? 'Publishing…' : 'Publish job'}</Button>
+            : <Button type="button" className="min-h-[44px]" disabled={busy || !ready || changedElsewhere || !base} onClick={() => void approve()}>{busy ? 'Approving…' : 'Approve criteria'}</Button>}
+          {approvedCurrent && olderFormat && <Button type="button" variant="outline" className="min-h-[44px]" disabled={busy || !ready || changedElsewhere || !base} onClick={() => void approve()}>
+            {busy ? 'Approving…' : 'Update and approve'}</Button>}
+        </div>
+        <p className="text-sm text-muted-foreground">{nextHelp}
           {suggestions.length > 0 && ` ${suggestions.length} suggested skill${suggestions.length === 1 ? ' is' : 's are'} not included.`}</p>
       </div>
     </section>

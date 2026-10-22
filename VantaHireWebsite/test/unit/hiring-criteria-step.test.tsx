@@ -8,7 +8,7 @@ import {jobPublicationLabel} from '../../client/src/lib/internal-copy';
 const apiRequest=vi.fn();
 vi.mock('../../client/src/lib/queryClient',()=>({apiRequest:(...args:unknown[])=>apiRequest(...args)}));
 vi.mock('../../client/src/hooks/use-auth',()=>({useAuth:()=>({user:{id:7}})}));
-import {HiringCriteriaStep,starterCriteria,withDetailFoundations,starterPlan,sections,usedSlots,foundationsReady,skillCriterion,MAX_CRITERIA,upgradedPayload,BRIEF_SCHEMA}
+import {HiringCriteriaStep,SkillRow,starterCriteria,withDetailFoundations,starterPlan,sections,usedSlots,foundationsReady,skillCriterion,MAX_CRITERIA,upgradedPayload,BRIEF_SCHEMA}
   from '../../client/src/components/hiring-criteria-step';
 
 const JD='We are hiring a Senior Backend Engineer in Bengaluru. Python and PostgreSQL are required. Kafka is nice to have.';
@@ -128,7 +128,8 @@ describe('HiringCriteriaStep',()=>{
   expect(host.querySelector('[aria-label="Remove Python"]')).not.toBeNull();
   expect([...host.querySelectorAll('label')].some(l=>l.textContent?.startsWith('Skill'))).toBe(true);
   expect(apiRequest).not.toHaveBeenCalled();
-  expect(button('Publish job').disabled).toBe(true);
+  // Publishing is a second step: only the approve action is offered until the criteria are approved.
+  expect(button('Publish job')).toBeUndefined();expect(button('Approve criteria')).toBeDefined();
   expect(host.textContent).toContain('Available after you approve the criteria');
   expect(host.textContent).not.toMatch(/crustdata/i);
  });
@@ -348,10 +349,10 @@ describe('HiringCriteriaStep',()=>{
  it('lists overflowing starter skills as suggestions, adds one on click, and says how many are not included',async()=>{
   const qc=new QueryClient({defaultOptions:{queries:{retry:false}}});
   await act(async()=>root.render(<QueryClientProvider client={qc}><HiringCriteriaStep jobId={42} actorId={7} details={many} onSubmitted={onSubmitted}/></QueryClientProvider>));await settle();
-  expect(host.textContent).toContain('Suggested from your job details');expect(host.textContent).toContain('33 · not included yet');
+  expect(host.textContent).toContain('Found in your job details');expect(host.textContent).toContain('33 not added');
   expect(host.textContent).toContain('2 of 12 criteria used');expect(host.textContent).toContain('33 suggested skills are not included');
   await act(async()=>[...host.querySelectorAll('button')].find(b=>b.getAttribute('aria-label')==='Add Must0 as must-have skill')!.click());
-  expect(host.textContent).toContain('3 of 12 criteria used');expect(host.textContent).toContain('32 · not included yet');
+  expect(host.textContent).toContain('3 of 12 criteria used');expect(host.textContent).toContain('32 not added');
  });
 
  it('never approves a version changed in another tab that is not on screen',async()=>{
@@ -403,12 +404,12 @@ describe('HiringCriteriaStep',()=>{
    apiRequest.mockImplementation(async(_m:string,url:string)=>url.endsWith('/brief')
      ?{json:async()=>({revision:'2',versionId:V2,reviewHash:'b'.repeat(64)})}:{json:async()=>({revision:'3'})});
    await render();
-   expect(host.textContent).toContain('Other requirements from the job description · 2');
+   expect(host.textContent).toContain('Found in your job description · 2');
    expect(host.querySelector('[aria-label="Add “Mentors engineers weekly” to the requirements"]')).toBeNull();
    expect(host.querySelectorAll('input[type=checkbox]')).toHaveLength(0);expect(host.querySelector('select[aria-label^="Exclude"]')).toBeNull();
    expect(button('Approve criteria').disabled).toBe(false);
    await act(async()=>(host.querySelector('[aria-label="Add “Go” to the requirements"]') as HTMLButtonElement).click());
-   expect(host.textContent).toContain('Other requirements from the job description · 1');expect(host.textContent).toContain('Nice-to-have skills · 1');
+   expect(host.textContent).toContain('Found in your job description · 1');expect(host.textContent).toContain('Nice to have· 1');
    await act(async()=>button('Approve criteria').click());await settle(10);
    const save=apiRequest.mock.calls.find(c=>String(c[1]).endsWith('/brief'))![2];
    expect(save.reviewSelection.dispositions).toEqual([
@@ -437,7 +438,7 @@ describe('HiringCriteriaStep',()=>{
   const qc=new QueryClient({defaultOptions:{queries:{retry:false}}});
   await act(async()=>root.render(<QueryClientProvider client={qc}><HiringCriteriaStep jobId={42} actorId={7} details={details} onSubmitted={onSubmitted} jobStatus="pending"/></QueryClientProvider>));await settle();
   expect(host.textContent).toContain('Not public yet');expect(host.textContent).not.toContain('admin approval');
-  expect(button('Publish job').disabled).toBe(true);expect(apiRequest).not.toHaveBeenCalled();
+  expect(button('Publish job')).toBeUndefined();expect(apiRequest).not.toHaveBeenCalled();
  });
 
  it('waits on an in-flight (dispatched) draft without a second call or a failure label',async()=>{
@@ -455,6 +456,55 @@ describe('HiringCriteriaStep',()=>{
    throw new Error('BRIEF_FOUNDATIONS_REQUIRED');});
   await render();await act(async()=>button('Approve criteria').click());await settle();
   expect(host.textContent).toContain('Add the experience and location criteria, then approve again');
-  expect(button('Publish job').disabled).toBe(true);
+  expect(button('Publish job')).toBeUndefined();
+ });
+
+ it('shows accepted alternatives from the brief and approves them unchanged',async()=>{
+  const k8s={...skillCriterion('Kubernetes','must_have')};(k8s.requirement as any).alternatives=['K8s','EKS'];
+  const result={...starterCriteria(details)};result.criteria=[...result.criteria,k8s];
+  brief={...baseBrief,draft:{state:'succeeded',result}};
+  apiRequest.mockImplementation(async(_m:string,url:string)=>url.endsWith('/brief')
+   ?{json:async()=>({revision:'2',versionId:'11111111-1111-4111-8111-111111111111'})}:{json:async()=>({revision:'3'})});
+  await render();
+  const alt=[...host.querySelectorAll('label')].find(l=>l.textContent?.startsWith('Accepted alternatives'))?.querySelector('input') as HTMLInputElement;
+  expect(alt.value).toBe('K8s, EKS');
+  await act(async()=>button('Approve criteria').click());await settle(10);
+  const saved=apiRequest.mock.calls.find(c=>c[1]==='/api/jobs/42/brief')![2];
+  expect(saved.payload.criteria.find((c:any)=>c.id===k8s.id).requirement).toEqual({kind:'accepted_skills',primary:'Kubernetes',alternatives:['K8s','EKS']});
+ });
+});
+
+describe('SkillRow accepted alternatives',()=>{
+ let host:HTMLDivElement,root:Root;
+ beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;host=document.createElement('div');document.body.append(host);root=createRoot(host);});
+ afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+ const altInput=()=>[...host.querySelectorAll('label')].find(l=>l.textContent?.startsWith('Accepted alternatives'))?.querySelector('input') as HTMLInputElement|undefined;
+ const openButton=()=>host.querySelector('[aria-label^="Add accepted alternatives"]') as HTMLButtonElement|null;
+ const withAlts=(c:any,alternatives:string[])=>({...c,requirement:{...c.requirement,alternatives}});
+ const base=skillCriterion('Kubernetes','must_have');
+ const mount=async(c:any,onChange=vi.fn())=>{await act(async()=>root.render(<SkillRow key={c.id} c={c} onChange={onChange} onRemove={()=>{}}/>));return onChange;};
+
+ it('shows existing alternatives on first render',async()=>{
+  await mount(withAlts(base,['K8s']));
+  expect(altInput()?.value).toBe('K8s');expect(openButton()).toBeNull();
+ });
+ it('keeps an empty row collapsed until opened, then stays open while the recruiter edits it',async()=>{
+  let current:any=base;const onChange=vi.fn((n:any)=>{current=n;});
+  await mount(current,onChange);
+  expect(altInput()).toBeUndefined();
+  await act(async()=>openButton()!.click());
+  expect(altInput()).toBeDefined();
+  const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!;
+  await act(async()=>{setter.call(altInput()!,'K8s');altInput()!.dispatchEvent(new Event('input',{bubbles:true}));});
+  await mount(current,onChange);
+  await act(async()=>{setter.call(altInput()!,'');altInput()!.dispatchEvent(new Event('input',{bubbles:true}));});
+  await mount(current,onChange);
+  expect(altInput()).toBeDefined();expect(altInput()!.value).toBe('');
+ });
+ it('shows alternatives added by a newer version of the same criterion (same id)',async()=>{
+  await mount(base);
+  expect(altInput()).toBeUndefined();
+  await mount(withAlts(base,['K8s']));
+  expect(altInput()?.value).toBe('K8s');
  });
 });

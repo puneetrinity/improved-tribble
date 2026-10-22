@@ -140,7 +140,7 @@ describe('brief recruiter UI',()=>{
         {id:'i2',text:'Go',priority:'preferred',topic:'skill',quote:'Go',sourceHash:H,span:{start:0,end:2},proposedCriterion:go,reason:'capacity'}]};
     mocks.query.mockReturnValue({data:{...brief,reviewWorkspace:ws},isPending:false,isError:false,refetch:vi.fn()});
     await render();
-    expect(host.textContent).toContain('Other requirements from the job description · 1');
+    expect(host.textContent).toContain('Found in your job description · 1');
     expect(button('Approve criteria').disabled).toBe(false);
     await act(async()=>{(host.querySelector('[aria-label="Add “Go” to the requirements"]') as HTMLButtonElement).click();});
     await click('Save changes');
