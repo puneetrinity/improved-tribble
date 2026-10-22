@@ -12,9 +12,23 @@ import {callbackBindingMatches} from '../contracts';
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const scope={organizationId:1,jobId:2,actorId:3};
 const id='10000000-0000-4000-8000-000000000001';
-const quote=()=>({payerUserId:4,payerDisplayName:'Fixture recruiter',payerSlotId:id,remaining:5,windowStart:'2026-10-01T00:00:00.000Z',windowEnd:'2026-11-01T00:00:00.000Z',
+const quote=()=>({quoteVersion:2 as const,includedRemaining:5,extraRemaining:0,funding:{kind:'included' as const,slotId:id,windowStart:'2026-10-01T00:00:00.000Z',revision:'0'},payerUserId:4,payerDisplayName:'Fixture recruiter',payerSlotId:id,remaining:5,windowStart:'2026-10-01T00:00:00.000Z',windowEnd:'2026-11-01T00:00:00.000Z',
   revision:1,briefVersionId:id,materialHash:'a'.repeat(64),artifactId:id,quotedAt:new Date().toISOString(),expiresAt:new Date(Date.now()+60000).toISOString()});
 describe('authenticated sourcing quote',()=>{
+  it('binds the grant and its revision; neither can be changed by the browser',async()=>{
+    vi.stubEnv('VANTAHIRE_JWT_PRIVATE_KEY',privateKey.export({type:'pkcs8',format:'pem'}).toString());
+    try{
+      const q={...quote(),includedRemaining:0,extraRemaining:10,remaining:10,funding:{kind:'extra' as const,grantId:id,revision:'7',expiresAt:'2030-01-01T00:00:00Z'}};
+      const repository={call:vi.fn().mockResolvedValue(q)} as unknown as SourcingRepository;
+      const token=sealQuote(scope,q,privateKey);
+      const command={expectedFunding:q.funding,requestId:id,expectedRevision:q.revision,briefVersionId:q.briefVersionId,materialHash:q.materialHash,
+        artifactId:q.artifactId,expectedPayerSlotId:q.payerSlotId,expectedWindowStart:q.windowStart,quoteToken:token};
+      for(const change of [{...q.funding,revision:'8'},{...q.funding,grantId:'20000000-0000-4000-8000-000000000002'}])
+        await expect(admitSourcing(repository,scope,{...command,expectedFunding:change})).rejects.toThrow('QUOTE_INVALID');
+      expect(repository.call).not.toHaveBeenCalled();
+      await admitSourcing(repository,scope,command);expect(repository.call).toHaveBeenCalledOnce();
+    }finally{vi.unstubAllEnvs();}
+  });
   it('preserves PostgreSQL microseconds in the signed quote and response',async()=>{
     vi.stubEnv('VANTAHIRE_JWT_PRIVATE_KEY',privateKey.export({type:'pkcs8',format:'pem'}).toString());
     try{
@@ -23,7 +37,7 @@ describe('authenticated sourcing quote',()=>{
       const result=await quoteSourcing(repository,scope);
       expect(result.windowStart).toBe(q.windowStart);
       expect(openQuote(result.quoteToken,scope,privateKey).windowStart).toBe(q.windowStart);
-      const body={requestId:id,expectedRevision:q.revision,briefVersionId:q.briefVersionId,materialHash:q.materialHash,
+      const body={expectedFunding:q.funding,requestId:id,expectedRevision:q.revision,briefVersionId:q.briefVersionId,materialHash:q.materialHash,
         artifactId:q.artifactId,expectedPayerSlotId:q.payerSlotId,expectedWindowStart:result.windowStart,quoteToken:result.quoteToken};
       await admitSourcing(repository,scope,body);
       expect(repository.call).toHaveBeenLastCalledWith('admit',[1,2,3,id,expect.objectContaining({expectedWindowStart:q.windowStart})]);

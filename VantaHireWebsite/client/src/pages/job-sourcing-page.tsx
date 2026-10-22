@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useJobBrief } from '@/lib/job-brief';
 import { useAuth } from '@/hooks/use-auth';
 import {readSourcingCapability,readSourcing,startGovernedSourcing,changePreparation,recordSourcingDecision,
+  requiresSourcingReconfirmation,sourcingErrorMessage,
   type AdmissionQuote,type SourcingPreview} from '@/lib/sourcing-authority';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from '@/components/ui/dialog';
 import {isApiError} from '@/lib/queryClient';
@@ -206,10 +207,10 @@ export default function JobSourcingPage() {
   const admission=useMutation({mutationFn:(q:AdmissionQuote)=>startGovernedSourcing(user!.id,jobId!,q),
     onSuccess:()=>{setAdmissionQuote(null);setGovernedMessage('Search started. Each job gets one search, so you can’t start another for this job.');openModal();invalidateSourcing();},
     onError:error=>{
-      if(isApiError(error)&&['SOURCING_PAYER_CHANGED','SOURCING_WINDOW_CHANGED','SOURCING_QUERY_STALE','SOURCING_REVISION_CONFLICT','SOURCING_QUOTE_INVALID','SOURCING_QUOTE_EXPIRED'].includes(error.code??'')){
+      if(isApiError(error)&&requiresSourcingReconfirmation(error.code)){
         setAdmissionQuote(null);setGovernedMessage('Your allowance or hiring criteria changed. Click Find candidates to check and confirm again.');
       }else if(isApiError(error)&&['SOURCING_ALREADY_ADMITTED','SOURCING_ALLOWANCE_EXHAUSTED','SOURCING_ENTITLEMENT_REQUIRED','SOURCING_DISABLED','SOURCING_TENANT_REQUIRED','SOURCING_INVALID_COMMAND'].includes(error.code??'')){
-        setAdmissionQuote(null);setGovernedMessage('We couldn’t start this search. (Reason: '+error.code+')');
+        setAdmissionQuote(null);setGovernedMessage(error.code==='SOURCING_ENTITLEMENT_REQUIRED'?sourcingErrorMessage(error.code):'We couldn’t start this search. (Reason: '+error.code+')');
       }else setGovernedMessage('We couldn’t confirm the search status. Click Start search again to check.');
       invalidateSourcing();
     }});
@@ -1007,7 +1008,9 @@ export default function JobSourcingPage() {
       />
       <Dialog open={admissionQuote!==null} onOpenChange={open=>{if(!open&&!admission.isPending)setAdmissionQuote(null);}}>
         <DialogContent><DialogHeader><DialogTitle>Start the search for this job?</DialogTitle>
-          <DialogDescription>Uses 1 of {admissionQuote?.remaining} remaining searches from {admissionQuote?.payerUserId===user?.id?'your allowance':`${admissionQuote?.payerDisplayName}’s allowance`}. Each job gets one search. It isn’t refunded if the search finds nobody or takes too long.</DialogDescription>
+          <DialogDescription>Uses 1 {admissionQuote?.funding.kind==='extra'?'extra':'included'} search from {admissionQuote?.payerUserId===user?.id?'your allowance':`${admissionQuote?.payerDisplayName}’s allowance`}. {admissionQuote?.includedRemaining} included and {admissionQuote?.extraRemaining} extra searches remain.
+            {admissionQuote?.funding.kind==='extra'&&` This extra search expires ${new Date(admissionQuote.funding.expiresAt).toLocaleDateString()}.`}
+            {' '}Each job gets one search. It isn’t refunded if the search finds nobody or takes too long.</DialogDescription>
         </DialogHeader><DialogFooter><Button variant="outline" disabled={admission.isPending} onClick={()=>setAdmissionQuote(null)}>Cancel</Button>
           <Button disabled={admission.isPending} onClick={()=>admissionQuote&&admission.mutate(admissionQuote)}>{admission.isPending?'Starting…':'Start search'}</Button>
         </DialogFooter></DialogContent>

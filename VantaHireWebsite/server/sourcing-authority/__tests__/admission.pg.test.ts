@@ -45,7 +45,7 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
       SELECT $1,organization_id,job_id,approved_version_id,approved_material_hash,'1',$2,'{}'::jsonb FROM job_brief_state WHERE job_id=$3`, [randomUUID(), hash, id]);
   }
   const quote = (jobId = 95201, user = actor) => one('SELECT flow_sourcing_quote($1,$2,$3) result', [org, jobId, user]);
-  const command = (q: any) => ({ expectedRevision: q.revision, briefVersionId: q.briefVersionId, materialHash: q.materialHash,
+  const command = (q: any) => ({ ...(q.funding?{expectedFunding:q.funding}:{}), expectedRevision: q.revision, briefVersionId: q.briefVersionId, materialHash: q.materialHash,
     artifactId: q.artifactId, expectedPayerSlotId: q.payerSlotId, expectedWindowStart: q.windowStart, quoteExpiresAt:q.expiresAt });
   const admit = (q: any, jobId = 95201, request = randomUUID(), user = actor) => one('SELECT flow_sourcing_admit($1,$2,$3,$4,$5) result', [org, jobId, user, request, command(q)]);
   async function boundAdmission(bind=true,historical=false){
@@ -66,9 +66,11 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
       if(!definition)throw Error('Missing admission fixture');
       return definition.replace('CREATE FUNCTION','CREATE OR REPLACE FUNCTION');
     };
+    const currentDefinition=historical?(await db.query("SELECT pg_get_functiondef('flow_sourcing_admit(integer,integer,integer,uuid,jsonb)'::regprocedure) d")).rows[0].d:null;
     if(historical)await db.query(admissionDefinition('0015_governed_sourcing.sql'));
-    const admitted=await admit(await quote());
-    if(historical)await db.query(admissionDefinition('0016_rubric_ranking.sql'));
+    let admitted:any;
+    try{const q=await quote();admitted=await admit(historical?{...q,funding:undefined}:q);}
+    finally{if(currentDefinition)await db.query(currentDefinition);}
     const dispatch=await one('SELECT flow_sourcing_dispatch_claim($1) result',[randomUUID()]);
     const discover=randomUUID(),execution=randomUUID();
     const finish=()=>one('SELECT flow_sourcing_dispatch_finish($1,$2,$3) result',[admitted.id,dispatch.lease,{kind:'bound',requestId:discover,flowRunId:admitted.id,
@@ -126,6 +128,111 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
   afterEach(async () => { await db?.query('ROLLBACK TO SAVEPOINT case_start'); });
   afterAll(async () => { await db?.query('ROLLBACK'); await db?.end(); });
 
+  async function extraSnapshot(user=actor){return one("SELECT jsonb_build_object('state',s,'hash',encode(sha256(convert_to(s::text,'UTF8')),'hex')) result FROM (SELECT flow_sourcing_extra_snapshot($1,$2) s) x",[org,user]);}
+  const extraBody=(quantity=5)=>({action:'issue',quantity,validFrom:new Date(Date.now()-1000).toISOString(),validUntil:new Date(Date.now()+86400000).toISOString(),operatorLabel:'self-declared test operator',reason:'Disposable extra-search test'});
+  async function extra(body=extraBody(),id=randomUUID(),snapshot?:any,user=actor){
+    return one('SELECT flow_sourcing_extra_manage($1,$2,$3,$4,$5) result',[org,user,id,body,(snapshot??await extraSnapshot(user)).hash]);
+  }
+  async function exhaustIncluded(){
+    const q=await quote();
+    await db.query(`INSERT INTO sourcing_allowance_windows(organization_id,slot_id,starts_at,ends_at,entitlement_id,captured)
+      SELECT $1,$2,$3,$4,entitlement_id,5 FROM sourcing_org_state WHERE organization_id=$1`,[org,q.payerSlotId,q.windowStart,q.windowEnd]);
+  }
+  async function refused(fn:()=>Promise<unknown>,code:string){
+    await db.query('SAVEPOINT expected_refusal');
+    try{await expect(fn()).rejects.toThrow(code);}finally{await db.query('ROLLBACK TO SAVEPOINT expected_refusal');}
+  }
+  it('adds five extra reservations without changing the five included searches already used',async()=>{
+    await exhaustIncluded();const g=await extra();
+    for(let n=0;n<5;n++){
+      const j=95201+n;if(n)await job(j);
+      const q=await quote(j);expect(q).toMatchObject({quoteVersion:2,includedRemaining:0,extraRemaining:5-n,funding:{kind:'extra',grantId:g.grantId}});
+      await admit(q,j);
+    }
+    await job(95206);await refused(()=>quote(95206),'ALLOWANCE_EXHAUSTED');
+    expect((await db.query('SELECT captured,reserved FROM sourcing_allowance_windows WHERE organization_id=$1',[org])).rows).toEqual([{captured:5,reserved:0}]);
+    expect((await db.query('SELECT reserved,captured FROM sourcing_extra_balances WHERE grant_id=$1',[g.grantId])).rows[0]).toEqual({reserved:5,captured:0});
+  });
+  it('uses included searches first, then earliest expiry, and rejects a stale funding quote',async()=>{
+    await extra();const sooner=await extra({...extraBody(),validUntil:new Date(Date.now()+3600000).toISOString()});
+    const q=await quote();expect(q.funding.kind).toBe('included');expect(q.remaining).toBe(15);
+    await exhaustIncluded();const chosen=await quote();expect(chosen.funding.grantId).toBe(sooner.grantId);
+    await extra({...extraBody(),validUntil:new Date(Date.now()+1800000).toISOString()});
+    await refused(()=>admit(chosen),'FUNDING_CHANGED');
+  });
+  it('replays an issue exactly once and refuses altered terms or an outdated preview',async()=>{
+    const id=randomUUID(),body=extraBody(),snapshot=await extraSnapshot();
+    const a=await extra(body,id,snapshot);expect(await extra(body,id,snapshot)).toEqual({...a,replayed:true});
+    await refused(()=>extra({...body,quantity:6},id,snapshot),'REQUEST_CONFLICT');
+    await refused(()=>extra(extraBody(),randomUUID(),snapshot),'REVISION_CONFLICT');
+    expect((await db.query('SELECT count(*)::int n FROM sourcing_extra_grants')).rows[0].n).toBe(1);
+  });
+  it('never permits a seated recruiter without an active sourcing slot to receive or use extras',async()=>{
+    await exhaustIncluded();await extra();
+    await db.query('UPDATE sourcing_seat_slots SET active=false,current_user_id=NULL WHERE organization_id=$1 AND current_user_id=$2',[org,actor]);
+    expect((await extraSnapshot()).state.eligible).toBe(false);
+    await refused(()=>extra(),'RECIPIENT_INELIGIBLE');
+    await refused(()=>quote(),'ALLOWANCE_EXHAUSTED');
+  });
+  it('revocation preserves reserved extra work, capture is once only, and the audit names the database role honestly',async()=>{
+    await exhaustIncluded();const g=await extra();const r=await boundAdmission();
+    await extra({action:'revoke',grantId:g.grantId,operatorLabel:'self-declared revoker',reason:'stop future grants'} as any);
+    const grant=await r.grant();const receipt=r.receipt(grant,'started');
+    await one('SELECT flow_sourcing_receipt($1,$2,$3) result',[org,r.admitted.id,receipt]);
+    await one('SELECT flow_sourcing_receipt($1,$2,$3) result',[org,r.admitted.id,receipt]);
+    expect((await db.query('SELECT reserved,captured,revoked_at IS NOT NULL revoked FROM sourcing_extra_balances WHERE grant_id=$1',[g.grantId])).rows[0]).toEqual({reserved:0,captured:1,revoked:true});
+    expect((await db.query("SELECT count(*)::int n FROM sourcing_extra_events WHERE kind='capture'")).rows[0].n).toBe(1);
+    expect((await db.query('SELECT database_user=session_user same,operator_label FROM sourcing_extra_grants WHERE id=$1',[g.grantId])).rows[0]).toEqual({same:true,operator_label:'self-declared test operator'});
+  });
+  it('does not allow extra credit to bypass disabled sourcing or cross-organisation scope',async()=>{
+    await extra();await exhaustIncluded();
+    expect(await one('SELECT flow_sourcing_quote($1,$2,$3) result',[org+1,95201,actor])).toBeNull();
+    await db.query('UPDATE sourcing_org_state SET enabled=false WHERE organization_id=$1',[org]);
+    await refused(()=>quote(),'SOURCING_DISABLED');
+  });
+  it('expired extra grants cannot fund new work',async()=>{
+    await exhaustIncluded();await extra({...extraBody(),validUntil:new Date(Date.now()+600).toISOString()});
+    expect((await quote()).funding.kind).toBe('extra');
+    await db.query('SELECT pg_sleep(0.65)');
+    await refused(()=>quote(),'ALLOWANCE_EXHAUSTED');
+  });
+  it('the database refuses perpetual grants even if a caller bypasses the CLI parser',async()=>{
+    await refused(()=>extra({...extraBody(),validUntil:'infinity'}),'sourcing_extra_grants_check');
+    expect((await db.query('SELECT count(*)::int n FROM sourcing_extra_grants')).rows[0].n).toBe(0);
+  });
+  it('extras cannot renew an expired entitlement or authorize another grant while access has expired',async()=>{
+    await exhaustIncluded();await extra();const id=randomUUID();
+    await db.query(`INSERT INTO sourcing_entitlements(id,organization_id,subscription_id,anchor,valid_from,valid_until,capacity,origin,evidence_sha256)
+      VALUES($1,$2,$2,'2026-01-31T00:00:00.123456Z','2026-02-01Z','2026-02-02Z',2,'explicit_grant',$3)`,[id,org,hash]);
+    await db.query('UPDATE sourcing_org_state SET entitlement_id=$2 WHERE organization_id=$1',[org,id]);
+    expect((await extraSnapshot()).state.eligible).toBe(false);
+    await refused(()=>extra(),'RECIPIENT_INELIGIBLE');await refused(()=>quote(),'ENTITLEMENT_REQUIRED');
+  });
+  it('capacity reduction blocks extras and re-seating the same person restores them without transferring credit',async()=>{
+    await exhaustIncluded();const g=await extra();
+    const q=await quote();
+    await db.query('UPDATE sourcing_org_state SET capacity=0 WHERE organization_id=$1',[org]);
+    await refused(()=>quote(),'ENTITLEMENT_REQUIRED');
+    await db.query('UPDATE sourcing_org_state SET capacity=2 WHERE organization_id=$1',[org]);
+    expect((await quote()).funding.grantId).toBe(g.grantId);
+    await db.query('UPDATE sourcing_seat_slots SET current_user_id=NULL WHERE organization_id=$1 AND current_user_id IN ($2,$3)',[org,actor,peer]);
+    await db.query('UPDATE sourcing_seat_slots SET current_user_id=$2 WHERE id=$1',[q.payerSlotId,peer]);
+    expect((await extraSnapshot(peer)).state.grants).toEqual([]);
+    await refused(()=>quote(),'ALLOWANCE_EXHAUSTED');
+    await db.query('UPDATE sourcing_seat_slots SET current_user_id=$2 WHERE id=$1',[q.payerSlotId,actor]);
+    expect((await quote()).funding.grantId).toBe(g.grantId);
+  });
+  it('no-dispatch cancellation releases only the reserved extra credit, without restoring included usage',async()=>{
+    await exhaustIncluded();const g=await extra();const f=await boundAdmission();
+    const proof={action:'no_dispatch',protocolVersion:1,flowRunId:f.admitted.id,artifactHash:f.artifact.queryHash,
+      discoverRequestId:f.grantCommand.discoverRequestId,executionAttemptId:f.grantCommand.executionAttemptId,cancellationId:randomUUID(),cancelledAt:new Date().toISOString()};
+    await one('SELECT flow_sourcing_cancel($1,$2,$3) result',[org,f.admitted.id,proof]);
+    await one('SELECT flow_sourcing_cancel($1,$2,$3) result',[org,f.admitted.id,proof]);
+    expect((await db.query('SELECT reserved,captured FROM sourcing_extra_balances WHERE grant_id=$1',[g.grantId])).rows[0]).toEqual({reserved:0,captured:0});
+    expect((await db.query('SELECT reserved,captured FROM sourcing_allowance_windows WHERE organization_id=$1',[org])).rows[0]).toEqual({reserved:0,captured:5});
+    expect((await db.query("SELECT count(*)::int n FROM sourcing_extra_events WHERE kind='release'")).rows[0].n).toBe(1);
+  });
+
   it('persists closed remote diagnostics in the existing bounded retry receipt',async()=>{
     const admitted=await admit(await quote());
     const dispatch=await one('SELECT flow_sourcing_dispatch_claim($1) result',[randomUUID()]);
@@ -161,7 +268,7 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
     await db.query('DELETE FROM sourcing_org_state WHERE organization_id=$1',[org]);
     expect(await one('SELECT flow_sourcing_decide($1,$2,$3,$4,$5,$6) result',[org,95201,actor,candidate,randomUUID(),{action:'pass',expectedRevision:0}])).toMatchObject({state:'passed'});
   });
-  for(const table of ['sourcing_entitlements','sourcing_seat_events','sourcing_query_artifacts','sourcing_account_events','sourcing_deliveries','sourcing_delivery_items','sourcing_decision_events']){
+  for(const table of ['sourcing_extra_grants','sourcing_extra_events','sourcing_admission_funding','sourcing_entitlements','sourcing_seat_events','sourcing_query_artifacts','sourcing_account_events','sourcing_deliveries','sourcing_delivery_items','sourcing_decision_events']){
     for(const operation of ['UPDATE','DELETE','TRUNCATE'])it(`refuses ${operation} of immutable ${table}`,async()=>{
       // Explicit FK closure lets the trigger run instead of passing on an FK
       // refusal. Never use CASCADE: every target is named from the owned schema.

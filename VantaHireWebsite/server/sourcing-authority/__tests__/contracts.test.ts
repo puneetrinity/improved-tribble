@@ -33,7 +33,7 @@ describe('governed sourcing closed contracts', () => {
     }
   });
   it('never accepts arbitrary payer, force or refresh on admission', () => {
-    const request = { requestId: id, expectedRevision: 0, briefVersionId: id, materialHash: hash,
+    const request = { expectedFunding:{kind:'included',slotId:id,windowStart:'2026-10-01T00:00:00.000Z',revision:'0'}, requestId: id, expectedRevision: 0, briefVersionId: id, materialHash: hash,
       artifactId: id, expectedPayerSlotId: id, expectedWindowStart: '2026-10-01T00:00:00.000Z', quoteToken:'signed-quote' };
     expect(sourcingAdmissionSchema.safeParse(request).success).toBe(true);
     for (const patch of [{ force: true }, { refresh: true }, { payerUserId: 7 }, { expectedRevision: -1 }]) {

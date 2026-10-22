@@ -1,9 +1,11 @@
 import {z} from 'zod';
 import {jobIntentRequest} from './job-brief';
+import {searchBudgetFields} from '../../../shared/sourcing-funding';
 
 export const admissionQuoteSchema=z.object({
+  ...searchBudgetFields,
   payerDisplayName:z.string().min(1).max(160),
-  payerUserId:z.number().int().positive(),payerSlotId:z.string().uuid(),remaining:z.number().int().min(1).max(5),
+  payerUserId:z.number().int().positive(),payerSlotId:z.string().uuid(),remaining:z.number().int().min(1).safe(),
   windowStart:z.string().datetime({offset:true}),windowEnd:z.string().datetime({offset:true}),revision:z.number().int().nonnegative(),
   briefVersionId:z.string().uuid(),materialHash:z.string().regex(/^[a-f0-9]{64}$/),artifactId:z.string().uuid(),
   quotedAt:z.string().datetime({offset:true}),expiresAt:z.string().datetime({offset:true}),quoteToken:z.string().min(1).max(8192),
@@ -26,6 +28,10 @@ export async function readSourcing<T>(jobId:number,part:'admission'|'preview',si
   if(!response.ok)throw Error(sourcingErrorMessage(value.code));
   return (part==='admission'?admissionQuoteSchema.parse(value):value) as T;
 }
+export function requiresSourcingReconfirmation(code:unknown):boolean {
+  return typeof code==='string'&&['SOURCING_PAYER_CHANGED','SOURCING_FUNDING_CHANGED','SOURCING_WINDOW_CHANGED',
+    'SOURCING_QUERY_STALE','SOURCING_REVISION_CONFLICT','SOURCING_QUOTE_INVALID','SOURCING_QUOTE_EXPIRED'].includes(code);
+}
 export function sourcingErrorMessage(code:unknown):string {
   switch(code) {
     case 'BRIEF_UPDATED_APPROVAL_REQUIRED':
@@ -35,6 +41,8 @@ export function sourcingErrorMessage(code:unknown):string {
     case 'SOURCING_ALLOWANCE_EXHAUSTED':return 'Neither the job poster nor you has a sourcing run available this month.';
     case 'SOURCING_ALREADY_ADMITTED':return 'This job already has its one sourcing run. Refresh to see its progress.';
     case 'SOURCING_PAYER_CHANGED':
+    case 'SOURCING_FUNDING_CHANGED':
+    case 'SOURCING_QUOTE_INVALID':
     case 'SOURCING_WINDOW_CHANGED':
     case 'SOURCING_QUERY_STALE':
     case 'SOURCING_REVISION_CONFLICT':
@@ -42,13 +50,13 @@ export function sourcingErrorMessage(code:unknown):string {
     case 'SOURCING_DIGEST_REQUIRED':
     case 'SOURCING_PREPARING':
     case 'SOURCING_ARTIFACT_REQUIRED':return 'Your search is still being prepared. Please check again shortly.';
-    case 'SOURCING_ENTITLEMENT_REQUIRED':return 'Sourcing allowance is not configured. Contact your workspace administrator.';
+    case 'SOURCING_ENTITLEMENT_REQUIRED':return 'Your organisation’s search access is inactive or has expired. Ask your administrator to renew it. Extra searches do not extend access.';
     default:return 'Searching isn’t available right now. Check that the hiring criteria are approved, the job is published and you have searches left. We couldn’t confirm the search status. Please check again.';
   }
 }
 export function admissionCommand(quote:AdmissionQuote) {
   const q=admissionQuoteSchema.parse(quote);
-  return {expectedRevision:q.revision,briefVersionId:q.briefVersionId,materialHash:q.materialHash,
+  return {expectedFunding:q.funding,expectedRevision:q.revision,briefVersionId:q.briefVersionId,materialHash:q.materialHash,
     artifactId:q.artifactId,expectedPayerSlotId:q.payerSlotId,expectedWindowStart:q.windowStart,quoteToken:q.quoteToken};
 }
 export function startGovernedSourcing(actorId:number,jobId:number,quote:AdmissionQuote) {

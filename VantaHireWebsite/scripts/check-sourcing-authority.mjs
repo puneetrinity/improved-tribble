@@ -15,6 +15,12 @@ export const frozenSourcingFiles={
   'server/candidate-index/search.ts':'eab5ded0878a5ea9125cc3d732b987c3b05576ffc774410a4f304cb4b6b55146',
 };
 export const sourcingAuthorityTokens={
+  'server/schema-migrations/0023_recruiter_extra_searches.sql':[
+    'EXTRA_SEARCH_BASELINE_DRIFT','EXTRA_SEARCH_PATCH_DRIFT','FORCE ROW LEVEL SECURITY',
+    'SOURCING_EXTRA_OWNER_REQUIRED','SOURCING_EXTRA_RECIPIENT_INELIGIBLE','SOURCING_FUNDING_CHANGED',
+    'flow_sourcing_funding_reserve','flow_sourcing_funding_finish',
+    'DEFERRABLE INITIALLY DEFERRED','sourcing_extra_revoke_once',
+  ],
   'server/sourcing-authority/candidate-origin.ts':['candidateEligibilityIdentity.parse','readPrivateDecisions','SOURCING_PRIVATE_CHANGED'],
   'server/lib/contactResolutionProcessor.ts':['canResolveSourcedContact','flow_sourcing_contact_allowed'],
   'server/lib/outreachDelivery.ts':['canContactSourcedCandidate','Applicant is not eligible for cold outreach'],
@@ -58,6 +64,8 @@ export function checkSourcingAuthority(read=path=>readFileSync(resolve(root,path
   if(!JSON.stringify(lock).includes(hash(sql)))throw Error('sourcing_migration_hash');
   if(lock.migrations?.['0016']!==hash(read('server/schema-migrations/0016_rubric_ranking.sql')))
     throw Error('ranking_migration_hash');
+  if(lock.migrations?.['0023']!==hash(read('server/schema-migrations/0023_recruiter_extra_searches.sql')))
+    throw Error('extra_search_migration_hash');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   const pg=process.argv.includes('--pg'),tests=process.argv.includes('--test'),client=process.argv.includes('--client'),processProof=process.argv.includes('--process');

@@ -796,7 +796,7 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "b10a37947be0eb1a90c07d0ffe634f06220b2086d121264f3838242f37b8d90c"
+      "sha256": "7ec4d5cbb21f2c94cc27c5d38d4871b956a1e5d0d3b63fd8df4647e9e947b132"
     },
     {
       "file": "package.json",
@@ -856,7 +856,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "f15527dc4083efcc084665935db9b11949bc5d214eee736c0f21ea6b3e94620a"
+      "sha256": "117c60c457074e23cd91edead910c149567d2b5a1d158b6efda1a2a50852da56"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -1016,15 +1016,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "4e1e12f08380e2b4d74d6f95f23a0d63cf1bb76e457e82bf1c05c100581c00b1"
+      "sha256": "bec3aeeb1915d96763d823ceb9897d03e5fbd55d667b951c9c74fe36b8155089"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "363ecd0c128963593341e7fb0077ec82ce5270e6519bf9d2a0bf7802acb8c2d9"
+      "sha256": "b307088d20d71f6a9cee044362ad590b563a4f29cbaa2b9c5a7bc83dd51f50da"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "8c9e3bc3daa82ad75bc487ec45905546279cdc7ecc6f30381206578fa4eacc95"
+      "sha256": "a06bd460e75e1094d08439afea60ca1f256a763f6152d0907596d530377143be"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",

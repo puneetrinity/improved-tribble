@@ -7,11 +7,13 @@ import { requireCandidatePrivacyAllowed } from '../candidate-privacy/decision';
 import { hashSchema, idSchema, revisionSchema, sourcingAdmissionSchema, sourcingDecisionSchema, sourcingPreviewRequestSchema, sourcingGrantRequestSchema,sourcingReceiptSchema,sourcingNoDispatchSchema } from './contracts';
 import {validateProviderGrant,type SourcingQueryArtifact,type ExactAcquisitionEvidence} from './compiler';
 import { SourcingError, SourcingRepository } from './repository';
+import {searchBudgetFields} from '../../shared/sourcing-funding';
 
 const scopeKeys = (s: BriefScope) => [s.organizationId, s.jobId, s.actorId];
 const quoteSchema = z.object({
+  ...searchBudgetFields,
   payerDisplayName:z.string().min(1).max(160),
-  payerUserId: z.number().int().positive(), payerSlotId: idSchema, remaining: z.number().int().min(1).max(5),
+  payerUserId: z.number().int().positive(), payerSlotId: idSchema, remaining: z.number().int().min(1).safe(),
   windowStart: z.string().datetime({offset:true}), windowEnd: z.string().datetime({offset:true}), revision: revisionSchema,
   briefVersionId: idSchema, materialHash: hashSchema, artifactId: idSchema,
   quotedAt: z.string().datetime({offset:true}), expiresAt: z.string().datetime({offset:true}),
@@ -20,7 +22,7 @@ type Quote = z.infer<typeof quoteSchema>;
 const signedQuoteSchema = z.object({
   organizationId:z.number().int().positive(),jobId:z.number().int().positive(),actorId:z.number().int().positive(),quote:quoteSchema,
 }).strict();
-const quoteDomain = 'ealana:sourcing-quote:v1:';
+const quoteDomain = 'ealana:sourcing-quote:v2:';
 function quoteKey(): KeyObject {
   const configured = process.env.VANTAHIRE_JWT_PRIVATE_KEY;
   if (!configured) throw new SourcingError('SOURCING_QUOTE_UNAVAILABLE',503);
@@ -65,7 +67,7 @@ export async function admitSourcing(repository:SourcingRepository,scope:BriefSco
   const quote=openQuote(quoteToken,scope);
   if(command.expectedRevision!==quote.revision || command.briefVersionId!==quote.briefVersionId ||
     command.materialHash!==quote.materialHash || command.artifactId!==quote.artifactId || command.expectedPayerSlotId!==quote.payerSlotId ||
-    command.expectedWindowStart!==quote.windowStart) throw new SourcingError('SOURCING_QUOTE_INVALID',409);
+    command.expectedWindowStart!==quote.windowStart || canonicalJson(command.expectedFunding)!==canonicalJson(quote.funding)) throw new SourcingError('SOURCING_QUOTE_INVALID',409);
   const result=await repository.call('admit',[...scopeKeys(scope),requestId,{...command,quoteExpiresAt:quote.expiresAt}]);
   if(!result) throw new SourcingError('SOURCING_NOT_FOUND',404);
   return result;
