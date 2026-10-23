@@ -31,7 +31,7 @@ import {
 } from "@/hooks/use-sourcing";
 import { SourcingProgressModal } from "@/components/sourcing/SourcingProgressModal";
 import { pickSourcingNotice, useSourcingStatusToast } from "@/components/sourcing/sourcing-status-toast";
-import { poolCardCopy } from "@/lib/sourcing-pool-copy";
+import { poolCardCopy, poolPreparationMessage } from "@/lib/sourcing-pool-copy";
 import { allowsPublicContact, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import { CandidateCard } from "@/components/sourcing/CandidateCard";
 import { CandidateDrawer } from "@/components/sourcing/CandidateDrawer";
@@ -50,6 +50,7 @@ import {
   type SourcingFilterState,
 } from "@/components/sourcing/SourcingFilters";
 import { SourcingListSkeleton } from "@/components/skeletons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { splitByTier, type TierModel } from "@/lib/sourcing-tiering";
 import { jobSourcingPageCopy } from "@/lib/internal-copy";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -560,12 +561,7 @@ export default function JobSourcingPage() {
         const copy=poolCardCopy(p);const counted=copy.counted;
         const labelFor=(id:string)=>brief.data?.latest?.payload.criteria.find(c=>c.id===id)?.label??null;
         const unsupported=(p?.criterionIds??[]).map(labelFor).filter((v):v is string=>!!v);
-        const prep=!p?.artifactId?(preview.isError?"We couldn't confirm the search status. Please check again.":
-          p?.preparationCode==='QUERY_MAPPING_UNSUPPORTED'?`Some requirements can't be used to search yet${unsupported.length?`: ${unsupported.join(', ')}`:''}. Edit them to continue.`:
-          p?.preparationCode==='SOURCING_DIGEST_UNAUTHORIZED'?"We couldn't prepare this search. Please contact support.":
-          p?.preparationCode==='SOURCING_DIGEST_RATE_LIMITED'?'Preparing searches is busy right now. Try again in a few minutes.':
-          p?.preparation==='failed'?"We couldn't prepare this search.":p?.preparation==='unknown'?"This search's preparation needs a check by our team before you continue.":
-          p?.preparation==='reserved'||p?.preparation==='started'?'Getting your search ready. Find candidates turns on as soon as it is ready.':'Approve the hiring criteria to get this search ready.'):null;
+        const prep=poolPreparationMessage({preview:p,previewError:preview.isError,briefLoaded:brief.data!==undefined,briefError:brief.data===undefined&&brief.isError,briefApproved:!!brief.data?.approvedVersionId,unsupported});
         return <section aria-labelledby="pool-card-title" aria-live="polite" data-pool-card="" className="mx-auto w-full max-w-[1500px] px-4 pt-4">
           <div className={`${INTERNAL_HERO} p-4 sm:p-5`}>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -807,7 +803,7 @@ export default function JobSourcingPage() {
                   <p className="text-xs text-muted-foreground">
                     {rubricRanked?"Candidates available":allBroader ? "Wider Search Results" : "Total"}
                   </p>
-                  <p className="text-base font-semibold">{counts.total}</p>
+                  {candidatesLoading?<Skeleton className="mt-1 h-6 w-10" aria-label="Loading" />:<p className="text-base font-semibold">{counts.total}</p>}
                 </CardContent>
               </Card>
               {grouped.tierModel !== "fallback" && !allBroader && (
@@ -815,13 +811,13 @@ export default function JobSourcingPage() {
                   <Card>
                     <CardContent className="p-4">
                       <p className="text-xs text-muted-foreground">{rubricRanked?"Within your experience range":"Top Matches"}</p>
-                      <p className="text-base font-semibold">{bestMatches.length}</p>
+                      {candidatesLoading?<Skeleton className="mt-1 h-6 w-10" aria-label="Loading" />:<p className="text-base font-semibold">{bestMatches.length}</p>}
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-4">
                       <p className="text-xs text-muted-foreground">{rubricRanked?"Up to 2 years outside your range":"Wider Search"}</p>
-                      <p className="text-base font-semibold">{broaderPool.length}</p>
+                      {candidatesLoading?<Skeleton className="mt-1 h-6 w-10" aria-label="Loading" />:<p className="text-base font-semibold">{broaderPool.length}</p>}
                     </CardContent>
                   </Card>
                 </>

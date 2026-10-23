@@ -144,3 +144,33 @@ describe('Main sourcing progress: completion and pool card wording',()=>{
   expect(c.note).toContain('more than a day old');
  });
 });
+
+import {poolPreparationMessage} from '../../client/src/lib/sourcing-pool-copy';
+describe('Talent pool readiness line while data loads',()=>{
+ const base={previewError:false,briefLoaded:true,briefError:false,briefApproved:true,unsupported:[] as string[]};
+ const ready={artifactId:'a',id:'i',state:'complete',count:1,countRelation:'eq',observedAt:null,stale:false,preparation:'ready'} as any;
+ const unprepared={...ready,artifactId:null,preparation:null};
+ it('does not ask for approval before the search status has loaded',()=>{
+  const m=poolPreparationMessage({...base,preview:undefined});
+  expect(m).toBe('Checking your search status…');expect(m).not.toMatch(/Approve/);
+ });
+ it('does not ask for approval before the criteria have loaded',()=>{
+  expect(poolPreparationMessage({...base,preview:unprepared,briefLoaded:false,briefApproved:false})).toBe('Checking your search status…');
+ });
+ it('does not ask for approval when the criteria failed to load',()=>{
+  const m=poolPreparationMessage({...base,preview:unprepared,briefLoaded:false,briefError:true,briefApproved:false});
+  expect(m).toBe("We couldn't load the hiring criteria. Please refresh the page.");expect(m).not.toMatch(/Approve/);
+ });
+ it('says nothing once the search is ready',()=>{
+  expect(poolPreparationMessage({...base,preview:ready})).toBeNull();
+ });
+ it('asks for approval only when the loaded criteria are not approved',()=>{
+  expect(poolPreparationMessage({...base,preview:unprepared,briefApproved:false})).toBe('Approve the hiring criteria to get this search ready.');
+  expect(poolPreparationMessage({...base,preview:unprepared,briefApproved:true})).toBe("Your search isn't ready yet.");
+ });
+ it('keeps the existing failure and in-progress wording',()=>{
+  expect(poolPreparationMessage({...base,preview:undefined,previewError:true})).toBe("We couldn't confirm the search status. Please check again.");
+  expect(poolPreparationMessage({...base,preview:{...unprepared,preparation:'started'}})).toMatch(/^Getting your search ready/);
+  expect(poolPreparationMessage({...base,preview:{...unprepared,preparationCode:'QUERY_MAPPING_UNSUPPORTED'},unsupported:['Rust']})).toBe("Some requirements can't be used to search yet: Rust. Edit them to continue.");
+ });
+});
