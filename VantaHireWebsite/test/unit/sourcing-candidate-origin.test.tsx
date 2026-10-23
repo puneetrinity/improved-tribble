@@ -103,6 +103,17 @@ describe('past-applicant card and detail panel',()=>{
   const open=[...host.querySelectorAll('a')].find(a=>a.textContent?.includes('Open application'));
   expect(open?.getAttribute('href')).toBe('/jobs/7/applications?applicationId=41');
  });
+ const entryLevel={...base,crustdata:{basic_profile:{name:'Test Person',headline:'Backend Engineer'},experience:{employment_details:{
+  current:[{title:'Staff Engineer',name:'Acme',seniority_level:'Entry Level',years_at_company_raw:7}],
+  past:[{title:'Engineer',name:'Beta',seniority_level:'Entry Level',years_at_company_raw:5}]}}}};
+ it('card: shows our experience, never the provider seniority label',async()=>{
+  await card(entryLevel);
+  expect(host.textContent).toContain('12 yrs exp');expect(host.textContent).not.toContain('Entry Level');
+ });
+ it('detail panel: shows experience years, never provider seniority (summary or per job)',async()=>{
+  await drawer(entryLevel);
+  expect(host.textContent).toContain('12 Yrs Exp');expect(host.textContent).not.toContain('Entry Level');
+ });
  it('detail panel: malformed origin withholds contact',async()=>{
   await drawer(malformed);
   expect(host.textContent).toContain('Contact details aren’t available for this result.');

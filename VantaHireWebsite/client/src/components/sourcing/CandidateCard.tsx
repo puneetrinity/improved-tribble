@@ -153,7 +153,8 @@ export function CandidateCard({
   const currentTitle = candidate.crustdata?.basic_profile?.current_title
     || currentRole?.title || null;
   const company = currentRole?.name || pastRole?.name || null;
-  const seniority = currentRole?.seniority_level || pastRole?.seniority_level || null;
+  // Provider per-role seniority (e.g. "Entry Level") is not shown: it often contradicts real experience.
+  // Our own experience figure below is shown instead.
 
   // Total experience, deduped by company (see computeTotalExperienceYears —
   // Crustdata repeats full company tenure per title, so a naive sum inflates it).
@@ -286,16 +287,13 @@ export function CandidateCard({
             </div>
           )}
 
-          {/* Row 3: seniority · exp · location */}
+          {/* Row 3: experience · location */}
           <div className="flex items-center gap-x-3 gap-y-1 text-sm text-muted-foreground flex-wrap">
-            {seniority && (
+            {expYearsDisplay && (
               <span className="inline-flex items-center gap-1 bg-primary/5 text-primary/80 border border-primary/10 rounded-full px-2.5 py-0.5 text-xs font-medium">
                 <Briefcase className="h-3 w-3" />
-                {seniority}
+                {expYearsDisplay} exp
               </span>
-            )}
-            {expYearsDisplay && (
-              <span className="text-muted-foreground">{expYearsDisplay} exp</span>
             )}
             {locationDisplay && (
               <span className="flex items-center gap-1 shrink-0">
