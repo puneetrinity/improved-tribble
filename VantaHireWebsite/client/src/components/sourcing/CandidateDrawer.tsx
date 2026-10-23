@@ -225,7 +225,7 @@ export function CandidateDrawer({
   // Crustdata schema: company is .name not .company_name
   const currentTitle = c.crustdata?.basic_profile?.current_title || currentRole?.title || null;
   const company = currentRole?.name || pastRole?.name || null;
-  const seniority = currentRole?.seniority_level || pastRole?.seniority_level || null;
+  // Provider per-role seniority is not shown (it often contradicts real experience); experience years are.
 
   const pictureUrl = c.crustdata?.professional_network?.profile_picture_permalink || c.crustdata?.basic_profile?.profile_picture_permalink || null;
 
@@ -328,14 +328,8 @@ export function CandidateDrawer({
               </div>
 
               {/* Premium Enrichlayer Stats Row */}
-              {(seniority || followerCount !== null || connections !== null || experienceYears !== null || c.ranking || industry !== null) && (
+              {(followerCount !== null || connections !== null || experienceYears !== null || c.ranking || industry !== null) && (
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pt-2 text-xs text-muted-foreground border-t border-muted/50 mt-2">
-                  {seniority && (
-                    <span className="flex items-center gap-1 font-medium text-foreground/90 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
-                      <Briefcase className="h-3.5 w-3.5 text-primary/80" />
-                      {seniority}
-                    </span>
-                  )}
                   {(experienceYears !== null||c.ranking) && (
                     <span className="flex items-center gap-1 font-medium text-foreground/90 bg-primary/5 px-2 py-0.5 rounded-full border border-primary/10">
                       <Briefcase className="h-3.5 w-3.5 text-primary/80" />
@@ -557,9 +551,6 @@ export function CandidateDrawer({
                         <div className="space-y-1">
                           <h5 className="font-bold text-sm leading-snug text-foreground flex flex-wrap items-center gap-2">
                             {exp.title}
-                            {exp.seniority_level && (
-                              <Badge variant="outline" className="text-[9px] h-4 px-1.5 py-0 uppercase tracking-wider">{exp.seniority_level}</Badge>
-                            )}
                             {exp.function_category && (
                               <Badge variant="outline" className="text-[9px] h-4 px-1.5 py-0 uppercase tracking-wider bg-blue-50 text-blue-700 border-blue-200">{exp.function_category}</Badge>
                             )}
