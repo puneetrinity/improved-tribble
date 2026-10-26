@@ -18,6 +18,7 @@
 import {rankedCandidateSchema,type RankedCandidate} from '../../sourcing-authority/ranking-contract';
 import { z } from 'zod';
 import {readSourcingCandidateOrigin,type SourcingCandidateOrigin} from '../../../shared/sourcing-candidate-origin';
+import {readResumeLocation,type ResumeLocation} from '../../../shared/resume-location';
 
 export {signalRcProgressSchema,type SignalRcProgress} from '../../../shared/rc-skills-progress';
 export type SignalSourceType = 'pool_enriched' | 'pool' | 'discovered';
@@ -317,6 +318,8 @@ export interface SignalMatchStrengthBands {
 /** Flattened candidate shape for UI consumption. */
 export interface SourcedCandidateForUI {
   candidateOrigin?:SourcingCandidateOrigin|null;
+  /** Previous applicants only: résumé city/country, null when unknown. Never set for public profiles. */
+  resumeLocation?:ResumeLocation|null;
   ranking?:RankedCandidate;
   id: number;
   jobId: number;
@@ -624,9 +627,13 @@ export function flattenCandidateForUI(row: {
   const cs = redactContactEvidence(rawCandidateSummary) as Record<string, unknown>;
   // Immutable resume provenance is service authority, not a browser DTO.
   delete cs.privateResumeIdentity;
+  // Only a previous applicant's own résumé location is shown, and only after validation.
+  const resumeLocation=origin.kind==='organization_candidate'?readResumeLocation(rawCandidateSummary.resumeLocation):undefined;
+  delete cs.resumeLocation;
   if (cs.candidate && typeof cs.candidate === 'object') {
     cs.candidate = {...cs.candidate as Record<string, unknown>};
     delete (cs.candidate as Record<string, unknown>).candidateOrigin;
+    delete (cs.candidate as Record<string, unknown>).resumeLocation;
   }
   if(!publicProfile) {
     for(const key of ['linkedinUrl','identities','identitySummary','searchMeta','snapshot'])delete cs[key];
@@ -660,6 +667,7 @@ export function flattenCandidateForUI(row: {
   return {
     ...(ranking?{ranking}:{}),
     ...(rawCandidateSummary.candidateOrigin!==undefined?{candidateOrigin:origin.kind==='invalid'?null:origin}:{}),
+    ...(resumeLocation!==undefined?{resumeLocation}:{}),
     id: row.id,
     jobId: row.jobId,
     signalCandidateId: row.signalCandidateId,

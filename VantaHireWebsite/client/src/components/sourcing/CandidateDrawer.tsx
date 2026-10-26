@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { allowsPublicContact, applicationHref, candidateDisplayName, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
+import { candidateSourceGroup, SOURCE_GROUP_LABEL } from "@/lib/sourcing-source-label";
+import { resumeLocationText } from "@shared/resume-location";
 import {
   Sheet,
   SheetContent,
@@ -216,8 +218,11 @@ export function CandidateDrawer({
 
   const headline = c.crustdata?.basic_profile?.headline || null;
   const summary = c.crustdata?.basic_profile?.summary || null;
-  const location = c.crustdata?.basic_profile?.location?.full_location
-    || c.crustdata?.basic_profile?.location?.raw || null;
+  const isApplicant = origin.kind === "organization_candidate";
+  // A previous applicant's location comes only from their own résumé; unknown stays unknown.
+  const location = isApplicant ? resumeLocationText(c.resumeLocation) : (c.crustdata?.basic_profile?.location?.full_location
+    || c.crustdata?.basic_profile?.location?.raw || null);
+  const sourceGroup = candidateSourceGroup(c);
 
   const currentRole = c.crustdata?.experience?.employment_details?.current?.[0];
   const pastRole = c.crustdata?.experience?.employment_details?.past?.[0];
@@ -294,6 +299,12 @@ export function CandidateDrawer({
                 )}
                 {origin.kind === "invalid" && (
                   <Badge variant="outline" data-origin-badge="" className="text-xs">Applicant details unavailable</Badge>
+                )}
+                {(sourceGroup === "from_memory" || sourceGroup === "new") && (
+                  <Badge variant="outline" data-source-badge={sourceGroup} className={cn("text-xs",
+                    sourceGroup === "new" ? "bg-sky-50 text-sky-800 border-sky-200" : "bg-slate-50 text-slate-700 border-slate-200")}>
+                    {SOURCE_GROUP_LABEL[sourceGroup]}
+                  </Badge>
                 )}
                 {appHref && (
                   <Button asChild size="sm" variant="outline" className="min-h-11">
@@ -682,12 +693,13 @@ export function CandidateDrawer({
           )}
 
           {/* Location Details */}
-          {location && (
+          {(location || isApplicant) && (
             <Section title="Location" icon={MapPin}>
-              <div className="p-4 rounded-lg border bg-card flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <div className="p-4 rounded-lg border bg-card flex items-start gap-3" data-location-source={isApplicant ? (location ? "resume" : "unknown") : "profile"}>
+                <MapPin className="h-5 w-5 text-muted-foreground mt-0.5" aria-hidden="true" />
                 <div className="space-y-1">
-                  <p className="text-sm font-semibold">{location}</p>
+                  <p className="text-sm font-semibold">{location ?? "Location unknown"}</p>
+                  {isApplicant && <p className="text-xs text-muted-foreground">{location ? "From their résumé" : "Their résumé doesn’t give a location"}</p>}
                   {locConf.label && (
                     <p className={cn("text-xs flex items-center gap-1.5", locConf.color)}>
                       <span className={cn("h-2 w-2 rounded-full", locConf.dotColor)} />

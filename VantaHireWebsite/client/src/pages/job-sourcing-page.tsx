@@ -34,6 +34,7 @@ import { pickSourcingNotice, useSourcingStatusToast } from "@/components/sourcin
 import { poolCardCopy, poolPreparationMessage } from "@/lib/sourcing-pool-copy";
 import { allowsPublicContact, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import { CandidateCard } from "@/components/sourcing/CandidateCard";
+import { countSourceGroups } from "@/lib/sourcing-source-label";
 import { CandidateDrawer } from "@/components/sourcing/CandidateDrawer";
 import {
   Pagination,
@@ -257,6 +258,7 @@ export default function JobSourcingPage() {
   const prevCandidateCountRef = useRef<number>(-1);
 
   const allCandidates = candidatesData?.candidates ?? [];
+  const sourceCounts = useMemo(() => countSourceGroups(allCandidates), [allCandidates]);
   const rubricRanked=candidatesData?.rankingProtocol===2||allCandidates.some(c=>c.ranking);
   const counts = candidatesData?.counts ?? { total: 0, talentPool: 0, newlyDiscovered: 0 };
   const shortlistedCandidates = allCandidates.filter((candidate) => candidate.state === "shortlisted");
@@ -824,6 +826,11 @@ export default function JobSourcingPage() {
               )}
             </div>
 
+            {!candidatesLoading&&sourceCounts.total>0&&(
+              <p className="text-sm text-muted-foreground mb-4" data-source-summary="">
+                {sourceCounts.total} {sourceCounts.total===1?"candidate":"candidates"} · {sourceCounts.previous_applicant} your previous {sourceCounts.previous_applicant===1?"applicant":"applicants"} · {sourceCounts.from_memory} from memory · {sourceCounts.new} new
+              </p>
+            )}
             {rubricRanked&&allCandidates.length<100&&<p className="text-sm text-muted-foreground mb-4">{allCandidates.length} candidates ranked against your approved requirements and privacy rules. We don’t add weaker matches or run another paid search to reach 100.</p>}
             {!rubricRanked&&(qualityDebug || kpis) && (
               <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40 p-3 mb-4">

@@ -14,6 +14,8 @@ export type LocationMatchType = "city_exact" | "city_alias" | "country_only" | "
 export interface SourcedCandidateForUI {
   /** Proposed, versioned origin; read only through readCandidateOrigin (fails closed). */
   candidateOrigin?: unknown;
+  /** Previous applicants only: résumé city/country, null when unknown. */
+  resumeLocation?: { city: string | null; country: string | null } | null;
   ranking?:import('../../../server/sourcing-authority/ranking-contract').RankedCandidate;
   id: number;
   jobId: number;
