@@ -50,6 +50,58 @@ describe('RC bounded progress UI',()=>{
  it('gives the close control a 44px minimum target',async()=>{
   await render();expect(host.querySelector('button')!.className).toMatch(/min-h-\[44px\]/);
  });
+ it('keeps one progress view: the skills check is a step after search and scoring, not a second loader',async()=>{
+  await render();
+  expect(host.querySelectorAll('[data-sourcing-progress-modal]')).toHaveLength(1);
+  const steps=[...host.querySelectorAll('li[data-stage]')].map(li=>[li.getAttribute('data-stage'),li.getAttribute('data-state')]);
+  expect(steps).toEqual([['discovery','done'],['ranking','done'],['skills','active'],['finalizing','todo']]);
+  expect(host.querySelectorAll('[role="progressbar"]')).toHaveLength(1);
+  expect(host.textContent).toContain('Checking candidate skills');
+  await render({...progress,state:'complete'});
+  const done=[...host.querySelectorAll('li[data-stage]')].map(li=>li.getAttribute('data-state'));
+  expect(done).toEqual(['done','done','done','active']);
+ });
+ const stepStates=()=>Object.fromEntries([...host.querySelectorAll('li[data-stage]')].map(li=>[li.getAttribute('data-stage'),li.getAttribute('data-state')]));
+ it('never shows search or scoring as finished for a queue that has not started',async()=>{
+  await render({...progress,state:'queued',safeReason:'worker_queue',workStarted:false,processed:0,total:0});
+  expect(stepStates()).toEqual({discovery:'todo',ranking:'todo',skills:'todo',finalizing:'todo'});
+  expect(host.querySelectorAll('li[data-state="done"]')).toHaveLength(0);
+ });
+ it('never shows search or scoring as finished when the status is unavailable',async()=>{
+  await render(progress,true);
+  expect(stepStates()).toEqual({discovery:'todo',ranking:'todo',skills:'todo',finalizing:'todo'});
+  expect(host.querySelectorAll('li[data-state="done"]')).toHaveLength(0);
+ });
+ it('keeps the live pipeline phase when the status is unavailable mid-run',async()=>{
+  await act(async()=>root.render(<SourcingProgressModal open
+   progress={{...INITIAL_PROGRESS,phase:'ranking',rcStatusUnavailable:true}} onClose={onClose}/>));
+  expect(stepStates()).toEqual({discovery:'done',ranking:'active',skills:'todo',finalizing:'todo'});
+ });
+ it('treats a queue whose work already started as past search and scoring',async()=>{
+  await render({...progress,state:'queued',safeReason:'quota_window',workStarted:true,processed:2,total:5});
+  expect(stepStates()).toEqual({discovery:'done',ranking:'done',skills:'active',finalizing:'todo'});
+ });
+ it.each(['stalled','closed_unrecoverable'] as const)(
+  'never shows search or scoring as finished for a %s check that checked nobody',async state=>{
+   await render({...progress,state,processed:0,total:0});
+   expect(stepStates()).toEqual({discovery:'todo',ranking:'todo',skills:'todo',finalizing:'todo'});
+   expect(host.querySelectorAll('li[data-state="done"]')).toHaveLength(0);
+   await render({...progress,state,processed:0,total:5});
+   expect(host.querySelectorAll('li[data-state="done"]')).toHaveLength(0);
+  });
+ it('keeps the live pipeline phase for a stalled check that checked nobody',async()=>{
+  await act(async()=>root.render(<SourcingProgressModal open
+   progress={{...INITIAL_PROGRESS,phase:'ranking',rcProgress:{...progress,state:'stalled',processed:0,total:0}}} onClose={onClose}/>));
+  expect(stepStates()).toEqual({discovery:'done',ranking:'active',skills:'todo',finalizing:'todo'});
+ });
+ it('treats a stalled check that already checked profiles as past search and scoring',async()=>{
+  await render({...progress,state:'stalled',processed:3,total:5});
+  expect(stepStates()).toEqual({discovery:'done',ranking:'done',skills:'active',finalizing:'todo'});
+ });
+ it('marks only the skills step failed when a failed check had already checked profiles',async()=>{
+  await render({...progress,state:'closed_unrecoverable',processed:3,total:5});
+  expect(stepStates()).toEqual({discovery:'done',ranking:'done',skills:'failed',finalizing:'todo'});
+ });
  it('makes unavailable status explicit without restarting or promising success',async()=>{
   await render(progress,true);expect(host.textContent).toContain('Status temporarily unavailable');
   expect(host.textContent).toContain('still saved');expect(onRunAgain).not.toHaveBeenCalled();

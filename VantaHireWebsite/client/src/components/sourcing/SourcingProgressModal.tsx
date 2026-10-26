@@ -19,13 +19,13 @@ import {rcProgressPresentation,type RcProgressTone,type SignalRcProgress} from '
 
 // RC skills-check tones. Text colours keep >=4.5:1 on their badge backgrounds; the label
 // repeats the state in words so colour is never the only signal.
-const RC_TONE: Record<RcProgressTone, { label: string; badge: string; bar: string }> = {
-  waiting: { label: "Waiting", badge: "border-[#E3E6F0] bg-[#F1F4FA] text-[#334155]", bar: "bg-[#94A3B8]" },
-  active: { label: "In progress", badge: "border-[#CFE0FB] bg-[#EAF2FE] text-[#1D4ED8]", bar: "bg-[#4B8EF0]" },
-  done: { label: "Done", badge: "border-[#C8EEDA] bg-[#E7F6EE] text-[#166534]", bar: "bg-[#1FA463]" },
-  attention: { label: "Needs attention", badge: "border-amber-200 bg-amber-50 text-amber-800", bar: "bg-amber-500" },
-  failed: { label: "Stopped", badge: "border-red-200 bg-red-50 text-red-700", bar: "bg-[#DC2626]" },
-  unknown: { label: "Status unknown", badge: "border-[#E3E6F0] bg-[#F1F4FA] text-[#334155]", bar: "bg-[#94A3B8]" },
+const RC_TONE: Record<RcProgressTone, { label: string; badge: string; ring: string }> = {
+  waiting: { label: "Waiting", badge: "border-[#E3E6F0] bg-[#F1F4FA] text-[#334155]", ring: "#94A3B8" },
+  active: { label: "In progress", badge: "border-[#CFE0FB] bg-[#EAF2FE] text-[#1D4ED8]", ring: "#4B8EF0" },
+  done: { label: "Done", badge: "border-[#C8EEDA] bg-[#E7F6EE] text-[#166534]", ring: "#1FA463" },
+  attention: { label: "Needs attention", badge: "border-amber-200 bg-amber-50 text-amber-800", ring: "#F59E0B" },
+  failed: { label: "Stopped", badge: "border-red-200 bg-red-50 text-red-700", ring: "#DC2626" },
+  unknown: { label: "Status unknown", badge: "border-[#E3E6F0] bg-[#F1F4FA] text-[#334155]", ring: "#94A3B8" },
 };
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -102,6 +102,11 @@ const STAGES: Stage[] = [
   { phase: "finalizing", label: "Preparing your results", tip: "Saving your ranked results.", icon: ListChecks },
 ];
 
+// The skills check runs after fit scoring. It is shown as one more step in the same
+// progress view (never a second loader), and only once its progress actually exists.
+const SKILLS_STAGE_KEY = "skills";
+const SKILLS_STAGE_LABEL = "Checking candidate skills";
+
 const ORDER: PipelinePhase[] = ["idle", "discovery", "ranking", "enriching", "finalizing", "complete"];
 
 function stageState(stage: Stage, current: PipelinePhase): "done" | "active" | "todo" | "failed" {
@@ -154,7 +159,16 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
 
   const isComplete = progress.phase === "complete";
   const isError = progress.phase === "error";
-  const isRunning = open && !isComplete && !isError && !progress.rcProgress && !progress.rcStatusUnavailable;
+  const rcMode = !!(progress.rcProgress || progress.rcStatusUnavailable);
+  const rc = progress.rcStatusUnavailable ? undefined : progress.rcProgress;
+  const rcView = rcMode ? rcProgressPresentation(rc, progress.rcStatusUnavailable) : null;
+  const rcTone = rcView ? RC_TONE[rcView.tone] : null;
+  // Counts only when work is actually sized; a queue with nothing sized yet shows no value.
+  const rcSized = !!rc && rc.total > 0;
+  const rcFill = rcSized ? (rc!.processed / rc!.total) * 100 : 0;
+  const isRunning = open && !isComplete && !isError && !rcMode;
+  const clockRunning = isRunning || (rcMode && (rcView!.tone === "active" || rcView!.tone === "waiting"));
+  const canClose = isComplete || isError || rcMode;
 
   // Smooth animated percent display (tracks the REAL percent, never a fixed timer)
   const [displayPct, setDisplayPct] = useState(0);
@@ -186,101 +200,65 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
     }
     const startedAt = runStartedAt.current;
     const tick = () => setElapsed(Math.floor((Date.now() - startedAt) / 1000));
-    if (!isRunning) {
+    if (!clockRunning) {
       // Terminal state: record the final elapsed value once and stop the clock.
       tick();
       return;
     }
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [open, isRunning]);
+  }, [open, clockRunning]);
 
-  const ringOffset = RING_CIRCUMFERENCE * (1 - displayPct / 100);
+  const ringOffset = RING_CIRCUMFERENCE * (1 - (rcMode ? rcFill : displayPct) / 100);
   const activeStage = STAGES.find((s) => s.phase === progress.phase);
   // The live pipeline message is a log line ("[PIPELINE] … queued"); recruiters see the stage in plain words.
   const tip = activeStage?.tip ?? "Getting your search ready…";
   const errorText = neutralizeProviderText(progress.error ?? "") || "Something went wrong. You can run again.";
-  const ringColor = isError ? "#DC2626" : isComplete ? "#1FA463" : "#4B8EF0";
+  const ringColor = rcTone ? rcTone.ring : isError ? "#DC2626" : isComplete ? "#1FA463" : "#4B8EF0";
+  // Search and scoring are shown as finished only when skills-check progress proves the
+  // check actually ran (it only runs on scored results). Running, partial and complete
+  // states prove it; a queue proves it only once work started; a stalled or failed check
+  // proves it only if at least one profile was checked. Anything else — including a status
+  // we could not read — proves nothing, so those steps keep the live pipeline phase.
+  const rcConfirmsSearchDone = !!rc && (
+    rc.state === "enriching_skills" || rc.state === "partial" || rc.state === "complete"
+      ? true
+      : rc.state === "queued"
+        ? rc.workStarted === true
+        : rc.processed > 0
+  );
+  const skillsState: "done" | "active" | "todo" | "failed" =
+    !rcConfirmsSearchDone ? "todo"
+    : rcView?.tone === "failed" ? "failed"
+    : rcView?.tone === "done" ? "done"
+    : "active";
+  // Results are prepared after the skills check.
+  const stageRows: { key: string; label: string; icon: typeof Search; state: "done" | "active" | "todo" | "failed" }[] = rcMode
+    ? [
+        ...STAGES.filter((st) => st.phase === "discovery" || st.phase === "ranking").map((st) => ({
+          key: st.phase,
+          label: st.label,
+          icon: st.icon,
+          state: rcConfirmsSearchDone ? ("done" as const) : stageState(st, progress.phase),
+        })),
+        { key: SKILLS_STAGE_KEY, label: SKILLS_STAGE_LABEL, icon: ListChecks, state: skillsState },
+        ...STAGES.filter((st) => st.phase === "finalizing").map((st) => ({ key: st.phase, label: st.label, icon: st.icon, state: skillsState === "done" ? ("active" as const) : ("todo" as const) })),
+      ]
+    : STAGES.map((st) => ({ key: st.phase, label: st.label, icon: st.icon, state: stageState(st, progress.phase) }));
 
   // Modal is closed by the hook after candidates are pre-fetched (unchanged behaviour).
 
-  if (progress.rcProgress || progress.rcStatusUnavailable) {
-    const rc = progress.rcStatusUnavailable ? undefined : progress.rcProgress;
-    const {heading,message,tone}=rcProgressPresentation(rc,progress.rcStatusUnavailable);
-    const toneStyle = RC_TONE[tone];
-    // Counts only when work is actually sized; a queue with nothing sized yet shows no bar value.
-    const sized = !!rc && rc.total > 0;
-    const fill = sized ? (rc!.processed / rc!.total) * 100 : 0;
-    return (
-      <Dialog open={open} onOpenChange={value => { if (!value) onClose?.(); }}>
-        <DialogContent
-          data-sourcing-progress-modal=""
-          data-rc-progress=""
-          data-rc-tone={tone}
-          className="w-full max-w-[440px] gap-0 overflow-hidden rounded-[14px] border-[#E3E6F0] p-0 motion-reduce:animate-none"
-        >
-          <div className="flex items-center justify-between gap-2 pl-[18px] pr-14 pt-[18px]">
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-[#687182]">
-              ealana · skills check
-            </p>
-            <Badge className={cn("text-[11px]", toneStyle.badge)}>{toneStyle.label}</Badge>
-          </div>
-          <div className="px-[18px] pt-3">
-            <DialogTitle className="text-[17px] font-semibold leading-snug text-[#0F172A]">{heading}</DialogTitle>
-            <div
-              role="progressbar"
-              aria-label="Skills check progress"
-              aria-valuemin={0}
-              aria-valuemax={sized ? rc!.total : undefined}
-              aria-valuenow={sized ? rc!.processed : undefined}
-              aria-valuetext={sized && rc ? `${rc.processed} of ${rc.total} profiles checked` : heading}
-              className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#E6EAF3]"
-            >
-              <div
-                className={cn(
-                  "h-full rounded-full transition-[width] duration-300 ease-out motion-reduce:transition-none",
-                  toneStyle.bar,
-                  tone === "waiting" && !sized && "w-1/3 animate-pulse motion-reduce:animate-none",
-                )}
-                style={sized ? { width: `${fill}%` } : undefined}
-              />
-            </div>
-            {sized && (
-              <p className="mt-2 font-mono text-[12px] tabular-nums text-[#475569]">
-                {rc!.processed} of {rc!.total} profiles checked
-              </p>
-            )}
-            <p className="mt-2 text-[14px] leading-relaxed text-[#334155]">{message}</p>
-            {sized && (
-              <p className="mt-1 text-[12px] leading-relaxed text-[#64748B]">
-                This is how many profiles we checked, not how many have the skills you asked for.
-              </p>
-            )}
-          </div>
-          <div className="flex justify-end px-[18px] pb-[18px] pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="min-h-[44px] min-w-[88px] cursor-pointer rounded-[10px] border border-[#E3E6F0] bg-white px-4 text-[14px] font-medium text-[#0F172A] transition-colors duration-200 hover:bg-[#F5F7FB] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B8EF0] focus-visible:ring-offset-2"
-            >
-              Close
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
   return (
-    <Dialog open={open} onOpenChange={() => { if ((isComplete || isError) && onClose) onClose(); }}>
+    <Dialog open={open} onOpenChange={() => { if (canClose && onClose) onClose(); }}>
       <DialogContent
         className="w-full max-w-[440px] gap-0 overflow-hidden rounded-[14px] border-[#E3E6F0] p-0 motion-reduce:animate-none"
         onPointerDownOutside={(e) => {
           // Prevent closing mid-run
-          if (!isComplete && !isError) e.preventDefault();
+          if (!canClose) e.preventDefault();
         }}
         aria-busy={isRunning}
         data-sourcing-progress-modal=""
+        {...(rcView ? { "data-rc-progress": "", "data-rc-tone": rcView.tone } : {})}
       >
         {/* Header */}
         <div className="flex items-center justify-between gap-2 pl-[18px] pr-14 pt-[18px]">
@@ -288,10 +266,13 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
             ealana · discover
           </p>
           <div className="flex items-center gap-2">
-            {isComplete && (
+            {rcView && rcTone && (
+              <Badge className={cn("text-[11px]", rcTone.badge)}>{rcTone.label}</Badge>
+            )}
+            {!rcMode && isComplete && (
               <Badge className="border-[#C8EEDA] bg-[#E7F6EE] text-[11px] text-[#166534]">Complete</Badge>
             )}
-            {isError && (
+            {!rcMode && isError && (
               <Badge className="border-red-200 bg-red-50 text-[11px] text-red-700">Error</Badge>
             )}
             <span className="font-mono text-[11px] tabular-nums text-[#687182]" aria-label="Elapsed time">
@@ -302,7 +283,18 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
 
         {/* Ring + title */}
         <div className="flex items-center gap-4 px-[18px] pt-3">
-          <div className="relative h-[104px] w-[104px] shrink-0" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(displayPct)} aria-label="Sourcing progress">
+          <div
+            className="relative h-[104px] w-[104px] shrink-0"
+            role="progressbar"
+            aria-valuemin={0}
+            {...(rcMode
+              ? {
+                  "aria-label": "Skills check progress",
+                  ...(rcSized ? { "aria-valuemax": rc!.total, "aria-valuenow": rc!.processed } : {}),
+                  "aria-valuetext": rcSized && rc ? `${rc.processed} of ${rc.total} profiles checked` : rcView!.heading,
+                }
+              : { "aria-label": "Sourcing progress", "aria-valuemax": 100, "aria-valuenow": Math.round(displayPct) })}
+          >
             <svg viewBox="0 0 104 104" className="h-full w-full -rotate-90">
               <circle cx="52" cy="52" r={RING_RADIUS} fill="none" stroke="#E6EAF3" strokeWidth="8" />
               <circle
@@ -319,7 +311,19 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
               />
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              {isComplete ? (
+              {rcMode ? (
+                rcView!.tone === "done" ? (
+                  <Check className="h-7 w-7 text-[#1FA463]" aria-hidden="true" />
+                ) : rcView!.tone === "failed" ? (
+                  <XCircle className="h-7 w-7 text-[#DC2626]" aria-hidden="true" />
+                ) : rcSized ? (
+                  <span className="font-satoshi text-[18px] font-bold leading-none tabular-nums text-[#17203A]" aria-hidden="true">
+                    {rc!.processed}/{rc!.total}
+                  </span>
+                ) : (
+                  <ListChecks className="h-7 w-7 text-[#687182] motion-safe:animate-pulse" aria-hidden="true" />
+                )
+              ) : isComplete ? (
                 <Check className="h-7 w-7 text-[#1FA463]" aria-hidden="true" />
               ) : isError ? (
                 <XCircle className="h-7 w-7 text-[#DC2626]" aria-hidden="true" />
@@ -332,23 +336,23 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
           </div>
           <div className="min-w-0">
             <DialogTitle className="font-satoshi text-[17px] font-bold leading-tight tracking-[-0.02em] text-[#17203A]">
-              {isComplete ? "Your results are ready" : isError ? "Search stopped" : "Finding your best-fit candidates"}
+              {rcView ? rcView.heading : isComplete ? "Your results are ready" : isError ? "Search stopped" : "Finding your best-fit candidates"}
             </DialogTitle>
             <p className="mt-1 text-[13px] leading-snug text-[#5F6675]" aria-live="polite">
-              {isError ? errorText : isComplete ? "Your ranked candidates are ready to review." : tip}
+              {rcView ? rcView.message : isError ? errorText : isComplete ? "Your ranked candidates are ready to review." : tip}
             </p>
           </div>
         </div>
 
         {/* Stages */}
         <ol className="mt-4 space-y-1 px-[18px]" aria-label="Sourcing stages">
-          {STAGES.map((stage) => {
-            const state = stageState(stage, progress.phase);
+          {stageRows.map((stage) => {
+            const state = stage.state;
             const Icon = stage.icon;
             return (
               <li
-                key={stage.phase}
-                data-stage={stage.phase}
+                key={stage.key}
+                data-stage={stage.key}
                 data-state={state}
                 className={cn(
                   "flex items-start gap-3 rounded-[10px] px-2.5 py-2 text-[13px] leading-snug transition-colors duration-300",
@@ -370,7 +374,12 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
                   {state === "done" ? <Check className="h-3.5 w-3.5" /> : <Icon className={cn("h-3.5 w-3.5", state === "active" && "motion-safe:animate-pulse")} />}
                 </span>
                 <span className={cn("min-w-0 flex-1 pt-1", state === "active" && "font-semibold")}>{stage.label}</span>
-                {stage.phase === "enriching" && state === "active" && progress.totalToEnrich > 0 && (
+                {stage.key === SKILLS_STAGE_KEY && rcSized && (
+                  <span className="shrink-0 pt-1 font-mono text-[11px] tabular-nums text-[#5F6675]">
+                    {rc!.processed}/{rc!.total}
+                  </span>
+                )}
+                {stage.key === "enriching" && state === "active" && progress.totalToEnrich > 0 && (
                   <span className="shrink-0 pt-1 font-mono text-[11px] tabular-nums text-[#5F6675]">
                     {progress.enrichedCount}/{progress.totalToEnrich}
                   </span>
@@ -379,6 +388,17 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
             );
           })}
         </ol>
+
+        {rcMode && rcSized && (
+          <div className="mt-3 px-[18px]">
+            <p className="font-mono text-[12px] tabular-nums text-[#475569]">
+              {rc!.processed} of {rc!.total} profiles checked
+            </p>
+            <p className="mt-1 text-[12px] leading-relaxed text-[#64748B]">
+              This is how many profiles we checked, not how many have the skills you asked for.
+            </p>
+          </div>
+        )}
 
         {/* Run facts (counts only — no vendor names) */}
         {(progress.crustdataFound != null || progress.rankingTotal != null || progress.replacedCount > 0) && (
@@ -415,8 +435,17 @@ export function SourcingProgressModal({ open, progress, onClose, onRunAgain, sho
         )}
 
         {/* Actions */}
-        <div className={cn("flex gap-2 px-[18px] pt-4", isComplete || isError ? "pb-[18px]" : "pb-4")}>
-          {isComplete ? (
+        <div className={cn("flex gap-2 px-[18px] pt-4", canClose ? "pb-[18px]" : "pb-4")}>
+          {rcMode ? (
+            <button
+              type="button"
+              onClick={onClose}
+              data-modal-action="close"
+              className="min-h-[44px] flex-1 cursor-pointer rounded-[10px] border border-[#E3E6F0] bg-white px-3 text-[13px] font-semibold text-[#17203A] transition-colors duration-200 hover:bg-[#F4F5FA] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B8EF0]/40"
+            >
+              Close
+            </button>
+          ) : isComplete ? (
             <>
               {onRunAgain ? (
                 <button
