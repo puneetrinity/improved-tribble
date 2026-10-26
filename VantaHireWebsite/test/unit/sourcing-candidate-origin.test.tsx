@@ -162,3 +162,68 @@ describe('cold outreach re-checks eligibility before sending',()=>{
   expect(onSend).not.toHaveBeenCalled();
  });
 });
+
+import {candidateSourceGroup,countSourceGroups} from '../../client/src/lib/sourcing-source-label';
+describe('result source badges, applicant location and source summary',()=>{
+ let host:HTMLDivElement,root:Root;
+ beforeEach(()=>{(globalThis as any).IS_REACT_ACT_ENVIRONMENT=true;host=document.createElement('div');
+  document.body.append(host);root=createRoot(host);});
+ afterEach(async()=>{await act(async()=>root.unmount());host.remove();});
+ const card=(c:any)=>act(async()=>root.render(<TooltipProvider><CandidateCard candidate={c} onClick={()=>{}} onShortlist={()=>{}}
+  governed isUpdating={false}/></TooltipProvider>));
+ const drawer=(c:any)=>act(async()=>root.render(<QueryClientProvider client={new QueryClient()}><TooltipProvider>
+  <CandidateDrawer candidate={c} open onClose={()=>{}} onUpdateState={()=>{}} isUpdating={false} governed/></TooltipProvider></QueryClientProvider>));
+ const located={...applicant,sourceType:'pool',resumeLocation:{city:'Bengaluru',country:'India'},
+  crustdata:{basic_profile:{location:{full_location:'Should Not Show'}}}};
+ const memory={...base,sourceType:'pool',crustdata:{basic_profile:{name:'Pool Person',location:{full_location:'Pune, Maharashtra, India'}}}};
+ const fresh={...base,sourceType:'discovered'};
+ const badge=()=>host.querySelector('[data-source-badge]')?.getAttribute('data-source-badge')??null;
+
+ it('labels each group once, previous applicant first, and never guesses a malformed origin',()=>{
+  expect(candidateSourceGroup(located)).toBe('previous_applicant');
+  expect(candidateSourceGroup(memory)).toBe('from_memory');
+  expect(candidateSourceGroup({...base,sourceType:'pool_enriched'})).toBe('from_memory');
+  expect(candidateSourceGroup(fresh)).toBe('new');
+  expect(candidateSourceGroup(malformed)).toBeNull();
+  expect(candidateSourceGroup({...base,sourceType:'mystery'})).toBeNull();
+ });
+ it('card: previous applicant shows their résumé location and no memory/new badge',async()=>{
+  await card(located);
+  expect(host.textContent).toContain('Previous applicant');expect(badge()).toBeNull();
+  const loc=host.querySelector('[data-location-source]')!;
+  expect(loc.getAttribute('data-location-source')).toBe('resume');
+  expect(loc.textContent).toContain('Bengaluru, India');expect(loc.textContent).toContain('(from résumé)');
+  expect(host.textContent).not.toContain('Should Not Show');
+ });
+ it('card: country-only and unknown applicant locations stay as given',async()=>{
+  await card({...located,resumeLocation:{city:null,country:'India'}});
+  expect(host.querySelector('[data-location-source="resume"]')?.textContent).toContain('India');
+  await card({...located,resumeLocation:null});
+  expect(host.querySelector('[data-location-source]')?.getAttribute('data-location-source')).toBe('unknown');
+  expect(host.textContent).toContain('Location unknown');expect(host.textContent).not.toContain('Should Not Show');
+ });
+ it('card: public results keep their profile location with From memory / New badges',async()=>{
+  await card(memory);
+  expect(badge()).toBe('from_memory');expect(host.textContent).toContain('From memory');
+  expect(host.querySelector('[data-location-source="profile"]')?.textContent).toContain('Pune, Maharashtra, India');
+  await card(fresh);expect(badge()).toBe('new');
+  await card(malformed);expect(badge()).toBeNull();
+ });
+ it('card: applicant contact restrictions are unchanged by the location',async()=>{
+  await card(located);
+  expect([...host.querySelectorAll('a')].some(a=>a.getAttribute('href')?.includes('linkedin.com'))).toBe(false);
+  expect(host.textContent).not.toMatch(/Reveal|person@example\.com/);
+ });
+ it('detail panel: shows résumé location, or says the résumé gives none',async()=>{
+  await drawer(located);
+  expect(host.textContent).toContain('Bengaluru, India');expect(host.textContent).toContain('From their résumé');
+  expect(host.textContent).not.toContain('Should Not Show');
+  await drawer({...located,resumeLocation:null});
+  expect(host.textContent).toContain('Location unknown');
+ });
+ it('summary counts mutually exclusive groups and skips hidden results',()=>{
+  const rows=[located,{...located,id:2},memory,{...memory,id:4,state:'hidden'},fresh,malformed];
+  expect(countSourceGroups(rows)).toEqual({total:5,previous_applicant:2,from_memory:1,new:1});
+  expect(countSourceGroups([])).toEqual({total:0,previous_applicant:0,from_memory:0,new:0});
+ });
+});

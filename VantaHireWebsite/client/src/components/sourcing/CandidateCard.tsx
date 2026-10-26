@@ -6,6 +6,8 @@ import {
   Mail, Phone, Github, Twitter, Linkedin, Sparkles, Loader2, FileText,
 } from "lucide-react";
 import { allowsPublicContact, applicationHref, candidateDisplayName, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
+import { candidateSourceGroup, SOURCE_GROUP_LABEL } from "@/lib/sourcing-source-label";
+import { resumeLocationText } from "@shared/resume-location";
 import { cn } from "@/lib/utils";
 import type { SourcedCandidateForUI } from "@/hooks/use-sourcing";
 import {
@@ -143,8 +145,12 @@ export function CandidateCard({
   const publicContact = allowsPublicContact(origin);
   const appHref = applicationHref(origin);
   const headline = candidate.crustdata?.basic_profile?.headline || null;
-  const locationDisplay = candidate.crustdata?.basic_profile?.location?.full_location
-    || candidate.crustdata?.basic_profile?.location?.raw || null;
+  const isApplicant = origin.kind === "organization_candidate";
+  // A previous applicant's location comes only from their own résumé; unknown stays unknown.
+  const applicantLocation = isApplicant ? resumeLocationText(candidate.resumeLocation) : null;
+  const locationDisplay = isApplicant ? applicantLocation : (candidate.crustdata?.basic_profile?.location?.full_location
+    || candidate.crustdata?.basic_profile?.location?.raw || null);
+  const sourceGroup = candidateSourceGroup(candidate);
 
   const currentRole = candidate.crustdata?.experience?.employment_details?.current?.[0];
   const pastRole = candidate.crustdata?.experience?.employment_details?.past?.[0];
@@ -255,6 +261,12 @@ export function CandidateCard({
                 Previous applicant
               </Badge>
             )}
+            {(sourceGroup === "from_memory" || sourceGroup === "new") && (
+              <Badge variant="outline" data-source-badge={sourceGroup} className={cn("text-xs shrink-0",
+                sourceGroup === "new" ? "bg-sky-50 text-sky-800 border-sky-200" : "bg-slate-50 text-slate-700 border-slate-200")}>
+                {SOURCE_GROUP_LABEL[sourceGroup]}
+              </Badge>
+            )}
             {origin.kind === "invalid" && (
               <Badge variant="outline" data-origin-badge="" className="text-xs shrink-0">Applicant details unavailable</Badge>
             )}
@@ -296,12 +308,19 @@ export function CandidateCard({
               </span>
             )}
             {locationDisplay && (
-              <span className="flex items-center gap-1 shrink-0">
+              <span className="flex items-center gap-1 shrink-0" data-location-source={isApplicant ? "resume" : "profile"}>
                 {locConf.dotColor && (
                   <span className={cn("inline-block h-2 w-2 rounded-full shrink-0", locConf.dotColor)} />
                 )}
-                <MapPin className="h-3.5 w-3.5" />
+                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
                 {locationDisplay}
+                {isApplicant && <span className="text-xs text-muted-foreground">(from résumé)</span>}
+              </span>
+            )}
+            {isApplicant && !locationDisplay && (
+              <span className="flex items-center gap-1 shrink-0" data-location-source="unknown">
+                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                Location unknown
               </span>
             )}
           </div>

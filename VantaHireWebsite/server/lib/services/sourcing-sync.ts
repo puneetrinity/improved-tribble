@@ -14,6 +14,7 @@ import {rankedCandidateSchema} from '../../sourcing-authority/ranking-contract';
 import { loadCandidatePrivacyConfig } from '../../candidate-privacy/config';
 import { checkMemoryEligibilityBatch } from '../../candidate-privacy/memory-client';
 import {parsePrivateOrigin,verifyPrivateDelivery} from '../../sourcing-authority/candidate-origin';
+import {resumeLocationForStorage} from '@shared/resume-location';
 
 const ENRICHED_STATUSES = new Set(['completed', 'enriched']);
 const PENDING_STATUSES = new Set(['pending', 'queued']);
@@ -198,6 +199,10 @@ export async function upsertSignalCandidates(
   if (allowedCandidates.length === 0 && !governed) return { count: 0, candidates: [] };
 
   // Build all row values for a single bulk INSERT
+  // Résumé location is kept only as a validated field on private applicant rows.
+  const withoutResumeLocation=<T extends object>(candidate:T):T=>{
+    const {resumeLocation:_unused,...rest}=candidate as T&{resumeLocation?:unknown};void _unused;return rest as T;
+  };
   const rows = allowedCandidates.map((c) => {
     const origin=parsePrivateOrigin(c.candidate);
     const fitScore = normalizeFitScoreForStorage(c.fitScore ?? null);
@@ -208,8 +213,9 @@ export async function upsertSignalCandidates(
 
     const summary = {
       ...(governed?.protocolVersion===2?{ranking:rankedCandidateSchema.parse(c.ranking)}:{}),
-      candidate: origin?{...c.candidate,candidateOrigin:origin.display}:c.candidate,
-      ...(origin?{candidateOrigin:origin.display,privateResumeIdentity:origin.identity}:{}),
+      candidate: origin?{...withoutResumeLocation(c.candidate),candidateOrigin:origin.display}:withoutResumeLocation(c.candidate),
+      ...(origin?{candidateOrigin:origin.display,privateResumeIdentity:origin.identity,
+        resumeLocation:resumeLocationForStorage((c.candidate as {resumeLocation?:unknown}).resumeLocation)}:{}),
       sourcingContext: c.sourcingContext,
       cardSignals: c.cardSignals,
       nameHint: c.candidate.nameHint,
