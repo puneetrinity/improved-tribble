@@ -2249,7 +2249,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (manifest.format_version !== 1 || manifest.source_commit !== SOURCE_COMMIT) {
     problems.push("object authorization manifest pin or format is invalid.");
   }
-  if (manifest.route_registration_census !== 333) {
+  if (manifest.route_registration_census !== 337) {
     problems.push("object authorization route census contract is invalid.");
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {

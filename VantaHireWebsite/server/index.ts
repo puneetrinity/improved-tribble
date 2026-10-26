@@ -50,7 +50,9 @@ app.use(compression({
 app.use(express.json({
   verify: (req: any, _res, buf) => {
     // Store raw body for webhook signature verification
-    if (req.url?.startsWith('/api/webhooks/')) {
+    const pathname = req.url?.split('?')[0];
+    if (req.url?.startsWith('/api/webhooks/') || pathname === '/api/candidate/product'
+        || pathname?.startsWith('/api/candidate/product/')) {
       req.rawBody = buf.toString('utf-8');
     }
   }
@@ -119,8 +121,12 @@ app.use((req, res, next) => {
 import { initWebSocketServer } from "./websocket";
 import { consentDeliveryConfig, startConsentProcessor } from "./candidate-consent/processor";
 import { candidateIndexProcessorConfig, startCandidateIndexProcessor } from "./candidate-index/processor";
+import { startFoundationProcessor } from "./candidate-product/processor";
+import { requireCandidatePrivacyAllowed } from "./candidate-privacy/decision";
+import { pool } from "./db";
 let stopConsentProcessor: (() => void) | undefined;
 let stopCandidateIndexProcessor: (() => Promise<void>) | undefined;
+let stopFoundationProcessor: (() => Promise<void>) | undefined;
 
 (async () => {
   const indexConfig = candidateIndexProcessorConfig();
@@ -204,6 +210,8 @@ let stopCandidateIndexProcessor: (() => Promise<void>) | undefined;
     startOrganizationCandidateProcessor();
     stopConsentProcessor = startConsentProcessor(consentConfig);
     stopCandidateIndexProcessor = startCandidateIndexProcessor(indexConfig);
+    stopFoundationProcessor = startFoundationProcessor({db:pool, privacy:userId => requireCandidatePrivacyAllowed(
+      {type:'candidate_user',id:userId},{globalUse:true,newGlobalOperation:true})});
 
     // Start job scheduler for automatic job expiration
     startJobScheduler();
@@ -241,8 +249,10 @@ let stopCandidateIndexProcessor: (() => Promise<void>) | undefined;
     void stopOrganizationCandidateProcessor();
     stopConsentProcessor?.();
     const indexStopped = stopCandidateIndexProcessor?.();
+    const foundationStopped = stopFoundationProcessor?.();
     server.close(() => {
-      void Promise.resolve(indexStopped).then(() => process.exit(0), () => process.exit(1));
+      void Promise.allSettled([Promise.resolve(indexStopped), foundationStopped])
+        .then(results => process.exit(results.some(result => result.status === 'rejected') ? 1 : 0));
     });
   };
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

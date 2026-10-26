@@ -89,6 +89,15 @@ beforeEach(() => { installFetch(); });
 afterEach(() => { if (root) act(() => root!.unmount()); root = null; host?.remove(); host = null; vi.unstubAllGlobals(); });
 
 describe("CandidateConsentPanel", () => {
+  it("treats an S1 version-zero anchor as no permission and never auto-submits consent", async () => {
+    route("GET", "/api/candidate/consent", () => ({status:200,body:baseStatus({version:0,desired:null,effective:null,publication_active:false})}));
+    await mount();
+    await refresh();
+    expect(byTestId("consent-none").textContent).toContain("No Ealana-wide matching permission is active");
+    expect(maybe('[data-testid="consent-effective"]')).toBeNull();
+    expect($("#consent-agree").getAttribute("aria-checked")).toBe("false");
+    expect(calls.filter(call=>call.method==='POST')).toEqual([]);
+  });
   it("renders the exact server consent copy, unchecked approval and a disabled save button by default", async () => {
     route("GET", "/api/candidate/consent", () => ({ status: 200, body: baseStatus() }));
     await mount();

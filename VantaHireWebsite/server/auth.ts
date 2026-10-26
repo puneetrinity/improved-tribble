@@ -7,7 +7,8 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+import { pool, db } from "./db";
+import { captureOptionalIntent } from './candidate-product/guest-intent';
 import { getEmailService } from "./simpleEmailService";
 import rateLimit from "express-rate-limit";
 import { computeProfileCompletion } from "./lib/profileCompletion";
@@ -458,12 +459,17 @@ export function setupAuth(app: Express) {
         return;
       }
 
-      const user = await storage.createUser({
+      let networkIntentStatus: 'recorded' | 'not_recorded' | undefined;
+      const user = await db.transaction(async (tx:any) => {
+        const created = await storage.createUser({
         username,
         password: await hashPassword(password),
         firstName,
         lastName,
         role: finalRole
+        }, tx);
+        if (finalRole === 'candidate') networkIntentStatus = await captureOptionalIntent(tx,'signup',created.id,req.body.networkIntent);
+        return created;
       });
       queueMauticSignupSync(user.id);
 
@@ -501,6 +507,7 @@ export function setupAuth(app: Express) {
           message: 'Registration successful, but we could not send the verification email right now. Please use "Resend Verification Email" on the login screen.',
           requiresVerification: true,
           emailDeliveryFailed: true,
+          ...(networkIntentStatus ? { networkIntentStatus } : {}),
         });
         return;
       }
@@ -508,6 +515,7 @@ export function setupAuth(app: Express) {
       res.status(201).json({
         message: 'Registration successful. Please check your email to verify your account.',
         requiresVerification: true,
+        ...(networkIntentStatus ? { networkIntentStatus } : {}),
       });
     } catch (error) {
       next(error);

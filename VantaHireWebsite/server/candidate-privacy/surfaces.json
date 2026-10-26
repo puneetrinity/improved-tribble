@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "d63448e4aa8afc384038d0364762471762a37d7ea913298ee4ecf32dbda558f6",
+  "source_census_sha256": "061cf2f622b82997e7b79ff3cef61d68817d03f634722df19eb3a54da2cdb47b",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "server/candidate-history/contracts.ts",
@@ -60,6 +60,11 @@
     "client/src/components/kanban/ApplicationDetailPanel.tsx"
   ],
   "sources": [
+    {"file":"server/candidate-product/routes.ts","classification":"fenced"},
+    {"file":"server/candidate-product/repository.ts","classification":"fenced"},
+    {"file":"server/candidate-product/processor.ts","classification":"fenced"},
+    {"file":"server/candidate-product/contracts.test.ts","classification":"excluded"},
+    {"file":"server/candidate-product/routes.test.ts","classification":"excluded"},
     { "file": "server/sourcing-authority/candidate-access.ts", "classification": "fenced" },
     { "file": "server/sourcing-authority/commands.ts", "classification": "fenced" },
     { "file": "server/schema-migrations/0015_governed_sourcing.sql", "classification": "fenced" },
@@ -168,6 +173,9 @@
     { "file": "client/src/pages/terms-of-service-page.tsx", "classification": "excluded" }
   ],
   "surfaces": [
+    {"id":"foundation-routes","file":"server/candidate-product/routes.ts","symbol":"registerCandidateProductRoutes","models":["candidate_product_accounts","candidate_network_intents"],"direction":"candidate_self_setup","privacy_action":["withdraw_global_matching","request_erasure"],"organization_scope":"candidate_self","enforcement":"Verified candidate, current privacy authority, recent authentication and CSRF; no effective consent or publication.","anchors":["requireVerifiedCandidate","requireCandidatePrivacyAllowed","recentConsentAuth","csrfProtection","parseStrictJson"]},
+    {"id":"foundation-repository","file":"server/candidate-product/repository.ts","symbol":"foundationRepository","models":["candidate_product_accounts","candidate_product_commands","candidate_network_intents"],"direction":"candidate_self_setup","privacy_action":["withdraw_global_matching","request_erasure"],"organization_scope":"candidate_self","enforcement":"Mandatory injected privacy check before routine-only access; server account authority and exact result schemas.","anchors":["await checkPrivacy(parsed.data.userId)","flow_candidate_foundation_ensure","schema.parse(row.result)"]},
+    {"id":"foundation-delivery","file":"server/candidate-product/processor.ts","symbol":"runFoundationOnce","models":["candidate_product_commands","candidate_product_outbox"],"direction":"empty_subject_delivery","privacy_action":["withdraw_global_matching","request_erasure"],"organization_scope":"candidate_self","enforcement":"Privacy check before each immutable empty-subject send, bounded deadline and fenced receipt; never grants consent.","anchors":["await deps.privacy(lease.userId)","if(expired || remaining<=0 || !enabled())","flow_candidate_foundation_finish_delivery"]},
     {
       "id": "sourcing-applicant-contact-authority",
       "file": "server/sourcing-authority/candidate-access.ts",
@@ -1058,6 +1066,8 @@
     }
   ],
   "exclusions": [
+    {"id":"foundation-contract-tests","file":"server/candidate-product/contracts.test.ts","symbol":"<module>","reason":"Synthetic contract and mocked delivery tests only; no runtime entrypoint.","anchors":["describe('foundation leased delivery'"]},
+    {"id":"foundation-route-tests","file":"server/candidate-product/routes.test.ts","symbol":"<module>","reason":"Registered-route tests with mocked authentication and database only.","anchors":["describe('foundation registered route chains'"]},
     {
       "id": "job-management-posting-read",
       "file": "server/lib/jobManagementRead.ts",

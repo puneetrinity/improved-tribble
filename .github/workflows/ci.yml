@@ -153,6 +153,23 @@ jobs:
       - run: npm run check:server
       - run: npm run check:client
       - run: npm run test:server
+      - run: npm run check:candidate-product
+      - name: Candidate foundation full-schema and deletion rehearsal
+        env:
+          NODE_ENV: test
+          NO_COLOR: '1'
+        run: |
+          set -euo pipefail
+          foundation_dir=$(mktemp -d /tmp/candidate-s1-ci-XXXXXX)
+          foundation_bin=$(pg_config --bindir)
+          "$foundation_bin/initdb" -D "$foundation_dir/data" -U ews -A trust --encoding=UTF8 --no-locale
+          "$foundation_bin/pg_ctl" -D "$foundation_dir/data" -l "$foundation_dir/postgres.log" -o "-k $foundation_dir -p 55495 -c listen_addresses='' -c shared_buffers=32MB -c max_connections=12" start
+          trap '"$foundation_bin/pg_ctl" -D "$foundation_dir/data" -m fast stop' EXIT
+          export CANDIDATE_FOUNDATION_TEST_SOCKET="$foundation_dir" CANDIDATE_FOUNDATION_TEST_PORT=55495
+          npx vitest run --config vitest.server.config.ts server/candidate-product/authority.pg.test.ts | tee "$foundation_dir/authority.log"
+          export CANDIDATE_FOUNDATION_FLOW_TEST_DATABASE=$(awk '/Retained Flow release fixture/{value=$NF} END{print value}' "$foundation_dir/authority.log")
+          test -n "$CANDIDATE_FOUNDATION_FLOW_TEST_DATABASE"
+          npx vitest run --config vitest.server.config.ts server/candidate-product/lifecycle.pg.test.ts
       - run: npm run test:candidate-consent
       - run: npm run test:candidate-index
       - run: npm run test:candidate-history

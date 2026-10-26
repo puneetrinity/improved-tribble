@@ -7,9 +7,10 @@
 
 import type { PgLike } from "./ledger";
 import { CANDIDATE_CONSENT_TABLES, CANDIDATE_CONSENT_FUNCTIONS, CANDIDATE_CONSENT_UPDATE_COLUMNS,
-  candidateConsentPrivilegesReady, candidateIndexPrivilegesReady,
+  candidateConsentPrivilegesReady, candidateIndexPrivilegesReady, foundationPrivilegesReady,
   candidateHistoryPrivilegesReady, CANDIDATE_HISTORY_FUNCTION, jobBriefPrivilegesReady, BRIEF_TRIGGER_FUNCTIONS } from "./readiness";
 import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
+import {FOUNDATION_TABLES,FOUNDATION_FUNCTIONS,FOUNDATION_OWNER_FUNCTIONS} from '../candidate-product/contracts';
 import {SOURCING_TABLES,SOURCING_FUNCTIONS,SOURCING_PRIVATE_FUNCTIONS,SOURCING_PRIVATE_NAMES,sourcingPrivilegesReady} from '../sourcing-authority/catalog';
 import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
   CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
@@ -289,6 +290,7 @@ export async function assertRuntimeRoleContract(
                   'candidate_consent_events','candidate_consent_outbox',
                   'candidate_index_outbox','candidate_index_delivery_state',
                   'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
+                  ${FOUNDATION_TABLES.map(n=>`'${n}'`).join(',')},
                   ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')}
                 )
                 AND has_table_privilege($1,c.oid,'SELECT')
@@ -303,6 +305,7 @@ export async function assertRuntimeRoleContract(
                 'candidate_consent_events','candidate_consent_outbox',
                 'candidate_index_outbox','candidate_index_delivery_state',
                 'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
+                ${FOUNDATION_TABLES.map(n=>`'${n}'`).join(',')},
                 ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')})
               -- Separately asserted below, including effective per-column rights.
             )
@@ -338,6 +341,7 @@ export async function assertRuntimeRoleContract(
          SELECT 1 FROM pg_catalog.pg_proc p JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
           WHERE n.nspname='public' AND p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity','flow_job_brief_validate_v3')
             AND p.proname NOT IN (${SOURCING_PRIVATE_NAMES.map(n=>`'${n}'`).join(',')})
+            AND p.proname NOT IN (${FOUNDATION_OWNER_FUNCTIONS.map(n=>`'${n.split('(')[0]}'`).join(',')})
             AND NOT has_function_privilege($1,p.oid,'EXECUTE')
        )
        AND (
@@ -374,6 +378,9 @@ export async function assertRuntimeRoleContract(
   }
   if (!(await candidateConsentPrivilegesReady(pg, role, false))) {
     throw new RuntimeRoleProvisionError("Candidate consent runtime authority is incomplete or excessive.");
+  }
+  if (!(await foundationPrivilegesReady(pg,role,false))) {
+    throw new RuntimeRoleProvisionError('Candidate foundation authority is incomplete or excessive.');
   }
   if (!(await candidateIndexPrivilegesReady(pg, role, false))) {
     throw new RuntimeRoleProvisionError("Candidate index runtime authority is incomplete or excessive.");
@@ -463,6 +470,23 @@ export async function provisionRuntimeRole(opts: RuntimeRoleProvisionOptions): P
       await migration.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE,SELECT,UPDATE ON SEQUENCES TO ${ident}`);
       await migration.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM ${ident}`);
       await migration.query(`ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO ${ident}`);
+
+      // Wave 3A's event authority is intentionally write-only to an ordinary
+      const foundationPresence=await migration.query("SELECT to_regclass('public.candidate_product_accounts') AS present");
+      if(foundationPresence.rows[0]?.present){
+        for(const table of FOUNDATION_TABLES){
+          await migration.query(`REVOKE ALL ON TABLE public.${table} FROM ${ident},PUBLIC`);
+          const columns=await migration.query('SELECT attname FROM pg_attribute WHERE attrelid=to_regclass($1) AND attnum>0 AND NOT attisdropped',[`public.${table}`]);
+          const list=columns.rows.map((row:any)=>quoteIdentifier(row.attname)).join(',');
+          await migration.query(`REVOKE SELECT(${list}),INSERT(${list}),UPDATE(${list}),REFERENCES(${list}) ON TABLE public.${table} FROM ${ident},PUBLIC`);
+        }
+        for(const signature of [...FOUNDATION_FUNCTIONS,...FOUNDATION_OWNER_FUNCTIONS]){
+          await migration.query(`REVOKE ALL ON FUNCTION public.${signature} FROM ${ident},PUBLIC`);
+        }
+        for(const signature of FOUNDATION_FUNCTIONS){
+          await migration.query(`GRANT EXECUTE ON FUNCTION public.${signature} TO ${ident}`);
+        }
+      }
 
       // Wave 3A's event authority is intentionally write-only to an ordinary
       // runtime. Older disposable/pre-0007 manifests do not have the objects,

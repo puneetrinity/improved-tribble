@@ -16,6 +16,7 @@ import type { Multer } from 'multer';
 import { sql, eq, and, inArray, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
+import { captureOptionalIntent } from './candidate-product/guest-intent';
 import { shouldEnqueueLegacyApplication } from './candidate-index/processor';
 import {
   storage,
@@ -766,6 +767,7 @@ export function registerApplicationsRoutes(
         phone: applicationData.phone,
         privateUse: true,
       });
+      let networkIntentStatus: 'recorded' | 'not_recorded' | undefined;
       const application = await db.transaction(async (tx: any) => {
           const created = await storage.createApplication({
           ...applicationData,
@@ -783,6 +785,7 @@ export function registerApplicationsRoutes(
           }),
           ...(job.organizationId != null && { organizationId: job.organizationId }),
           }, tx, { admission: 'organization_private' });
+          networkIntentStatus = await captureOptionalIntent(tx,'guest',created.id,req.body.networkIntent);
           if (applicationSource) {
             // Optional owner-only tracking row. A savepoint isolates it: any
             // failure rolls back this insert only and never the application.
@@ -914,7 +917,8 @@ export function registerApplicationsRoutes(
       res.status(201).json({
         success: true,
         message: 'Application submitted successfully',
-        applicationId: application.id
+        applicationId: application.id,
+        ...(networkIntentStatus ? { networkIntentStatus } : {})
       });
       return;
     } catch (error) {
