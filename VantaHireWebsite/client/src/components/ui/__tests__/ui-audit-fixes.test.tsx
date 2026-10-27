@@ -83,5 +83,10 @@ describe("recruiter dashboard panels", () => {
     await mount(<TodaysInterviewsPanel jobId="all" />);
     const next = Array.from(host!.querySelectorAll("button")).find(b => b.textContent?.startsWith("Next:"));
     expect(next?.textContent).toContain("3 interviews");
+    await act(async () => { next!.click(); });
+    for (let i = 0; i < 6; i++) await act(async () => { await new Promise(r => setTimeout(r, 0)); });
+    const urls = (fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.map(c => String(c[0]));
+    expect(urls.some(u => u.includes(`interviewDate=${d(2)}`))).toBe(true);
+    expect(host!.querySelector(`button[aria-pressed="true"]`)?.getAttribute("aria-label")).toContain("3 interviews");
   });
 });

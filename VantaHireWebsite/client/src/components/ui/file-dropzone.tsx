@@ -1,8 +1,9 @@
 // Single-file drag-and-drop upload. Adapted from 21st.dev "File Dropzone" (joyco):
 // dashed drop area, icon, accepted types and size limit, selected-file view with a remove
 // button, and inline errors. Changes: controlled value/onChange, single file only (every use
-// here uploads one file), a dark tone for the public marketing theme, extension + MIME
-// checks, 44px targets, and no image previews (résumés are documents).
+// here uploads one file), a dark tone for the public marketing theme, a best-effort
+// client check of extension, size and emptiness (the server still validates type and
+// content), an external error for failed uploads, 44px targets, and no image previews.
 import { useId, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { AlertCircle, FileText, Loader2, Upload, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,8 @@ type Props = {
   id?: string | undefined;
   /** The page already renders a <label htmlFor={id}>; don't draw a second one. */
   externalLabel?: boolean | undefined;
+  /** An error from outside, e.g. a failed upload. Shown until a new file is chosen. */
+  error?: string | null | undefined;
 };
 
 export function formatFileSize(bytes: number): string {
@@ -40,12 +43,13 @@ export function checkFile(file: File, accept: string, maxSizeMB: number): string
   return null;
 }
 
-export function FileDropzone({ value, onChange, accept, maxSizeMB, label, required, hint, disabled, busy, tone = "light", id, externalLabel }: Props) {
+export function FileDropzone({ value, onChange, accept, maxSizeMB, label, required, hint, disabled, busy, tone = "light", id, externalLabel, error: externalError }: Props) {
   const auto = useId();
   const inputId = id ?? `${auto}-input`, hintId = `${auto}-hint`, errorId = `${auto}-error`;
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const error = localError ?? externalError ?? null;
   const dark = tone === "dark";
   const locked = disabled || busy;
   const types = accept.split(",").map(a => a.trim()).filter(a => a.startsWith(".")).map(a => a.slice(1).toUpperCase()).join(", ");
@@ -53,7 +57,7 @@ export function FileDropzone({ value, onChange, accept, maxSizeMB, label, requir
   function take(file: File | undefined) {
     if (!file) return;
     const problem = checkFile(file, accept, maxSizeMB);
-    setError(problem);
+    setLocalError(problem);
     if (!problem) onChange(file);
   }
   function onDrop(e: DragEvent<HTMLDivElement>) {
@@ -85,7 +89,7 @@ export function FileDropzone({ value, onChange, accept, maxSizeMB, label, requir
             <p className={cn("truncate text-sm font-medium", dark ? "text-e-text" : "text-foreground")}>{value.name}</p>
             <p className={cn("text-xs", dark ? "text-e-text2" : "text-muted-foreground")}>{busy ? "Uploading…" : formatFileSize(value.size)}</p>
           </div>
-          <button type="button" disabled={locked} onClick={() => { onChange(null); setError(null); }} aria-label={`Remove ${value.name}`}
+          <button type="button" disabled={locked} onClick={() => { onChange(null); setLocalError(null); }} aria-label={`Remove ${value.name}`}
             className={cn("flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50",
               dark ? "text-e-text2 hover:bg-white/[0.06] hover:text-e-text focus-visible:ring-e-blue" : "text-muted-foreground hover:bg-background hover:text-foreground focus-visible:ring-ring")}>
             <X className="h-4 w-4" aria-hidden />

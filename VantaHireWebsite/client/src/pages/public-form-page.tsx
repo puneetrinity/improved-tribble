@@ -28,6 +28,14 @@ export default function PublicFormPage() {
   const [uploadingFiles, setUploadingFiles] = useState<Set<number>>(new Set());
   // Chosen file per field, shown while it uploads (the uploaded view replaces it afterwards).
   const [pendingFiles, setPendingFiles] = useState<Map<number, File>>(new Map());
+  // Per-field failed-upload message; the picker comes back so the user can retry at once.
+  const [uploadErrors, setUploadErrors] = useState<Map<number, string>>(new Map());
+  const forgetSelection = (fieldId: number) => {
+    setPendingFiles((prev) => { const next = new Map(prev); next.delete(fieldId); return next; });
+  };
+  const setUploadError = (fieldId: number, message: string | null) => {
+    setUploadErrors((prev) => { const next = new Map(prev); if (message) next.set(fieldId, message); else next.delete(fieldId); return next; });
+  };
 
   // Fetch form data on mount - using typed API client with exhaustive error handling
   useEffect(() => {
@@ -99,9 +107,9 @@ export default function PublicFormPage() {
       // Use typed API client for file upload
       const { fileUrl, filename, size } = await formsApi.uploadPublicFile(token!, file);
 
-      const newAnswers = new Map(answers);
-      newAnswers.set(fieldId, { fieldId, fileUrl, filename, size });
-      setAnswers(newAnswers);
+      setAnswers((prev) => { const next = new Map(prev); next.set(fieldId, { fieldId, fileUrl, filename, size }); return next; });
+      forgetSelection(fieldId);
+      setUploadError(fieldId, null);
 
       // Clear error for this field
       const newErrors = new Map(errors);
@@ -114,6 +122,9 @@ export default function PublicFormPage() {
       });
     } catch (error: any) {
       console.error('File upload error:', error);
+      // Never leave a failed local selection looking like an answer: restore the picker.
+      forgetSelection(fieldId);
+      setUploadError(fieldId, `Upload failed${error?.message ? `: ${error.message}` : ''}. Choose the file again to retry.`);
       toast({
         title: "Upload Failed",
         description: error.message || 'Failed to upload file',
@@ -132,6 +143,8 @@ export default function PublicFormPage() {
     const newAnswers = new Map(answers);
     newAnswers.delete(fieldId);
     setAnswers(newAnswers);
+    forgetSelection(fieldId);
+    setUploadError(fieldId, null);
   };
 
   const validateForm = (): boolean => {
@@ -373,11 +386,12 @@ export default function PublicFormPage() {
                 maxSizeMB={5}
                 value={pendingFiles.get(field.id) ?? null}
                 busy={isUploading}
+                error={uploadErrors.get(field.id) ?? null}
                 onChange={(file) => {
-                  const next = new Map(pendingFiles);
-                  if (file) next.set(field.id, file); else next.delete(field.id);
-                  setPendingFiles(next);
-                  if (file) handleFileUpload(field.id, file);
+                  setUploadError(field.id, null);
+                  if (!file) { forgetSelection(field.id); return; }
+                  setPendingFiles((prev) => new Map(prev).set(field.id, file));
+                  handleFileUpload(field.id, file);
                 }}
               />
             ) : (

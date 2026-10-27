@@ -796,11 +796,11 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "7ec4d5cbb21f2c94cc27c5d38d4871b956a1e5d0d3b63fd8df4647e9e947b132"
+      "sha256": "77838f10ea055bd31883abe353c4f7424c899a0c2a06df517bb174cebd2d9929"
     },
     {
       "file": "package.json",
-      "sha256": "5f1d8388370c02c78695074720b2c6bae1c24b4f16deebadc31e7161054b18cf"
+      "sha256": "08e5a952a5370b30e411f728feaf62f6a0ca0d867a5d3a8ff0c75caf12929f8f"
     },
     {
       "file": "vitest.server.config.ts",

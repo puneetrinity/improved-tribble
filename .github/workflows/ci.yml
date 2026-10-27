@@ -162,6 +162,7 @@ jobs:
       - run: npm run test:sourcing-authority:client
       - run: npm run test:candidate-consent:client
       - run: npm run test:candidate-index:client
+      - run: npm run test:client-components
       - name: Run disposable schema-control matrix
         env:
           NODE_ENV: test

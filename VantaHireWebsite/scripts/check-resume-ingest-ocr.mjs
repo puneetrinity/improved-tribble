@@ -42,7 +42,7 @@ const FROZEN = {
   'server/bulkResumeImport.routes.ts': '7b0a7c07c42360c8d86ad950607335b7a2714318b7f685d7b502411d52abfa6e',
   'server/lib/resumeImportProcessor.ts': '1314be8df83e520c46c1eab5831d468f42659f3a4783a124e38c224381ad92e2',
   'server/gcs-storage.ts': '5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802',
-  'package.json': '5f1d8388370c02c78695074720b2c6bae1c24b4f16deebadc31e7161054b18cf',
+  'package.json': '08e5a952a5370b30e411f728feaf62f6a0ca0d867a5d3a8ff0c75caf12929f8f',
   'package-lock.json': 'b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539',
   'vitest.server.config.ts': '27f3e8aae976d6bd8eb22261c34267ede1ab28dd98e3a97c0eb8093333649a17',
   'server/schema-control/manifest.ts': '16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2',
