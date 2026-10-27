@@ -1053,7 +1053,7 @@
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "b307088d20d71f6a9cee044362ad590b563a4f29cbaa2b9c5a7bc83dd51f50da"
+      "sha256": "f9dcacc099b1c097b4f0a39e37e9d2d90c103d090f22fdf88602f65f51442d45"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
@@ -1209,11 +1209,11 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "87f0cd78d126000a3b961be2f85f6f4cb41f82629cd7b0908fcddad383ca51a1"
+      "sha256": "09f1993b4534363afed58d428c167817c37356b97833a920e9c7217df489f9f2"
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
-      "sha256": "de0d29134b81e6fd2a64bf74c60448b18654b871de00f88ad5f2befde94555d8"
+      "sha256": "2ba2dfa5e93a6ac1c529f14697b61f32d322b87fbd33d25e8e7c61c6bd05774c"
     },
     {
       "file": "server/decision-projection/config.ts",
