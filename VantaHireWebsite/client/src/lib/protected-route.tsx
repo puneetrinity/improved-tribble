@@ -1,8 +1,8 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useOnboardingStatus } from "@/hooks/use-onboarding-status";
 import { useOrganization } from "@/hooks/use-organization";
-import { Loader2 } from "lucide-react";
-import { Redirect, Route, useLocation } from "wouter";
+import { Loader2, ShieldAlert } from "lucide-react";
+import { Link, Redirect, Route, useLocation } from "wouter";
 import { ComponentType, LazyExoticComponent } from "react";
 
 type LazyComponent = LazyExoticComponent<ComponentType<object>>;
@@ -90,10 +90,18 @@ export function ProtectedRoute({
   if (requiredRole && !requiredRole.includes(user.role)) {
     return (
       <Route path={path}>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold mb-2">Access Denied</h2>
+        {/* Own light surface: this screen renders outside the app shell, over the dark site background. */}
+        <div className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+          <div className="max-w-sm text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <ShieldAlert className="h-6 w-6 text-muted-foreground" aria-hidden />
+            </div>
+            <h2 className="mb-2 text-2xl font-bold">Access Denied</h2>
             <p className="text-muted-foreground">You don't have permission to access this page.</p>
+            <Link href={homeForRole(user.role)}
+              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
+              Go to your dashboard
+            </Link>
           </div>
         </div>
       </Route>
@@ -131,4 +139,15 @@ export function ProtectedRoute({
   }
 
   return <Route path={path}><Component /></Route>;
+}
+
+/** Where "Go to your dashboard" leads for each signed-in role. */
+export function homeForRole(role: string | null | undefined): string {
+  switch (role) {
+    case "candidate": return "/my-dashboard";
+    case "hiring_manager": return "/hiring-manager";
+    case "super_admin": return "/admin";
+    case "recruiter": return "/recruiter-dashboard";
+    default: return "/";
+  }
 }

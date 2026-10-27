@@ -85,6 +85,10 @@ function getCurrentWeekDays(): InterviewWeekDay[] {
   });
 }
 
+function formatDayLabel(dateKey: string): string {
+  return parseDateKey(dateKey).toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short" });
+}
+
 function getInitials(name: string): string {
   return name
     .split(" ")
@@ -152,6 +156,12 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
   }, [data?.week, todayKey]);
   const items = data?.items ?? [];
   const count = data?.count ?? 0;
+  // When the selected day is empty, point at the next day this week that has interviews.
+  const nextDay = useMemo(() => {
+    const later = weekDays.filter((day) => day.date > selectedDate && day.count > 0);
+    const earlierToday = weekDays.filter((day) => day.date >= todayKey && day.date !== selectedDate && day.count > 0);
+    return later[0] ?? earlierToday[0] ?? null;
+  }, [weekDays, selectedDate, todayKey]);
 
   useEffect(() => {
     if (!isMobile || !listRef.current) return;
@@ -204,7 +214,9 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
               key={day.date}
               type="button"
               onClick={() => setSelectedDate(day.date)}
-              className="flex min-w-[52px] shrink-0 flex-col items-center gap-2 text-center md:min-w-0"
+              aria-pressed={isSelected}
+              aria-label={`${formatDayLabel(day.date)}: ${day.count} interview${day.count === 1 ? "" : "s"}`}
+              className="flex min-w-[52px] shrink-0 flex-col items-center gap-2 rounded-md text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B8EF0] md:min-w-0"
             >
               <span
                 className={cn(
@@ -255,10 +267,21 @@ export function TodaysInterviewsPanel({ jobId }: TodaysInterviewsPanelProps) {
             </div>
           ))
         ) : count === 0 || items.length === 0 ? (
-          <div className="flex min-h-[180px] items-center justify-center rounded-[12px] border border-dashed border-[#E7E9F0] bg-[#FBFBFD] px-6 text-center">
-            <p className="max-w-sm text-sm font-medium text-[#9AA1AF]">
+          <div className="flex min-h-[120px] flex-col items-center justify-center gap-3 rounded-[12px] border border-dashed border-[#E7E9F0] bg-[#FBFBFD] px-6 py-5 text-center">
+            <p className="max-w-sm text-sm font-medium text-[#6B7280]">
               {recruiterDashboardCopy.interviewsPanel.empty}
             </p>
+            {nextDay ? (
+              <button
+                type="button"
+                onClick={() => setSelectedDate(nextDay.date)}
+                className="inline-flex min-h-11 items-center rounded-[10px] bg-[#EEF5FF] px-4 text-[13px] font-semibold text-[#4B8EF0] transition-colors hover:bg-[#E0EDFF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4B8EF0]"
+              >
+                Next: {formatDayLabel(nextDay.date)} · {nextDay.count} interview{nextDay.count === 1 ? "" : "s"}
+              </button>
+            ) : (
+              <p className="text-xs text-[#9AA1AF]">Nothing else scheduled this week.</p>
+            )}
           </div>
         ) : (
           items.map((item) => {
