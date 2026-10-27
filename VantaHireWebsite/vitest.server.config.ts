@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: [
+      'server/candidate-product/**/*.test.ts',
       'server/schema-control/__tests__/**/*.test.ts',
       'server/lib/__tests__/**/*.test.ts',
       'server/tests/ai.routes.test.ts',

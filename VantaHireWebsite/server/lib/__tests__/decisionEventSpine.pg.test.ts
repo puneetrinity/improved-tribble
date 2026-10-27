@@ -201,7 +201,7 @@ describe.skipIf(!enabled)("decision-event spine exact-schema PostgreSQL", () => 
 
     // The release-first window is intentionally not runtime-ready until the
     // provisioner removes default table/sequence grants and applies the exact exception.
-    await expect(readinessAsRuntime()).rejects.toThrow(/Candidate index catalog, insert-only intent and five fenced routines are exact/);
+    await expect(readinessAsRuntime()).rejects.toThrow(/Candidate foundation catalog and routine-only permissions are exact/);
     await provisionRuntimeRole({
       migrateUrl: migrationUrl,
       runtimeUrl,

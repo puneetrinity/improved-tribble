@@ -207,7 +207,7 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   getUserByUsername(username: string): Promise<User | undefined>;
   updateUserPassword(id: number, hashedPassword: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  createUser(user: InsertUser, executor?: typeof db): Promise<User>;
 
   // Email verification operations
   setVerificationToken(userId: number, token: string, expires: Date): Promise<void>;
@@ -582,8 +582,8 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const [user] = await db
+  async createUser(insertUser: InsertUser, executor: typeof db = db): Promise<User> {
+    const [user] = await executor
       .insert(users)
       .values(insertUser)
       .returning();

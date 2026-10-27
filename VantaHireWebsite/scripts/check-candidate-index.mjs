@@ -14,11 +14,11 @@ export const FROZEN = {
   "package-lock.json": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539",
   "playwright.config.ts": "98cf29f15ddd205e42c713db919a54737bedcf2437b410c61f33df4f75d43e46",
   "server/ai.routes.ts": "0708edb56f17304257441a8f51111cffd06a7e449c5c01ffd4ac432df1360421",
-  "server/auth.ts": "25113b8fa50d0845ccb205b4fa02bae7c424e7b13aed30149d87b7e06a54b468",
+  "server/auth.ts": "be612d5ddcce73e7f2b398b58ec961e427e66e886d10db4c509bd3f1aed71d32",
   "server/candidate-consent/contracts.ts": "07bf05a48f5c475f3b44d30d1092196b106a5423174e4794a816ff8e9edb756e",
   "server/candidate-consent/memory-client.ts": "af32e401541bf21a8fdf33e09cc78c095948efaa62f151bd641a194b6eed8371",
   "server/candidate-consent/processor.ts": "ac2e75c87ed96d448579190ab82772655497510d850a71969ae826d5def47593",
-  "server/candidate-consent/repository.ts": "baf4d5c7a2cbcf164f364099ff95b3a28b94cd1fcfc26fc20a488dc8245081fd",
+  "server/candidate-consent/repository.ts": "25315b150c030ed97da3b96528d1ba81c69394cc507ecde51da980611ed0e833",
   "server/candidate-consent/routes.ts": "bc5f52d1710f7337eb27a74b729a2b4c07d946bc9c4fa23886152d2c525c5efa",
   "server/candidate-privacy/decision.ts": "02bd1b412deb3f89f8cd4646dae19a2a0825486acf0c09c109c247da83c38f52",
   "server/candidate-privacy/memory-client.ts": "2ebadff6448e64f01e13fccd2e0003d27728e566493f2d72aaf114475aa60dc8",
@@ -29,7 +29,7 @@ export const FROZEN = {
   "server/gcs-storage.ts": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802",
   "server/lib/resumeExtractor.ts": "217ed1dd5b7c23fa6945d5602c55286cc5655ff8ba481f3b5dbf106fea44c0f2",
   "server/lib/services/activekg-client.ts": "936ce79804d7380bf2f213354a6a5128ef24c96a58d321caa1dce54a73be140d",
-  "server/lib/services/jwt-signer.ts": "c33e30968cd75e3919cff56f4b33a9b7d3f85c17b74d262ef2269b203cdba811",
+  "server/lib/services/jwt-signer.ts": "da6b52eeafa94a540d8244eccbf1433f30e6274ef5132d17b4ad3e6e17e0709d",
   "server/organization-candidates/contracts.ts": "e68a6226ac9225f4767ffa69d2431392f15b6d9aef8857202047eddbf81696c8",
   "server/organization-candidates/memory-client.ts": "216691b47c39d3b8d54201cecf1b065f5bc55a95d5e5790bf41e8e177922e77b",
   "server/organization-candidates/processor.ts": "379701feac382b3b42e37e16ff9144adc595244a272e378b519d860b5c11d914",
@@ -50,7 +50,7 @@ export const FROZEN = {
   "server/schema-migrations/0010_organization_private_candidate_reference.sql": "eaecd7bdc1637aaa314bc0c04c123b1fcfbeb8501d2cc83c8cb58b8a75a30495",
   "server/schema-migrations/0011_candidate_consent.sql": "0d544103c5cacc60861b3916b243d2ae8690b8a470ed7233222eff4c3c7f4b74",
   "server/schema-migrations/catalog.lock.json": "999636b7722cc305b10f71b9a096cc75701400ff49aea91435f839cadf13b90c",
-  "server/storage.ts": "b361556678de9f1626cf6cbd7657b56eebc8da367dd100673f926ec7564f3908"
+  "server/storage.ts": "a8680da684c2363ab56d1a0749cc561db08a201771af0a437f23d739a158eed7"
 };
 export const MIGRATION = "server/schema-migrations/0012_candidate_index_delivery.sql";
 export const AUTHORITIES = [MIGRATION, "server/schema-migrations/checksums.lock",

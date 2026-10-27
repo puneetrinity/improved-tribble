@@ -55,6 +55,8 @@
     "db:provision-runtime-role": "cross-env NODE_ENV=production node dist/provision-runtime-role.js",
     "schema:ready": "cross-env NODE_ENV=production node dist/schema-ready.js",
     "check:schema-control": "node scripts/check-schema-control.mjs",
+    "check:candidate-product": "node scripts/check-candidate-product.mjs",
+    "test:candidate-product": "vitest run --config vitest.server.config.ts server/candidate-product",
     "check:candidate-privacy-surfaces": "node scripts/check-candidate-privacy-surfaces.mjs",
     "check:object-authorization": "node scripts/check-object-authorization.mjs",
     "check:organization-candidate-intake": "node scripts/check-organization-candidate-intake.mjs",

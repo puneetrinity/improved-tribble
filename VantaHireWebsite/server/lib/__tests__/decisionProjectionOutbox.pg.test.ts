@@ -213,7 +213,7 @@ describe.skipIf(!enabled)("decision-projection outbox exact-schema PostgreSQL", 
       "SELECT COUNT(*)::integer events,(SELECT COUNT(*)::integer FROM decision_projection_outbox) intents FROM decision_events",
     )).rows[0]?.events === 1 && (await owner.query("SELECT COUNT(*)::integer n FROM decision_projection_outbox")).rows[0]?.n === 0;
 
-    await expect(readinessAsRuntime()).rejects.toThrow(/Candidate index catalog, insert-only intent and five fenced routines are exact/);
+    await expect(readinessAsRuntime()).rejects.toThrow(/Candidate foundation catalog and routine-only permissions are exact/);
     await provision();
     await expect(readinessAsRuntime()).resolves.toEqual({ version: currentTail, applied: currentLedger });
     process.env.DATABASE_URL = runtimeUrl;
