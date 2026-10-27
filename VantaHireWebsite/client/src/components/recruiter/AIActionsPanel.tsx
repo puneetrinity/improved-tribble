@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { AlertCircle, ArrowRight, Loader2, RefreshCcw, Zap } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile";
 import { recruiterDashboardCopy } from "@/lib/internal-copy";
 import { apiRequest } from "@/lib/queryClient";
 import { DASHBOARD_EYEBROW, DASHBOARD_PANEL, DASHBOARD_PANEL_MUTED, DASHBOARD_TITLE } from "@/lib/dashboard-theme";
@@ -146,7 +145,6 @@ function normalizeSections(rawSections: RawActionSection[] | undefined): Normali
 export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<TabKey>("candidates_to_review");
-  const isMobile = useIsMobile();
 
   const { data, isLoading, error, refetch, isFetching } = useQuery<RawActionsResponse>({
     queryKey: ["/api/recruiter-dashboard/actions", range, jobId],
@@ -168,6 +166,12 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
     [data?.generatedAt, data?.updatedAt],
   );
   const activeSection = sections.find((section) => section.key === activeTab) ?? sections[0];
+  const sharedUrgency: ActionUrgency | null = (() => {
+    const items = activeSection?.items ?? [];
+    if (items.length < 2) return null;
+    const first = items[0]!.urgency;
+    return items.every((item) => item.urgency === first) && URGENCY_BADGE_STYLES[first] ? first : null;
+  })();
 
   return (
     <section
@@ -246,7 +250,17 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
             <p className="font-inter text-sm text-[#9CA3AF]">{activeSection.emptyMessage}</p>
           </div>
         ) : (
-          <div className="actions-list flex-1 space-y-3 overflow-y-auto pr-1 transition-[overflow] duration-150 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#B8D5FF] [&::-webkit-scrollbar-thumb:hover]:bg-[#4B8EF0] [&::-webkit-scrollbar-track]:bg-transparent md:overflow-y-hidden md:hover:[scrollbar-color:#B8D5FF_transparent] md:[.actions-panel:hover_&]:overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col">
+            {sharedUrgency ? (
+              // Every item shares one urgency: say it once instead of tagging every row.
+              <p className="mb-3 inline-flex items-center gap-2 font-inter text-xs text-[#6B7280]">
+                <span className={cn("inline-flex rounded-[6px] px-2 py-1 font-medium leading-none", URGENCY_BADGE_STYLES[sharedUrgency].container)}>
+                  {URGENCY_BADGE_STYLES[sharedUrgency].label} {recruiterDashboardCopy.actionsPanel.urgency.suffix}
+                </span>
+                <span>Applies to every item below</span>
+              </p>
+            ) : null}
+            <ul className="actions-list flex-1 divide-y divide-[#191C1E]/6 overflow-y-auto rounded-[12px] border border-[#191C1E]/6 pr-1 [scrollbar-width:thin] [&::-webkit-scrollbar]:w-[4px] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[#B8D5FF] [&::-webkit-scrollbar-track]:bg-transparent">
             {activeSection.items.map((item, index) => {
               const fitKey = item.badge?.trim().toLowerCase() ?? "";
               const fitBadgeClass = FIT_BADGE_STYLES[fitKey] ?? "bg-[#F3F4F6] text-[#6B7280]";
@@ -254,60 +268,37 @@ export function AIActionsPanel({ range, jobId }: AIActionsPanelProps) {
               const cardKey = item.id ?? `${item.title}-${item.ctaHref}-${index}`;
 
               return (
-                <article
-                  key={cardKey}
-                  onClick={() => {
-                    if (isMobile) {
-                      setLocation(item.ctaHref);
-                    }
-                  }}
-                  className={cn(DASHBOARD_PANEL_MUTED, "cursor-pointer p-4 transition-colors hover:bg-[#F3F4F8]")}
-                >
-                  <div className="flex items-start justify-between gap-4">
+                <li key={cardKey}>
+                  {/* The whole row opens the item, by mouse, touch or keyboard. */}
+                  <button
+                    type="button"
+                    onClick={() => setLocation(item.ctaHref)}
+                    aria-label={`${item.ctaLabel}: ${item.title}`}
+                    className="group flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[#F3F4F8] focus-visible:bg-[#F3F4F8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#4B8EF0]"
+                  >
                     <div className="min-w-0 flex-1">
-                      <h3 className="truncate font-manrope text-[15px] font-semibold leading-[1.25] text-[#191C1E]">
-                        {item.title}
-                      </h3>
-                      <p className="mt-1 truncate font-inter text-sm font-normal leading-[1.35] text-[#464555]">
-                        {item.subtitle}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setLocation(item.ctaHref);
-                        }}
-                        className="mt-5 inline-flex items-center gap-2 rounded-[12px] bg-[#FFFFFF] px-5 py-3 font-inter text-[0.875rem] font-medium leading-none text-[#4B8EF0] shadow-[0_2px_8px_rgba(75,142,240,0.08)] transition-colors hover:bg-[#EEF5FF]"
-                      >
-                        <span>{item.ctaLabel}</span>
-                        <ArrowRight className="h-4 w-4" />
-                      </button>
+                      <h3 className="truncate font-manrope text-[15px] font-semibold leading-[1.25] text-[#191C1E]">{item.title}</h3>
+                      <p className="mt-0.5 truncate font-inter text-sm font-normal leading-[1.35] text-[#464555]">{item.subtitle}</p>
                     </div>
-
-                    <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       {item.badge ? (
-                        <span
-                          className={cn(
-                            "inline-flex rounded-[6px] px-2 py-1 font-inter text-[0.65rem] font-bold uppercase tracking-[0.08em]",
-                            fitBadgeClass,
-                          )}
-                        >
+                        <span className={cn("hidden rounded-[6px] px-2 py-1 font-inter text-[0.65rem] font-bold uppercase tracking-[0.08em] sm:inline-flex", fitBadgeClass)}>
                           {item.badge}
                         </span>
                       ) : null}
-                      <span
-                        className={cn(
-                          "inline-flex rounded-[6px] px-2 py-1 font-inter text-[0.7rem] font-medium leading-none",
-                          urgencyStyle.container,
-                        )}
-                      >
-                        {urgencyStyle.label} {recruiterDashboardCopy.actionsPanel.urgency.suffix}
-                      </span>
+                      {!sharedUrgency ? (
+                        <span className={cn("inline-flex rounded-[6px] px-2 py-1 font-inter text-[0.7rem] font-medium leading-none", urgencyStyle.container)}>
+                          {urgencyStyle.label} {recruiterDashboardCopy.actionsPanel.urgency.suffix}
+                        </span>
+                      ) : null}
+                      <span className="hidden font-inter text-sm font-medium text-[#4B8EF0] md:inline">{item.ctaLabel}</span>
+                      <ArrowRight className="h-4 w-4 text-[#4B8EF0] transition-transform group-hover:translate-x-0.5" aria-hidden />
                     </div>
-                  </div>
-                </article>
+                  </button>
+                </li>
               );
             })}
+            </ul>
           </div>
         )}
       </div>

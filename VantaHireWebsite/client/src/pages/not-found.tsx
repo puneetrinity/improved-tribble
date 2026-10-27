@@ -1,7 +1,7 @@
 import HomepageFooter from "@/components/HomepageFooter";
 import HomepageNav from "@/components/HomepageNav";
 import GridOverlay from "@/components/GridOverlay";
-import { AlertCircle, ArrowRight } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 
@@ -43,7 +43,6 @@ export default function NotFound() {
                     className="inline-flex items-center gap-2 rounded-xl bg-e-blue px-6 py-3 text-sm font-medium text-white no-underline transition-all duration-200 hover:brightness-110 hover:shadow-[0_8px_36px_rgba(75,142,240,0.35)]"
                   >
                     Get Started -&gt;
-                    <ArrowRight className="h-4 w-4" />
                   </Link>
                   <Link
                     href="/"

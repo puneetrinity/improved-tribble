@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,8 @@ export default function PublicFormPage() {
   const [errors, setErrors] = useState<Map<number, string>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [uploadingFiles, setUploadingFiles] = useState<Set<number>>(new Set());
+  // Chosen file per field, shown while it uploads (the uploaded view replaces it afterwards).
+  const [pendingFiles, setPendingFiles] = useState<Map<number, File>>(new Map());
 
   // Fetch form data on mount - using typed API client with exhaustive error handling
   useEffect(() => {
@@ -361,22 +364,22 @@ export default function PublicFormPage() {
         inputElement = (
           <div className="space-y-2">
             {!fileAnswer ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  {...commonProps}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      handleFileUpload(field.id, file);
-                    }
-                  }}
-                  disabled={isUploading}
-                  className="text-foreground"
-                />
-                {isUploading && <Loader2 className="w-4 h-4 text-primary animate-spin" />}
-              </div>
+              <FileDropzone
+                id={`field-${field.id}`}
+                externalLabel
+                label={field.label}
+                required={field.required}
+                accept=".pdf,.doc,.docx"
+                maxSizeMB={5}
+                value={pendingFiles.get(field.id) ?? null}
+                busy={isUploading}
+                onChange={(file) => {
+                  const next = new Map(pendingFiles);
+                  if (file) next.set(field.id, file); else next.delete(field.id);
+                  setPendingFiles(next);
+                  if (file) handleFileUpload(field.id, file);
+                }}
+              />
             ) : (
               <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border border-border">
                 <div className="flex items-center gap-2 flex-1 min-w-0">

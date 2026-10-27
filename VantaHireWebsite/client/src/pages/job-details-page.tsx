@@ -1,9 +1,10 @@
 ﻿import { useState, useEffect, useLayoutEffect } from "react";
+import { FileDropzone } from "@/components/ui/file-dropzone";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useSearch } from "wouter";
 import { Helmet } from "react-helmet-async";
 import { publicJobDescription, serializeJobJsonLd } from '@shared/jobDescription';
-import { MapPin, Clock, Calendar, Users, FileText, Upload, Briefcase, Star, Share2, Bookmark, Sparkles, AlertTriangle, RotateCcw, History, IndianRupee, GraduationCap, ChevronRight, User, X, Check } from "lucide-react";
+import { MapPin, Clock, Calendar, Users, FileText, Briefcase, Star, Share2, Bookmark, Sparkles, AlertTriangle, RotateCcw, History, IndianRupee, GraduationCap, ChevronRight, User, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { insertApplicationSchema, type UserProfile } from "@shared/schema";
 import type { PublicJob } from '@shared/publicJob';
@@ -989,25 +990,16 @@ export default function JobDetailsPage() {
                             </Link>
                           </div>
                         ) : (
-                          <div className="flex flex-col gap-1.5">
-                            <label htmlFor="resume" className="text-[0.78rem] font-medium text-e-text2">Resume (PDF) *</label>
-                            <div className="relative">
-                              <input
-                                id="resume"
-                                type="file"
-                                accept=".pdf,.doc,.docx"
-                                className="bg-white/[0.04] border border-white/10 rounded-xl py-2.5 px-3 font-ui text-[0.82rem] text-e-text2 w-full cursor-pointer file:bg-e-blue file:text-white file:border-none file:rounded-xl file:py-1.5 file:px-4 file:mr-3 file:font-ui file:text-[0.78rem] file:font-medium file:cursor-pointer"
-                                onChange={(e) => setResumeFile(e.target.files?.[0] || null)}
-                                required
-                              />
-                              <Upload className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-e-text3 pointer-events-none" />
-                            </div>
-                            {resumeFile && (
-                              <span className="flex items-center gap-1.5 text-[0.78rem] text-e-green mt-1 [&>svg]:w-3.5 [&>svg]:h-3.5">
-                                <Check /> {resumeFile.name}
-                              </span>
-                            )}
-                          </div>
+                          <FileDropzone
+                            id="resume"
+                            label="Resume"
+                            required
+                            tone="dark"
+                            accept=".pdf,.doc,.docx"
+                            maxSizeMB={5}
+                            value={resumeFile}
+                            onChange={setResumeFile}
+                          />
                         )}
                         <div className="flex flex-col gap-1.5">
                           <label htmlFor="coverLetter" className="text-[0.78rem] font-medium text-e-text2">Cover Letter</label>
