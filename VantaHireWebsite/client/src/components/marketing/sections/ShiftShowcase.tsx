@@ -93,7 +93,7 @@ function TiPanel({ animate }: { animate: boolean }) {
             return (
               <motion.div
                 key={role + meta}
-                initial={animate ? { opacity: 0, y: 8 } : false}
+                initial={animate ? { y: 8 } : false}
                 animate={{ y: 0 }}
                 transition={{ duration: 0.25, delay: animate ? Math.min(i * 0.045, 0.7) : 0 }}
                 style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #E5E7EB", borderRadius: 9, padding: "8px 10px", background: "#FFFFFF", color: "#6B7280", fontSize: "0.66rem" }}
@@ -129,7 +129,7 @@ function DiPanel({ animate }: { animate: boolean }) {
         {RANKED.map((c, i) => (
           <motion.div
             key={c.initials}
-            initial={animate ? { opacity: 0, y: 14 } : false}
+            initial={animate ? { y: 14 } : false}
             animate={{ y: 0 }}
             transition={{ duration: 0.3, delay: animate ? 0.12 * i : 0 }}
             style={{ display: "grid", gridTemplateColumns: "34px 1fr auto", gap: 12, alignItems: "center", padding: "9px 10px", borderBottom: i < RANKED.length - 1 ? "1px solid #ECEFF5" : "none" }}
