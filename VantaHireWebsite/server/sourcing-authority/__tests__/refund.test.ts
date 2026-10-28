@@ -71,3 +71,25 @@ describe('no-result search refunds', () => {
     expect(claim).not.toHaveBeenCalled();
   });
 });
+
+import { noResultRefundReason } from '../refund';
+import { noResultRefundOffered } from '../contracts';
+
+describe('Part B trigger', () => {
+  it('maps terminal callbacks to the right refund, or none', () => {
+    expect(noResultRefundReason('failed', 'failed', 0)).toBe('system_failure');
+    expect(noResultRefundReason('complete', 'completed', 0)).toBe('zero_results');
+    // partial results, any delivered candidate, or Flow's own fetch failure: no refund
+    expect(noResultRefundReason('partial', 'completed', 0)).toBeNull();
+    expect(noResultRefundReason('complete', 'completed', 3)).toBeNull();
+    expect(noResultRefundReason('complete', 'failed', 0)).toBeNull();
+    expect(noResultRefundReason('partial', 'failed', 0)).toBeNull();
+  });
+  it('offers "no candidates, no search charged" only while both switches are on', () => {
+    expect(noResultRefundOffered({ FLOW_SOURCING_REFUND_SYSTEM_FAILURE: 'true', FLOW_SOURCING_REFUND_ZERO_RESULTS: 'true' })).toBe(true);
+    expect(noResultRefundOffered({ FLOW_SOURCING_REFUND_SYSTEM_FAILURE: 'true' })).toBe(false);
+    expect(noResultRefundOffered({ FLOW_SOURCING_REFUND_ZERO_RESULTS: 'true' })).toBe(false);
+    expect(noResultRefundOffered({})).toBe(false);
+    expect(noResultRefundOffered({ FLOW_SOURCING_REFUND_ZERO_RESULTS: 'yes' })).toBe(false);
+  });
+});

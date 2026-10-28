@@ -29,6 +29,11 @@ export function sourcingRefundPolicy(env: NodeJS.ProcessEnv = process.env): { sy
   };
   return { systemFailure: read('FLOW_SOURCING_REFUND_SYSTEM_FAILURE'), zeroResults: read('FLOW_SOURCING_REFUND_ZERO_RESULTS') };
 }
+/** The confirm dialog promises "no candidates, no search charged" only while both
+ * refund switches are on. Display only: it isn't part of the sealed quote. */
+export function noResultRefundOffered(env: NodeJS.ProcessEnv = process.env): boolean {
+  try { const p = sourcingRefundPolicy(env); return p.systemFailure && p.zeroResults; } catch { return false; }
+}
 
 export const sourcingReasonCodes = [
   'skills_gap', 'experience_requirement', 'role_seniority', 'domain',

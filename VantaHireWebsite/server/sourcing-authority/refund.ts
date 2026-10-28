@@ -7,6 +7,22 @@ export type RefundReason = 'system_failure' | 'zero_results';
 type RefundCall = (organizationId: number, admissionId: string, reason: RefundReason) => Promise<unknown>;
 export type UnresolvedRefundAlert = { organizationId: number; admissionId: string; reason: RefundReason };
 
+/** Which refund (if any) a terminal callback can trigger.
+ * - Part A: Discover reported `failed`. Flow's own results-fetch failure arrives as
+ *   `complete` and becomes `failed` locally; it never refunds, because results can
+ *   still arrive.
+ * - Part B: Discover reported `complete` (not `partial`) and Flow delivered nothing.
+ * The database routine re-checks that nothing was delivered and is once-only. */
+export function noResultRefundReason(
+  callbackStatus: 'complete' | 'partial' | 'failed',
+  finalStatus: 'completed' | 'failed',
+  deliveredCount: number,
+): RefundReason | null {
+  if (callbackStatus === 'failed' && finalStatus === 'failed') return 'system_failure';
+  if (callbackStatus === 'complete' && finalStatus === 'completed' && deliveredCount === 0) return 'zero_results';
+  return null;
+}
+
 const EMAIL = /^[^\s@<>"]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$/;
 
 /** Operator alert for a refund recorded as `unusable` (the organisation had no

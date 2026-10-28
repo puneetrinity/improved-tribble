@@ -4,7 +4,7 @@ import { canonicalJson, approveBriefSchema, sourceHash } from '../job-brief/cont
 import type { BriefScope } from '../job-brief/repository';
 import { getGroqModel } from '../lib/aiModelConfig';
 import { requireCandidatePrivacyAllowed } from '../candidate-privacy/decision';
-import { hashSchema, idSchema, revisionSchema, sourcingAdmissionSchema, sourcingDecisionSchema, sourcingPreviewRequestSchema, sourcingGrantRequestSchema,sourcingReceiptSchema,sourcingNoDispatchSchema } from './contracts';
+import { hashSchema, idSchema, revisionSchema, sourcingAdmissionSchema, sourcingDecisionSchema, sourcingPreviewRequestSchema, sourcingGrantRequestSchema,sourcingReceiptSchema,sourcingNoDispatchSchema, noResultRefundOffered } from './contracts';
 import {validateProviderGrant,type SourcingQueryArtifact,type ExactAcquisitionEvidence} from './compiler';
 import { SourcingError, SourcingRepository } from './repository';
 import {searchBudgetFields} from '../../shared/sourcing-funding';
@@ -59,7 +59,7 @@ export async function quoteSourcing(repository:SourcingRepository,scope:BriefSco
   // PostgreSQL timestamps carry microseconds. Preserve the signed wire value:
   // JavaScript Date would silently truncate the subscription/window identity.
   const quote=parsed;
-  return {...quote,quoteToken:sealQuote(scope,quote)};
+  return {...quote,quoteToken:sealQuote(scope,quote),noResultRefund:noResultRefundOffered()};
 }
 export async function admitSourcing(repository:SourcingRepository,scope:BriefScope,input:unknown) {
   const parsed=sourcingAdmissionSchema.parse(input);

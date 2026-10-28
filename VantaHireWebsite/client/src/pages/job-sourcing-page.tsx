@@ -1013,7 +1013,7 @@ export default function JobSourcingPage() {
         <DialogContent><DialogHeader><DialogTitle>Start the search for this job?</DialogTitle>
           <DialogDescription>Uses 1 {admissionQuote?.funding.kind==='extra'?'extra':'included'} search from {admissionQuote?.payerUserId===user?.id?'your allowance':`${admissionQuote?.payerDisplayName}’s allowance`}. {admissionQuote?.includedRemaining} included and {admissionQuote?.extraRemaining} extra searches remain.
             {admissionQuote?.funding.kind==='extra'&&` This extra search expires ${new Date(admissionQuote.funding.expiresAt).toLocaleDateString()}.`}
-            {' '}Each job gets one search. If something looks wrong with your results, contact us at <a href="mailto:info@ealana.com" className="font-medium text-primary underline underline-offset-2">info@ealana.com</a>.</DialogDescription>
+            {' '}Each job gets one search.{admissionQuote?.noResultRefund&&' No candidates, no search charged.'} If something looks wrong with your results, contact us at <a href="mailto:info@ealana.com" className="font-medium text-primary underline underline-offset-2">info@ealana.com</a>.</DialogDescription>
         </DialogHeader><DialogFooter><Button variant="outline" disabled={admission.isPending} onClick={()=>setAdmissionQuote(null)}>Cancel</Button>
           <Button disabled={admission.isPending} onClick={()=>admissionQuote&&admission.mutate(admissionQuote)}>{admission.isPending?'Starting…':'Start search'}</Button>
         </DialogFooter></DialogContent>

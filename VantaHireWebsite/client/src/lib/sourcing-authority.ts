@@ -9,6 +9,7 @@ export const admissionQuoteSchema=z.object({
   windowStart:z.string().datetime({offset:true}),windowEnd:z.string().datetime({offset:true}),revision:z.number().int().nonnegative(),
   briefVersionId:z.string().uuid(),materialHash:z.string().regex(/^[a-f0-9]{64}$/),artifactId:z.string().uuid(),
   quotedAt:z.string().datetime({offset:true}),expiresAt:z.string().datetime({offset:true}),quoteToken:z.string().min(1).max(8192),
+  noResultRefund:z.boolean(),
 }).strict();
 export type AdmissionQuote=z.infer<typeof admissionQuoteSchema>;
 export type SourcingPreview={artifactId:string|null;id:string|null;state:string;count:number|null;
