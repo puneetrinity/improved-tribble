@@ -19,6 +19,17 @@ export function sourcingEnabled(env: NodeJS.ProcessEnv = process.env, worker = f
   return value === 'true';
 }
 
+/** No-result search refunds. Part A (system failure) and Part B (zero results)
+ * have separate switches; absent means off. Invalid values refuse startup. */
+export function sourcingRefundPolicy(env: NodeJS.ProcessEnv = process.env): { systemFailure: boolean; zeroResults: boolean } {
+  const read = (name: string) => {
+    const value = env[name];
+    if (value !== undefined && value !== 'false' && value !== 'true') throw new Error('SOURCING_INVALID_CONFIGURATION');
+    return value === 'true';
+  };
+  return { systemFailure: read('FLOW_SOURCING_REFUND_SYSTEM_FAILURE'), zeroResults: read('FLOW_SOURCING_REFUND_ZERO_RESULTS') };
+}
+
 export const sourcingReasonCodes = [
   'skills_gap', 'experience_requirement', 'role_seniority', 'domain',
   'location_work_arrangement', 'compensation', 'availability', 'insufficient_information', 'other',

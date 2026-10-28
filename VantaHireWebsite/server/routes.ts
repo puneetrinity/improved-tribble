@@ -19,7 +19,8 @@ import { registerClientsRoutes } from "./clients.routes";
 import { registerJobsRoutes } from "./jobs.routes";
 import { registerJobBriefRoutes } from "./job-brief/routes";
 import { jobBriefEnabled, jobBriefAutoDraftEnabled } from "./job-brief/contracts";
-import { sourcingEnabled } from "./sourcing-authority/contracts";
+import { sourcingEnabled, sourcingRefundPolicy } from "./sourcing-authority/contracts";
+import { startOpsNotificationDrainer } from "./sourcing-authority/refund";
 import { registerSourcingAuthorityRoutes } from "./sourcing-authority/routes";
 import { startSourcingAuthorityWorker } from "./sourcing-authority/worker";
 import { registerApplicationsRoutes } from "./applications.routes";
@@ -58,6 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   jobBriefEnabled(); // Strict web-only configuration, before accepting requests.
   jobBriefAutoDraftEnabled();
   sourcingEnabled();
+  sourcingRefundPolicy();
+  // Durable operator notifications (unusable refunds) are delivered from the web process.
+  if (process.env.FLOW_OPS_ALERT_EMAIL) startOpsNotificationDrainer();
   // Setup security middleware with environment-aware CSP
   const isDevelopment = process.env.NODE_ENV === 'development';
 

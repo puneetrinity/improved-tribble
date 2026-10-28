@@ -1,6 +1,7 @@
 import type {PgLike} from '../schema-control/ledger';
 
 export const SOURCING_TABLES=[
+  'sourcing_refunds','sourcing_ops_notifications',
   'sourcing_extra_grants','sourcing_extra_balances','sourcing_extra_events','sourcing_admission_funding',
   'sourcing_org_state','sourcing_entitlements','sourcing_seat_slots','sourcing_seat_events','sourcing_allowance_windows',
   'sourcing_query_artifacts','sourcing_digest_requests','sourcing_admissions','sourcing_account_events','sourcing_dispatch_outbox',
@@ -16,7 +17,7 @@ export const SOURCING_FUNCTIONS=[
   'flow_sourcing_dispatch_claim(uuid)','flow_sourcing_dispatch_finish(uuid,uuid,jsonb)',
   'flow_sourcing_grant_context(text,uuid)','flow_sourcing_run_binding(integer,integer,text)',
   'flow_sourcing_grant(integer,uuid,jsonb)','flow_sourcing_receipt(integer,uuid,jsonb)','flow_sourcing_cancel(integer,uuid,jsonb)',
-  'flow_sourcing_deliver(integer,uuid,jsonb)','flow_sourcing_preview_request(integer,integer,integer,uuid,jsonb)',
+  'flow_sourcing_deliver(integer,uuid,jsonb)','flow_sourcing_refund(integer,uuid,text)','flow_sourcing_ops_notify_claim(uuid)','flow_sourcing_ops_notify_finish(uuid,uuid,boolean,text)','flow_sourcing_preview_request(integer,integer,integer,uuid,jsonb)',
   'flow_sourcing_preview_claim(uuid)','flow_sourcing_preview_finish(uuid,uuid,jsonb)',
 ] as const;
 export const SOURCING_PRIVATE_FUNCTIONS=[
@@ -29,7 +30,7 @@ export const SOURCING_PRIVATE_FUNCTIONS=[
 ] as const;
 export const SOURCING_PRIVATE_NAMES=SOURCING_PRIVATE_FUNCTIONS.map(s=>s.slice(0,s.indexOf('(')));
 // Reproduced from the final disposable catalog before the build can pass readiness.
-export const SOURCING_CATALOG_SHA256='5217df060750cb91d4066422b5d0b450fffc55a95d1f8dc5da45c1c7b4879182';
+export const SOURCING_CATALOG_SHA256='7002a17e53bc09cc50020eb0490d304d092511f92eacb8f6e092b49202fe85d8';
 export const SOURCING_CATALOG_SQL=`WITH relations AS (
  SELECT c.* FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
  WHERE n.nspname='public' AND c.relname LIKE 'sourcing_%' AND c.relkind IN ('r','p')

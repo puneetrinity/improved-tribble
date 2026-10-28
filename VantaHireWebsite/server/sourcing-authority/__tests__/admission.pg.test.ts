@@ -529,6 +529,165 @@ describe.skipIf(!enabled)('sourcing SQL admission component on real PostgreSQL',
     await db.query('ROLLBACK TO SAVEPOINT replay');
     expect((await db.query("SELECT count(*)::int n FROM sourcing_account_events WHERE kind='release'")).rows[0].n).toBe(1);
   });
+  describe('no-result refunds',()=>{
+    const refund=(id:string,reason:string)=>one('SELECT flow_sourcing_refund($1,$2,$3) result',[org,id,reason]);
+    const win=()=>db.query('SELECT reserved,captured FROM sourcing_allowance_windows WHERE organization_id=$1',[org]).then(r=>r.rows[0]);
+    async function charged(historical=true){
+      const f=await boundAdmission(true,historical),grant=await f.grant();
+      await one('SELECT flow_sourcing_receipt($1,$2,$3) result',[org,f.admitted.id,f.receipt(grant,'started')]);
+      return f;
+    }
+    const finish=(id:string,status:string)=>db.query('UPDATE job_sourcing_runs SET status=$2 WHERE sourcing_admission_id=$1',[id,status]);
+    it('refunds a failed search once into its open window, never twice or for both reasons',async()=>{
+      const f=await charged();expect(await win()).toEqual({reserved:0,captured:1});
+      await finish(f.admitted.id,'failed');
+      expect(await refund(f.admitted.id,'system_failure')).toEqual({refunded:true,replayed:false,reason:'system_failure',target:'original_window'});
+      expect(await win()).toEqual({reserved:0,captured:0});
+      expect(await refund(f.admitted.id,'system_failure')).toMatchObject({refunded:true,replayed:true});
+      await finish(f.admitted.id,'completed');
+      expect(await refund(f.admitted.id,'zero_results')).toMatchObject({replayed:true,reason:'system_failure'});
+      expect(await win()).toEqual({reserved:0,captured:0});
+      expect((await db.query('SELECT count(*)::int n FROM sourcing_refunds')).rows[0].n).toBe(1);
+    });
+    it('refuses delivered, partial, unfinished, mismatched and uncharged searches',async()=>{
+      const f=await charged();
+      expect(await refund(f.admitted.id,'system_failure')).toEqual({refunded:false,code:'SOURCING_REFUND_NOT_TERMINAL'});
+      await finish(f.admitted.id,'failed');
+      expect(await refund(f.admitted.id,'zero_results')).toEqual({refunded:false,code:'SOURCING_REFUND_NOT_TERMINAL'});
+      await db.query("INSERT INTO job_sourced_candidates(organization_id,job_id,request_id,signal_candidate_id,source_type) VALUES($1,95201,$2,'partial-person','discovered')",[org,f.grantCommand.discoverRequestId]);
+      expect(await refund(f.admitted.id,'system_failure')).toEqual({refunded:false,code:'SOURCING_REFUND_DELIVERED'});
+      expect(await win()).toEqual({reserved:0,captured:1});
+      expect((await db.query('SELECT count(*)::int n FROM sourcing_refunds')).rows[0].n).toBe(0);
+    });
+    it('refuses a search that was never charged',async()=>{
+      const f=await boundAdmission(true,true);await finish(f.admitted.id,'failed');
+      expect(await refund(f.admitted.id,'system_failure')).toEqual({refunded:false,code:'SOURCING_REFUND_NOT_CAPTURED'});
+    });
+    it('refuses results that arrive after a refund',async()=>{
+      const f=await charged();await finish(f.admitted.id,'completed');
+      expect(await refund(f.admitted.id,'zero_results')).toMatchObject({refunded:true,target:'original_window'});
+      await refused(()=>one('SELECT flow_sourcing_deliver($1,$2,$3) result',[org,f.admitted.id,{requestId:f.grantCommand.discoverRequestId,
+        executionAttemptId:f.grantCommand.executionAttemptId,artifactHash:f.artifact.queryHash,revision:1,orderedSignalIds:[]}]),'SOURCING_REFUNDED');
+    });
+    // A current (non-historical) admission carries a ranking contract, so delivery goes through the
+    // ranking validation branch: revision, output hash and contract hash must match each stored assessment.
+    async function rankedWrite(f:any,person:string){
+      const contract=await one('SELECT ranking_contract result FROM sourcing_admissions WHERE id=$1',[f.admitted.id]);
+      expect(contract).not.toBeNull();
+      const binding=await one('SELECT flow_sourcing_run_binding($1,$2,$3) result',[org,95201,f.grantCommand.discoverRequestId]);
+      expect(binding).toMatchObject({protocolVersion:2,flowRunId:f.admitted.id});
+      const body={requestId:f.grantCommand.discoverRequestId,executionAttemptId:f.grantCommand.executionAttemptId,
+        artifactHash:f.artifact.queryHash,revision:1,orderedSignalIds:[person],
+        rankingRevision:randomUUID(),rankingHash:hash,contractHash:binding.contractHash};
+      const assessment={candidateId:person,ordinal:1,revisionId:body.rankingRevision,outputHash:hash,contractHash:binding.contractHash};
+      // The late results callback stores and ranks its candidates and delivers them as one unit.
+      return async()=>{
+        await db.query("INSERT INTO job_sourced_candidates(organization_id,job_id,request_id,signal_candidate_id,source_type,candidate_summary) VALUES($1,95201,$2,$3,'discovered',$4)",
+          [org,f.grantCommand.discoverRequestId,person,{ranking:assessment}]);
+        return one('SELECT flow_sourcing_deliver($1,$2,$3) result',[org,f.admitted.id,body]);
+      };
+    }
+    const published=async(f:any)=>({
+      candidates:(await db.query('SELECT count(*)::int n FROM job_sourced_candidates WHERE request_id=$1',[f.grantCommand.discoverRequestId])).rows[0].n,
+      deliveries:(await db.query('SELECT count(*)::int n FROM sourcing_deliveries WHERE admission_id=$1',[f.admitted.id])).rows[0].n,
+      items:(await db.query('SELECT count(*)::int n FROM sourcing_delivery_items')).rows[0].n});
+    it('refuses a valid current ranked delivery that arrives after a refund, publishing nothing',async()=>{
+      const f=await charged(false),write=await rankedWrite(f,'late-person');
+      // Control: the identical ranked payload is accepted when no refund exists.
+      await db.query('SAVEPOINT ranked_control');
+      expect(await write()).toMatchObject({revision:1,replayed:false});
+      expect(await published(f)).toEqual({candidates:1,deliveries:1,items:1});
+      await db.query('ROLLBACK TO SAVEPOINT ranked_control');
+      expect(await published(f)).toEqual({candidates:0,deliveries:0,items:0});
+      await finish(f.admitted.id,'failed');
+      expect(await refund(f.admitted.id,'system_failure')).toMatchObject({refunded:true,target:'original_window'});
+      await refused(write,'SOURCING_REFUNDED');
+      expect(await published(f)).toEqual({candidates:0,deliveries:0,items:0});
+      expect(await win()).toEqual({reserved:0,captured:0});
+    });
+    it('refuses a refund after a valid current ranked delivery through the real delivery routine',async()=>{
+      const f=await charged(false),write=await rankedWrite(f,'ranked-person');
+      expect(await write()).toMatchObject({revision:1,replayed:false});
+      expect(await published(f)).toEqual({candidates:1,deliveries:1,items:1});
+      await finish(f.admitted.id,'failed');
+      expect(await refund(f.admitted.id,'system_failure')).toEqual({refunded:false,code:'SOURCING_REFUND_DELIVERED'});
+      expect(await win()).toEqual({reserved:0,captured:1});
+      expect((await db.query('SELECT count(*)::int n FROM sourcing_refunds')).rows[0].n).toBe(0);
+    });
+    it('gives one usable search until the billing period ends when the original window has closed',async()=>{
+      const f=await charged();await finish(f.admitted.id,'failed');
+      await db.query('UPDATE sourcing_allowance_windows SET ends_at=clock_timestamp()-interval \'1 second\' WHERE organization_id=$1',[org]);
+      const r=await refund(f.admitted.id,'system_failure');expect(r).toMatchObject({refunded:true,target:'replacement_grant'});
+      expect(await win()).toEqual({reserved:0,captured:1});
+      const g=(await db.query(`SELECT g.recipient_user_id,g.quantity,b.quantity bq,b.captured,g.valid_until>clock_timestamp() usable,
+        g.valid_until=(SELECT ends_at FROM flow_sourcing_window((SELECT anchor FROM sourcing_org_state WHERE organization_id=$1),clock_timestamp())) period_end,
+        r.replacement_grant_id=g.id linked FROM sourcing_refunds r JOIN sourcing_extra_grants g ON g.id=r.replacement_grant_id JOIN sourcing_extra_balances b ON b.grant_id=g.id`,[org])).rows[0];
+      expect(g).toEqual({recipient_user_id:f.admitted.payerUserId,quantity:1,bq:1,captured:0,usable:true,period_end:true,linked:true});
+      expect((await db.query("SELECT count(*)::int n FROM sourcing_extra_events WHERE kind='issue' AND operator_label='system:no-result-refund'")).rows[0].n).toBe(1);
+    });
+    it('refunds an extra search to its grant, or replaces it when that grant was revoked',async()=>{
+      await exhaustIncluded();const g=await extra();const f=await charged(false);await finish(f.admitted.id,'failed');
+      expect((await db.query('SELECT captured FROM sourcing_extra_balances WHERE grant_id=$1',[g.grantId])).rows[0].captured).toBe(1);
+      await db.query('SAVEPOINT revoke_case');
+      await extra({action:'revoke',grantId:g.grantId,operatorLabel:'self-declared revoker',reason:'stop future grants'} as any);
+      expect(await refund(f.admitted.id,'system_failure')).toMatchObject({refunded:true,target:'replacement_grant'});
+      await db.query('ROLLBACK TO SAVEPOINT revoke_case');
+      expect(await refund(f.admitted.id,'system_failure')).toMatchObject({refunded:true,target:'original_grant'});
+      expect((await db.query('SELECT captured FROM sourcing_extra_balances WHERE grant_id=$1',[g.grantId])).rows[0].captured).toBe(0);
+      expect((await db.query("SELECT count(*)::int n FROM sourcing_extra_events WHERE kind='refund' AND admission_id=$1",[f.admitted.id])).rows[0].n).toBe(1);
+    });
+    it('records an unusable refund once when the organization has no current access',async()=>{
+      const f=await charged();await finish(f.admitted.id,'failed');
+      await db.query('UPDATE sourcing_allowance_windows SET ends_at=clock_timestamp()-interval \'1 second\' WHERE organization_id=$1',[org]);
+      await db.query('UPDATE sourcing_org_state SET enabled=false WHERE organization_id=$1',[org]);
+      expect(await refund(f.admitted.id,'system_failure')).toEqual({refunded:false,replayed:false,reason:'system_failure',target:'unusable'});
+      expect(await refund(f.admitted.id,'system_failure')).toMatchObject({refunded:false,replayed:true,target:'unusable'});
+      expect((await db.query('SELECT count(*)::int n FROM sourcing_extra_grants')).rows[0].n).toBe(0);
+    });
+    it('commits one durable operator notification with an unusable refund, delivered under a lease with bounded retries',async()=>{
+      const f=await charged();await finish(f.admitted.id,'failed');
+      await db.query('UPDATE sourcing_allowance_windows SET ends_at=clock_timestamp()-interval \'1 second\' WHERE organization_id=$1',[org]);
+      await db.query('UPDATE sourcing_org_state SET enabled=false WHERE organization_id=$1',[org]);
+      await refund(f.admitted.id,'system_failure');
+      // A lost commit response replays the refund; the obligation already exists once.
+      expect(await refund(f.admitted.id,'system_failure')).toMatchObject({replayed:true,target:'unusable'});
+      const rows=()=>db.query('SELECT kind,subject_id,attempts,sent_at IS NOT NULL sent,last_error FROM sourcing_ops_notifications').then(r=>r.rows);
+      expect(await rows()).toEqual([{kind:'refund_unusable',subject_id:f.admitted.id,attempts:0,sent:false,last_error:null}]);
+      const lease=randomUUID(),claimed=await one('SELECT flow_sourcing_ops_notify_claim($1) result',[lease]);
+      expect(claimed).toMatchObject({kind:'refund_unusable',subjectId:f.admitted.id,organizationId:org,reason:'system_failure',attempt:1});
+      expect(await one('SELECT flow_sourcing_ops_notify_claim($1) result',[randomUUID()])).toBeNull();
+      expect(await one('SELECT flow_sourcing_ops_notify_finish($1,$2,$3,$4) result',[claimed.id,randomUUID(),true,null])).toBe(false);
+      expect(await one('SELECT flow_sourcing_ops_notify_finish($1,$2,$3,$4) result',[claimed.id,lease,false,'SEND_FAILED'])).toBe(true);
+      expect(await rows()).toEqual([{kind:'refund_unusable',subject_id:f.admitted.id,attempts:1,sent:false,last_error:'SEND_FAILED'}]);
+      // Backoff: not due again yet. Make it due, then a successful send settles it for good.
+      expect(await one('SELECT flow_sourcing_ops_notify_claim($1) result',[randomUUID()])).toBeNull();
+      await db.query('UPDATE sourcing_ops_notifications SET next_attempt_at=clock_timestamp()');
+      const lease2=randomUUID(),again=await one('SELECT flow_sourcing_ops_notify_claim($1) result',[lease2]);
+      expect(again.attempt).toBe(2);
+      expect(await one('SELECT flow_sourcing_ops_notify_finish($1,$2,$3,$4) result',[again.id,lease2,true,null])).toBe(true);
+      await db.query('UPDATE sourcing_ops_notifications SET next_attempt_at=clock_timestamp()');
+      expect(await one('SELECT flow_sourcing_ops_notify_claim($1) result',[randomUUID()])).toBeNull();
+      expect(await rows()).toEqual([{kind:'refund_unusable',subject_id:f.admitted.id,attempts:2,sent:true,last_error:null}]);
+    });
+    it('stops claiming an unsent notification after ten attempts, keeping it visible',async()=>{
+      const f=await charged();await finish(f.admitted.id,'failed');
+      await db.query('UPDATE sourcing_allowance_windows SET ends_at=clock_timestamp()-interval \'1 second\' WHERE organization_id=$1',[org]);
+      await db.query('UPDATE sourcing_org_state SET enabled=false WHERE organization_id=$1',[org]);
+      await refund(f.admitted.id,'system_failure');
+      await db.query('UPDATE sourcing_ops_notifications SET attempts=10,next_attempt_at=clock_timestamp()');
+      expect(await one('SELECT flow_sourcing_ops_notify_claim($1) result',[randomUUID()])).toBeNull();
+      expect((await db.query('SELECT count(*)::int n FROM sourcing_ops_notifications WHERE sent_at IS NULL')).rows[0].n).toBe(1);
+      await refused(()=>db.query('UPDATE sourcing_ops_notifications SET attempts=11'),'check');
+    });
+    it('records no notification for refunds that were given back',async()=>{
+      const f=await charged();await finish(f.admitted.id,'failed');await refund(f.admitted.id,'system_failure');
+      expect((await db.query('SELECT count(*)::int n FROM sourcing_ops_notifications')).rows[0].n).toBe(0);
+    });
+    it('keeps the refund record append-only and private to the owner',async()=>{
+      const f=await charged();await finish(f.admitted.id,'failed');await refund(f.admitted.id,'system_failure');
+      for(const op of ['UPDATE sourcing_refunds SET reason=reason','DELETE FROM sourcing_refunds'])await refused(()=>db.query(op),'SOURCING_IMMUTABLE');
+    });
+  });
   it('binds immutable delivered order and preserves a recruiter decision on replay',async()=>{
     const f=await boundAdmission(true,true),grant=await f.grant();
     await one('SELECT flow_sourcing_receipt($1,$2,$3) result',[org,f.admitted.id,f.receipt(grant,'started')]);
