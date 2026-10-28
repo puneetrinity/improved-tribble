@@ -36,8 +36,11 @@ test.describe('governed sourcing built browser, real local routes',()=>{
       await start.click();
       const dialog=page.getByRole('dialog',{name:'Start the search for this job?'});
       await expect(dialog).toBeVisible();
-      await expect(dialog).toContainText('remaining searches from your allowance');
+      await expect(dialog).toContainText('search from your allowance');
+      await expect(dialog).toContainText('searches remain');
       await expect(dialog).toContainText('contact us at info@ealana.com');
+      // Refund switches are off in this fixture, so the dialog must not promise a refund.
+      await expect(dialog).not.toContainText('no search charged');
       await expect(dialog.getByRole('button',{name:'Start search',exact:true})).toBeEnabled();
       if(fixture.phase==='confirm'){
         const response=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith(`/api/jobs/${fixture.job}/find-candidates`));

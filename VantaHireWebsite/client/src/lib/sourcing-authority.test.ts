@@ -7,7 +7,7 @@ import {admissionCommand,changePreparation,readSourcing,readSourcingCapability,r
 const id='10000000-0000-4000-8000-000000000001';
 const quote={quoteVersion:2 as const,includedRemaining:3,extraRemaining:0,funding:{kind:'included' as const,slotId:id,windowStart:'2026-10-01T00:00:00.000Z',revision:'0'},payerUserId:4,payerDisplayName:'Fixture recruiter',payerSlotId:id,remaining:3,windowStart:'2026-10-01T00:00:00.000Z',
   windowEnd:'2026-11-01T00:00:00.000Z',revision:7,briefVersionId:id,materialHash:'a'.repeat(64),artifactId:id,
-  quotedAt:'2026-10-05T00:00:00.000Z',expiresAt:'2026-10-05T00:01:00.000Z',quoteToken:'signed-token'};
+  quotedAt:'2026-10-05T00:00:00.000Z',expiresAt:'2026-10-05T00:01:00.000Z',quoteToken:'signed-token',noResultRefund:false};
 afterEach(()=>{vi.unstubAllGlobals();vi.clearAllMocks();});
 describe('governed sourcing browser contract',()=>{
   it('accepts balances above five and sends the exact extra funding source',()=>{

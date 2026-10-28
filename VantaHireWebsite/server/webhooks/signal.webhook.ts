@@ -43,6 +43,7 @@ import {
 } from '../lib/services/signal-execution-fence';
 import { requireNewCandidateIdentityAllowed } from '../candidate-privacy/decision';
 import {SourcingRepository} from '../sourcing-authority/repository';
+import {noResultRefundReason, refundNoResultSearch} from '../sourcing-authority/refund';
 import {callbackBindingMatches} from '../sourcing-authority/contracts';
 
 const WEBHOOK_PROVIDER = 'signal';
@@ -511,6 +512,25 @@ export function registerSignalWebhook(app: Express) {
           res,
         );
         return;
+      }
+
+      // Part A: Discover reported the search failed. Flow's own result-fetch
+      // failure is not final (results can still arrive), so it never refunds.
+      // A refund whose outcome is unknown is not acknowledged: Discover keeps the
+      // callback pending and redelivers it (with a new token), and the once-only
+      // routine either applies the refund or reports the earlier one.
+      // Part B: Discover reported the search complete (not partial) and Flow delivered no
+      // candidates. The routine re-checks zero delivered items itself, so partial
+      // results never refund, and its once-only record stops Part A and Part B
+      // from both applying.
+      const refundReason = noResultRefundReason(payload.status, finalStatus, finalCandidateCount);
+      if (refundReason) {
+        const refund = await refundNoResultSearch({ organizationId: run.organizationId, admissionId: run.sourcingAdmissionId, reason: refundReason });
+        if (refund.retry) {
+          await finalizeWebhookEvent(claims.jti, 'failed', 'Search refund not yet recorded');
+          res.status(503).json({ success: false, retryable: true, error: 'Search refund not yet recorded' });
+          return;
+        }
       }
 
       // 11. Finalize webhook event
