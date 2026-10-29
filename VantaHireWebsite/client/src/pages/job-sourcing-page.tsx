@@ -6,7 +6,7 @@ import { useJobBrief } from '@/lib/job-brief';
 import { useAuth } from '@/hooks/use-auth';
 import {readSourcingCapability,readSourcing,startGovernedSourcing,changePreparation,recordSourcingDecision,
   requiresSourcingReconfirmation,sourcingErrorMessage,
-  type AdmissionQuote,type SourcingPreview} from '@/lib/sourcing-authority';
+  type AdmissionQuote,type SourcingPreview,sourcingJobNotice} from '@/lib/sourcing-authority';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription,DialogFooter} from '@/components/ui/dialog';
 import {isApiError} from '@/lib/queryClient';
 import Layout from "@/components/Layout";
@@ -185,7 +185,7 @@ export default function JobSourcingPage() {
   const [outreachSidebarOpen, setOutreachSidebarOpen] = useState(false);
   const PAGE_SIZE = 25;
 
-  const { data: status, isLoading: statusLoading, isPolling } = useSourcingStatus(jobId);
+  const { data: status, isLoading: statusLoading, isError: statusError, refetch: refetchStatus, isPolling } = useSourcingStatus(jobId);
   const { data: candidatesData, isLoading: candidatesLoading } = useSourcedCandidates(jobId);
   const { trigger: findCandidatesBase, isPending: findPending } = useFindCandidates(jobId);
   const {user}=useAuth();
@@ -233,7 +233,7 @@ export default function JobSourcingPage() {
   // Open the progress modal first, then trigger sourcing
   const findCandidates = (opts: Record<string, unknown>) => {
     if(!briefCapability){setGovernedMessage('We couldn’t load search settings. Please try again.');return;}
-    if(governed){quoteMutation.mutate();return;}
+    if(governed){if(jobNotSearchable)return;quoteMutation.mutate();return;}
     if(briefCapability?.jobBriefEnabled===true) {setBriefSourcingNotice(true);return;}
     if (!opts.refresh) {
       openModal();
@@ -442,6 +442,12 @@ export default function JobSourcingPage() {
   // A failed/expired transport status is not proof of a refund. Only the
   // authority's keyed census can permit a fresh admission after cancellation.
   const governedRunBlocked = preview.data?.canAdmit !== true;
+  // The job itself must be searchable. The server still refuses a quote for a
+  // closed, unapproved or expired job; this only explains it before the click.
+  const jobNotice = sourcingJobNotice({ governed, statusLoading, statusError, jobState: status?.jobState });
+  const jobNotSearchable = jobNotice.blocked;
+  const jobStateUnknown = jobNotice.unknown;
+  const jobStateNotice = jobNotice.message;
   const runStatus = status?.status;
   // const enrichment = status?.enrichment;
   // const enrichmentInProgress = enrichment?.inProgress === true;
@@ -621,7 +627,7 @@ export default function JobSourcingPage() {
           <div className="flex items-center gap-2">
             <Button
               onClick={() => findCandidates({ forceSourcing: true })}
-              disabled={findPending || isRunning || !briefCapability || (governed&&(governedRunBlocked||!preview.data?.artifactId||quoteMutation.isPending||admission.isPending))}
+              disabled={findPending || isRunning || !briefCapability || (governed&&(jobNotSearchable||governedRunBlocked||!preview.data?.artifactId||quoteMutation.isPending||admission.isPending))}
               size="sm"
               variant={hasRun ? "outline" : "default"}
             >
@@ -633,6 +639,14 @@ export default function JobSourcingPage() {
               {isRunning ? "Running..." : governed ? (governedRunBlocked&&hasRun?"Search already used":"Find Candidates") : hasRun ? "Find Candidates Again" : "Find Candidates"}
             </Button>
           </div>
+          {jobStateNotice && (
+            <div role="status" className="flex w-full items-center justify-end gap-2 text-sm text-muted-foreground">
+              <span>{jobStateNotice}</span>
+              {jobStateUnknown && (
+                <Button variant="outline" size="sm" className="min-h-11" onClick={() => void refetchStatus()}>Refresh</Button>
+              )}
+            </div>
+          )}
         </div>
 
         <JobSubNav jobId={jobId ?? 0} className="mb-4" />
@@ -781,7 +795,7 @@ export default function JobSourcingPage() {
             <p className="text-sm text-muted-foreground mb-6 max-w-md">
               We will prioritize the strongest matches first and clearly separate broader results when location or fit constraints are expanded.
             </p>
-            <Button onClick={() => findCandidates({})} disabled={findPending}>
+            <Button onClick={() => findCandidates({})} disabled={findPending || jobNotSearchable}>
               {findPending ? <Loader2 className="h-4 w-4 mr-1.5 animate-spin" /> : <Search className="h-4 w-4 mr-1.5" />}
               Find Candidates
             </Button>

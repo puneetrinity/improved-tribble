@@ -3,8 +3,8 @@ import ArticleLayout from "@/components/marketing/ArticleLayout";
 export default function TalentIntelligenceVsAtsPage() {
   return (
     <ArticleLayout
-      title="Talent Intelligence vs ATS: What's the Difference? | ealana"
-      description="An ATS tracks candidates who arrive; talent intelligence finds and understands the whole market. Here's the difference — and the next step past both."
+      title="ATS vs Talent Intelligence vs CRM: What Each One Does"
+      description="An ATS tracks people who apply. A recruiting CRM nurtures people you already know. Talent intelligence finds everyone else. Here's what each does and when you need it."
       path="/talent-intelligence-vs-ats"
       headline="Talent Intelligence vs ATS: What's the Difference?"
       datePublished="2026-07-23"
@@ -23,6 +23,16 @@ export default function TalentIntelligenceVsAtsPage() {
           question: "What should a small team buy first?",
           answer:
             "Neither, separately. Stitching two systems is where small teams bleed time. A connected platform that finds, decides, and executes in one place — priced to start free — is the practical answer.",
+        },
+        {
+          question: "What's the difference between a talent management platform and an ATS?",
+          answer:
+            "An ATS covers hiring, from the job post to the signed offer. A talent management platform covers what happens after someone joins: performance reviews, learning, succession plans and internal moves. Some HR suites bundle both. If your problem is filling roles, you need an ATS or a hiring platform. Talent management only becomes relevant once those people are on the payroll.",
+        },
+        {
+          question: "What's the difference between CRM, ATS and talent intelligence platforms?",
+          answer:
+            "Each one covers a different group of people. An ATS manages people who applied to your jobs. A recruiting CRM keeps in touch with people you have already met. A talent intelligence platform finds people you haven't met yet and tells you who fits. A team hiring around ten roles a month usually needs all three jobs done. ealana keeps the search, a memory of your past searches and candidates, and the hiring workflow in one system, so none of them starts from zero.",
         },
       ]}
     >
@@ -75,6 +85,20 @@ export default function TalentIntelligenceVsAtsPage() {
         <li><strong>Market insight</strong> — where the talent is, what it costs, who's hiring it.</li>
       </ul>
 
+      <h2>A recruiting CRM remembers people, but only the ones you already found</h2>
+      <p>
+        A recruiting CRM sits between the other two. Your ATS handles people who applied, and your
+        CRM handles people you want to keep in touch with: the strong runner-up from last quarter,
+        a referral who wasn't ready to move, someone a hiring manager met at a conference. You add
+        them, tag them, and send them updates until the timing is right.
+      </p>
+      <p>
+        The catch is that a CRM only holds what your team puts into it. It can't tell you who else
+        exists for a role, and the profiles go stale because nobody updates them. Most teams end up
+        running three tools: a CRM for relationships, an ATS for process and a sourcing tool for
+        discovery. Each one sees a different slice of the same candidate.
+      </p>
+
       <h2>Side by side</h2>
       <div className="table-scroll">
         <table>
@@ -83,14 +107,15 @@ export default function TalentIntelligenceVsAtsPage() {
               <th>Dimension</th>
               <th>ATS</th>
               <th>Talent intelligence</th>
+              <th>Recruiting CRM</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Direction</td><td>Inbound — manages who applies</td><td>Outbound — searches the whole market</td></tr>
-            <tr><td>Core job</td><td>Process: stages, interviews, compliance</td><td>Insight: find, enrich, evaluate</td></tr>
-            <tr><td>Data</td><td>Static records candidates gave you</td><td>Living profiles drawn from the market</td></tr>
-            <tr><td>Best at</td><td>Order and auditability</td><td>Coverage and discovery</td></tr>
-            <tr><td>Blind spot</td><td>Everyone who didn't apply</td><td>Executing the hire it helped you find</td></tr>
+            <tr><td>Direction</td><td>Inbound — manages who applies</td><td>Outbound — searches the whole market</td><td>Relationship. It keeps warm the people you have already met.</td></tr>
+            <tr><td>Core job</td><td>Process: stages, interviews, compliance</td><td>Insight: find, enrich, evaluate</td><td>Store contacts, send nurture emails, track who you spoke to and when.</td></tr>
+            <tr><td>Data</td><td>Static records candidates gave you</td><td>Living profiles drawn from the market</td><td>Whatever your team added by hand or imported, so it ages fast.</td></tr>
+            <tr><td>Best at</td><td>Order and auditability</td><td>Coverage and discovery</td><td>Staying in touch with past candidates and referrals.</td></tr>
+            <tr><td>Blind spot</td><td>Everyone who didn't apply</td><td>Executing the hire it helped you find</td><td>Only knows people you already found. It doesn't search the market, and it doesn't run interviews or offers.</td></tr>
           </tbody>
         </table>
       </div>
@@ -99,6 +124,33 @@ export default function TalentIntelligenceVsAtsPage() {
         tool typically can't run the process. So most teams end up paying for both, exporting
         CSVs from one into the other, and losing everything the search taught them somewhere in
         between.
+      </p>
+
+      <h3>Where tools like Workday, Jobvite and Juicebox fit</h3>
+      <p>
+        Workday Recruiting and Jobvite are applicant tracking systems. Workday's sits inside its
+        larger HR suite, and Jobvite is one of Employ's recruiting platforms, alongside Lever and
+        JazzHR. Both are built to manage applicants and hiring workflows.
+      </p>
+      <p>
+        Juicebox and similar AI search tools sit on the talent intelligence side. You describe who
+        you want in plain language, and they find matching profiles across the web, verify contact
+        details and send outreach. The hiring itself, from stages to interviews to offers, happens
+        in a separate ATS they connect to. ealana runs the search, keeps a memory of your past searches
+        and candidates, and runs the hiring workflow in the same system, so a role you
+        open next month starts with what you learned this month.
+      </p>
+
+      <h2>What is the role of AI in an ATS vs talent intelligence?</h2>
+      <p>
+        In an ATS, AI mostly speeds up the paperwork: parsing resumes, filtering applicants on
+        keywords, suggesting interview slots. It works on the people who already applied. In talent
+        intelligence, AI does the searching. It reads profiles across the market, works out who fits
+        a role even when they use different words for the same skills, and ranks them.
+      </p>
+      <p>
+        The difference shows up in the shortlist. AI in an ATS makes a big inbound pile smaller,
+        while AI in talent intelligence finds people who would never have been in that pile at all.
       </p>
 
       <h2>Where both stop: the decision</h2>
@@ -164,6 +216,12 @@ export default function TalentIntelligenceVsAtsPage() {
         systems is where small teams bleed time. A connected platform that finds, decides, and
         executes in one place — priced to start free — is the practical answer. That's{" "}
         <a href="/pricing">where ealana starts</a>.
+      </p>
+      <p>
+        <strong>What's the difference between a talent management platform and an ATS?</strong> An ATS covers hiring, from the job post to the signed offer. A talent management platform covers what happens after someone joins: performance reviews, learning, succession plans and internal moves. Some HR suites bundle both. If your problem is filling roles, you need an ATS or a hiring platform. Talent management only becomes relevant once those people are on the payroll.
+      </p>
+      <p>
+        <strong>What's the difference between CRM, ATS and talent intelligence platforms?</strong> Each one covers a different group of people. An ATS manages people who applied to your jobs. A recruiting CRM keeps in touch with people you have already met. A talent intelligence platform finds people you haven't met yet and tells you who fits. A team hiring around ten roles a month usually needs all three jobs done. ealana keeps the search, a memory of your past searches and candidates, and the hiring workflow in one system, so none of them starts from zero.
       </p>
     </ArticleLayout>
   );

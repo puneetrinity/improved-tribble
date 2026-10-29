@@ -72,3 +72,21 @@ export function recordSourcingDecision(actorId:number,jobId:number,candidateId:n
   return jobIntentRequest(actorId,jobId,`sourcing-decision:${candidateId}`,`/api/jobs/${jobId}/sourced-candidates/${candidateId}`,
     {expectedRevision,action,...(reasonCode?{reasonCode}:{}),...(criterionId?{criterionId}:{})});
 }
+
+export type SourcingJobState='open'|'closed'|'unapproved'|'expired';
+const JOB_STATE_NOTICE:Record<Exclude<SourcingJobState,'open'>,string>={
+  closed:'This job is closed. Reactivate it to search for candidates.',
+  unapproved:'Publish this job to search for candidates.',
+  expired:'This job has expired, so it can’t be searched.',
+};
+/** Whether the governed search button may be used for this job, and why not.
+ * The server's quote refusal stays authoritative; this only explains it. */
+export function sourcingJobNotice(input:{governed:boolean;statusLoading:boolean;statusError:boolean;jobState?:SourcingJobState|undefined}):
+  {blocked:boolean;unknown:boolean;message:string|null} {
+  if(!input.governed)return {blocked:false,unknown:false,message:null};
+  if(input.statusLoading)return {blocked:true,unknown:false,message:null};
+  if(input.statusError||!input.jobState)return {blocked:true,unknown:true,message:'We couldn’t check whether this job can be searched.'};
+  if(input.jobState==='open')return {blocked:false,unknown:false,message:null};
+  return {blocked:true,unknown:false,message:JOB_STATE_NOTICE[input.jobState]};
+}
+

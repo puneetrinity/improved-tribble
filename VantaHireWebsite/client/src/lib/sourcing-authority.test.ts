@@ -2,7 +2,7 @@ import {afterEach,describe,expect,it,vi} from 'vitest';
 vi.mock('./job-brief',()=>({jobIntentRequest:vi.fn().mockResolvedValue({ok:true})}));
 import {jobIntentRequest} from './job-brief';
 import {admissionCommand,changePreparation,readSourcing,readSourcingCapability,recordSourcingDecision,
-  sourcingErrorMessage,startGovernedSourcing,requiresSourcingReconfirmation} from './sourcing-authority';
+  sourcingErrorMessage,startGovernedSourcing,requiresSourcingReconfirmation,sourcingJobNotice} from './sourcing-authority';
 
 const id='10000000-0000-4000-8000-000000000001';
 const quote={quoteVersion:2 as const,includedRemaining:3,extraRemaining:0,funding:{kind:'included' as const,slotId:id,windowStart:'2026-10-01T00:00:00.000Z',revision:'0'},payerUserId:4,payerDisplayName:'Fixture recruiter',payerSlotId:id,remaining:3,windowStart:'2026-10-01T00:00:00.000Z',
@@ -68,3 +68,23 @@ describe('governed sourcing browser contract',()=>{
     expect(sourcingErrorMessage('SOURCING_DIGEST_RATE_LIMITED')).toContain('temporarily busy');
   });
 });
+
+describe('sourcingJobNotice',()=>{
+  const base={governed:true,statusLoading:false,statusError:false};
+  it('allows an open job',()=>expect(sourcingJobNotice({...base,jobState:'open'})).toEqual({blocked:false,unknown:false,message:null}));
+  it.each([
+    ['closed','This job is closed. Reactivate it to search for candidates.'],
+    ['unapproved','Publish this job to search for candidates.'],
+    ['expired','This job has expired, so it can’t be searched.'],
+  ] as const)('blocks a %s job with its own reason',(jobState,message)=>
+    expect(sourcingJobNotice({...base,jobState})).toEqual({blocked:true,unknown:false,message}));
+  it('blocks with a refresh offer when status is unavailable or missing',()=>{
+    for(const input of [{...base,statusError:true,jobState:'open' as const},{...base,jobState:undefined}])
+      expect(sourcingJobNotice(input)).toEqual({blocked:true,unknown:true,message:'We couldn’t check whether this job can be searched.'});
+  });
+  it('blocks silently while status is still loading',()=>
+    expect(sourcingJobNotice({...base,statusLoading:true})).toEqual({blocked:true,unknown:false,message:null}));
+  it('never blocks the ungoverned path',()=>
+    expect(sourcingJobNotice({governed:false,statusLoading:false,statusError:true,jobState:'closed'})).toEqual({blocked:false,unknown:false,message:null}));
+});
+
