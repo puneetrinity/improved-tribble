@@ -215,8 +215,8 @@ export async function setupVite(app: Express, server: Server) {
       canonical: 'https://ealana.com/what-is-decision-intelligence',
     },
     '/talent-intelligence-vs-ats': {
-      title: 'Talent Intelligence vs ATS: What\u2019s the Difference? | ealana',
-      description: 'An ATS tracks candidates who arrive; talent intelligence finds and understands the whole market. Here\u2019s the difference \u2014 and the next step past both.',
+      title: 'ATS vs Talent Intelligence vs CRM: What Each One Does',
+      description: 'An ATS tracks people who apply. A recruiting CRM nurtures people you already know. Talent intelligence finds everyone else. Here\u2019s what each does and when you need it.',
       canonical: 'https://ealana.com/talent-intelligence-vs-ats',
     },
     '/privacy-policy': {
@@ -506,8 +506,8 @@ export async function serveStatic(app: Express) {
       canonical: 'https://ealana.com/what-is-decision-intelligence',
     },
     '/talent-intelligence-vs-ats': {
-      title: 'Talent Intelligence vs ATS: What\u2019s the Difference? | ealana',
-      description: 'An ATS tracks candidates who arrive; talent intelligence finds and understands the whole market. Here\u2019s the difference \u2014 and the next step past both.',
+      title: 'ATS vs Talent Intelligence vs CRM: What Each One Does',
+      description: 'An ATS tracks people who apply. A recruiting CRM nurtures people you already know. Talent intelligence finds everyone else. Here\u2019s what each does and when you need it.',
       canonical: 'https://ealana.com/talent-intelligence-vs-ats',
     },
     '/privacy-policy': {
