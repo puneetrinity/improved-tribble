@@ -136,6 +136,8 @@ export interface SourcingStatus {
   errorMessage?: string;
   rcProgress?: SignalRcProgress;
   rcStatusUnavailable?: boolean;
+  /** Whether the job can be searched; the server's quote refusal stays authoritative. */
+  jobState?: import('@/lib/sourcing-authority').SourcingJobState;
 }
 
 export interface SourcedCandidatesResponse {
@@ -332,6 +334,8 @@ export function useSourcingStatus(jobId: number | undefined) {
   return {
     data: query.data,
     isLoading: query.isLoading,
+    isError: query.isError,
+    refetch: query.refetch,
     isPolling: !!query.data?.hasRun && !isTerminal(query.data?.status),
   };
 }

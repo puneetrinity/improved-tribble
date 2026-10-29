@@ -40,6 +40,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {applicantContactBlocked,readSourcingCandidateOrigin} from '@shared/sourcing-candidate-origin';
 import {filterStoredPrivateCandidates} from './sourcing-authority/candidate-origin';
+import { sourcingJobState } from './sourcing-authority/job-state';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { jobBriefEnabled } from './job-brief/contracts';
 import {sourcingEnabled,MAX_SOURCING_BODY_BYTES} from './sourcing-authority/contracts';
@@ -585,6 +586,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
         return;
       }
       const { organizationId } = contextResult.context;
+      const jobState = sourcingJobState(contextResult.context.job);
 
       const latestRun = await db.query.jobSourcingRuns.findFirst({
         where: and(
@@ -595,7 +597,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
       });
 
       if (!latestRun) {
-        res.json({ hasRun: false });
+        res.json({ hasRun: false, jobState });
         return;
       }
 
@@ -695,6 +697,7 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       res.json({
         hasRun: true,
+        jobState,
         requestId: latestRun.requestId,
         status: latestRun.status,
         candidateCount: latestRun.candidateCount,
