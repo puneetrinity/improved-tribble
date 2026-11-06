@@ -208,6 +208,7 @@ jobs:
       - run: npm run check:sourcing-authority
       - run: npm run check:server
       - run: npm run check:client
+      - run: npx tsc -p scripts/tsconfig.spark-private-job.json --noEmit
       - run: npm run test:server
       - run: npm run check:candidate-product
       - name: Candidate foundation, profile and consent full-schema rehearsal

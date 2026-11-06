@@ -835,7 +835,7 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "8ed49c2ed88dda20fa7f07080bef6b9ec9e47f2c5e64a85631787addbc66dd3d"
+      "sha256": "e8411fa417f1dac613d693c7901f15d393c174552b39a71ab8611b867cb9318d"
     },
     {
       "file": "package.json",
