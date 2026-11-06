@@ -27,6 +27,7 @@ const fixtureFiles = [
   "VantaHireWebsite/nixpacks.toml",
   "VantaHireWebsite/railway.json",
   "VantaHireWebsite/railway.schema-release.json",
+  "VantaHireWebsite/railway.private-job.json",
   "VantaHireWebsite/package.json",
   "VantaHireWebsite/provisioning-portal/package.json",
   "VantaHireWebsite/server/index.ts",

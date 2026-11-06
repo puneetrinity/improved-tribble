@@ -34,11 +34,21 @@ test('valid one-shot config and dangerous inherited settings',()=>{
   RAILWAY_ENVIRONMENT_ID:'c3b75445-d0de-49fa-a533-b4b9a20b5f5d',RAILWAY_DEPLOYMENT_ID:'deployment',
   SPARK_PRIVATE_JOB_SERVICE_ID:id,RAILWAY_SERVICE_ID:id,CANDIDATE_NETWORK_RECOVERY_EPOCH:'release-epoch-20261106',
   SPARK_RECOVERY_RUN_ID:id,SPARK_RECOVERY_RESTORED:'none',ACTIVEKG_BASE_URL:'https://memory.example',
-  FLOW_SCHEMA_TARGET_ID:id,ACTIVEKG_SCHEMA_TARGET_ID:id,SIGNAL_SCHEMA_TARGET_ID:id};
+  FLOW_SCHEMA_TARGET_ID:'ab'.repeat(24),ACTIVEKG_SCHEMA_TARGET_ID:id,SIGNAL_SCHEMA_TARGET_ID:id};
  validateRuntime(good);
  for(const [key,value] of Object.entries({NODE_TLS_REJECT_UNAUTHORIZED:'0',PGHOSTADDR:'1.2.3.4',NODE_OPTIONS:'--inspect',
   ACTIVEKG_MIGRATION_APPLY:'1',SPARK_RECOVERY_RESTORED:'invalid',ACTIVEKG_BASE_URL:'http://memory.example',FLOW_SCHEMA_TARGET_ID:''}))
   assert.throws(()=>validateRuntime({...good,[key]:value}));
+ for(const target of [' padded','trailing\n','x'.repeat(257)])
+  assert.throws(()=>validateRuntime({...good,FLOW_SCHEMA_TARGET_ID:target}));
+ assert.throws(()=>validateRuntime({...good,ACTIVEKG_SCHEMA_TARGET_ID:'ab'.repeat(24)}));
+});
+test('Flow opaque target must match exactly, including case',async()=>{
+ const target='ab'.repeat(24);
+ const db={query:async()=>({rows:[{product:'flow',environment:'production',target_id:target}]})} as any;
+ await identity(db,'FLOW',target);
+ await assert.rejects(identity(db,'FLOW',target.toUpperCase()));
+ await assert.rejects(identity(db,'FLOW','cd'.repeat(24)));
 });
 test('three actual identity layouts checked; mismatch refuses',async()=>{
  const kinds=['FLOW','MEMORY','DISCOVER'] as const;
