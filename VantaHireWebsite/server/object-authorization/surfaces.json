@@ -1215,11 +1215,11 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "b9c5e3b92995e351f9a0c1deafec56d42b2a201f1ab9f611afb8b83aad35c417"
+      "sha256": "d5cb459f2617bd47c3f25548c7f2049b31f55268a2051a500c60bac81db0edc9"
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
-      "sha256": "219267557ba26b02e2d71421eb6df0238772fb59e0d30fe2d771cf9c3dec1ef4"
+      "sha256": "52e5ca9f449a06fce56ef77c3e9773ca9ed3b697ed9394320f210be64f94d0bd"
     },
     {
       "file": "server/decision-projection/config.ts",
