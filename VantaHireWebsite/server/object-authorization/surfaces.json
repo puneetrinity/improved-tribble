@@ -1,9 +1,15 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 333,
+  "route_registration_census": 356,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
+    {"method":"post","path":"/api/candidate/product/consent/signup-intent/activate","command":"flow_consent_v2_signup_activate","authority":"Verified candidate session and CSRF, capture/delivery gates, exact stored signup wording, linked owner/current privacy; newer grant or withdrawal supersedes intent."},
+    {"method":"get","path":"/api/candidate/product/sources/:sourceId/proposals/:proposalId","reader":"readSourceProposal","authority":"Verified candidate session, default-off source gate, owner binding checked before and after signed Memory read; no-store."},
+    {"method":"post","path":"/api/candidate/product/sources/resume-snapshots","command":"sourceObjectDependencies.snapshot","authority":"Verified candidate session, recent authentication, CSRF and owner-bound immutable library file; no browser locator/subject."},
+    {"method":"post","path":"/api/candidate/product/sources/resume","command":"flow_candidate_source_enqueue","authority":"Verified candidate owner, recent authentication, CSRF, current consent and immutable source; default-off."},
+    {"method":"get","path":"/api/candidate/product/sources/resume/:commandId","reader":"flow_candidate_source_status / retry_status","authority":"Verified candidate owner only; no-store explicit status projection; no paid work."},
+    {"method":"post","path":"/api/candidate/product/sources/resume/:commandId/retry","command":"flow_candidate_source_retry","authority":"Verified candidate owner, recent authentication, CSRF, path/body command identity, durable3-attempt file cap."},
     {
       "method": "post",
       "path": "/api/internal/sourcing/candidate-eligibility",
@@ -15,14 +21,24 @@
       "path": "/api/jobs/:id/sourcing/admission",
       "reader": "quoteSourcing / flow_sourcing_quote",
       "authority": "authenticated current seated recruiter assigned to this organization/job; SQL recheck",
-      "projection": ["signed_quote", "payer", "window", "approved_artifact"]
+      "projection": [
+        "signed_quote",
+        "payer",
+        "window",
+        "approved_artifact"
+      ]
     },
     {
       "method": "get",
       "path": "/api/jobs/:id/sourcing/preview",
       "reader": "readSourcingPreview / flow_sourcing_preview_request",
       "authority": "authenticated current seated recruiter assigned to this organization/job; SQL recheck",
-      "projection": ["count", "preparation", "admission_state", "allowance_reset"]
+      "projection": [
+        "count",
+        "preparation",
+        "admission_state",
+        "allowance_reset"
+      ]
     },
     {
       "method": "post",
@@ -40,13 +56,24 @@
       "method": "get",
       "path": "/api/jobs/:id/management",
       "reader": "readManagementJob",
-      "projection": ["publicJob", "organizationId", "hiringManagerId", "clientId"]
+      "projection": [
+        "publicJob",
+        "organizationId",
+        "hiringManagerId",
+        "clientId"
+      ]
     },
     {
       "method": "get",
       "path": "/api/applications/:id/decision-history",
       "reader": "readAuthorizedCandidateHistoryContext",
-      "projection": ["binding", "authority_status", "coverage", "freshness", "summary"]
+      "projection": [
+        "binding",
+        "authority_status",
+        "coverage",
+        "freshness",
+        "summary"
+      ]
     },
     {
       "method": "get",
@@ -778,10 +805,22 @@
     }
   ],
   "governed_files": [
-    {"file":"shared/publicJob.ts","sha256":"1f5d9c50034837bf733c5549b7f6145105c76aef04952d8494295e142afc6905"},
-    {"file":"server/lib/jobManagementRead.ts","sha256":"071471682a7385dd087bf6a7fa585b3c9d53730e48ef9d56e5fb38bcf77b1089"},
-    {"file":"server/lib/__tests__/publicJobDto.test.ts","sha256":"1a0f98236b49c2cf06c33f911c1c6eb3d6d8f50f8ba4c64147155979b1eac11e"},
-    {"file":"server/lib/__tests__/publicJobDto.pg.test.ts","sha256":"5e466b9becb8e5825c0c06106da1dfe792da59327a6a44476ae231c016093570"},
+    {
+      "file": "shared/publicJob.ts",
+      "sha256": "1f5d9c50034837bf733c5549b7f6145105c76aef04952d8494295e142afc6905"
+    },
+    {
+      "file": "server/lib/jobManagementRead.ts",
+      "sha256": "071471682a7385dd087bf6a7fa585b3c9d53730e48ef9d56e5fb38bcf77b1089"
+    },
+    {
+      "file": "server/lib/__tests__/publicJobDto.test.ts",
+      "sha256": "1a0f98236b49c2cf06c33f911c1c6eb3d6d8f50f8ba4c64147155979b1eac11e"
+    },
+    {
+      "file": "server/lib/__tests__/publicJobDto.pg.test.ts",
+      "sha256": "5e466b9becb8e5825c0c06106da1dfe792da59327a6a44476ae231c016093570"
+    },
     {
       "file": "server/candidate-history/contracts.ts",
       "sha256": "be5d3a44db3c7674253054cbeefee042b186d09bedab16e89d3cfb819696022b"
@@ -796,19 +835,19 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "77838f10ea055bd31883abe353c4f7424c899a0c2a06df517bb174cebd2d9929"
+      "sha256": "a6ad3bc0ab2bebbb6401667880a6576de78ecbc18d9b372bcde4997b8406783c"
     },
     {
       "file": "package.json",
-      "sha256": "08e5a952a5370b30e411f728feaf62f6a0ca0d867a5d3a8ff0c75caf12929f8f"
+      "sha256": "52835160492361c90b890e2b58daede78a73154c204819335bc040b0bbe178a6"
     },
     {
       "file": "vitest.server.config.ts",
-      "sha256": "27f3e8aae976d6bd8eb22261c34267ede1ab28dd98e3a97c0eb8093333649a17"
+      "sha256": "55c7e7f394abe4fcdf61554aa9c44fe3cc208b99b27071dde419e4396136b768"
     },
     {
       "file": "server/applications.routes.ts",
-      "sha256": "488db8204c5c4f14349c8a0ac466e59593642d7489d65104ea32dd64abdae12f"
+      "sha256": "eb7ed48fe615c4566429863128675214fa07bf4ac2e2a824a8567566bba911a0"
     },
     {
       "file": "server/communications.routes.ts",
@@ -836,7 +875,7 @@
     },
     {
       "file": "server/routes.ts",
-      "sha256": "7ab3cd347b3a0b2f630bfa1350ff4cb0b3b81de33aa4fc907f1b3478304f8f29"
+      "sha256": "c93bf7b390015c9721797022d15b16b7f5b2ceedb4de09621085acdfa35f8f1d"
     },
     {
       "file": "server/resume.routes.ts",
@@ -848,15 +887,15 @@
     },
     {
       "file": "server/gcs-storage.ts",
-      "sha256": "5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802"
+      "sha256": "1e663e8e93bb1533b15635aaf6693c27fcfb20df0f8ae09c991e3881fb2d80bb"
     },
     {
       "file": "server/auth.ts",
-      "sha256": "25113b8fa50d0845ccb205b4fa02bae7c424e7b13aed30149d87b7e06a54b468"
+      "sha256": "e23254590027783644093fe2a489de844322fa5816525be675c50b400f0cc388"
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "dd423b9663495fd437380243d414952fb1d5575d284ffbf6eec512b16fe7699b"
+      "sha256": "70f44177cc7d21bbdc0106a2f98c33aa4dc69882b95039c2a939d844871293dc"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -864,7 +903,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "00919e906e57b0e5ae9ec98c13c36fe936543684e5937981e04d5deb86fd9a31"
+      "sha256": "a8d18b72614a3e0cc305bc4c647be93b396627558b90c4d9971282bb3baa90cf"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -944,7 +983,7 @@
     },
     {
       "file": "server/storage.ts",
-      "sha256": "b361556678de9f1626cf6cbd7657b56eebc8da367dd100673f926ec7564f3908"
+      "sha256": "a8680da684c2363ab56d1a0749cc561db08a201771af0a437f23d739a158eed7"
     },
     {
       "file": "server/tests/applicationReadAuthorization.pg.test.ts",
@@ -952,7 +991,7 @@
     },
     {
       "file": "server/tests/candidatePrivacy.pg.test.ts",
-      "sha256": "f0244a49dbc7b5b99c4d2db50bd243f6bcc709cde8e7be6261c834bd2af4969b"
+      "sha256": "74cf5c579c37666643c94e77c619f9dc227c1f93c9905c7ef57573f97eaab46c"
     },
     {
       "file": "server/tests/interviewIcsAuthorization.routes.test.ts",
@@ -968,7 +1007,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "f28cfe114d7ea683ae32e156aed645dc6a0f8de1956fda417db7d4e499c34ed4"
+      "sha256": "05e198735f687e5bbb32378b09750c06bb806c61feec0371cbfd28c0eda8cefb"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -996,7 +1035,7 @@
     },
     {
       "file": "shared/schema.ts",
-      "sha256": "08b548c14d8bcadacbf1a2d4feace0e189203aa0a3e7e87bbe7c94069da1b7f3"
+      "sha256": "4b0ffdf8c86cc94a96ad27aa3893244baf41a1734333d27ecfe3ba1063d4698a"
     },
     {
       "file": "shared/forms.types.ts",
@@ -1016,15 +1055,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "2b9ea9487616814dbdaf0fc2ac5ca7dc9d2209784d5c0f0458bc8a70dfcc99f1"
+      "sha256": "436ce1ac23d7df76d795e0df3b29a6b444084555c02c674763627d17c719df79"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "0d694b1c13637936023f1875807a345534ead322f4ec6e9fc06c9a31d4e4fa6b"
+      "sha256": "40f52daf765fcea8aec799509c54ebc153a07b7c83b88fb3da5289f49923b04d"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "b27e577a89a5d200d9850ab0445bdeced4b6bbc989299ed515b9c605c705450f"
+      "sha256": "e039701ea0cddcd271ce393027019fb0344056d7360159de4a2ac830cefd358f"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
@@ -1064,7 +1103,7 @@
     },
     {
       "file": "client/src/App.tsx",
-      "sha256": "05927965067586cc753ff9c48d3d39005ae86343a9f17eff9d2c535a53175e4d"
+      "sha256": "e983db24f4ead299e354563c00a6636c9d12c0bbc99c2b9ec1f52996f32690d9"
     },
     {
       "file": "client/src/components/QuickAccessBar.tsx",
@@ -1128,7 +1167,7 @@
     },
     {
       "file": "server/lib/__tests__/candidatePortalAuthQuotaContracts.test.ts",
-      "sha256": "b887e440c019bc2b6f7c35697bfea2aa48c0a63e5e3cd3ac3e99c3c22d6350b3"
+      "sha256": "c1a37d4f7ff5eeb6d490657126516871cd8ad2b5e83eee129f8ed67c0d707338"
     },
     {
       "file": "server/schema-migrations/0006_versioned_invitation_grants.sql",
@@ -1144,7 +1183,7 @@
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.routes.test.ts",
-      "sha256": "a088b0566cf6b722dc0ec093d620061a44bde92cdf408eb22fbdc943c9816d70"
+      "sha256": "0a00b8d97806a84bebb783c9f4c288114acbfd99e76de984f05cfc400bb356d7"
     },
     {
       "file": "server/lib/__tests__/versionedInvitationGrantAuthorization.pg.test.ts",
@@ -1176,11 +1215,11 @@
     },
     {
       "file": "server/lib/__tests__/decisionEventSpine.pg.test.ts",
-      "sha256": "87f0cd78d126000a3b961be2f85f6f4cb41f82629cd7b0908fcddad383ca51a1"
+      "sha256": "b9c5e3b92995e351f9a0c1deafec56d42b2a201f1ab9f611afb8b83aad35c417"
     },
     {
       "file": "server/lib/__tests__/decisionProjectionOutbox.pg.test.ts",
-      "sha256": "de0d29134b81e6fd2a64bf74c60448b18654b871de00f88ad5f2befde94555d8"
+      "sha256": "219267557ba26b02e2d71421eb6df0238772fb59e0d30fe2d771cf9c3dec1ef4"
     },
     {
       "file": "server/decision-projection/config.ts",
@@ -1287,7 +1326,7 @@
     },
     {
       "file": "server/index.ts",
-      "sha256": "0c065af0bf6a941fecf3e67988e5dc11dfd285311eaac5470b7ac0ae7a469580"
+      "sha256": "5e8bc8b58ef0ab49a68549be2997dbf0b9043f4c8ee30cddb551d769f15a4cf3"
     },
     {
       "file": "server/aiWorker.ts",

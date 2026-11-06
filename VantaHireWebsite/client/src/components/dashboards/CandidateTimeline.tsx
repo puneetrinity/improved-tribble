@@ -36,16 +36,16 @@ export function CandidateTimeline({
     return (
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-white">{title}</CardTitle>
+          <CardTitle className="text-foreground">{title}</CardTitle>
           {description && <CardDescription className="text-muted-foreground">{description}</CardDescription>}
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {Array.from({ length: 3 }).map((_, i) => (
               <div key={i} className="space-y-3">
-                <Skeleton className="h-5 w-32 bg-slate-700" />
+                <Skeleton className="h-5 w-32 bg-muted" />
                 <div className="space-y-2 ml-4">
-                  <Skeleton className="h-20 w-full bg-slate-700" />
+                  <Skeleton className="h-20 w-full bg-muted" />
                 </div>
               </div>
             ))}
@@ -59,7 +59,7 @@ export function CandidateTimeline({
     return (
       <Card className="bg-card border-border">
         <CardHeader>
-          <CardTitle className="text-white">{title}</CardTitle>
+          <CardTitle className="text-foreground">{title}</CardTitle>
           {description && <CardDescription className="text-muted-foreground">{description}</CardDescription>}
         </CardHeader>
         <CardContent>
@@ -92,7 +92,7 @@ export function CandidateTimeline({
   return (
     <Card className="bg-card border-border">
       <CardHeader>
-        <CardTitle className="text-white">{title}</CardTitle>
+        <CardTitle className="text-foreground">{title}</CardTitle>
         {description && <CardDescription className="text-muted-foreground">{description}</CardDescription>}
       </CardHeader>
       <CardContent>
@@ -123,17 +123,17 @@ export function CandidateTimeline({
                       return (
                         <div
                           key={app.id}
-                          className="relative bg-white/5 p-4 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                          className="relative bg-muted/60 p-4 rounded-lg hover:bg-muted transition-colors cursor-pointer"
                           onClick={() => onApplicationClick?.(app.id)}
                         >
                           {/* Timeline dot */}
-                          <div className="absolute -left-[29px] top-6 w-3 h-3 bg-primary/100 rounded-full border-4 border-slate-900" />
+                          <div className="absolute -left-[29px] top-6 w-3 h-3 bg-primary/100 rounded-full border-4 border-background" />
 
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <Briefcase className="w-4 h-4 text-primary flex-shrink-0" />
-                                <h4 className="text-white font-medium truncate">{app.jobTitle}</h4>
+                                <h4 className="text-foreground font-medium truncate">{app.jobTitle}</h4>
                               </div>
                               {app.jobLocation && (
                                 <div className="flex items-center gap-1 mt-1 text-muted-foreground text-sm">

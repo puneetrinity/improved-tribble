@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { pool } from "../db";
+import { eraseSparkProfile, erasureIdentitySchema } from "../candidate-product/profile-client";
 import {
   decisionForRemote,
   type FlowPrivacyDecision,
@@ -19,6 +20,32 @@ import {
 export class CandidatePrivacyConflict extends Error {}
 export class CandidatePrivacyUnavailable extends Error {}
 export class CandidatePrivacySubjectNotFound extends Error {}
+
+/** Dormant retained integration; NOT called by the request outbox. Runtime roles
+ * cannot execute its prepare/finish routines. A future operator procedure needs
+ * separately approved credentials, preview and execution. No email matching is
+ * used as deletion authority; SQL binds the verified request actor to the owner.
+ * Network completion is separate from reference-aware résumé-file cleanup. */
+export async function eraseSparkNetworkForRequest(claim: ClaimedOutbox): Promise<void> {
+  if (claim.action !== "request_erasure" || claim.authorityType !== "verified_candidate") return;
+  let result;
+  try {
+    result = await pool.query("SELECT public.flow_candidate_source_erasure_prepare($1::uuid) AS value", [claim.requestId]);
+  } catch (error) {
+    // Existing non-Spark installations have no candidate-product schema.
+    if ((error as {code?:string}).code === "42883") return;
+    throw error;
+  }
+  if (result.rows.length !== 1) throw new CandidatePrivacyUnavailable("spark_erasure_authority_unavailable");
+  if (result.rows[0].value === null) return;
+  const identity = erasureIdentitySchema.parse(result.rows[0].value);
+  if (identity.requestId !== claim.requestId) throw new CandidatePrivacyConflict("spark_erasure_identity_conflict");
+  await eraseSparkProfile(identity, new AbortController().signal);
+  const finished = await pool.query("SELECT public.flow_candidate_source_erasure_finish($1::uuid,$2::uuid,$3::uuid) AS value",
+    [identity.requestId, identity.subjectId, identity.bindingId]);
+  if (finished.rows.length !== 1 || finished.rows[0].value !== true)
+    throw new CandidatePrivacyUnavailable("spark_erasure_cleanup_unavailable");
+}
 
 type SubjectType =
   | "candidate_user"
@@ -365,6 +392,18 @@ export async function claimPrivacyOutbox(leaseMs: number): Promise<ClaimedOutbox
 }
 
 export async function transientIdentifiersForRequest(requestId: string): Promise<PrivacyIdentifier[]> {
+  // This immutable server-owned subject survives email changes and has no
+  // LinkedIn prerequisite. Keep it ahead of the legacy bounded identifier list.
+  // Older installations can process privacy requests before the consent schema.
+  const present = await pool.query("SELECT to_regclass('public.candidate_consent_subjects') AS relation");
+  const native = present.rows[0]?.relation ? await pool.query(
+    `SELECT DISTINCT 'signal_candidate_id'::text AS identifier_type,
+       'network:' || s.subject_id::text AS value
+       FROM candidate_privacy_subject_links l
+       JOIN candidate_consent_subjects s ON s.user_id=l.candidate_user_id
+      WHERE l.request_id=$1 AND l.subject_type='candidate_user'
+      ORDER BY value LIMIT 2`, [requestId]) : {rows: []};
+  if (native.rows.length > 1) throw new CandidatePrivacyConflict("candidate_privacy_subject_conflict");
   const result = await pool.query(
     `SELECT identifier_type, value FROM (
        SELECT 'email'::text AS identifier_type, lower(u.username)::text AS value
@@ -387,7 +426,9 @@ export async function transientIdentifiersForRequest(requestId: string): Promise
          FROM candidate_privacy_subject_links l JOIN talent_pool t ON t.id=l.talent_pool_id
         WHERE l.request_id=$1 AND l.talent_pool_id IS NOT NULL
        UNION
-       SELECT 'signal_candidate_id', s.signal_candidate_id
+       SELECT 'signal_candidate_id', CASE WHEN s.candidate_summary->'candidateOrigin'->>'kind'='candidate_network'
+          AND s.candidate_summary->'networkPublication'->>'subjectId' ~ '^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$'
+         THEN 'network:'||(s.candidate_summary->'networkPublication'->>'subjectId') ELSE s.signal_candidate_id END
          FROM candidate_privacy_subject_links l JOIN job_sourced_candidates s ON s.id=l.job_sourced_candidate_id
         WHERE l.request_id=$1 AND l.job_sourced_candidate_id IS NOT NULL
      ) identities
@@ -396,10 +437,11 @@ export async function transientIdentifiersForRequest(requestId: string): Promise
      LIMIT 8`,
     [requestId],
   );
-  if (result.rows.length === 0) {
+  if (result.rows.length === 0 && native.rows.length === 0) {
     throw new CandidatePrivacyUnavailable("candidate_privacy_subject_unavailable");
   }
-  return result.rows;
+  return [...native.rows, ...result.rows.filter((row:PrivacyIdentifier) => !native.rows.some((n:PrivacyIdentifier) =>
+    n.identifier_type === row.identifier_type && n.value === row.value))].slice(0, 8);
 }
 
 export async function markOutboxRetry(

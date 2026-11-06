@@ -14,6 +14,8 @@ export type { SourcingCandidateOrigin } from '@shared/sourcing-candidate-origin'
 export type ReadOrigin =
   | { kind: 'public_profile' }
   | { kind: 'organization_candidate'; applicationId: number; applicationJobId: number }
+  /** spark network candidate: redacted card, no LinkedIn, contact or outreach controls. */
+  | { kind: 'candidate_network' }
   | { kind: 'invalid' };
 
 export function readCandidateOrigin(value: unknown): ReadOrigin {
@@ -27,14 +29,24 @@ export function readCandidateOrigin(value: unknown): ReadOrigin {
 /** Public profiles only: LinkedIn link, paid contact lookup and cold outreach. */
 export const allowsPublicContact = (origin: ReadOrigin): boolean => origin.kind === 'public_profile';
 
+const pickText = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
 /**
  * Display name. Public profiles use the profile name. Previous applicants use the name on their
  * application in this organisation, which the server reads and authorises; never a profile guess.
+ * spark network candidates have no provider profile: their name is the server's redacted summary
+ * hint (the candidate's confirmed, published name).
  */
-export function candidateDisplayName(origin: ReadOrigin, profileName: unknown, applicationName: unknown): string {
-  const pick = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  if (origin.kind === 'organization_candidate') return pick(applicationName) ?? 'Previous applicant';
-  return pick(profileName) ?? 'Unknown Candidate';
+export function candidateDisplayName(origin: ReadOrigin, profileName: unknown, summaryName: unknown): string {
+  if (origin.kind === 'organization_candidate') return pickText(summaryName) ?? 'Previous applicant';
+  if (origin.kind === 'candidate_network') return pickText(summaryName) ?? 'Unknown Candidate';
+  return pickText(profileName) ?? 'Unknown Candidate';
+}
+
+/** Card/drawer location for non-applicants: provider profile location, or for spark network
+ * candidates the server's location label (their published location). Applicants use their résumé location instead. */
+export function candidateLocationText(origin: ReadOrigin, profileLocation: unknown, summaryLocation: unknown): string | null {
+  return origin.kind === 'candidate_network' ? pickText(summaryLocation) : pickText(profileLocation);
 }
 
 export function applicationHref(origin: ReadOrigin): string | null {

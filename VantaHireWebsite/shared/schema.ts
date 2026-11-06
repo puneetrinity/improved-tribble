@@ -348,6 +348,8 @@ export const applications = pgTable("applications", {
   phone: text("phone").notNull(),
   resumeUrl: text("resume_url").notNull(),
   resumeFilename: text("resume_filename"), // Original filename for proper downloads
+  candidateLocation: jsonb("candidate_location"), // Candidate-confirmed application snapshot; not résumé inference
+  willingToRelocate: boolean("willing_to_relocate"),
   extractedResumeText: text("extracted_resume_text"), // Extracted resume text for AI summary
   coverLetter: text("cover_letter"),
   status: text("status").default("submitted").notNull(),

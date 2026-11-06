@@ -272,20 +272,18 @@ describe("candidate application privacy boundary", () => {
     );
 
     const dashboard = read(
-      "../../../client/src/pages/candidate-dashboard.tsx",
+      "../../../client/src/pages/candidate-portal-page.tsx",
     );
-    const contentStart = dashboard.indexOf(
-      "function CandidateDashboardContent",
-    );
-    const guard = dashboard.slice(
-      dashboard.indexOf("export default function CandidateDashboard"),
-      contentStart,
-    );
-
-    expect(contentStart).toBeGreaterThan(-1);
-    expect(guard).toContain(
-      "return <CandidateDashboardContent key={user.id} user={user} />",
-    );
-    expect(guard).not.toContain("useQuery<");
+    const guardStart = dashboard.indexOf('if (!user || user.role !== "candidate" || !user.emailVerified)');
+    expect(guardStart).toBeGreaterThan(-1);
+    const guardedRender = dashboard.slice(guardStart);
+    expect(guardedRender).toContain('return <Redirect to="/candidate-auth#signin" />');
+    expect(guardedRender.indexOf('<Redirect')).toBeLessThan(guardedRender.indexOf('<CandidatePortal'));
+    // Hooks must run before the conditional redirect on every auth transition.
+    expect(guardedRender).not.toMatch(/\buse(?:State|Effect|Memo|Query|InfiniteQuery|Auth|Location)\s*(?:<[^>]*>)?\s*\(/);
+    expect(dashboard.slice(0, guardStart)).toContain('useInfiniteQuery<');
+    const app = read("../../../client/src/App.tsx");
+    expect(app).toContain('import("@/pages/candidate-portal-page")');
+    expect(app).toContain('path="/my-dashboard" component={CandidateDashboard} requiredRole={[\'candidate\']}');
   });
 });

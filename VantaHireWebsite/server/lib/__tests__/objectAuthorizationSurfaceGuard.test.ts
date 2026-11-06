@@ -9,6 +9,7 @@ import {
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
+import { setImmediate as yieldToRunner } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 
 // @ts-expect-error Plain ESM guard intentionally runs before TypeScript compilation.
@@ -29,7 +30,7 @@ describe("4C route census amendment", () => {
     const root = fixture();
     const path = join(root, MANIFEST);
     const manifest = JSON.parse(readFileSync(path, "utf8"));
-    expect(manifest.route_registration_census).toBe(333);
+    expect(manifest.route_registration_census).toBe(356);
     manifest.route_registration_census = 316;
     writeFileSync(path, JSON.stringify(manifest));
     expect(checkObjectAuthorization(root)).toContain("object authorization route census contract is invalid.");
@@ -146,8 +147,11 @@ function mutate(root: string, file: string, update: (source: string) => string):
   return problems;
 }
 
-afterEach(() => {
+afterEach(async () => {
   while (scratch.length) rmSync(scratch.pop()!, { recursive: true, force: true });
+  // Synchronous fixture copies and guard mutations otherwise monopolise the
+  // worker loop for the entire suite, starving Vitest's result acknowledgements.
+  await yieldToRunner();
 });
 
 describe("object authorization surface guard", () => {

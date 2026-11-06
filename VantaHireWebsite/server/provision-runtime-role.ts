@@ -1,6 +1,7 @@
 // One-run Flow runtime-role provisioning entrypoint. Never imported by runtime.
 
 import type { RuntimeRoleClient } from "./schema-control/runtimeRole";
+import {globalBudgetsFromEnv,applyGlobalBudgets} from './candidate-product/budget-config';
 import {
   provisionRuntimeRole,
   resolveRuntimeRoleProvisioningEnv,
@@ -20,11 +21,18 @@ async function connect(url: string): Promise<RuntimeRoleClient> {
 }
 
 async function main(): Promise<void> {
+  const budgets=globalBudgetsFromEnv(process.env);
+  const config=resolveRuntimeRoleProvisioningEnv();
   const result = await provisionRuntimeRole({
-    ...resolveRuntimeRoleProvisioningEnv(),
+    ...config,
     connectMigration: connect,
     connectRuntime: connect,
   });
+  if(budgets){
+    if(!result.controlPlaneReady)throw Error('spark_budget_schema_not_ready');
+    const db=await connect(config.migrateUrl);
+    try{await applyGlobalBudgets(db,budgets);}finally{await db.end?.();}
+  }
   console.log(
     `schema-provision-runtime-role: OK (control-plane=${result.controlPlaneReady ? "ready" : "pending-adoption"})`,
   );

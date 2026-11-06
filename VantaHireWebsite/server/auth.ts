@@ -7,8 +7,11 @@ import { promisify } from "util";
 import { storage } from "./storage";
 import { User as SelectUser } from "@shared/schema";
 import connectPg from "connect-pg-simple";
-import { pool } from "./db";
+import { pool, db } from "./db";
+import { captureOptionalIntent } from './candidate-product/guest-intent';
+import { captureSignupConsentIntent } from './candidate-product/consent-v2';
 import { getEmailService } from "./simpleEmailService";
+import { verificationEmailForAccount } from './candidate-product/verification-email';
 import rateLimit from "express-rate-limit";
 import { computeProfileCompletion } from "./lib/profileCompletion";
 import { queueMauticFirstLoginSync, queueMauticSignupSync } from "./lib/mauticService";
@@ -86,8 +89,9 @@ const passwordResetLimiter = rateLimit({
 async function sendVerificationEmail(
   email: string,
   token: string,
-  firstName?: string | null,
-  inviteToken?: string | null
+  firstName: string | null | undefined,
+  inviteToken: string | null | undefined,
+  account: Pick<SelectUser, 'id' | 'role'>
 ): Promise<boolean> {
   const emailService = await getEmailService();
   if (!emailService) {
@@ -99,35 +103,22 @@ async function sendVerificationEmail(
   const verifyUrl = inviteToken
     ? `${baseUrl}/verify-email/${token}?invite=${inviteToken}`
     : `${baseUrl}/verify-email/${token}`;
-  const name = firstName || 'there';
-
   try {
+    const content = await verificationEmailForAccount({firstName:firstName ?? null, verifyUrl, baseUrl, userId:account.id, role:account.role}, async userId => {
+      try {
+        const result = await pool.query('SELECT public.flow_consent_v2_signup_origin($1::integer) AS spark', [userId]);
+        if (result.rows.length !== 1 || typeof result.rows[0]?.spark !== 'boolean') throw Error('invalid_signup_origin');
+        return result.rows[0].spark;
+      } catch (error) {
+        // Before S2 migrations exist, all accounts use the established branding.
+        // Other database failures must not be mistaken for a non-spark signup.
+        if ((error as {code?: string}).code === '42883') return false;
+        throw error;
+      }
+    });
     await emailService.sendEmail({
       to: email,
-      subject: 'Verify your Ealana account',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #1a1a1a;">Welcome to Ealana!</h2>
-          <p>Hi ${name},</p>
-          <p>Thanks for signing up. Please verify your email address to get started.</p>
-          <p style="margin: 30px 0;">
-            <a href="${verifyUrl}"
-               style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-              Verify Email
-            </a>
-          </p>
-          <p style="color: #666; font-size: 14px;">
-            Or copy this link: <a href="${verifyUrl}">${verifyUrl}</a>
-          </p>
-          <p style="color: #666; font-size: 14px;">
-            This link expires in 24 hours.
-          </p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
-          <p style="color: #999; font-size: 12px;">
-            If you didn't create an account, you can safely ignore this email.
-          </p>
-        </div>
-      `,
+      ...content,
     });
     return true;
   } catch (error) {
@@ -458,12 +449,19 @@ export function setupAuth(app: Express) {
         return;
       }
 
-      const user = await storage.createUser({
+      let networkIntentStatus: 'recorded' | 'not_recorded' | undefined;
+      const user = await db.transaction(async (tx:any) => {
+        const created = await storage.createUser({
         username,
         password: await hashPassword(password),
         firstName,
         lastName,
         role: finalRole
+        }, tx);
+        if (finalRole === 'candidate') networkIntentStatus = req.body.networkIntent?.schemaVersion === 2
+          ? await captureSignupConsentIntent(tx,created.id,req.body.networkIntent)
+          : await captureOptionalIntent(tx,'signup',created.id,req.body.networkIntent);
+        return created;
       });
       queueMauticSignupSync(user.id);
 
@@ -495,12 +493,13 @@ export function setupAuth(app: Express) {
       await storage.setVerificationToken(user.id, hash, expires);
 
       // Preserve the organization invite only in the post-verification redirect.
-      const emailSent = await sendVerificationEmail(username, token, firstName, inviteToken);
+      const emailSent = await sendVerificationEmail(username, token, firstName, inviteToken, user);
       if (!emailSent) {
         res.status(201).json({
           message: 'Registration successful, but we could not send the verification email right now. Please use "Resend Verification Email" on the login screen.',
           requiresVerification: true,
           emailDeliveryFailed: true,
+          ...(networkIntentStatus ? { networkIntentStatus } : {}),
         });
         return;
       }
@@ -508,6 +507,7 @@ export function setupAuth(app: Express) {
       res.status(201).json({
         message: 'Registration successful. Please check your email to verify your account.',
         requiresVerification: true,
+        ...(networkIntentStatus ? { networkIntentStatus } : {}),
       });
     } catch (error) {
       next(error);
@@ -772,7 +772,7 @@ export function setupAuth(app: Express) {
       await storage.setVerificationToken(user.id, hash, expires);
 
       // Send verification email - pass inviteToken to preserve org invite through verification
-      const sent = await sendVerificationEmail(email, token, user.firstName, inviteToken);
+      const sent = await sendVerificationEmail(email, token, user.firstName, inviteToken, user);
       if (!sent) {
         // Best effort rollback: don't strand users on an unsent token if an older valid token existed.
         if (previousTokenHash && previousExpiry) {

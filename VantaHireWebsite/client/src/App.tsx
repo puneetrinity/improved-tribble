@@ -18,6 +18,7 @@ import React, { lazy, Suspense, useEffect, useState, useRef } from "react";
 
 const RecruiterAuth = lazy(() => import("@/pages/recruiter-auth"));
 const CandidateAuth = lazy(() => import("@/pages/candidate-auth"));
+const CandidateSetup = lazy(() => import("@/pages/candidate-setup-page"));
 const JobsPage = lazy(() => import("@/pages/jobs-page"));
 const JobDetailsPage = lazy(() => import("@/pages/job-details-page"));
 const JobPostPage = lazy(() => import("@/pages/job-post-page"));
@@ -41,7 +42,7 @@ const JobPipelinePage = lazy(() => import("@/pages/job-pipeline-page"));
 const JobAnalyticsPage = lazy(() => import("@/pages/job-analytics-page"));
 const JobSourcingPage = lazy(() => import("@/pages/job-sourcing-page"));
 const BulkResumeImportPage = lazy(() => import("@/pages/bulk-resume-import-page"));
-const CandidateDashboard = lazy(() => import("@/pages/candidate-dashboard"));
+const CandidateDashboard = lazy(() => import("@/pages/candidate-portal-page"));
 const JobAnalyticsDashboard = lazy(() => import("@/pages/job-analytics-dashboard"));
 const RecruiterDashboard = lazy(() => import("@/pages/recruiter-dashboard"));
 const HiringManagerDashboard = lazy(() => import("@/pages/hiring-manager-dashboard"));
@@ -100,6 +101,7 @@ function Router() {
       <Route path="/talent-intelligence-vs-ats" component={TalentIntelligenceVsAtsPage} />
       <Route path="/recruiter-auth" component={RecruiterAuth} />
       <Route path="/candidate-auth" component={CandidateAuth} />
+      <Route path="/candidate-setup" component={CandidateSetup} />
       <ProtectedRoute path="/onboarding" component={OnboardingPage} requiredRole={['recruiter']} />
       <Route path="/form/:token" component={PublicFormPage} />
       <Route path="/client-shortlist/:token" component={ClientShortlistPage} />

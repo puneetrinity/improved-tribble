@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import {createHash} from 'node:crypto';
 import {
   INGEST_OCR_CALL_TIMEOUT_MS,
   INGEST_OCR_MAX_INPUT_BYTES,
@@ -15,6 +16,7 @@ function visionResponse(pages: number[], textPrefix = 'page') {
   return new Response(JSON.stringify({
     responses: [{
       responses: pages.map((page) => ({
+        context:{pageNumber:page},
         fullTextAnnotation: { text: `${textPrefix}-${page}` },
       })),
     }],
@@ -44,6 +46,32 @@ function clientFor(input: {
 }
 
 describe('bounded ordinary-ingest Vision client', () => {
+  const plan=(pageNumbers: number[],totalPages=4)=>({schemaVersion:1 as const,contentHash:createHash('sha256').update(pdf).digest('hex'),totalPages,pageNumbers});
+  it('sends only the explicitly selected pages and retains page identity',async()=>{
+    const fetchImpl=vi.fn(async(_url,init)=>visionResponse(JSON.parse(String(init?.body)).requests[0].pages)) as unknown as typeof fetch;
+    const result=await clientFor({pageCount:4,fetchImpl})(pdf,plan([2,4]));
+    expect(result).toMatchObject({success:true,pageTexts:[{pageNumber:2,text:'page-2'},{pageNumber:4,text:'page-4'}]});
+    expect(JSON.parse(String((fetchImpl as any).mock.calls[0][1].body)).requests[0].pages).toEqual([2,4]);
+  });
+  it.each([[1,1],[4,2],[0],[5],[]].map(pages=>({pages})))('rejects invalid selection $pages before authentication',async ({pages})=>{
+    const auth=vi.fn(async()=> 'test-token');
+    expect((await clientFor({pageCount:4,getAccessToken:auth})(pdf,plan(pages))).success).toBe(false);
+    expect(auth).not.toHaveBeenCalled();
+  });
+  it('refuses a mismatched document hash or count before authentication',async()=>{
+    const auth=vi.fn(async()=> 'test-token'),client=clientFor({pageCount:4,getAccessToken:auth});
+    expect((await client(pdf,{...plan([2]),contentHash:'a'.repeat(64)})).success).toBe(false);
+    expect((await client(pdf,plan([2],3))).success).toBe(false);
+    expect(auth).not.toHaveBeenCalled();
+  });
+  it.each([[2,2],[1,4],[2]].map(pages=>({pages})))('refuses missing, duplicate or foreign response pages $pages',async ({pages})=>{
+    const client=clientFor({pageCount:4,fetchImpl:async()=>visionResponse(pages)});
+    expect(await client(pdf,plan([2,4]))).toMatchObject({success:false,reasonCode:'OCR_OUTPUT_REFUSED'});
+  });
+  it('orders the exact returned pages by the requested selection',async()=>{
+    const client=clientFor({pageCount:4,fetchImpl:async()=>visionResponse([4,2])});
+    expect((await client(pdf,plan([2,4]))).pageTexts).toEqual([{pageNumber:2,text:'page-2'},{pageNumber:4,text:'page-4'}]);
+  });
   it('freezes all production limits', () => {
     expect(INGEST_OCR_TOTAL_TIMEOUT_MS).toBe(20_000);
     expect(INGEST_OCR_CALL_TIMEOUT_MS).toBe(10_000);

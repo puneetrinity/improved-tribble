@@ -82,8 +82,13 @@ export async function signServiceJwt(
     scopes: string;           // space-delimited scopes string
     requestId?: string;
     actorType?: string;
+    lifetimeSeconds?: number;
   },
 ): Promise<string> {
+  if (opts.lifetimeSeconds !== undefined && (!Number.isInteger(opts.lifetimeSeconds)
+    || opts.lifetimeSeconds < 1 || opts.lifetimeSeconds > 300)) {
+    throw new Error('Service JWT lifetime must be an integer between 1 and 300 seconds');
+  }
   const privateKey = await getPrivateKey();
 
   const jwt = new SignJWT({
@@ -97,7 +102,7 @@ export async function signServiceJwt(
     .setSubject('vantahire-backend')
     .setAudience(audience)
     .setIssuedAt()
-    .setExpirationTime(DEFAULT_EXPIRY)
+    .setExpirationTime(opts.lifetimeSeconds === undefined ? DEFAULT_EXPIRY : `${opts.lifetimeSeconds}s`)
     .setJti(randomUUID());
 
   return jwt.sign(privateKey);

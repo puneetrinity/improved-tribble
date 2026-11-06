@@ -13,6 +13,87 @@ import { CANDIDATE_INDEX_TABLES, CANDIDATE_INDEX_FUNCTIONS,
   CANDIDATE_INDEX_TRIGGER_FUNCTION } from "../candidate-index/contracts";
 import { BRIEF_TABLES, BRIEF_FUNCTIONS } from '../job-brief/contracts';
 import {SOURCING_TABLES,SOURCING_PRIVATE_NAMES,sourcingPrivilegesReady} from '../sourcing-authority/catalog';
+import {FOUNDATION_TABLES,FOUNDATION_FUNCTIONS,FOUNDATION_OWNER_FUNCTIONS} from '../candidate-product/contracts';
+import {PROFILE_TABLES,PROFILE_FUNCTIONS,PROFILE_OWNER_FUNCTIONS} from '../candidate-product/profile-contracts';
+import {SOURCE_TABLES,SOURCE_OWNER_FUNCTIONS,SOURCE_RUNTIME_FUNCTIONS} from '../candidate-product/source-repository';
+import {CONSENT_V2_TABLES,CONSENT_V2_OWNER_FUNCTIONS,CONSENT_V2_RUNTIME_FUNCTIONS} from '../candidate-product/consent-v2';
+
+export const FOUNDATION_CATALOG_MD5='f1ad94c0ba0229954d1b9050ef92869a';
+export const FOUNDATION_CATALOG_SQL=`WITH relations AS (
+ SELECT c.* FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname='public' AND (c.relname LIKE 'candidate_product_%' OR c.relname='candidate_network_intents') AND c.relkind IN ('r','p','v','m','f')
+), routines AS (
+ SELECT p.* FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+ WHERE n.nspname='public' AND p.proname LIKE 'flow_candidate_foundation_%'
+)
+SELECT md5(jsonb_build_object(
+ 'tables',(SELECT jsonb_agg(jsonb_build_array(c.relname,c.relkind,c.relrowsecurity,c.relforcerowsecurity,
+  (SELECT jsonb_agg(jsonb_build_array(a.attname,format_type(a.atttypid,a.atttypmod),a.attnotnull,a.attidentity,a.attgenerated,
+    pg_get_expr(d.adbin,d.adrelid)) ORDER BY a.attnum) FROM pg_attribute a LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum
+    WHERE a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped),
+  (SELECT jsonb_agg(jsonb_build_array(x.conname,x.convalidated,x.condeferrable,x.condeferred,pg_get_constraintdef(x.oid)) ORDER BY x.conname COLLATE "C") FROM pg_constraint x WHERE x.conrelid=c.oid),
+  (SELECT jsonb_agg(jsonb_build_array(i.indisvalid,i.indisready,pg_get_indexdef(i.indexrelid)) ORDER BY pg_get_indexdef(i.indexrelid) COLLATE "C") FROM pg_index i WHERE i.indrelid=c.oid),
+  (SELECT jsonb_agg(jsonb_build_array(p.polname,p.polcmd,p.polpermissive,p.polroles=ARRAY[c.relowner],pg_get_expr(p.polqual,p.polrelid),pg_get_expr(p.polwithcheck,p.polrelid)) ORDER BY p.polname COLLATE "C") FROM pg_policy p WHERE p.polrelid=c.oid)
+ ) ORDER BY c.relname COLLATE "C") FROM relations c),
+ 'routines',(SELECT jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,p.proowner=(SELECT relowner FROM relations WHERE relname='candidate_product_accounts'),pg_get_functiondef(p.oid)) ORDER BY p.oid::regprocedure::text COLLATE "C") FROM routines p),
+ 'triggers',(SELECT jsonb_agg(jsonb_build_array(t.tgenabled,pg_get_triggerdef(t.oid)) ORDER BY t.tgname COLLATE "C") FROM pg_trigger t WHERE t.tgfoid IN(SELECT oid FROM routines)),
+ 'anchor_index',pg_get_indexdef(to_regclass('public.candidate_consent_subject_user_identity'))
+)::text) AS digest,
+ NOT EXISTS(SELECT 1 FROM relations c CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) v(privilege)
+  WHERE has_table_privilege($1,c.oid,v.privilege))
+ AND NOT EXISTS(SELECT 1 FROM relations c CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) v(privilege)
+  WHERE has_any_column_privilege($1,c.oid,v.privilege))
+ AND NOT EXISTS(SELECT 1 FROM relations c CROSS JOIN LATERAL aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee<>c.relowner)
+ AND NOT EXISTS(SELECT 1 FROM relations c JOIN pg_attribute x ON x.attrelid=c.oid CROSS JOIN LATERAL aclexplode(x.attacl) a WHERE a.grantee<>c.relowner)
+ AND NOT EXISTS(SELECT 1 FROM routines p WHERE has_function_privilege($1,p.oid,'EXECUTE') IS DISTINCT FROM (p.oid::regprocedure::text=ANY($2::text[]))
+  OR EXISTS(SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE a.grantee<>p.proowner AND
+    (a.grantee IS DISTINCT FROM (SELECT oid FROM pg_roles WHERE rolname=$1) OR a.is_grantable OR NOT(p.oid::regprocedure::text=ANY($2::text[]))))) AS privileges`;
+
+export async function foundationPrivilegesReady(pg:PgLike,role:string,required:boolean):Promise<boolean>{
+  const present=await pg.query(`SELECT to_regclass('public.candidate_product_accounts') AS present`);
+  if(!present.rows[0]?.present && !required) return true;
+  const result=await pg.query(FOUNDATION_CATALOG_SQL,[role,[...FOUNDATION_FUNCTIONS]]);
+  return result.rows[0]?.digest===FOUNDATION_CATALOG_MD5 && result.rows[0]?.privileges===true;
+}
+
+export const PROFILE_CATALOG_MD5='67218494c2edc5a9895d25d75ebe12fb';
+export const PROFILE_CATALOG_SQL=FOUNDATION_CATALOG_SQL
+ .replace("(c.relname LIKE 'candidate_product_%' OR c.relname='candidate_network_intents')","c.relname LIKE 'candidate_profile_%'")
+ .replace("p.proname LIKE 'flow_candidate_foundation_%'","p.proname LIKE 'flow_candidate_profile_%'")
+ .replace("relname='candidate_product_accounts'","relname='candidate_profile_commands'");
+export async function profilePrivilegesReady(pg:PgLike,role:string,required:boolean):Promise<boolean>{
+ const present=await pg.query("SELECT to_regclass('public.candidate_profile_commands') AS present");
+ if(!present.rows[0]?.present)return !required;
+ const result=await pg.query(PROFILE_CATALOG_SQL,[role,[...PROFILE_FUNCTIONS]]);
+ return result.rows[0]?.digest===PROFILE_CATALOG_MD5&&result.rows[0]?.privileges===true;
+}
+
+export const CONSENT_V2_CATALOG_MD5='53023911157addbac8df92d2535b2f50';
+export const SOURCE_CATALOG_MD5='4ffc69994784680c162ea9ed6e9d7b4d';
+export const SOURCE_CATALOG_SQL=FOUNDATION_CATALOG_SQL
+ .replace("(c.relname LIKE 'candidate_product_%' OR c.relname='candidate_network_intents')","c.relname LIKE 'candidate_source_%'")
+ .replace("p.proname LIKE 'flow_candidate_foundation_%'","p.proname LIKE 'flow_candidate_source_%'")
+ .replace("relname='candidate_product_accounts'","relname='candidate_source_objects'");
+export async function sourcePrivilegesReady(pg:PgLike,role:string,required:boolean):Promise<boolean>{
+ const present=await pg.query("SELECT to_regclass('public.candidate_source_jobs') AS present");
+ if(!present.rows[0]?.present)return !required;
+ const result=await pg.query(SOURCE_CATALOG_SQL,[role,[...SOURCE_RUNTIME_FUNCTIONS]]);
+ return result.rows[0]?.digest===SOURCE_CATALOG_MD5&&result.rows[0]?.privileges===true;
+}
+export const CONSENT_V2_CATALOG_SQL=FOUNDATION_CATALOG_SQL
+ .replace("(c.relname LIKE 'candidate_product_%' OR c.relname='candidate_network_intents')","c.relname LIKE 'candidate_consent_%'")
+ .replace('), routines AS (',"), private_relations AS (SELECT * FROM relations WHERE relname IN ('candidate_consent_v2_copies','candidate_consent_signup_intents')), routines AS (")
+ .replace("p.proname LIKE 'flow_candidate_foundation_%'",`p.proname IN (${[...[...CONSENT_V2_OWNER_FUNCTIONS,...CONSENT_V2_RUNTIME_FUNCTIONS].map(s=>s.split('(')[0]),'flow_claim_candidate_consent_outbox','flow_ack_candidate_consent_outbox','flow_fail_candidate_consent_outbox'].map(s=>`'${s}'`).join(',')})`)
+ .replace("relname='candidate_product_accounts'","relname='candidate_consent_subjects'")
+ .replaceAll('FROM relations c CROSS','FROM private_relations c CROSS')
+ .replaceAll('FROM relations c JOIN pg_attribute','FROM private_relations c JOIN pg_attribute');
+export async function consentV2PrivilegesReady(pg:PgLike,role:string,required:boolean):Promise<boolean>{
+ const present=await pg.query("SELECT to_regclass('public.candidate_consent_v2_copies') AS present");
+ if(!present.rows[0]?.present)return !required;
+ const allowed=[...CANDIDATE_CONSENT_FUNCTIONS.slice(0,3).map(s=>s.replace(/^public\./,'')),...CONSENT_V2_RUNTIME_FUNCTIONS];
+ const result=await pg.query(CONSENT_V2_CATALOG_SQL,[role,allowed]);
+ return result.rows[0]?.digest===CONSENT_V2_CATALOG_MD5&&result.rows[0]?.privileges===true;
+}
 
 // Owner-private helpers share the same deny-runtime treatment as trigger functions.
 export const BRIEF_TRIGGER_FUNCTIONS=['flow_job_brief_immutable()','flow_lock_job_application_activity()','flow_job_brief_validate_v3(jsonb)'] as const;
@@ -308,6 +389,13 @@ export async function candidateConsentPrivilegesReady(pg: PgLike, role: string, 
   const counts = presence.rows[0];
   if (!required && counts?.tables === 0 && counts?.functions === 0) return true;
   if (counts?.tables !== 4 || counts?.functions !== 4) return false;
+  const v2=await pg.query("SELECT to_regclass('public.candidate_consent_v2_copies') AS present");
+  const constraints:readonly (readonly unknown[])[]=v2.rows[0]?.present ? [
+    ...CANDIDATE_CONSENT_CONSTRAINTS.filter(row=>!['candidate_consent_events_copy_version_check','candidate_consent_events_purpose_version_check','candidate_consent_events_schema_version_check','consent_source_profile_shape'].includes(row[1])),
+    ['candidate_consent_sources','consent_source_profile_shape','c',false,false,'ec7c11a2ce0438a9dcb090272777ca7d'],
+    ['candidate_consent_sources','candidate_consent_sources_source_schema_version_check','c',false,false,'546ab4289aec631dc37a8ed59f18f97b'],
+    ['candidate_consent_events','consent_event_versioned_disclosure','c',false,false,'878896dab504caab998d586ee820866d'],
+  ] : CANDIDATE_CONSENT_CONSTRAINTS;
   const result = await pg.query(`SELECT
     NOT EXISTS (
       SELECT 1 FROM pg_class c JOIN pg_namespace ns ON ns.oid=c.relnamespace
@@ -344,13 +432,13 @@ export async function candidateConsentPrivilegesReady(pg: PgLike, role: string, 
       JOIN pg_proc p ON p.oid=t.tgfoid AND p.proname=required.function_name
       WHERE NOT t.tgisinternal AND t.tgenabled='O' AND t.tgtype=required.trigger_type
     ) AND (
-      SELECT count(*)=58 FROM jsonb_array_elements($5::jsonb) expected(value)
+      SELECT count(*)=jsonb_array_length($5::jsonb) FROM jsonb_array_elements($5::jsonb) expected(value)
       JOIN pg_constraint c ON c.conrelid=to_regclass('public.'||(value->>0)) AND c.conname=value->>1
       WHERE c.contype::text=value->>2 AND c.convalidated
         AND c.condeferrable=(value->>3)::boolean AND c.condeferred=(value->>4)::boolean
         AND md5(pg_get_constraintdef(c.oid))=value->>5
     ) AS ok`, [role, [...CANDIDATE_CONSENT_TABLES], [...CANDIDATE_CONSENT_FUNCTIONS], [...CANDIDATE_CONSENT_UPDATE_COLUMNS],
-      JSON.stringify(CANDIDATE_CONSENT_CONSTRAINTS)]);
+      JSON.stringify(constraints)]);
   return result.rows[0]?.ok === true;
 }
 
@@ -358,6 +446,18 @@ export async function candidateConsentPrivilegesReady(pg: PgLike, role: string, 
 export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
   ReadinessInput["criticalPostconditions"]
 > = [
+  {name:'Candidate source catalog remains owner-only until integration is activated',async check(pg){
+    const who=await pg.query('SELECT current_user AS role');return sourcePrivilegesReady(pg,who.rows[0]?.role,true);
+  }},
+  {name:'Candidate consent v2 catalog and routine-only permissions are exact',async check(pg){
+    const who=await pg.query('SELECT current_user AS role');return consentV2PrivilegesReady(pg,who.rows[0]?.role,true);
+  }},
+  {name:'Candidate profile catalog and routine-only permissions are exact',async check(pg){
+    const who=await pg.query('SELECT current_user AS role');return profilePrivilegesReady(pg,who.rows[0]?.role,true);
+  }},
+  {name:'Candidate foundation catalog and routine-only permissions are exact',async check(pg){
+    const who=await pg.query('SELECT current_user AS role');return foundationPrivilegesReady(pg,who.rows[0]?.role,true);
+  }},
   {
     name: "Candidate history keyed read-only routine and index are exact",
     async check(pg) {
@@ -730,7 +830,7 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                      'candidate_consent_events','candidate_consent_outbox',
                      'candidate_index_outbox','candidate_index_delivery_state',
                      'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
-                     ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')}
+                     ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')},${[...FOUNDATION_TABLES,...PROFILE_TABLES,...CONSENT_V2_TABLES,...SOURCE_TABLES].map(n=>`'${n}'`).join(',')}
                    )
                    AND has_table_privilege(current_user, c.oid, 'SELECT')
                    AND has_table_privilege(current_user, c.oid, 'INSERT')
@@ -744,7 +844,7 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                    'candidate_consent_events','candidate_consent_outbox',
                    'candidate_index_outbox','candidate_index_delivery_state',
                    'job_brief_state','job_brief_versions','job_brief_events','job_brief_draft_requests',
-                   ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')})
+                   ${SOURCING_TABLES.map(n=>`'${n}'`).join(',')},${[...FOUNDATION_TABLES,...PROFILE_TABLES,...CONSENT_V2_TABLES,...SOURCE_TABLES].map(n=>`'${n}'`).join(',')})
                  -- Exact consent table/column privileges are a separate mandatory postcondition above.
                )
           )
@@ -776,6 +876,7 @@ export const FLOW_CRITICAL_POSTCONDITIONS: NonNullable<
                  pg_has_role(current_user, pg_get_userbyid(p.proowner), 'MEMBER')
                  OR (p.proname NOT IN ('flow_candidate_index_evidence_guard','flow_job_brief_immutable','flow_lock_job_application_activity','flow_job_brief_validate_v3')
                    AND p.proname NOT IN (${SOURCING_PRIVATE_NAMES.map(n=>`'${n}'`).join(',')})
+                   AND p.proname NOT IN (${[...FOUNDATION_OWNER_FUNCTIONS,...PROFILE_OWNER_FUNCTIONS,...CONSENT_V2_OWNER_FUNCTIONS,...SOURCE_OWNER_FUNCTIONS].map(n=>`'${n.split('(')[0]}'`).join(',')})
                    AND NOT has_function_privilege(current_user, p.oid, 'EXECUTE'))
                )
           ) AS ok

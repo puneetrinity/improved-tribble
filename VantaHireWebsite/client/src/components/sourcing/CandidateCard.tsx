@@ -5,7 +5,7 @@ import {
   Star, MapPin, Building, Briefcase, CheckCircle2,
   Mail, Phone, Github, Twitter, Linkedin, Sparkles, Loader2, FileText,
 } from "lucide-react";
-import { allowsPublicContact, applicationHref, candidateDisplayName, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
+import { allowsPublicContact, applicationHref, candidateDisplayName, candidateLocationText, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import { candidateSourceGroup, SOURCE_GROUP_LABEL } from "@/lib/sourcing-source-label";
 import { resumeLocationText } from "@shared/resume-location";
 import { cn } from "@/lib/utils";
@@ -148,8 +148,8 @@ export function CandidateCard({
   const isApplicant = origin.kind === "organization_candidate";
   // A previous applicant's location comes only from their own résumé; unknown stays unknown.
   const applicantLocation = isApplicant ? resumeLocationText(candidate.resumeLocation) : null;
-  const locationDisplay = isApplicant ? applicantLocation : (candidate.crustdata?.basic_profile?.location?.full_location
-    || candidate.crustdata?.basic_profile?.location?.raw || null);
+  const locationDisplay = isApplicant ? applicantLocation : candidateLocationText(origin, candidate.crustdata?.basic_profile?.location?.full_location
+    || candidate.crustdata?.basic_profile?.location?.raw, candidate.locationLabel);
   const sourceGroup = candidateSourceGroup(candidate);
 
   const currentRole = candidate.crustdata?.experience?.employment_details?.current?.[0];

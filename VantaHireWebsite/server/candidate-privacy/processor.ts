@@ -40,6 +40,7 @@ async function deliverOne(): Promise<boolean> {
       identifiers,
       timeoutMs: config.memoryTimeoutMs,
     });
+    // Erasure requests quarantine only. Permanent deletion is operator-only.
     await markOutboxDelivered(claim, remote);
   } catch (error) {
     const retryable = error instanceof CandidatePrivacyMemoryError ? error.retryable : true;

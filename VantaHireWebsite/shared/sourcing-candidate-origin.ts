@@ -2,6 +2,7 @@ import {z} from 'zod';
 const id=z.number().int().positive().safe();
 export const sourcingCandidateOriginSchema=z.discriminatedUnion('kind',[
   z.object({version:z.literal(1),kind:z.literal('public_profile')}).strict(),
+  z.object({version:z.literal(1),kind:z.literal('candidate_network')}).strict(),
   z.object({version:z.literal(1),kind:z.literal('organization_candidate'),
     applicationId:id,applicationJobId:id}).strict(),
 ]);

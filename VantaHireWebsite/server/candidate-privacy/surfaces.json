@@ -1,9 +1,18 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "fa8c9f386a45b9584f77b91df5b7285c10e5a9748a10840fc367d1ae39b1d0bc",
+  "source_census_sha256": "c9f582408200a031d104d6c897eaee994b7a29f80f054c961bb24bcd5073049c",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
+    "client/src/lib/candidate-profile-api.ts",
+    "client/src/components/candidate-portal/CandidatePortal.tsx",
+    "server/candidate-product/interpretation.ts",
+    "server/candidate-product/application-location.ts",
+    "server/schema-migrations/0027_application_candidate_location.sql",
+    "shared/candidate-profile.ts",
+    "server/candidate-product/source-adapters.ts",
+    "server/candidate-product/source-contracts.ts",
+    "server/candidate-product/source-processor.ts",
     "server/candidate-history/contracts.ts",
     "server/candidate-history/memory-client.ts",
     "server/candidate-history/routes.ts",
@@ -49,7 +58,7 @@
     "server/lib/services/jwt-signer.ts",
     "server/lib/services/signal-client.ts",
     "server/lib/services/sourcing-sync.ts",
-    "client/src/pages/candidate-dashboard.tsx",
+    "client/src/pages/candidate-portal-page.tsx",
     "client/src/pages/candidates-page.tsx",
     "client/src/pages/job-sourcing-page.tsx",
     "client/src/pages/bulk-resume-import-page.tsx",
@@ -60,114 +69,950 @@
     "client/src/components/kanban/ApplicationDetailPanel.tsx"
   ],
   "sources": [
-    { "file": "server/sourcing-authority/candidate-access.ts", "classification": "fenced" },
-    { "file": "server/sourcing-authority/commands.ts", "classification": "fenced" },
-    { "file": "server/schema-migrations/0015_governed_sourcing.sql", "classification": "fenced" },
-    { "file": "client/src/lib/sourcing-authority.ts", "classification": "ui_consumer" },
-    { "file": "server/lib/jobManagementRead.ts", "classification": "excluded" },
-    { "file": "server/candidate-history/contracts.ts", "classification": "fenced" },
-    { "file": "server/candidate-history/memory-client.ts", "classification": "fenced" },
-    { "file": "server/candidate-history/routes.ts", "classification": "fenced" },
-    { "file": "server/candidate-privacy/config.ts", "classification": "fenced" },
-    { "file": "server/candidate-privacy/models.ts", "classification": "fenced" },
-    { "file": "server/candidate-privacy/decision.ts", "classification": "fenced" },
-    { "file": "server/candidate-privacy/memory-client.ts", "classification": "fenced" },
-    { "file": "server/candidate-privacy/repository.ts", "classification": "fenced" },
-    { "file": "server/candidate-privacy/processor.ts", "classification": "fenced" },
-    { "file": "server/candidate-privacy/routes.ts", "classification": "fenced" },
-    { "file": "server/candidate-consent/contracts.ts", "classification": "fenced" },
-    { "file": "server/candidate-consent/repository.ts", "classification": "fenced" },
-    { "file": "server/candidate-consent/routes.ts", "classification": "fenced" },
-    { "file": "server/candidate-consent/processor.ts", "classification": "fenced" },
-    { "file": "server/candidate-consent/memory-client.ts", "classification": "fenced" },
-    { "file": "server/candidate-index/memory-client.ts", "classification": "fenced" },
-    { "file": "server/candidate-index/processor.ts", "classification": "fenced" },
-    { "file": "server/candidate-index/search.ts", "classification": "fenced" },
-    { "file": "server/candidate-index/catchup.ts", "classification": "fenced" },
-    { "file": "server/organization-candidates/application-intake.ts", "classification": "fenced" },
-    { "file": "server/organization-candidates/processor.ts", "classification": "fenced" },
-    { "file": "server/auth.ts", "classification": "fenced" },
-    { "file": "server/index.ts", "classification": "fenced" },
-    { "file": "server/routes.ts", "classification": "fenced" },
-    { "file": "server/rateLimit.ts", "classification": "fenced" },
-    { "file": "server/storage.ts", "classification": "fenced" },
-    { "file": "server/lib/applicationReadAuthorization.ts", "classification": "fenced" },
-    { "file": "server/applications.routes.ts", "classification": "fenced" },
-    { "file": "server/candidatePortal.routes.ts", "classification": "fenced" },
-    { "file": "server/profile.routes.ts", "classification": "fenced" },
-    { "file": "server/resume.routes.ts", "classification": "fenced" },
-    { "file": "server/bulkResumeImport.routes.ts", "classification": "fenced" },
-    { "file": "server/talent-pool.routes.ts", "classification": "fenced" },
-    { "file": "server/lib/talentPoolAuthorization.ts", "classification": "fenced" },
-    { "file": "server/signal.routes.ts", "classification": "fenced" },
-    { "file": "server/candidates.semantic.routes.ts", "classification": "fenced" },
-    { "file": "server/recruiterDashboard.routes.ts", "classification": "fenced" },
-    { "file": "server/admin.routes.ts", "classification": "fenced" },
-    { "file": "server/ai.routes.ts", "classification": "fenced" },
-    { "file": "server/coldOutreach.routes.ts", "classification": "fenced" },
-    { "file": "server/communications.routes.ts", "classification": "fenced" },
-    { "file": "server/forms.routes.ts", "classification": "fenced" },
-    { "file": "server/clients.routes.ts", "classification": "fenced" },
-    { "file": "server/jobs.routes.ts", "classification": "fenced" },
-    { "file": "server/webhooks/signal.webhook.ts", "classification": "fenced" },
-    { "file": "server/aiWorker.ts", "classification": "fenced" },
-    { "file": "server/lib/applicationGraphSyncProcessor.ts", "classification": "fenced" },
-    { "file": "server/lib/resumeImportProcessor.ts", "classification": "fenced" },
-    { "file": "server/lib/contactResolutionProcessor.ts", "classification": "fenced" },
-    { "file": "server/lib/outreachScheduler.ts", "classification": "fenced" },
-    { "file": "server/lib/outreachDelivery.ts", "classification": "fenced" },
-    { "file": "server/lib/sourcingRefreshWorker.ts", "classification": "fenced" },
-    { "file": "server/lib/services/activekg-client.ts", "classification": "fenced" },
-    { "file": "server/lib/services/jwt-signer.ts", "classification": "fenced" },
-    { "file": "server/lib/services/signal-client.ts", "classification": "fenced" },
-    { "file": "server/lib/services/sourcing-sync.ts", "classification": "fenced" },
-    { "file": "server/lib/aiLimits.ts", "classification": "fenced" },
-    { "file": "server/lib/resumeImportFinalize.ts", "classification": "fenced" },
-    { "file": "server/lib/profileCompletion.ts", "classification": "fenced" },
-    { "file": "server/emailTemplateService.ts", "classification": "fenced" },
-    { "file": "server/whatsappTemplateService.ts", "classification": "fenced" },
-    { "file": "server/notificationService.ts", "classification": "fenced" },
-    { "file": "server/lib/analyticsHelper.ts", "classification": "fenced" },
-    { "file": "server/lib/orgAnalyticsService.ts", "classification": "fenced" },
-    { "file": "server/organization.routes.ts", "classification": "fenced" },
-    { "file": "server/outreachCompliance.routes.ts", "classification": "excluded" },
-    { "file": "server/lib/outreachHygieneProcessor.ts", "classification": "excluded" },
-    { "file": "server/lib/contactSendGuard.ts", "classification": "excluded" },
-    { "file": "server/jobScheduler.ts", "classification": "excluded" },
-    { "file": "server/job-brief/commands.ts", "classification": "excluded" },
-    { "file": "server/lib/backfillResumeText.ts", "classification": "excluded" },
-    { "file": "server/lib/pipelineStageMerge.ts", "classification": "excluded" },
-    { "file": "server/lib/outreachComplianceCore.ts", "classification": "excluded" },
-    { "file": "server/webhooks/brevo.webhook.ts", "classification": "excluded" },
-    { "file": "server/schema-control/readiness.ts", "classification": "excluded" },
-    { "file": "server/schema-migrations/0001_candidate_privacy_flow.sql", "classification": "excluded" },
-    { "file": "client/src/App.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/AISummaryPanel.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/admin/AdminPrivacyRequestPanel.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/ClientFeedbackList.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/FeedbackPanel.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/ResumePreviewModal.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/candidate-privacy/CandidatePrivacyPanel.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/candidate/CandidateConsentPanel.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/candidate/CandidateConsentPanel.test.tsx", "classification": "excluded" },
-    { "file": "client/src/pages/candidates-page.test.tsx", "classification": "excluded" },
-    { "file": "client/src/components/kanban/ApplicationDetailModal.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/kanban/ApplicationDetailPanel.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/recruiter/MoveCandidateToJobDialog.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/components/sourcing/CandidateDrawer.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/hooks/use-sourcing.ts", "classification": "ui_consumer" },
-    { "file": "client/src/pages/admin-super-dashboard.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/application-management-page.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/applications-page.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/bulk-resume-import-page.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/candidate-dashboard.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/candidates-page.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/hiring-manager-review-page.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/job-sourcing-page.tsx", "classification": "ui_consumer" },
-    { "file": "client/src/pages/privacy-policy-page.tsx", "classification": "excluded" },
-    { "file": "client/src/pages/terms-of-service-page.tsx", "classification": "excluded" }
+    {
+      "file": "server/sourcing-authority/candidate-access.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/sourcing-authority/commands.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/schema-migrations/0015_governed_sourcing.sql",
+      "classification": "fenced"
+    },
+    {
+      "file": "client/src/lib/sourcing-authority.ts",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "server/lib/jobManagementRead.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-history/contracts.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-history/memory-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-history/routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-privacy/config.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-privacy/models.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-privacy/decision.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-privacy/memory-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-privacy/repository.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-privacy/processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-privacy/routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-consent/contracts.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-consent/repository.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-consent/routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-consent/processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-consent/memory-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-index/memory-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-index/processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-index/search.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-index/catchup.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/organization-candidates/application-intake.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/organization-candidates/processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/auth.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/index.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/rateLimit.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/storage.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/applicationReadAuthorization.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/applications.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidatePortal.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/profile.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/resume.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/bulkResumeImport.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/talent-pool.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/talentPoolAuthorization.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/signal.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidates.semantic.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/recruiterDashboard.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/admin.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/ai.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/coldOutreach.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/communications.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/forms.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/clients.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/jobs.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/webhooks/signal.webhook.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/aiWorker.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/applicationGraphSyncProcessor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/resumeImportProcessor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/contactResolutionProcessor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/outreachScheduler.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/outreachDelivery.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/sourcingRefreshWorker.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/services/activekg-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/services/jwt-signer.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/services/signal-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/services/sourcing-sync.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/aiLimits.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/resumeImportFinalize.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/profileCompletion.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/emailTemplateService.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/whatsappTemplateService.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/notificationService.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/analyticsHelper.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/orgAnalyticsService.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/organization.routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/outreachCompliance.routes.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/lib/outreachHygieneProcessor.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/lib/contactSendGuard.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/jobScheduler.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/job-brief/commands.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/lib/backfillResumeText.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/lib/pipelineStageMerge.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/lib/outreachComplianceCore.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/webhooks/brevo.webhook.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/schema-control/readiness.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/schema-migrations/0001_candidate_privacy_flow.sql",
+      "classification": "excluded"
+    },
+    {
+      "file": "client/src/App.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/AISummaryPanel.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/admin/AdminPrivacyRequestPanel.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/ClientFeedbackList.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/FeedbackPanel.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/ResumePreviewModal.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/candidate-privacy/CandidatePrivacyPanel.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/candidate/CandidateConsentPanel.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/candidate/CandidateConsentPanel.test.tsx",
+      "classification": "excluded"
+    },
+    {
+      "file": "client/src/pages/candidates-page.test.tsx",
+      "classification": "excluded"
+    },
+    {
+      "file": "client/src/components/kanban/ApplicationDetailModal.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/kanban/ApplicationDetailPanel.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/recruiter/MoveCandidateToJobDialog.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/sourcing/CandidateDrawer.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/hooks/use-sourcing.ts",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/admin-super-dashboard.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/application-management-page.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/applications-page.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/bulk-resume-import-page.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/candidates-page.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/hiring-manager-review-page.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/job-sourcing-page.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/privacy-policy-page.tsx",
+      "classification": "excluded"
+    },
+    {
+      "file": "client/src/pages/terms-of-service-page.tsx",
+      "classification": "excluded"
+    },
+    {
+      "file": "client/src/components/candidate-portal/CandidatePortal.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/components/candidate-profile/CareerProfilePanel.test.tsx",
+      "classification": "excluded"
+    },
+    {
+      "file": "client/src/components/candidate-profile/SparkConsentPanel.test.tsx",
+      "classification": "excluded"
+    },
+    {
+      "file": "client/src/components/candidate-profile/SparkConsentPanel.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/lib/candidate-profile-api.ts",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/pages/candidate-portal-page.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "client/src/s2-preview.tsx",
+      "classification": "ui_consumer"
+    },
+    {
+      "file": "scripts/erase-spark-candidate.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/application-location.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/application-location.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/consent-v2.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/consent-v2.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/contracts.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/erasure-operator.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/interpretation.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/interpretation.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/profile-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/profile-contracts.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/profile-contracts.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/profile-processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/profile-repository.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/profile-routes.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/repository.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/restore-reconcile.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/restore-reconcile.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/resume-source-client.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/resume-source-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/resume-source-processor.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/resume-source-processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/resume-source-repository.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/resume-source-routes.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/resume-source-routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/retention.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/retention.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/routes.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/routes.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/source-adapters.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/source-contracts.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/source-processor.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/source-repository.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/source.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/spark-client.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/spark-contracts.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/candidate-product/spark-cross-system.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/candidate-product/spark-lifecycle.pg.test.ts",
+      "classification": "excluded"
+    },
+    {
+      "file": "server/schema-migrations/0027_application_candidate_location.sql",
+      "classification": "fenced"
+    },
+    {
+      "file": "shared/candidate-profile.ts",
+      "classification": "fenced"
+    }
   ],
   "surfaces": [
+    {
+      "id": "candidate-spark-consent-ui",
+      "file": "client/src/components/candidate-profile/SparkConsentPanel.tsx",
+      "symbol": "SparkConsentPanel",
+      "models": ["ConsentStatus"],
+      "direction": "read_write_render",
+      "privacy_action": ["withdraw_global_matching"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Browser status and CSRF-protected v2 withdrawal only; server enforces owner identity and consent revision. Completed status requires delivered current revision; pending grants and withdrawals use bounded polling and explicit refresh. UI never grants server authority.",
+      "anchors": ["fetchWithCsrf", "readConsent", "expectedConsentRevision", "action: \"withdraw\"", "pending.current ??="]
+    },
+    {
+      "id": "candidate-preview-ui-consumer",
+      "file": "client/src/s2-preview.tsx",
+      "symbol": "<module>",
+      "models": ["applications", "candidate_resumes", "CandidatePrivacyStatus"],
+      "direction": "read_write_render",
+      "privacy_action": ["withdraw_global_matching", "request_erasure", "application_withdrawal"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Prototype mocks selected APIs but falls through to real fetch. Classified as a UI consumer, NOT an isolated-fixture exemption; unmocked requests still depend on server session/CSRF/privacy checks. Preview deployment isolation remains a release check.",
+      "anchors": ["window.fetch = async", "return realFetch(input, init)", "CandidatePortal", "AuthProvider"]
+    },
+    {
+      "id": "candidate-profile-browser-client",
+      "file": "client/src/lib/candidate-profile-api.ts",
+      "symbol": "loadProfile",
+      "models": ["candidate_profile_commands", "candidate_resumes", "CandidatePrivacyStatus"],
+      "direction": "read_write",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Session-scoped profile/source reads and CSRF-protected commands; browser handles disabled/unavailable states and never grants server authority.",
+      "anchors": ["fetchWithCsrf", "credentials: \"include\"", "res.status === 404", "/api/candidate/privacy/reauth", "confirmation_conflict"]
+    },
+    {
+      "id": "candidate-portal-ui",
+      "file": "client/src/components/candidate-portal/CandidatePortal.tsx",
+      "symbol": "CandidatePortal",
+      "models": ["applications", "candidate_resumes", "CandidatePrivacyStatus"],
+      "direction": "read_write_render",
+      "privacy_action": ["withdraw_global_matching", "request_erasure", "application_withdrawal"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Reuses candidate job-state reads, existing resume library and separate application-withdrawal, consent and privacy controls. Server endpoints enforce ownership and privacy.",
+      "anchors": ["useCandidateJobState", "CandidatePrivacyPanel", "CandidateConsentPanel", "fetchWithCsrf", "/api/ai/resume", "/withdraw"]
+    },
+    {
+      "id": "spark-operator-erasure",
+      "file": "scripts/erase-spark-candidate.ts",
+      "symbol": "executeErasure",
+      "models": ["candidate_source_erasures", "candidate_profile_heads"],
+      "direction": "operator_deletion",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "verified_candidate_only",
+      "enforcement": "Database owner only; exact verified quarantined request, dry-run plan fingerprint, durable fence before Memory deletion, generation-bound files and independent-reference locks. No app mount.",
+      "anchors": ["operator_owner_required", "verified_quarantine_required", "memory_quarantine_required", "plan_changed", "SHARE ROW EXCLUSIVE MODE", "ifGenerationMatch"]
+    },
+    {
+      "id": "spark-source-retention",
+      "file": "server/candidate-product/retention.ts",
+      "symbol": "redactSourceCopies",
+      "models": ["candidate_source_jobs", "candidate_source_lookups", "candidate_source_interpretations"],
+      "direction": "temporary_copy_cleanup",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "system_bounded",
+      "enforcement": "Bounded SQL compaction only; retains purchase identities and spend, refuses payload resurrection, never deletes canonical profiles or blobs.",
+      "anchors": ["flow_candidate_source_redact_due()", "max(100)"]
+    },
+    {
+      "id": "candidate-ai-proposal-core",
+      "file": "server/candidate-product/interpretation.ts",
+      "symbol": "interpretCandidateText",
+      "models": ["candidate_source_interpretations"],
+      "direction": "owner_private_processing",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Default-off authenticated interpreter and owner-only journal; authority before purchase, no direct profile writer, scrubbed model input and allowlisted review proposals. Signed Memory storage and review routes are integrated. Temporary responses are redacted after 7 days acknowledged or 30 days unresolved; permanent erasure remains operator-only.",
+      "anchors": ["await deps.authorize(request)", "await deps.dispatch(slot.reservationId,context.authorityHash)", "checkedStoredResponse", "scrubResumeContacts"]
+    },
+    {
+      "id": "application-location-intake",
+      "file": "server/candidate-product/application-location.ts",
+      "symbol": "readApplicationLocation",
+      "models": ["applications.candidate_location", "applications.willing_to_relocate"],
+      "direction": "organization_private_write",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "existing_application_organization",
+      "enforcement": "Strict all-or-none candidate-confirmed facts, server timestamp, no resume/profile inference or cross-service export. Existing application privacy gate remains in the caller.",
+      "anchors": ["candidateLocationSchema.safeParse", "confirmedAt: now.toISOString()", "APPLICATION_LOCATION_REQUIRED"]
+    },
+    {
+      "id": "application-confirmed-location-schema",
+      "file": "server/schema-migrations/0027_application_candidate_location.sql",
+      "symbol": "application_candidate_location_immutable",
+      "models": ["applications.candidate_location", "applications.willing_to_relocate"],
+      "direction": "organization_private_storage",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "existing_application_organization",
+      "enforcement": "Nullable, no backfill or profile/resume inference. Runtime cannot rewrite recorded facts; table owner may clear them for separately authorized erasure. No cross-service export added.",
+      "anchors": ["ADD COLUMN candidate_location jsonb", "ADD COLUMN willing_to_relocate boolean", "current_user = pg_get_userbyid(relowner)"]
+    },
+    {
+      "id": "candidate-owned-photo-contract",
+      "file": "shared/candidate-profile.ts",
+      "symbol": "candidatePhotoUrlSchema",
+      "models": ["candidate_profile_drafts", "candidate_profile_versions"],
+      "direction": "candidate_private_display",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Optional exact LinkedIn media URL from reviewed RC proposal; explicit null removal. No legacy avatar import, server image fetch, publication or ranking change.",
+      "anchors": ["export const candidatePhotoUrlSchema", "photoUrl:candidatePhotoUrlSchema.nullable().optional()"]
+    },
+    {
+      "id": "lookup-private-delivery",
+      "file": "server/candidate-product/source-adapters.ts",
+      "symbol": "deliverLookupTransfer",
+      "models": ["candidate_source_lookups"],
+      "direction": "owner_private_delivery",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Canonical lookup document checked before signing; exact Memory receipt, bounded deadline/bytes, no redirect or automatic retry.",
+      "anchors": ["parseLookupTransfer(stored.canonical)", "t.hash!==stored.sha256", "candidate-profile:owner-write", "redirect:'error'", "validateSourceReceipt(t.value,receipt,'professional_lookup')"]
+    },
+    {
+      "id": "lookup-proposal-conversion",
+      "file": "server/candidate-product/source-contracts.ts",
+      "symbol": "buildLookupTransfer",
+      "models": ["candidate_source_lookups"],
+      "direction": "owner_private_processing",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Already-paid professional facts only; contact scrub, deterministic identities, no invented dates or automatic profile writes.",
+      "anchors": ["cleanPerson(result.person)", "sourceKind:'professional_lookup'", "validateLookupTransfer("]
+    },
+    {
+      "id": "lookup-durable-delivery",
+      "file": "server/candidate-product/source-processor.ts",
+      "symbol": "runLookupDelivery",
+      "models": ["candidate_source_lookups"],
+      "direction": "owner_private_delivery",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Owner/SQL-fenced repository; immutable transfer persists before HTTP, replay skips paid lookup and versions read, exact receipt settlement.",
+      "anchors": ["deps.repository.prepareDelivery(attemptId)", "deps.repository.storeDelivery(attemptId", "deps.deliver(stored)", "deps.repository.finishDelivery(attemptId,stored,receipt)"]
+    },
+    {
+      "id": "signup-consent-intent",
+      "file": "server/candidate-product/consent-v2.ts",
+      "symbol": "captureSignupConsentIntent",
+      "models": ["candidate_consent_signup_intents"],
+      "direction": "owner_private",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Default-off optional signup savepoint stores approved copy and email hash only; activation requires verified linked owner, current privacy and no newer consent decision. Does not publish.",
+      "anchors": ["signupConsentIntentSchema.safeParse(input)", "flow_consent_v2_signup_intent", "flow_consent_v2_signup_activate", "await privacy(a.userId)"]
+    },
+    {
+      "id": "source-native-extraction-cache",
+      "file": "server/candidate-product/source-repository.ts",
+      "symbol": "withCachedResumeExtraction",
+      "models": ["candidate_source_jobs"],
+      "direction": "owner_private_processing",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Fixed lease-fenced SQL cache checks current consent and scrub context; immutable bytes and canonical hashes verified; only complete native extraction stored; no paid dispatch.",
+      "anchors": ["flow_candidate_source_extraction_cache($1,$2)", "source_cache_changed", "result.output.method==='native_text'"]
+    },
+    {
+      "id": "resume-source-client",
+      "file": "server/candidate-product/resume-source-client.ts",
+      "symbol": "deliverResumeTransfer",
+      "models": ["candidate_source_jobs"],
+      "direction": "owner_private_delivery",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Exact stored canonical/hash before signed bounded owner-write transfer; Memory rechecks current privacy and consent; receipt matches every identity.",
+      "anchors": ["verifyStoredTransfer(stored)", "candidate-profile:owner-write", "redirect: 'error'", "receipt.commandHash !== stored.sha256"]
+    },
+    {
+      "id": "resume-source-worker",
+      "file": "server/candidate-product/resume-source-processor.ts",
+      "symbol": "processResumeSource",
+      "models": ["candidate_source_jobs", "candidate_source_paid_operations"],
+      "direction": "owner_private_processing",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Prepare checks current authority; private immutable reader; paid reserve/dispatch fences; held OCR stops; scrubbed text only in model/transfer; canonical profile unchanged.",
+      "anchors": ["repo.prepare(input)", "scrubContextSchema.safeParse", "scrubResumeContacts(extraction.text, knownContacts)", "ocrReceipt.state === 'held'", "repo.persistTransfer(lease, stored)"]
+    },
+    {
+      "id": "resume-source-repository",
+      "file": "server/candidate-product/resume-source-repository.ts",
+      "symbol": "resumeSourceRepository",
+      "models": ["candidate_source_jobs", "candidate_source_paid_operations"],
+      "direction": "owner_private",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Fixed parameterized security-definer routines, owner privacy before reads/writes, exact result schemas and lease identity, no direct table access.",
+      "anchors": ["await privacy(a.userId)", "await privacy(claim.actor.userId)", "flow_candidate_source_paid_dispatch", "sameLease(claim.lease, l)"]
+    },
+    {
+      "id": "resume-source-routes",
+      "file": "server/candidate-product/resume-source-routes.ts",
+      "symbol": "registerResumeSourceRoutes",
+      "models": ["candidate_source_jobs"],
+      "direction": "owner_private",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Default-off owner endpoints; verified candidate, CSRF/recent auth for paid-work admission, strict bodies, status projection and read-only GET.",
+      "anchors": ["deps.enabled()", "deps.requireCandidate, deps.csrf, deps.recentAuth", "deps.identity(req)", "statusView(status)", "message: retry.message"]
+    },
+    {
+      "id": "spark-contracts",
+      "file": "server/candidate-product/spark-contracts.ts",
+      "symbol": "parseConsentProjection",
+      "models": ["candidate_consent_outbox"],
+      "direction": "candidate_private",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Strict canonical commands and consent projections, exact field sets and hashes.",
+      "anchors": ["consentProjectionSchema", "parseProfileJson", "createHash"]
+    },
+    {
+      "id": "consent-v2-transport",
+      "file": "server/candidate-product/spark-client.ts",
+      "symbol": "sendConsentV2",
+      "models": ["candidate_consent_outbox"],
+      "direction": "candidate_private",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Exact immutable command before signing, secure bounded transport and identity-checked receipts.",
+      "anchors": ["command.hash!==expectedHash", "redirect:'error'", "lifetimeSeconds:60"]
+    },
+    {
+      "id": "consent-v2-worker",
+      "file": "server/candidate-product/consent-v2.ts",
+      "symbol": "runConsentV2Once",
+      "models": ["candidate_consent_outbox"],
+      "direction": "candidate_private",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Dedicated v2 claim, current authority after privacy and generation-fenced settlement; startup is gated and shutdown awaited. Capture remains owner-only.",
+      "anchors": ["flow_claim_candidate_consent_v2_outbox", "const ready=await prepare()", "flow_consent_v2_ack"]
+    },
+    {
+      "id": "owner-profile-routes",
+      "file": "server/candidate-product/routes.ts",
+      "symbol": "registerCandidateProfileRoutes",
+      "models": ["candidate_profile_commands"],
+      "direction": "owner_private",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Verified owner, CSRF on writes, current binding/privacy rechecked after reads and recent authentication on confirm.",
+      "anchors": ["const current=await profiles.owner(actor(req))", "requireVerifiedCandidate,csrfProtection", "command.action==='confirm'", "parseQueuedProfileCommand(raw)"]
+    },
+    {
+      "id": "owner-profile-repository",
+      "file": "server/candidate-product/profile-repository.ts",
+      "symbol": "profileRepository",
+      "models": ["candidate_profile_commands", "candidate_profile_outbox"],
+      "direction": "owner_private",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Mandatory privacy check and current owner routine authority; no browser identity fields.",
+      "anchors": ["await privacy(a.userId)", "flow_candidate_profile_owner_read", "flow_candidate_profile_admit"]
+    },
+    {
+      "id": "owner-profile-delivery",
+      "file": "server/candidate-product/profile-processor.ts",
+      "symbol": "runProfileBatch",
+      "models": ["candidate_profile_outbox"],
+      "direction": "owner_private_delivery",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Current authority before dispatch; total deadline, exact receipt identity and bounded automatic retries.",
+      "anchors": ["await deps.authority(lease)", "controller.signal.aborted||!deps.enabled()", "receipt.subjectId!==lease.subjectId", "PROFILE_MAX_ATTEMPTS=12"]
+    },
+    {
+      "id": "owner-profile-transport",
+      "file": "server/candidate-product/profile-client.ts",
+      "symbol": "deliverProfile",
+      "models": ["candidate_profile_commands"],
+      "direction": "owner_private_delivery",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Short-lived signed owner scopes, bounded response and exact command identity/hash.",
+      "anchors": ["candidate-profile:owner-write", "candidate-profile:owner-read", "lifetimeSeconds:60", "identity_conflict"]
+    },
+    {
+      "id": "owner-profile-wire",
+      "file": "server/candidate-product/profile-contracts.ts",
+      "symbol": "parseProfileCommand",
+      "models": ["candidate_profile_commands"],
+      "direction": "owner_private_validation",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Strict canonical request, duplicate keys rejected, bounded bytes and depth.",
+      "anchors": ["PROFILE_REQUEST_MAX_BYTES", "profileReceiptSchema", "parseProfileJson"]
+    },
+    {
+      "id": "foundation-routes",
+      "file": "server/candidate-product/routes.ts",
+      "symbol": "registerCandidateProductRoutes",
+      "models": ["candidate_product_accounts", "candidate_network_intents"],
+      "direction": "candidate_self_setup",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Verified candidate, current privacy authority, recent authentication and CSRF; no effective consent or publication.",
+      "anchors": ["requireVerifiedCandidate", "requireCandidatePrivacyAllowed", "recentConsentAuth", "csrfProtection", "parseStrictJson"]
+    },
+    {
+      "id": "foundation-repository",
+      "file": "server/candidate-product/repository.ts",
+      "symbol": "foundationRepository",
+      "models": ["candidate_product_accounts", "candidate_product_commands", "candidate_network_intents"],
+      "direction": "candidate_self_setup",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Mandatory injected privacy check before routine-only access; server account authority and exact result schemas.",
+      "anchors": ["await checkPrivacy(parsed.data.userId)", "flow_candidate_foundation_ensure", "schema.parse(row.result)"]
+    },
+    {
+      "id": "foundation-delivery",
+      "file": "server/candidate-product/processor.ts",
+      "symbol": "runFoundationOnce",
+      "models": ["candidate_product_commands", "candidate_product_outbox"],
+      "direction": "empty_subject_delivery",
+      "privacy_action": ["withdraw_global_matching", "request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Privacy check before each immutable empty-subject send, bounded deadline and fenced receipt; never grants consent.",
+      "anchors": ["await deps.privacy(lease.userId)", "if(expired || remaining<=0 || !enabled())", "flow_candidate_foundation_finish_delivery"]
+    },
     {
       "id": "sourcing-applicant-contact-authority",
       "file": "server/sourcing-authority/candidate-access.ts",
@@ -184,7 +1029,8 @@
       "file": "server/candidate-history/contracts.ts",
       "symbol": "validateHistoryResponse",
       "models": ["applications", "decision_events", "organization_candidate_references"],
-      "direction": "read", "privacy_action": ["request_erasure"],
+      "direction": "read",
+      "privacy_action": ["request_erasure"],
       "organization_scope": "one authorized application and exact private reference",
       "enforcement": "Strict closed wire projection with tuple, watermark and authority validation; historical completeness is always false.",
       "anchors": ["validateHistoryResponse", "historical_complete", "binding_conflict"]
@@ -194,7 +1040,8 @@
       "file": "server/candidate-history/memory-client.ts",
       "symbol": "readMemoryHistory",
       "models": ["applications", "organization_candidate_references"],
-      "direction": "read", "privacy_action": ["request_erasure"],
+      "direction": "read",
+      "privacy_action": ["request_erasure"],
       "organization_scope": "service JWT tenant and exact private application tuple",
       "enforcement": "Fixed scoped endpoint, three-second deadline, bounded response and current Memory privacy authority; no vendor error text returned.",
       "anchors": ["decision-history:read", "validateHistoryResponse", "bytes > 65536"]
@@ -204,7 +1051,8 @@
       "file": "server/candidate-history/routes.ts",
       "symbol": "registerCandidateHistoryRoutes",
       "models": ["applications", "organization_candidate_references", "decision_events"],
-      "direction": "read", "privacy_action": ["request_erasure"],
+      "direction": "read",
+      "privacy_action": ["request_erasure"],
       "organization_scope": "job-authorized application, no platform-admin bypass",
       "enforcement": "Existing private authorization helper before and after the remote call, including remote refusal; one bounded recapture retry and no-store.",
       "anchors": ["const before = await readAuthorizedCandidateHistoryContext", "const after = await readAuthorizedCandidateHistoryContext", "private, no-store", "attempt < 2"]
@@ -959,14 +1807,14 @@
     },
     {
       "id": "candidate-dashboard-ui",
-      "file": "client/src/pages/candidate-dashboard.tsx",
-      "symbol": "CandidateDashboard",
+      "file": "client/src/pages/candidate-portal-page.tsx",
+      "symbol": "CandidatePortalPage",
       "models": ["applications", "candidate_resumes", "CandidatePrivacyStatus"],
       "direction": "read_write_render",
       "privacy_action": ["withdraw_global_matching", "request_erasure", "application_withdrawal"],
       "organization_scope": "candidate_self",
-      "enforcement": "Fifth Privacy & Data tab remains distinct from existing application withdrawal and uses the privacy panel.",
-      "anchors": ["Privacy &amp; Data", "CandidatePrivacyPanel", "My Applications"]
+      "enforcement": "Verified candidate portal entrypoint; profile and public job reads remain subject to server authority. UI is not an authorization boundary.",
+      "anchors": ["!user || user.role !== \"candidate\" || !user.emailVerified", "<Redirect to=\"/candidate-auth#signin\"", "loadProfile()", "<CandidatePortal"]
     },
     {
       "id": "application-management-ui-family",
@@ -1055,9 +1903,132 @@
       "organization_scope": "candidate_self",
       "enforcement": "Server-returned status/version gates controls; approval is unchecked by default, no resume is preselected; reauth and a stable request UUID precede one grant/withdraw attempt; 202 renders pending, never effective.",
       "anchors": ["/api/candidate/consent", "/api/candidate/consent/sources", "/api/candidate/privacy/reauth", "/api/candidate/consent/grant", "/api/candidate/consent/withdraw"]
+    },
+    {
+      "id": "spark-restore-reconcile",
+      "file": "server/candidate-product/restore-reconcile.ts",
+      "symbol": "reconcileSparkRestore",
+      "models": ["candidate_consent_events", "candidate_profile_outbox", "candidate_privacy_remote_projection"],
+      "direction": "operator_reconciliation",
+      "privacy_action": ["withdraw_global_matching"],
+      "organization_scope": "verified_candidate_only",
+      "enforcement": "Operator CLI only, no app mount. Runs while Memory's recovery epoch is closed; re-sends only acknowledged original consent events through the signed receiver, never downgrades a restriction, holds unproven candidates, and refuses to attest when both databases were restored, a Flow-known restriction is missing or older, Memory's privacy log is behind what Flow or Discover read, or no erasure or outside-Flow privacy change since the backup is unconfirmed.",
+      "anchors": ["memory_reader_not_privileged", "both_restored", "privacy_directive_missing", "privacy_history_unconfirmed", "privacy_feed_regressed", "candidate_network_recovery_hold", "candidate_network_recovery_attest"]
     }
   ],
   "exclusions": [
+    {
+      "id": "candidate-spark-profile-ui-test",
+      "file": "client/src/components/candidate-profile/CareerProfilePanel.test.tsx",
+      "symbol": "CareerProfilePanel",
+      "reason": "Synthetic component tests with mocked transport for profile saving and password reauthentication; not a production authorization or privacy enforcement point.",
+      "anchors": ["/api/candidate/privacy/reauth"]
+    },
+    {
+      "id": "spark-operator-erasure-tests",
+      "file": "server/candidate-product/erasure-operator.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic databases and fake cloud object operations only.",
+      "anchors": ["planErasure", "executeErasure", "vi.fn()"]
+    },
+    {
+      "id": "spark-retention-tests",
+      "file": "server/candidate-product/retention.test.ts",
+      "symbol": "<module>",
+      "reason": "Mock bounded payload-compaction adapter tests; no private data.",
+      "anchors": ["redactSourceCopies", "bounded payload compactor"]
+    },
+    {
+      "id": "resume-source-client-tests",
+      "file": "server/candidate-product/resume-source-client.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic signed-client tests using fake fetch, no production candidate or provider.",
+      "anchors": ["deliverResumeTransfer"]
+    },
+    {
+      "id": "resume-source-worker-tests",
+      "file": "server/candidate-product/resume-source-processor.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic worker/replay tests with fake providers and repositories.",
+      "anchors": ["processResumeSource"]
+    },
+    {
+      "id": "interpretation-core-tests",
+      "file": "server/candidate-product/interpretation.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic model/journal unit tests; no real provider or private data.",
+      "anchors": ["interpretCandidateText", "setup()"]
+    },
+    {
+      "id": "spark-erasure-lifecycle-tests",
+      "file": "server/candidate-product/spark-lifecycle.pg.test.ts",
+      "symbol": "<module>",
+      "reason": "Explicitly disposable synthetic database fixtures only; no production or provider calls.",
+      "anchors": ["S2_PROTOTYPE_DISPOSABLE", "verified erasure is owner-bound"]
+    },
+    {
+      "id": "spark-erasure-signed-tests",
+      "file": "server/candidate-product/spark-cross-system.test.ts",
+      "symbol": "<module>",
+      "reason": "Explicitly disposable signed Flow/Memory synthetic tests; no real provider or production endpoint.",
+      "anchors": ["local_test_only", "erase_runtime_denied"]
+    },
+    {
+      "id": "application-location-tests",
+      "file": "server/candidate-product/application-location.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic parser and public-handler tests; no real application or file upload.",
+      "anchors": ["readApplicationLocation"]
+    },
+    {
+      "id": "lookup-worker-tests",
+      "file": "server/candidate-product/source.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic lookup adapter/scheduler tests; no real credentials or provider calls.",
+      "anchors": ["runLookupQueueOnce", "synthetic-key"]
+    },
+    {
+      "id": "resume-source-route-tests",
+      "file": "server/candidate-product/resume-source-routes.test.ts",
+      "symbol": "<module>",
+      "reason": "Injected route-chain tests with fake sessions and repository; no runtime data.",
+      "anchors": ["registerResumeSourceRoutes"]
+    },
+    {
+      "id": "consent-v2-synthetic-tests",
+      "file": "server/candidate-product/consent-v2.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic worker and local HTTP transport checks, no production data or provider.",
+      "anchors": ["workerChecks", "transportChecks"]
+    },
+    {
+      "id": "owner-profile-contract-tests",
+      "file": "server/candidate-product/profile-contracts.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic validators and mocked transport/processor only.",
+      "anchors": ["runProfileBatch", "afterEach(()=>vi.useRealTimers())"]
+    },
+    {
+      "id": "owner-profile-route-tests",
+      "file": "server/candidate-product/profile-routes.test.ts",
+      "symbol": "<module>",
+      "reason": "Mocked owner routes; no production data or provider.",
+      "anchors": ["registerCandidateProfileRoutes", "vi.mock('../db'"]
+    },
+    {
+      "id": "foundation-contract-tests",
+      "file": "server/candidate-product/contracts.test.ts",
+      "symbol": "<module>",
+      "reason": "Synthetic contract and mocked delivery tests only; no runtime entrypoint.",
+      "anchors": ["describe('foundation leased delivery'"]
+    },
+    {
+      "id": "foundation-route-tests",
+      "file": "server/candidate-product/routes.test.ts",
+      "symbol": "<module>",
+      "reason": "Registered-route tests with mocked authentication and database only.",
+      "anchors": ["describe('foundation registered route chains'"]
+    },
     {
       "id": "job-management-posting-read",
       "file": "server/lib/jobManagementRead.ts",
@@ -1227,11 +2198,25 @@
       "anchors": ["/api/candidate/consent", "/api/candidate/consent/grant", "/api/candidate/consent/withdraw"]
     },
     {
+      "id": "candidate-spark-consent-ui-test",
+      "file": "client/src/components/candidate-profile/SparkConsentPanel.test.tsx",
+      "symbol": "SparkConsentPanel",
+      "reason": "Component contract test: URL-routed fetch stub only, synthetic fixture status, no production transport or candidate data; asserts v2 withdrawal requests and that spark and legacy candidates both keep the wider privacy requests (U5).",
+      "anchors": ["/api/candidate/product/consent", "/api/candidate/privacy/status"]
+    },
+    {
       "id": "candidate-index-ui-test",
       "file": "client/src/pages/candidates-page.test.tsx",
       "symbol": "CandidatesPage",
       "reason": "Wave 4D reserved ReactDOM harness for the candidates page index adoption; test-only, no candidate data leaves the test process.",
       "anchors": ["/api/candidates/semantic-search"]
+    },
+    {
+      "id": "spark-restore-reconcile-test",
+      "file": "server/candidate-product/restore-reconcile.test.ts",
+      "symbol": "reconcileSparkRestore",
+      "reason": "Synthetic unit tests with in-memory fake databases for the operator restore reconciliation; not a production authorization or privacy enforcement point.",
+      "anchors": ["B5 restore reconciliation"]
     }
   ]
 }

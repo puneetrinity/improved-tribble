@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { allowsPublicContact, applicationHref, candidateDisplayName, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
+import { allowsPublicContact, applicationHref, candidateDisplayName, candidateLocationText, readCandidateOrigin } from "@/lib/sourcing-candidate-origin";
 import { candidateSourceGroup, SOURCE_GROUP_LABEL } from "@/lib/sourcing-source-label";
 import { resumeLocationText } from "@shared/resume-location";
 import {
@@ -220,8 +220,8 @@ export function CandidateDrawer({
   const summary = c.crustdata?.basic_profile?.summary || null;
   const isApplicant = origin.kind === "organization_candidate";
   // A previous applicant's location comes only from their own résumé; unknown stays unknown.
-  const location = isApplicant ? resumeLocationText(c.resumeLocation) : (c.crustdata?.basic_profile?.location?.full_location
-    || c.crustdata?.basic_profile?.location?.raw || null);
+  const location = isApplicant ? resumeLocationText(c.resumeLocation) : candidateLocationText(origin, c.crustdata?.basic_profile?.location?.full_location
+    || c.crustdata?.basic_profile?.location?.raw, c.locationLabel);
   const sourceGroup = candidateSourceGroup(c);
 
   const currentRole = c.crustdata?.experience?.employment_details?.current?.[0];

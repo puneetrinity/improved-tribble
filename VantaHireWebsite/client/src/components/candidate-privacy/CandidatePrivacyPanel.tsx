@@ -109,14 +109,15 @@ export function CandidatePrivacyPanel(): JSX.Element {
           const current = latestByAction.get(action);
           const Icon = action === "request_erasure" ? UserX : Shield;
           return (
-            <Card key={action}>
+            <Card key={action} className="flex flex-col">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Icon className="h-5 w-5" />{actionCopy[action].title}</CardTitle>
+                <CardTitle className="flex items-start gap-2"><Icon className="mt-1 h-5 w-5 shrink-0" aria-hidden />{actionCopy[action].title}</CardTitle>
                 <CardDescription>{actionCopy[action].description}</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
+              {/* Button at the bottom, so both cards line up whatever the text length. */}
+              <CardContent className="mt-auto space-y-3">
                 {current && <div className="text-sm">Current request: <Badge variant="secondary">{readableState(current.state)}</Badge></div>}
-                <Button disabled={!status.data.intakeEnabled || submit.isPending} onClick={() => begin(action)}>
+                <Button className="min-h-11 cursor-pointer" disabled={!status.data.intakeEnabled || submit.isPending} onClick={() => begin(action)}>
                   {action === "request_erasure" ? "Request review" : "Stop global matching"}
                 </Button>
               </CardContent>

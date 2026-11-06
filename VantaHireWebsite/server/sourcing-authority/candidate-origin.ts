@@ -5,8 +5,18 @@ import {sql} from 'drizzle-orm';
 import {readSourcingCandidateOrigin} from '@shared/sourcing-candidate-origin';
 
 export const privateCandidateOrigin=candidateEligibilityIdentity.extend({version:z.literal(1),kind:z.literal('organization_candidate')}).strict();
+export const networkPublicationAuthority=z.object({subjectId:z.string().uuid(),publicationId:z.string().uuid(),
+ profileVersion:z.number().int().positive().safe(),preferenceVersion:z.number().int().positive().safe(),
+ consentRevision:z.number().int().positive().safe(),contentHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict();
+export const networkCandidateOrigin=networkPublicationAuthority.extend({version:z.literal(1),kind:z.literal('candidate_network')}).strict();
+export function parseNetworkOrigin(candidate:{candidateOrigin?:unknown}) {
+ if((candidate.candidateOrigin as {kind?:unknown}|null)?.kind!=='candidate_network')return null;
+ const {version,kind,...identity}=networkCandidateOrigin.parse(candidate.candidateOrigin);
+ return {identity,display:{version,kind}};
+}
 export function parsePrivateOrigin(candidate:{candidateOrigin?:unknown}) {
  if(candidate.candidateOrigin===undefined)return null;
+ if(parseNetworkOrigin(candidate))return null;
  const origin=privateCandidateOrigin.parse(candidate.candidateOrigin);
  const {version,kind,...identity}=origin;
  return {identity,display:{version,kind,applicationId:identity.applicationId,applicationJobId:identity.applicationJobId}};
@@ -50,6 +60,10 @@ export async function filterStoredPrivateCandidates<T extends {signalCandidateId
   const summary=candidate.candidateSummary as Record<string,unknown>|null;
   const origin=readSourcingCandidateOrigin(summary?.candidateOrigin);
   if(origin.kind==='public_profile')return [];
+  if(origin.kind==='candidate_network'){
+   networkPublicationAuthority.parse(summary?.networkPublication);
+   return [];
+  }
   if(origin.kind==='invalid')throw Error('SOURCING_PRIVATE_BINDING');
   const identity=candidateEligibilityIdentity.parse(summary?.privateResumeIdentity);
   if(identity.applicationId!==origin.applicationId||identity.applicationJobId!==origin.applicationJobId)

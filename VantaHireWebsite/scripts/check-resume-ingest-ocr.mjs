@@ -41,10 +41,11 @@ const FROZEN = {
   'server/resume.routes.ts': '8a85106836a3bb681e66e1a25bf0dcedeb8181e00b4bbb669c1b8e85c446d26e',
   'server/bulkResumeImport.routes.ts': '7b0a7c07c42360c8d86ad950607335b7a2714318b7f685d7b502411d52abfa6e',
   'server/lib/resumeImportProcessor.ts': '1314be8df83e520c46c1eab5831d468f42659f3a4783a124e38c224381ad92e2',
-  'server/gcs-storage.ts': '5354cc3391894ae91fd2f6c5dca656a1aaf6a6eae175deee76782cf690360802',
-  'package.json': '08e5a952a5370b30e411f728feaf62f6a0ca0d867a5d3a8ff0c75caf12929f8f',
+  // P0 approved private, generation-pinned source reader; old application helpers unchanged.
+  'server/gcs-storage.ts': '1e663e8e93bb1533b15635aaf6693c27fcfb20df0f8ae09c991e3881fb2d80bb',
+  'package.json': '52835160492361c90b890e2b58daede78a73154c204819335bc040b0bbe178a6',
   'package-lock.json': 'b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539',
-  'vitest.server.config.ts': '27f3e8aae976d6bd8eb22261c34267ede1ab28dd98e3a97c0eb8093333649a17',
+  'vitest.server.config.ts': '55c7e7f394abe4fcdf61554aa9c44fe3cc208b99b27071dde419e4396136b768',
   'server/schema-control/manifest.ts': '16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2',
   'server/schema-migrations/0000_baseline.sql': '3fd883d6fb45d0c52acc69bff16949185948bb51e5d732f57247f542814aa129',
   'server/schema-migrations/0001_candidate_privacy_flow.sql': 'a050e6b3e72a61b1d73c9124ddcd10eb6309f804891412dec9e15288df8c77c8',
@@ -163,7 +164,10 @@ export function validateResumeIngestOcrSources(files) {
     "response.headers.get('content-length')",
     'response.body.getReader()',
     'total > INGEST_OCR_MAX_RESPONSE_BYTES',
-    'for (const pages of pageBatches(pageCount))',
+    'for (const pages of pageBatches(selectedPages))',
+    'plan.contentHash!==createHash',
+    'page<=selectedPages[i-1]!',
+    'byPage.has(pageNumber!)',
   ]) requireAnchor(problems, client, anchor, `client anchor missing: ${anchor}`);
 
   for (const forbidden of [
@@ -187,11 +191,22 @@ export function validateResumeIngestOcrSources(files) {
     'if (native.success && validateResumeText(nativeText))',
     'if (!isPdf(buffer))',
     'await options.beforeOcr()',
+    'await options.beforeOcr(plan)',
+    'dependencies.ocrUnavailable?.()',
+    'text:stripPII(nativeText)',
+    'analysePdf:undefined',
+    'if(pages.length>10)',
+    'pageNumbers.length===0',
+    'if(!options.requireComplete&&validateResumeText(nativeText))',
     'ocr = await dependencies.extractOcr(buffer)',
     'if (!validateResumeText(sanitized))',
     'text: stripPII(sanitized)',
     "reasonCode: 'NO_EXTRACTABLE_TEXT'",
   ]) requireAnchor(problems, helper, anchor, `shared-helper anchor missing: ${anchor}`);
+  const pageGate=helper.indexOf('await options.beforeOcr(plan)');
+  const pageAvailability=helper.indexOf('dependencies.ocrUnavailable?.()');
+  const pageCall=helper.indexOf('await dependencies.extractOcr(buffer,plan)');
+  if(pageAvailability<0||pageAvailability>pageGate||pageCall<pageGate)problems.push('selected-page availability/reservation/OCR ordering drifted.');
   const nativeAt = helper.indexOf('await dependencies.extractNative(buffer)');
   const nativeValidAt = helper.indexOf('if (native.success && validateResumeText(nativeText))');
   const privacyAt = helper.indexOf('await options.beforeOcr()');
@@ -326,7 +341,7 @@ export function checkResumeIngestOcr(root = APP_ROOT) {
 
   const productionCallers = [];
   for (const absolute of walk(join(root, 'server'))) {
-    if (!absolute.endsWith('.ts') || absolute.includes('/__tests__/') || absolute.includes('/tests/')) continue;
+    if (!absolute.endsWith('.ts') || absolute.endsWith('.test.ts') || absolute.includes('/__tests__/') || absolute.includes('/tests/')) continue;
     const file = relative(root, absolute).replaceAll('\\', '/');
     const source = readFileSync(absolute, 'utf8');
     if (source.includes('extractResumeForOrdinaryIngest')) productionCallers.push(file);
@@ -337,8 +352,13 @@ export function checkResumeIngestOcr(root = APP_ROOT) {
   if (JSON.stringify(productionCallers.sort()) !== JSON.stringify([
     'server/ai.routes.ts',
     'server/applications.routes.ts',
+    'server/candidate-product/resume-source.ts',
     'server/lib/resumeIngestExtraction.ts',
   ])) problems.push('ordinary-ingest helper caller census drifted.');
+  const sparkResume = readFileSync(join(root, 'server/candidate-product/resume-source.ts'), 'utf8');
+  for (const anchor of ['requireComplete: true', 'result.partial', 'pageNumbers']) {
+    requireAnchor(problems, sparkResume, anchor, `Spark complete-resume anchor missing: ${anchor}`);
+  }
 
   problems.push(...composeSharedGuardProblems(
     checkCandidatePrivacySurfaces(root),
