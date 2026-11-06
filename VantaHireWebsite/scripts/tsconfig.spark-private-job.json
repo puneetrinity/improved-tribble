@@ -1,5 +1,5 @@
 {
   "extends": "../tsconfig.server.json",
-  "include": ["spark-private-recovery.ts", "../server/**/*.d.ts"],
+  "include": ["spark-private-recovery.ts", "spark-release-alert.ts", "../server/**/*.d.ts"],
   "exclude": ["../node_modules"]
 }

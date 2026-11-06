@@ -6,6 +6,7 @@
     "VantaHireWebsite/Procfile",
     "VantaHireWebsite/nixpacks.toml",
     "VantaHireWebsite/railway.json",
+    "VantaHireWebsite/railway.private-job.json",
     "VantaHireWebsite/railway.schema-release.json"
   ],
   "runtimeEntrypoints": [

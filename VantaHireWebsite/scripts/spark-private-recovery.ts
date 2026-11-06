@@ -44,7 +44,10 @@ export function validateRuntime(env:NodeJS.ProcessEnv){
  need(['none','memory','flow','both'].includes(env.SPARK_RECOVERY_RESTORED??''));
  const origin=new URL(env.ACTIVEKG_BASE_URL??'');
  need(origin.protocol==='https:'&&!origin.username&&!origin.password&&!origin.search&&!origin.hash);
- for(const k of ['FLOW_SCHEMA_TARGET_ID','ACTIVEKG_SCHEMA_TARGET_ID','SIGNAL_SCHEMA_TARGET_ID'])
+ // Flow's schema identity is opaque text (production currently uses 48 hex chars).
+ // Preserve the exact value; Memory and Discover still require UUIDs.
+ need(/^[\x21-\x7e]{1,256}$/.test(env.FLOW_SCHEMA_TARGET_ID??'')&&!/\s/.test(env.FLOW_SCHEMA_TARGET_ID??''));
+ for(const k of ['ACTIVEKG_SCHEMA_TARGET_ID','SIGNAL_SCHEMA_TARGET_ID'])
   need(uuid.test(env[k]??''));
 }
 
