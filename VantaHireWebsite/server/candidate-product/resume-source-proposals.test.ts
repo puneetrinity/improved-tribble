@@ -6,7 +6,7 @@ import {
 } from './resume-source-proposals';
 
 const sha = (v: string) => createHash('sha256').update(v, 'utf8').digest('hex');
-const seam = () => import('/home/ews/ealana-index/candidate-parallel-lock-20261030/contracts.mjs' as string);
+const seam = () => import('./lock-seam-contracts.mjs' as string);
 
 const TEXT = [
   'Priya Rao 🚀',

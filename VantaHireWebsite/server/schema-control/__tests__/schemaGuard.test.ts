@@ -404,7 +404,8 @@ describe("schema-control CI isolation", () => {
     const workflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
 
     expect(workflow).not.toMatch(/^\s+services:\s*$/m);
-    expect(workflow).toContain("sudo systemctl start postgresql");
+    // Runner-local PostgreSQL 16 created explicitly (runner images now ship a newer default).
+    expect(workflow).toContain("sudo pg_createcluster -p 5432 16 main --start");
     expect(workflow).toContain("SHOW server_version_num");
     expect(workflow).toContain("pg_isready -h 127.0.0.1");
     expect(workflow).toMatch(

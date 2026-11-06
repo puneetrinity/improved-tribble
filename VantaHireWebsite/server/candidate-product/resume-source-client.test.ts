@@ -5,7 +5,7 @@ import { assembleResumeProposal, buildResumeTransfer, parseSemanticFacts, type E
 import { canonicalProfileJson } from './profile-contracts';
 
 const sha = (v: string) => createHash('sha256').update(v, 'utf8').digest('hex');
-const seam = () => import('/home/ews/ealana-index/candidate-parallel-lock-20261030/contracts.mjs' as string);
+const seam = () => import('./lock-seam-contracts.mjs' as string);
 const env = { ACTIVEKG_BASE_URL: 'https://memory.example/' } as NodeJS.ProcessEnv;
 const TEXT = 'Priya Rao 🚀\nSkills: Go, PostgreSQL, Kafka';
 

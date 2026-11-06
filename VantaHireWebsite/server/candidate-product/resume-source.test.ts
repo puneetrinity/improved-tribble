@@ -57,7 +57,7 @@ function harness(bytes: Buffer, options: { native?: { success: boolean; text?: s
 }
 
 // Frozen seam validator from the package lock; proves output conformance.
-const seam = () => import('/home/ews/ealana-index/candidate-parallel-lock-20261030/contracts.mjs' as string);
+const seam = () => import('./lock-seam-contracts.mjs' as string);
 
 describe('P2 resume extraction adapter', () => {
   it('returns native text with no OCR, an exact text hash and a seam-valid result', async () => {

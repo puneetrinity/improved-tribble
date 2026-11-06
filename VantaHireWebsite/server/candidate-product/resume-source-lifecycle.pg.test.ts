@@ -194,7 +194,7 @@ describe.skipIf(!url)('P2 résumé pipeline on the full Flow schema and a restri
     expect(status.proposalId).not.toBeNull();
     const t = verifyStoredTransfer(calls.delivered[0]!);
     expect(t).toMatchObject({ commandId: f.commandId, subjectId: f.actor.subjectId, bindingId: f.actor.bindingId, sourceId: f.snapshot.sourceId });
-    const { validateSourceReceipt } = await import('/home/ews/ealana-index/candidate-parallel-lock-20261030/contracts.mjs' as string);
+    const { validateSourceReceipt } = await import('./lock-seam-contracts.mjs' as string);
     expect(validateSourceReceipt(JSON.parse(calls.delivered[0]!.canonical), (await d.deliver!(calls.delivered[0]!, new AbortController().signal)).receipt)).toBeTruthy();
     expect(await rowsMentioning(email(f.actor.userId))).toBe(0);
   });
