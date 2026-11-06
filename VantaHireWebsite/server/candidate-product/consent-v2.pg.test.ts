@@ -32,19 +32,19 @@ describe.skipIf(!url)('S2 consent on the full release schema',()=>{
   if(mode==='upgrade'){
    const before=mkdtempSync('/tmp/candidate-s2-before-');
    try{
-    for(const file of readdirSync(input.migrationsDir))if(!['0026_candidate_profile_drafts.sql','0027_application_candidate_location.sql'].includes(file))copyFileSync(resolve(input.migrationsDir,file),resolve(before,file));
-    const lock=JSON.parse(readFileSync(resolve(before,'checksums.lock'),'utf8'));delete lock.migrations['0026'];delete lock.migrations['0027'];writeFileSync(resolve(before,'checksums.lock'),JSON.stringify(lock));
+    for(const file of readdirSync(input.migrationsDir))if(!/^00(2[6-9]|30)_/.test(file))copyFileSync(resolve(input.migrationsDir,file),resolve(before,file));
+    const lock=JSON.parse(readFileSync(resolve(before,'checksums.lock'),'utf8'));for(const v of ['0026','0027','0028','0029','0030'])delete lock.migrations[v];writeFileSync(resolve(before,'checksums.lock'),JSON.stringify(lock));
     expect((await runReleaseMigration({...input,migrationsDir:before})).applied).toHaveLength(26);
     await provision();
    }finally{rmSync(before,{recursive:true,force:true});}
   }
-  expect((await runReleaseMigration(input)).applied).toHaveLength(mode==='fresh'?28:2);
+  expect((await runReleaseMigration(input)).applied).toHaveLength(mode==='fresh'?31:5);
   expect((await runReleaseMigration(input)).applied).toEqual([]);
   await provision();
   const db=await connect(),app=await connect(runtime);
   try{
-   expect(await assertSchemaReady({pg:app,migrationsDir:input.migrationsDir,expectedTargetId:target,environment:'development',criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS})).toMatchObject({version:'0027',applied:28});
-   expect((await db.query('SELECT count(*)::int n FROM schema_control.applied')).rows[0].n).toBe(28);
+   expect(await assertSchemaReady({pg:app,migrationsDir:input.migrationsDir,expectedTargetId:target,environment:'development',criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS})).toMatchObject({version:'0030',applied:31});
+   expect((await db.query('SELECT count(*)::int n FROM schema_control.applied')).rows[0].n).toBe(31);
    expect((await db.query(PROFILE_CATALOG_SQL,[runtime,[...PROFILE_FUNCTIONS]])).rows[0]).toEqual({digest:PROFILE_CATALOG_MD5,privileges:true});
    expect((await db.query(CONSENT_V2_CATALOG_SQL,[runtime,[...CANDIDATE_CONSENT_FUNCTIONS.slice(0,3).map(s=>s.replace(/^public\./,'')),...CONSENT_V2_RUNTIME_FUNCTIONS]])).rows[0]).toEqual({digest:CONSENT_V2_CATALOG_MD5,privileges:true});
    const constraints=await db.query(`SELECT conrelid::regclass::text relation,conname,md5(pg_get_constraintdef(oid)) digest FROM pg_constraint

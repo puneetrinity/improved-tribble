@@ -33,14 +33,14 @@ describe.skipIf(!socket)('foundation actual Flow release and runtime authority',
   const creds={migrateUrl:url(owner),expectedTargetId:target,environment:'development' as const,allowFreshInitialization:true};
   if(mode==='upgrade'){
     const before=mkdtempSync('/tmp/candidate-s1-flow-before-');
-    for(const file of readdirSync(migrationsDir))if(!['0025_candidate_product_foundation.sql','0026_candidate_profile_drafts.sql','0027_application_candidate_location.sql'].includes(file))copyFileSync(resolve(migrationsDir,file),resolve(before,file));
+    for(const file of readdirSync(migrationsDir))if(!/^00(2[5-9]|30)_/.test(file))copyFileSync(resolve(migrationsDir,file),resolve(before,file));
     const lock=JSON.parse(readFileSync(resolve(before,'checksums.lock'),'utf8'));
-    delete lock.migrations['0025'];delete lock.migrations['0026'];delete lock.migrations['0027'];writeFileSync(resolve(before,'checksums.lock'),JSON.stringify(lock));
+    for(const v of ['0025','0026','0027','0028','0029','0030'])delete lock.migrations[v];writeFileSync(resolve(before,'checksums.lock'),JSON.stringify(lock));
     const previous=await runReleaseMigration({migrationsDir:before,creds,connect:()=>connect(owner)});
     expect(previous.applied).toHaveLength(25);
   }
   const first=await runReleaseMigration({migrationsDir,creds,connect:()=>connect(owner)});
-  expect(first.applied).toHaveLength(mode==='fresh'?28:3);
+  expect(first.applied).toHaveLength(mode==='fresh'?31:6);
   await provisionRuntimeRole({migrateUrl:url(owner),runtimeUrl:url(runtime),runtimeRole:runtime,
     expectedTargetId:target,connectMigration:()=>connect(owner),connectRuntime:()=>connect(runtime)});
   const replay=await runReleaseMigration({migrationsDir,creds,connect:()=>connect(owner)});
@@ -48,7 +48,7 @@ describe.skipIf(!socket)('foundation actual Flow release and runtime authority',
   const reader=await connect(runtime);
   try{
     expect(await assertSchemaReady({pg:reader,migrationsDir,expectedTargetId:target,environment:'development',
-      criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS})).toMatchObject({version:'0027',applied:28});
+      criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS})).toMatchObject({version:'0030',applied:31});
     expect(await foundationPrivilegesReady(reader,runtime,true)).toBe(true);
     for(const table of FOUNDATION_TABLES){
       await expect(reader.query(`SELECT * FROM public.${table}`)).rejects.toThrow();
