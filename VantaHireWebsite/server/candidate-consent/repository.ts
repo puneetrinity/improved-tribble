@@ -69,7 +69,7 @@ export async function getConsentStatus(userId: number, db: ConsentDb = pool) {
     purpose: CONSENT_PURPOSE, copy_version: CONSENT_COPY_VERSION, copy: CONSENT_COPY, copy_sha256: CONSENT_COPY_SHA256,
     publication_active: false, saved_message: CONSENT_SAVED_COPY,
     version: r ? Number(r.version) : 0,
-    desired: r ? { action: r.desired_action, profile: r.desired_profile ?? null,
+    desired: r && Number(r.version) > 0 ? { action: r.desired_action, profile: r.desired_profile ?? null,
       resume_version_id: r.desired_resume_version_id ?? null, profile_sha256: r.desired_profile_sha256 ?? null } : null,
     effective: r?.acknowledged_action ? { action: r.acknowledged_action, version: Number(r.acknowledged_version),
       profile: r.effective_profile ?? null, resume_version_id: r.effective_resume_version_id ?? null,

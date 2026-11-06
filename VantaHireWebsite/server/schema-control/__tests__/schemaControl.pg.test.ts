@@ -323,6 +323,12 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0022", apply_mode: "adopted" },
         { version: "0023", apply_mode: "adopted" },
         { version: "0024", apply_mode: "adopted" },
+        { version: "0025", apply_mode: "adopted" },
+        { version: "0026", apply_mode: "adopted" },
+        { version: "0027", apply_mode: "adopted" },
+        { version: "0028", apply_mode: "adopted" },
+        { version: "0029", apply_mode: "adopted" },
+        { version: "0030", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +
@@ -719,7 +725,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
           environment: "production",
           expectedTargetId: adoptedTarget,
           criticalPostconditions: FLOW_CRITICAL_POSTCONDITIONS,
-        })).rejects.toThrow(/Candidate index catalog, insert-only intent and five fenced routines are exact/);
+        })).rejects.toThrow(/Candidate source catalog remains owner-only until integration is activated/);
         await preReconciliationRuntime.query("ROLLBACK");
       } finally {
         await preReconciliationRuntime.end();

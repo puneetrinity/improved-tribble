@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { CheckCircle2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,10 +12,13 @@ import HomepageNav from "@/components/HomepageNav";
 import GridOverlay from "@/components/GridOverlay";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { isApiError } from "@/lib/queryClient";
+import { apiRequest, isApiError } from "@/lib/queryClient";
+import { CandidateAuthShell } from "@/components/candidate-profile/CandidateAuthShell";
+import { CandidateAuthError, CandidateSignIn, CandidateSignup, CheckYourEmail } from "@/components/candidate-profile/CandidateSignup";
+import { CONSENT_COPY_CURRENT, CONSENT_COPY_CURRENT_HASH } from "@/components/candidate-profile/consent-copy";
 import { candidateAuthPageCopy } from "@/lib/internal-copy";
 
-export default function CandidateAuth() {
+function LegacyCandidateAuth() {
   const { user, loginMutation, registerMutation } = useAuth();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
@@ -278,5 +282,95 @@ export default function CandidateAuth() {
         <HomepageFooter audience="candidate" />
       </div>
     </div>
+  );
+}
+
+/** The spark page is used only when the server says spark sign-up is on. Missing, false or a
+ * failed config read keeps the current page (Codex auth seam, 30 Oct). */
+export default function CandidateAuth() {
+  const config = useQuery({
+    queryKey: ["/api/client-config", "candidateSparkSignupEnabled"],
+    queryFn: async () => {
+      const r = await fetch("/api/client-config", { credentials: "include", cache: "no-store" });
+      if (!r.ok) return false;
+      const body = await r.json().catch(() => null);
+      return body?.candidateSparkSignupEnabled === true;
+    },
+    retry: false, staleTime: 0,
+  });
+  if (config.isLoading) return null;
+  return config.data === true ? <SparkCandidateAuth /> : <LegacyCandidateAuth />;
+}
+
+type SparkView = "signup" | "signin" | "verify";
+const viewFromHash = (): SparkView => (typeof window !== "undefined" && window.location.hash === "#signin" ? "signin" : "signup");
+
+/** spark sign-up / sign-in (the approved prototype journey). Sign-up sends the exact consent text
+ * version and fingerprint the candidate accepted; the server records it only as sign-up intent and
+ * activates it after the email is verified. */
+export function SparkCandidateAuth() {
+  const { user, loginMutation } = useAuth();
+  const [, setLocation] = useLocation();
+  const { toast } = useToast();
+  const [view, setView] = useState<SparkView>(viewFromHash);
+  const [email, setEmail] = useState("");
+  // One key per sign-up attempt, reused if the same request is retried.
+  const attempt = useRef<{ email: string; key: string } | null>(null);
+
+  useEffect(() => {
+    const onHash = () => setView(v => (v === "verify" ? v : viewFromHash()));
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  useEffect(() => {
+    // Spark: verified candidates go to setup, which records consent and hands over to the dashboard.
+    if (user?.role === "candidate" && user.emailVerified) setLocation("/candidate-setup");
+    else if (user?.role === "candidate") { setEmail(user.username); setView("verify"); }
+    else if (user) {
+      toast({ title: candidateAuthPageCopy.accessDeniedTitle, description: candidateAuthPageCopy.accessDeniedDescription, variant: "destructive" });
+      setLocation("/recruiter-auth");
+    }
+  }, [user, setLocation, toast]);
+
+  const readable = (error: unknown) => isApiError(error) && error.status >= 400 && error.status < 500 && error.message
+    ? new CandidateAuthError(error.message) : error;
+
+  async function create(address: string, password: string) {
+    if (attempt.current?.email !== address) attempt.current = { email: address, key: crypto.randomUUID() };
+    try {
+      const res = await apiRequest("POST", "/api/register", {
+        username: address, password, role: "candidate",
+        networkIntent: { schemaVersion: 2, idempotencyKey: attempt.current.key, accepted: true, copyVersion: CONSENT_COPY_CURRENT.copyVersion, copyHash: CONSENT_COPY_CURRENT_HASH },
+      });
+      await res.json().catch(() => null);
+    } catch (error) { throw readable(error); }
+    setEmail(address); setView("verify");
+  }
+
+  async function signIn(address: string, password: string) {
+    try { await loginMutation.mutateAsync({ username: address, password, expectedRole: "candidate" }); }
+    catch (error) {
+      if (isApiError(error) && error.code === "EMAIL_NOT_VERIFIED") { setEmail(address.toLowerCase()); setView("verify"); return; }
+      throw readable(error);
+    }
+  }
+
+  async function resend() {
+    const r = await fetch("/api/resend-verification", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ email }) });
+    if (!r.ok) throw new Error("resend_failed");
+  }
+
+  const go = (v: SparkView) => { setView(v); window.history.replaceState(null, "", v === "signin" ? "#signin" : `${window.location.pathname}`); };
+  return (
+    <CandidateAuthShell matching="not_ready">
+      {view === "verify" ? (
+        <CheckYourEmail email={email} onResend={resend} onChangeEmail={() => go("signup")} />
+      ) : view === "signin" ? (
+        <CandidateSignIn onSignIn={signIn} signUpUrl="#signup" />
+      ) : (
+        <CandidateSignup consentVersion={String(CONSENT_COPY_CURRENT.copyVersion)} privacyUrl={CONSENT_COPY_CURRENT.documents[0].url} termsUrl={CONSENT_COPY_CURRENT.documents[1].url}
+          jobsUrl="/jobs" signInUrl="#signin" showMarketing={false} onCreate={(address, password) => create(address, password)} onDeclined={() => undefined} />
+      )}
+    </CandidateAuthShell>
   );
 }

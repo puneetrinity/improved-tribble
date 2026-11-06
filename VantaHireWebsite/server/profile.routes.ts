@@ -22,6 +22,7 @@ import { getEmailService } from './simpleEmailService';
 import { initializeMemberCredits } from './lib/creditService';
 import { getOrganizationSubscription } from './lib/subscriptionService';
 import crypto from 'crypto';
+import { profileEnabled } from './candidate-product/config';
 import {
   CandidatePrivacyRestrictedError,
   requireCandidatePrivacyAllowed,
@@ -215,6 +216,10 @@ export function registerProfileRoutes(
    * Update the current user's profile
    */
   app.patch("/api/profile", csrfProtection, requireAuth, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    if(req.user?.role==='candidate'&&profileEnabled()&&req.body&&typeof req.body==='object'
+      &&['displayName','company','bio','skills','linkedin','location','isPublic'].some(key=>Object.prototype.hasOwnProperty.call(req.body,key))){
+      res.status(409).json({code:'use_candidate_profile_api'});return;
+    }
     try {
       const userId = req.user!.id;
       await requireCandidateProfileAllowed(req);

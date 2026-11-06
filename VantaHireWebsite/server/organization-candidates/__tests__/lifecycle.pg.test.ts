@@ -365,7 +365,7 @@ describe.skipIf(!enabled)("organization-private application evidence PostgreSQL 
         .rejects.toMatchObject({ code: "55000" });
     }
     await expect(owner!.query(
-      "TRUNCATE organization_candidate_memory_outbox,application_resume_versions,organization_candidate_references,candidate_consent_subjects,candidate_consent_sources,candidate_consent_events,candidate_consent_outbox,candidate_index_outbox,candidate_index_delivery_state",
+      "TRUNCATE organization_candidate_memory_outbox,application_resume_versions,organization_candidate_references,candidate_consent_subjects,candidate_consent_sources,candidate_consent_events,candidate_consent_outbox,candidate_index_outbox,candidate_index_delivery_state,candidate_product_accounts,candidate_product_commands,candidate_product_outbox,candidate_network_intents,candidate_profile_commands,candidate_profile_outbox,candidate_source_erasures,candidate_source_interpretation_reviews,candidate_source_interpretations,candidate_source_jobs,candidate_source_lookup_requests,candidate_source_lookups,candidate_source_paid_operations",
     )).rejects.toMatchObject({ code: "55000" });
   }, 180_000);
 });

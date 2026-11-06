@@ -58,6 +58,12 @@ const fixtureFiles = [
   "VantaHireWebsite/server/schema-migrations/0022_direct_job_publication.sql",
   "VantaHireWebsite/server/schema-migrations/0023_recruiter_extra_searches.sql",
   "VantaHireWebsite/server/schema-migrations/0024_sourcing_refunds.sql",
+  "VantaHireWebsite/server/schema-migrations/0025_candidate_product_foundation.sql",
+  "VantaHireWebsite/server/schema-migrations/0026_candidate_profile_drafts.sql",
+  "VantaHireWebsite/server/schema-migrations/0027_application_candidate_location.sql",
+  "VantaHireWebsite/server/schema-migrations/0028_candidate_shared_ai_budget.sql",
+  "VantaHireWebsite/server/schema-migrations/0029_candidate_budget_operations.sql",
+  "VantaHireWebsite/server/schema-migrations/0030_candidate_unpaid_budget_retry.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
   "VantaHireWebsite/server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
@@ -398,7 +404,8 @@ describe("schema-control CI isolation", () => {
     const workflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
 
     expect(workflow).not.toMatch(/^\s+services:\s*$/m);
-    expect(workflow).toContain("sudo systemctl start postgresql");
+    // Runner-local PostgreSQL 16 created explicitly (runner images now ship a newer default).
+    expect(workflow).toContain("sudo pg_createcluster -p 5432 16 main --start");
     expect(workflow).toContain("SHOW server_version_num");
     expect(workflow).toContain("pg_isready -h 127.0.0.1");
     expect(workflow).toMatch(

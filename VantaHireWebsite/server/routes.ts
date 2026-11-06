@@ -48,6 +48,8 @@ import { registerCandidatePortalRoutes } from "./candidatePortal.routes";
 import { registerOutreachComplianceRoutes } from "./outreachCompliance.routes";
 import { registerCandidatePrivacyRoutes } from "./candidate-privacy/routes";
 import { registerCandidateConsentRoutes } from "./candidate-consent/routes";
+import { registerCandidateProductRoutes,registerCandidateProfileRoutes,registerCandidateConsentV2Routes,registerCandidateResumeRoutes } from "./candidate-product/routes";
+import { candidateSparkSignupEnabled } from "./candidate-product/config";
 import { registerCandidateHistoryRoutes } from "./candidate-history/routes";
 import { isExpectedDisconnectError } from "./monitoring";
 import {
@@ -170,11 +172,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public client configuration (non-sensitive)
   app.get("/api/client-config", (_req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store");
     res.json({
       apolloAppId: process.env.APOLLO_APP_ID || null,
       jobBriefEnabled: jobBriefEnabled(),
       jobBriefAutoDraftEnabled: jobBriefAutoDraftEnabled(),
       sourcingEnabled: sourcingEnabled(),
+      candidateSparkSignupEnabled: candidateSparkSignupEnabled(),
     });
   });
 
@@ -398,6 +402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerCandidatePortalRoutes(app, doubleCsrfProtection);
   registerCandidatePrivacyRoutes(app, doubleCsrfProtection);
   registerCandidateConsentRoutes(app, doubleCsrfProtection);
+  registerCandidateProductRoutes(app, doubleCsrfProtection);
+  registerCandidateConsentV2Routes(app, doubleCsrfProtection);
+  registerCandidateProfileRoutes(app, doubleCsrfProtection);
+  registerCandidateResumeRoutes(app, doubleCsrfProtection);
   registerCandidateHistoryRoutes(app);
   registerOutreachComplianceRoutes(app);
 

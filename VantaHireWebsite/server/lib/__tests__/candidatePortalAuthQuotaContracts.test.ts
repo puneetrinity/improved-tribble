@@ -128,9 +128,12 @@ describe('candidate portal authentication contracts', () => {
 
   it('uses Ealana in applicant-visible auth email copy without renaming the session secret', () => {
     const authSource = read('../../auth.ts');
+    const template = read('../../candidate-product/verification-email.ts');
+    expect(template).toContain('Confirm your email for spark');
+    expect(template).toContain('Confirm your email for ealana');
+    expect(authSource).toContain('verificationEmailForAccount');
+    expect(authSource).toContain('sendVerificationEmail(email, token, user.firstName, inviteToken, user)');
     const applicantEmailCopy = [
-      'Verify your Ealana account',
-      'Welcome to Ealana!',
       'Reset Your Ealana Password',
       'Reset your Ealana password',
     ];
@@ -170,7 +173,7 @@ describe('candidate portal authentication contracts', () => {
     expect(register).not.toContain('verifyUserEmail(user.id)');
     expect(register).not.toContain('req.login(user');
     expect(register).toContain('storage.setVerificationToken(user.id, hash, expires)');
-    expect(register).toContain('sendVerificationEmail(username, token, firstName, inviteToken)');
+    expect(register).toContain('sendVerificationEmail(username, token, firstName, inviteToken, user)');
   });
 });
 

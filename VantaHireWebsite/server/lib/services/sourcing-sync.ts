@@ -13,7 +13,8 @@ import {SourcingRepository} from '../../sourcing-authority/repository';
 import {rankedCandidateSchema} from '../../sourcing-authority/ranking-contract';
 import { loadCandidatePrivacyConfig } from '../../candidate-privacy/config';
 import { checkMemoryEligibilityBatch } from '../../candidate-privacy/memory-client';
-import {parsePrivateOrigin,verifyPrivateDelivery} from '../../sourcing-authority/candidate-origin';
+import {parsePrivateOrigin,parseNetworkOrigin,verifyPrivateDelivery} from '../../sourcing-authority/candidate-origin';
+import {validateNetworkDelivery} from '../../candidate-product/profile-client';
 import {resumeLocationForStorage} from '@shared/resume-location';
 
 const ENRICHED_STATUSES = new Set(['completed', 'enriched']);
@@ -29,12 +30,13 @@ async function filterPrivacyAllowedCandidates(
   const subjects = candidates.map((candidate) => ({
     candidate,
     privateOrigin:parsePrivateOrigin(candidate.candidate),
+    networkOrigin:parseNetworkOrigin(candidate.candidate),
     requestRef: randomUUID(),
   }));
   const decisions = await checkMemoryEligibilityBatch({
-    subjects: subjects.map(({ candidate, requestRef,privateOrigin }) => ({
+    subjects: subjects.map(({ candidate, requestRef,privateOrigin,networkOrigin }) => ({
       requestRef,
-      identifiers: privateOrigin?[]:[{ identifier_type: 'signal_candidate_id' as const, value: candidate.candidate.id }],
+      identifiers: privateOrigin?[]:[{ identifier_type: 'signal_candidate_id' as const, value: networkOrigin?`network:${networkOrigin.identity.subjectId}`:candidate.candidate.id }],
       ...(privateOrigin?{canonicalReference:{candidate_tenant_id:`org_${organizationId}`,candidate_id:privateOrigin.identity.candidateId}}:{}),
     })),
     timeoutMs: config.memoryTimeoutMs,
@@ -194,7 +196,13 @@ export async function upsertSignalCandidates(
 ): Promise<{ count: number; candidates: SignalResultCandidateV3[] }> {
   if (candidates.length === 0 && !governed) return { count: 0, candidates: [] };
 
-  const allowedCandidates = await filterPrivacyAllowedCandidates(candidates,organizationId);
+  let allowedCandidates = await filterPrivacyAllowedCandidates(candidates,organizationId);
+  const native=allowedCandidates.flatMap(c=>{const origin=parseNetworkOrigin(c.candidate);return origin?[origin.identity]:[];});
+  if(native.length){
+    if(governed?.protocolVersion!==2)throw Error('SOURCING_NETWORK_BINDING');
+    const current=await validateNetworkDelivery(organizationId,native);
+    allowedCandidates=allowedCandidates.filter(c=>{const origin=parseNetworkOrigin(c.candidate);return !origin||current.has(origin.identity.publicationId);});
+  }
   if(!governed&&allowedCandidates.some(candidate=>parsePrivateOrigin(candidate.candidate)))throw Error('SOURCING_PRIVATE_BINDING');
   if (allowedCandidates.length === 0 && !governed) return { count: 0, candidates: [] };
 
@@ -205,6 +213,7 @@ export async function upsertSignalCandidates(
   };
   const rows = allowedCandidates.map((c) => {
     const origin=parsePrivateOrigin(c.candidate);
+    const networkOrigin=parseNetworkOrigin(c.candidate);
     const fitScore = normalizeFitScoreForStorage(c.fitScore ?? null);
     const searchSnippet = (c.candidate as unknown as { searchSnippet?: unknown }).searchSnippet ?? null;
     const searchMeta = (c.candidate as unknown as { searchMeta?: unknown }).searchMeta ?? null;
@@ -213,7 +222,9 @@ export async function upsertSignalCandidates(
 
     const summary = {
       ...(governed?.protocolVersion===2?{ranking:rankedCandidateSchema.parse(c.ranking)}:{}),
-      candidate: origin?{...withoutResumeLocation(c.candidate),candidateOrigin:origin.display}:withoutResumeLocation(c.candidate),
+      candidate: origin?{...withoutResumeLocation(c.candidate),candidateOrigin:origin.display}:networkOrigin?
+        {...withoutResumeLocation(c.candidate),candidateOrigin:networkOrigin.display}:withoutResumeLocation(c.candidate),
+      ...(networkOrigin?{candidateOrigin:networkOrigin.display,networkPublication:networkOrigin.identity}:{}),
       ...(origin?{candidateOrigin:origin.display,privateResumeIdentity:origin.identity,
         resumeLocation:resumeLocationForStorage((c.candidate as {resumeLocation?:unknown}).resumeLocation)}:{}),
       sourcingContext: c.sourcingContext,

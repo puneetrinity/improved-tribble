@@ -179,6 +179,6 @@ describe("2L-B organization invitation routes", () => {
     expect(register).not.toContain("validOrgInvite");
     expect(register).not.toContain("verifyUserEmail(user.id)");
     expect(register).not.toContain("req.login(user");
-    expect(register).toContain("sendVerificationEmail(username, token, firstName, inviteToken)");
+    expect(register).toContain("sendVerificationEmail(username, token, firstName, inviteToken, user)");
   });
 });

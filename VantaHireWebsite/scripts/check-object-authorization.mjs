@@ -1771,7 +1771,7 @@ function validateVersionedInvitationGrants(root, problems) {
   }
   for (const anchor of [
     "storage.setVerificationToken(user.id, hash, expires)",
-    "sendVerificationEmail(username, token, firstName, inviteToken)",
+    "sendVerificationEmail(username, token, firstName, inviteToken, user)",
     "readHiringManagerRegistrationGrant(invitationToken)",
     "acceptHiringManagerRegistrationGrant(",
   ]) requireAnchor(problems, register, anchor, `registration invitation anchor is missing: ${anchor}`);
@@ -2249,14 +2249,16 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   if (manifest.format_version !== 1 || manifest.source_commit !== SOURCE_COMMIT) {
     problems.push("object authorization manifest pin or format is invalid.");
   }
-  if (manifest.route_registration_census !== 333) {
+  // P4 adds a source-order test containing the existing apply-route anchor.
+  // This lexical census includes that witness; no extra public route was added.
+  if (manifest.route_registration_census !== 356) {
     problems.push("object authorization route census contract is invalid.");
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
     problems.push("exactly five WhatsApp and two talent-pool route blocks must be frozen.");
   }
-  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 64) {
-    problems.push("exactly sixty-four protected authorization routes must be governed.");
+  if (!Array.isArray(manifest.routes) || manifest.routes.length !== 70) {
+    problems.push("exactly seventy protected authorization routes must be governed.");
   }
   if (!Array.isArray(manifest.retired_routes) || manifest.retired_routes.length !== 10) {
     problems.push("exactly ten resume/application/consultant/attribution registrations must be retired.");
@@ -2463,7 +2465,7 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
 
   const routeCount = routeRegistrationCount(root);
   if (routeCount !== manifest.route_registration_census) {
-    problems.push(`Flow route registration census drifted (expected 333, found ${routeCount}).`);
+    problems.push(`Flow route registration census drifted (expected ${manifest.route_registration_census}, found ${routeCount}).`);
   }
 
   try {

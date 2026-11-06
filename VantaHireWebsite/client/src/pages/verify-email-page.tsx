@@ -25,12 +25,12 @@ export default function VerifyEmailPage() {
 
   // Route the post-verification "Login" button to the correct portal: a
   // recruiter co-recruiter invite stays on recruiter auth; a verified candidate
-  // goes to candidate auth; everything else (recruiter self-signup / unknown
+  // goes to candidate sign-in; everything else (recruiter self-signup / unknown
   // role) keeps the recruiter default.
   const redirectUrl = inviteToken
     ? `/recruiter-auth?invite=${inviteToken}`
     : role === "candidate"
-      ? "/candidate-auth"
+      ? "/candidate-auth#signin"
       : "/recruiter-auth";
 
   useEffect(() => {

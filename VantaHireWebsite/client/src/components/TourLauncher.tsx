@@ -41,7 +41,8 @@ export function TourLauncher() {
   };
 
   // Super admins are internal operators; keep product tours focused on end users.
-  if (!user || user.role === "super_admin") {
+  // Candidates use the spark portal, which has its own welcome; the old candidate tour targets the retired dashboard.
+  if (!user || user.role === "super_admin" || user.role === "candidate") {
     return null;
   }
 

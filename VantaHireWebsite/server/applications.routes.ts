@@ -16,6 +16,7 @@ import type { Multer } from 'multer';
 import { sql, eq, and, inArray, desc } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from './db';
+import { captureOptionalIntent } from './candidate-product/guest-intent';
 import { shouldEnqueueLegacyApplication } from './candidate-index/processor';
 import {
   storage,
@@ -47,6 +48,7 @@ import {
   type JobSourcedCandidate,
 } from '@shared/schema';
 import { readApplicationSource } from '@shared/application-source';
+import { readApplicationLocation } from './candidate-product/application-location';
 import {
   uploadToGCS,
   deleteFromGCS,
@@ -561,6 +563,12 @@ export function registerApplicationsRoutes(
       // Owner-only record of where the applicant came from. Invalid or missing
       // data is dropped silently and never blocks the application.
       const applicationSource = readApplicationSource(req.body?.applicationSource);
+      // P4: city, country and relocation for this job, validated before any side effect.
+      const locationIntake = readApplicationLocation(req.body, new Date());
+      if (locationIntake.kind === 'invalid') {
+        res.status(400).json({ error: 'Invalid application location', code: 'invalid_application_location', fields: locationIntake.fields });
+        return;
+      }
 
       // Before duplicate disclosure, GCS, extraction, candidate-resume insert,
       // application insert, notifications or queueing.
@@ -766,9 +774,11 @@ export function registerApplicationsRoutes(
         phone: applicationData.phone,
         privateUse: true,
       });
+      let networkIntentStatus: 'recorded' | 'not_recorded' | undefined;
       const application = await db.transaction(async (tx: any) => {
           const created = await storage.createApplication({
           ...applicationData,
+          ...(locationIntake.facts ?? {}),
           status: 'submitted',
           jobId,
           resumeUrl,
@@ -783,6 +793,7 @@ export function registerApplicationsRoutes(
           }),
           ...(job.organizationId != null && { organizationId: job.organizationId }),
           }, tx, { admission: 'organization_private' });
+          networkIntentStatus = await captureOptionalIntent(tx,'guest',created.id,req.body.networkIntent);
           if (applicationSource) {
             // Optional owner-only tracking row. A savepoint isolates it: any
             // failure rolls back this insert only and never the application.
@@ -914,7 +925,8 @@ export function registerApplicationsRoutes(
       res.status(201).json({
         success: true,
         message: 'Application submitted successfully',
-        applicationId: application.id
+        applicationId: application.id,
+        ...(networkIntentStatus ? { networkIntentStatus } : {})
       });
       return;
     } catch (error) {

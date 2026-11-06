@@ -1,4 +1,7 @@
 import { GoogleAuth } from 'google-auth-library';
+import { createHash } from 'node:crypto';
+
+export type PdfOcrPlan = Readonly<{schemaVersion:1;contentHash:string;totalPages:number;pageNumbers:readonly number[]}>;
 
 export const INGEST_OCR_TOTAL_TIMEOUT_MS = 20_000;
 export const INGEST_OCR_CALL_TIMEOUT_MS = 10_000;
@@ -23,6 +26,7 @@ export type GoogleVisionIngestOcrResult = {
   success: boolean;
   text: string;
   providerCalls: number;
+  pageTexts?: Array<{pageNumber:number;text:string}>;
   reasonCode?: GoogleVisionIngestOcrReasonCode;
 };
 
@@ -110,8 +114,7 @@ async function countPdfPages(buffer: Buffer, timeoutMs: number): Promise<number>
   }
 }
 
-function pageBatches(pageCount: number): number[][] {
-  const pages = Array.from({ length: pageCount }, (_, index) => index + 1);
+function pageBatches(pages: readonly number[]): number[][] {
   const batches: number[][] = [];
   for (let index = 0; index < pages.length; index += INGEST_OCR_MAX_PAGES_PER_REQUEST) {
     batches.push(pages.slice(index, index + INGEST_OCR_MAX_PAGES_PER_REQUEST));
@@ -155,20 +158,25 @@ async function readBoundedBody(
   return Buffer.concat(chunks, total);
 }
 
-function pageTexts(payload: unknown, expectedPages: number): string[] {
+function pageTexts(payload: unknown, expected: readonly number[], requireIdentity: boolean): string[] {
   if (!payload || typeof payload !== 'object') throw new Error('OCR_OUTPUT_REFUSED');
   const outer = (payload as { responses?: unknown }).responses;
   if (!Array.isArray(outer) || outer.length !== 1) throw new Error('OCR_OUTPUT_REFUSED');
   const file = outer[0];
   if (!file || typeof file !== 'object' || 'error' in file) throw new Error('OCR_PROVIDER_REFUSED');
   const pages = (file as { responses?: unknown }).responses;
-  if (!Array.isArray(pages) || pages.length !== expectedPages) throw new Error('OCR_OUTPUT_REFUSED');
-  return pages.map((page) => {
+  if (!Array.isArray(pages) || pages.length !== expected.length) throw new Error('OCR_OUTPUT_REFUSED');
+  const byPage = new Map<number,string>();
+  const result = pages.map((page, index) => {
     if (!page || typeof page !== 'object') throw new Error('OCR_OUTPUT_REFUSED');
     if ('error' in page) throw new Error('OCR_PROVIDER_REFUSED');
     const annotation = (page as { fullTextAnnotation?: { text?: unknown } }).fullTextAnnotation;
-    return typeof annotation?.text === 'string' ? annotation.text.trim() : '';
+    const pageNumber = requireIdentity ? (page as {context?:{pageNumber?:number}}).context?.pageNumber : expected[index];
+    if (!Number.isSafeInteger(pageNumber) || !expected.includes(pageNumber!) || byPage.has(pageNumber!)) throw new Error('OCR_OUTPUT_REFUSED');
+    const text = typeof annotation?.text === 'string' ? annotation.text.trim() : '';
+    byPage.set(pageNumber!,text);return text;
   });
+  return requireIdentity ? expected.map(page=>byPage.get(page)!) : result;
 }
 
 function knownReason(error: unknown): GoogleVisionIngestOcrReasonCode {
@@ -187,7 +195,7 @@ function knownReason(error: unknown): GoogleVisionIngestOcrReasonCode {
 }
 
 function createClient(dependencies: ClientDependencies, limits: ClientLimits) {
-  return async (buffer: Buffer): Promise<GoogleVisionIngestOcrResult> => {
+  return async (buffer: Buffer, plan?: PdfOcrPlan): Promise<GoogleVisionIngestOcrResult> => {
     const now = dependencies.now ?? Date.now;
     let providerCalls = 0;
     if (!Buffer.isBuffer(buffer)
@@ -206,6 +214,12 @@ function createClient(dependencies: ClientDependencies, limits: ClientLimits) {
       );
       if (!Number.isSafeInteger(pageCount) || pageCount <= 0) throw new Error('OCR_PAGE_COUNT_REFUSED');
       if (pageCount > INGEST_OCR_MAX_PAGES) throw new Error('OCR_PAGE_CEILING_REFUSED');
+      const selectedPages = plan ? [...plan.pageNumbers] : Array.from({length:pageCount},(_,i)=>i+1);
+      if (plan && (plan.schemaVersion!==1 || plan.totalPages!==pageCount
+        || plan.contentHash!==createHash('sha256').update(buffer).digest('hex')
+        || selectedPages.length<1 || selectedPages.length>INGEST_OCR_MAX_PAGES
+        || selectedPages.some((page,i)=>!Number.isSafeInteger(page)||page<1||page>pageCount||(i>0&&page<=selectedPages[i-1]!))))
+        throw new Error('OCR_PAGE_COUNT_REFUSED');
 
       providerCalls += 1;
       const authTimeoutMs = remainingMilliseconds(deadline, limits.callTimeoutMs, now());
@@ -217,7 +231,7 @@ function createClient(dependencies: ClientDependencies, limits: ClientLimits) {
       if (!accessToken) throw new Error('OCR_AUTH_REFUSED');
 
       const textChunks: string[] = [];
-      for (const pages of pageBatches(pageCount)) {
+      for (const pages of pageBatches(selectedPages)) {
         const timeoutMs = remainingMilliseconds(deadline, limits.callTimeoutMs, now());
         if (timeoutMs <= 0) throw new Error('OCR_TIMEOUT');
         const callDeadline = now() + timeoutMs;
@@ -255,7 +269,7 @@ function createClient(dependencies: ClientDependencies, limits: ClientLimits) {
           } catch {
             throw new Error('OCR_OUTPUT_REFUSED');
           }
-          textChunks.push(...pageTexts(payload, pages.length));
+          textChunks.push(...pageTexts(payload, pages, plan !== undefined));
         } catch (error) {
           if (controller.signal.aborted) throw new Error('OCR_TIMEOUT');
           throw error;
@@ -267,6 +281,7 @@ function createClient(dependencies: ClientDependencies, limits: ClientLimits) {
         success: true,
         text: textChunks.filter(Boolean).join('\n\n').trim(),
         providerCalls,
+        ...(plan ? {pageTexts:selectedPages.map((pageNumber,index)=>({pageNumber,text:textChunks[index]!}))} : {}),
       };
     } catch (error) {
       return { success: false, text: '', providerCalls, reasonCode: knownReason(error) };
@@ -286,6 +301,7 @@ export function createGoogleVisionIngestOcrClientForTest(
 
 export async function extractTextWithGoogleVisionIngestOcr(
   buffer: Buffer,
+  plan?: PdfOcrPlan,
 ): Promise<GoogleVisionIngestOcrResult> {
   if (process.env.GOOGLE_VISION_OCR_ENABLED !== 'true') {
     return { success: false, text: '', providerCalls: 0, reasonCode: 'OCR_DISABLED' };
@@ -325,5 +341,5 @@ export async function extractTextWithGoogleVisionIngestOcr(
     totalTimeoutMs: INGEST_OCR_TOTAL_TIMEOUT_MS,
     callTimeoutMs: INGEST_OCR_CALL_TIMEOUT_MS,
   });
-  return client(buffer);
+  return client(buffer, plan);
 }

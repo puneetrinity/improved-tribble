@@ -18,7 +18,8 @@ import { candidateResumes, applications, jobs, users, BatchFitResult } from '../
 import { eq, and, inArray, sql, desc, count } from 'drizzle-orm';
 import { upload, uploadToGCS, downloadFromGCS } from './gcs-storage';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
-import { extractResumeForOrdinaryIngest } from './lib/resumeIngestExtraction';
+import { extractResumeForOrdinaryIngest, checkResumeForSparkReading } from './lib/resumeIngestExtraction';
+import { resumeSourceEnabled } from './candidate-product/config';
 import { generateJDDigest, JDDigest, CURRENT_DIGEST_VERSION, digestSource } from './lib/jdDigest';
 import { jobBriefEnabled, sourceHash } from './job-brief/contracts';
 import { computeFitScore, isFitStale, getStalenessReason } from './lib/aiMatchingEngine';
@@ -67,6 +68,8 @@ const saveResumeSchema = z.object({
   label: z.string().min(1).max(100),
   // Multer/FormData sends booleans as strings; coerce to boolean
   isDefault: z.coerce.boolean().optional(),
+  // B3: set only by the Spark résumé step. Spark's budgeted reader does any OCR.
+  readBy: z.literal('spark').optional(),
 });
 
 const computeFitSchema = z.object({
@@ -381,6 +384,8 @@ export function registerAIRoutes(app: Express): void {
         }
 
         const { label, isDefault } = body.data;
+        // Honoured only while Spark résumé reading is on; otherwise the ordinary path runs.
+        const sparkReading = body.data.readBy === 'spark' && resumeSourceEnabled();
 
         // Check resume limit (max 3)
         const existingResumes = await db.query.candidateResumes.findMany({
@@ -396,12 +401,26 @@ export function registerAIRoutes(app: Express): void {
         }
 
         // Extract text before upload. OCR is reached only after a fresh privacy recheck.
-        const extractionResult = await extractResumeForOrdinaryIngest(file.buffer, {
-          beforeOcr: () => requireCandidatePrivacyAllowed(
-            { type: 'candidate_user', id: userId },
-            { globalUse: true, newGlobalOperation: true },
-          ),
-        });
+        // B3: when Spark will read this file with OCR, the upload does not OCR it: the
+        // file is checked and stored without text until Spark's budgeted reader saves
+        // its complete text. A Spark upload never calls OCR here; a file Spark cannot
+        // read gets the existing 'Invalid resume' answer instead of unbudgeted OCR.
+        let extractionResult: Awaited<ReturnType<typeof extractResumeForOrdinaryIngest>> | null = null;
+        if (sparkReading) {
+          const check = await checkResumeForSparkReading(file.buffer);
+          // Empty text = waiting for Spark's read (readers already fall back on empty text).
+          if (check.state === 'needs_spark_reading') extractionResult = { success: true, text: '', method: 'none', providerCalls: 0 };
+          else if (check.state === 'unreadable') extractionResult = { success: false, text: '', method: 'none', providerCalls: 0, reasonCode: 'NO_EXTRACTABLE_TEXT' };
+          else extractionResult = check.result;
+        }
+        if (!extractionResult) {
+          extractionResult = await extractResumeForOrdinaryIngest(file.buffer, {
+            beforeOcr: () => requireCandidatePrivacyAllowed(
+              { type: 'candidate_user', id: userId },
+              { globalUse: true, newGlobalOperation: true },
+            ),
+          });
+        }
 
         if (!extractionResult.success
             && extractionResult.reasonCode === 'NATIVE_UNSUPPORTED_FOR_OCR') {

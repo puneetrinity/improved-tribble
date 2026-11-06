@@ -78,11 +78,13 @@ export function ProtectedRoute({
 
   if (!user) {
     // Redirect to appropriate auth page based on required role
-    const authPath = requiredRole?.includes('candidate') ? '/candidate-auth' : '/recruiter-auth';
+    const candidate = requiredRole?.includes('candidate');
+    const authPath = candidate ? '/candidate-auth' : '/recruiter-auth';
     const redirectParam = encodeURIComponent(location);
     return (
       <Route path={path}>
-        <Redirect to={`${authPath}?redirect=${redirectParam}`} />
+        {/* A signed-out candidate is returning, so open on Sign in rather than Create account. */}
+        <Redirect to={`${authPath}?redirect=${redirectParam}${candidate ? '#signin' : ''}`} />
       </Route>
     );
   }

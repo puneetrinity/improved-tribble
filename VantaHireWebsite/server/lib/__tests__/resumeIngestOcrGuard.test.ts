@@ -24,6 +24,10 @@ const files: Record<string, string> = {
   '../.github/workflows/ci.yml': read('../.github/workflows/ci.yml'),
 };
 const mutations: Array<[string, string, string, string]> = [
+  ['selected page order', 'server/lib/googleVisionIngestOcrClient.ts', 'page<=selectedPages[i-1]!', 'false'],
+  ['duplicate response page', 'server/lib/googleVisionIngestOcrClient.ts', 'byPage.has(pageNumber!)', 'false'],
+  ['plan privacy gate', 'server/lib/resumeIngestExtraction.ts', 'await options.beforeOcr(plan)', 'void options.beforeOcr'],
+  ['mixed PDF page cap', 'server/lib/resumeIngestExtraction.ts', 'if(pages.length>10)', 'if(false)'],
   ['async Vision', 'server/lib/googleVisionIngestOcrClient.ts', 'files:annotate', 'files:asyncBatchAnnotate'],
   ['GCS source', 'server/lib/googleVisionIngestOcrClient.ts', "content: buffer.toString('base64')", "gcsSource: { uri: 'gs://unsafe' }"],
   ['total timeout', 'server/lib/googleVisionIngestOcrClient.ts', 'INGEST_OCR_TOTAL_TIMEOUT_MS = 20_000', 'INGEST_OCR_TOTAL_TIMEOUT_MS = 120_000'],

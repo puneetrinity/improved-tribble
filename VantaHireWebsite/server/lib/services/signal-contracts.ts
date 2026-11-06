@@ -627,6 +627,7 @@ export function flattenCandidateForUI(row: {
   const cs = redactContactEvidence(rawCandidateSummary) as Record<string, unknown>;
   // Immutable resume provenance is service authority, not a browser DTO.
   delete cs.privateResumeIdentity;
+  delete cs.networkPublication;
   // Only a previous applicant's own résumé location is shown, and only after validation.
   const resumeLocation=origin.kind==='organization_candidate'?readResumeLocation(rawCandidateSummary.resumeLocation):undefined;
   delete cs.resumeLocation;

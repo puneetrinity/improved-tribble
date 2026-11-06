@@ -124,6 +124,22 @@ function requestInput(userId: number, requestId = randomUUID()) {
 }
 
 describe.skipIf(!enabled)("candidate privacy disposable PostgreSQL", () => {
+  it("includes the native Spark identity without a LinkedIn URL and after an email change", async () => {
+    const userId = await createCandidate();
+    const subject = randomUUID();
+    const input = requestInput(userId);
+    const owner = await clientFor(migrationUrl);
+    try {
+      await owner.query(`INSERT INTO candidate_consent_subjects(subject_id,user_id,created_at,updated_at) VALUES($1,$2,clock_timestamp(),clock_timestamp())`, [subject,userId]);
+      await repository.createLocalPrivacyRequest(input);
+      const first = await repository.transientIdentifiersForRequest(input.requestId);
+      expect(first[0]).toEqual({identifier_type:"signal_candidate_id",value:`network:${subject}`});
+      await owner.query("UPDATE users SET username='changed@example.invalid' WHERE id=$1",[userId]);
+      const second = await repository.transientIdentifiersForRequest(input.requestId);
+      expect(second[0]).toEqual(first[0]);
+      expect(second).toContainEqual({identifier_type:"email",value:"changed@example.invalid"});
+    } finally { await owner.end(); }
+  });
   beforeAll(async () => {
     if (process.env.NODE_ENV !== "test") {
       throw new Error("Disposable candidate privacy integration requires NODE_ENV=test.");

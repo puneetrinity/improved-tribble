@@ -1,4 +1,5 @@
-﻿import { useState, useEffect, useLayoutEffect } from "react";
+﻿import { COUNTRIES } from "@/components/candidate-profile/countries";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useSearch } from "wouter";
@@ -71,6 +72,10 @@ function createEmptyApplicationForm() {
     phone: "",
     coverLetter: "",
     whatsappConsent: true,
+    // P4: where the applicant lives and whether they'd move for this job. Sent separately, never in insertApplicationSchema.
+    locationCity: "",
+    locationCountryCode: "",
+    willingToRelocate: null as boolean | null,
   };
 }
 
@@ -308,6 +313,9 @@ export default function JobDetailsPage() {
         phone: candidateJobState.isVerifiedCandidate ? current.phone : "",
         coverLetter: "",
         whatsappConsent: true,
+        locationCity: "",
+        locationCountryCode: "",
+        willingToRelocate: null,
       }));
       setResumeFile(null);
     },
@@ -341,9 +349,14 @@ export default function JobDetailsPage() {
       return;
     }
 
+    if (!formData.locationCity.trim() || !formData.locationCountryCode || formData.willingToRelocate === null) {
+      toast({ title: "Location required", description: "Add your city and country, and say whether you'd relocate for this job.", variant: "destructive" });
+      return;
+    }
     try {
+      const { locationCity, locationCountryCode, willingToRelocate, ...applicant } = formData;
       const validatedData = insertApplicationSchema.parse({
-        ...formData,
+        ...applicant,
         phone: normalizePhoneNumber(formData.phone),
         jobId: job?.id!,
       });
@@ -358,6 +371,9 @@ export default function JobDetailsPage() {
       } else if (resumeFile) {
         formDataToSend.append('resume', resumeFile);
       }
+      formDataToSend.append("locationCity", locationCity.trim());
+      formDataToSend.append("locationCountryCode", locationCountryCode);
+      formDataToSend.append("willingToRelocate", String(willingToRelocate));
       if (outreachAttributionToken) {
         formDataToSend.append("outreachAttributionToken", outreachAttributionToken);
       }
@@ -954,6 +970,33 @@ export default function JobDetailsPage() {
                             placeholder="+91 98765 43210"
                           />
                         </div>
+                        <div className="grid gap-3">
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="locationCity" className="text-[0.78rem] font-medium text-e-text2">City *</label>
+                            <input id="locationCity" type="text" className={formInputCls} maxLength={200} autoComplete="address-level2"
+                              value={formData.locationCity} onChange={(e) => setFormData({ ...formData, locationCity: e.target.value })} required />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label htmlFor="locationCountryCode" className="text-[0.78rem] font-medium text-e-text2">Country *</label>
+                            <select id="locationCountryCode" className={`${formInputCls} min-h-11 cursor-pointer`} autoComplete="country"
+                              value={formData.locationCountryCode} onChange={(e) => setFormData({ ...formData, locationCountryCode: e.target.value })} required>
+                              <option value="">Choose a country</option>
+                              {COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                        <fieldset className="flex flex-col gap-1.5">
+                          <legend className="mb-1.5 text-[0.78rem] font-medium text-e-text2">Are you willing to relocate for this job? *</legend>
+                          <div className="flex gap-2" role="radiogroup">
+                            {([["Yes", true], ["No", false]] as const).map(([label, v]) => (
+                              <button key={label} type="button" role="radio" aria-checked={formData.willingToRelocate === v}
+                                onClick={() => setFormData({ ...formData, willingToRelocate: v })}
+                                className={`min-h-11 min-w-20 cursor-pointer rounded-xl border px-4 text-[0.88rem] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-e-blue ${formData.willingToRelocate === v ? "border-e-blue bg-e-blue/15 text-e-text" : "border-white/10 bg-white/[0.04] text-e-text2 hover:bg-white/[0.08]"}`}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+                        </fieldset>
                         {candidateJobState.isVerifiedCandidate ? (
                           <div className="flex flex-col gap-1.5">
                             <label htmlFor="resumeId" className="text-[0.78rem] font-medium text-e-text2">

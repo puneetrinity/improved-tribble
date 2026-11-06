@@ -47,10 +47,18 @@ app.use(compression({
 
 // Capture raw body for webhook signature verification
 // The rawBody is stored on the request object for routes that need it
+// Only S2's profile command endpoint accepts larger JSON. S1 and every other
+// route retain their existing parser limit. Preserve exact Unicode/duplicate keys.
+app.use('/api/candidate/product/profile/commands', express.json({
+  limit: 384 * 1024,
+  verify: (req:any,_res,buf) => { req.rawBody = new TextDecoder('utf-8',{fatal:true}).decode(buf); },
+}));
 app.use(express.json({
   verify: (req: any, _res, buf) => {
     // Store raw body for webhook signature verification
-    if (req.url?.startsWith('/api/webhooks/')) {
+    const pathname = req.url?.split('?')[0];
+    if (req.url?.startsWith('/api/webhooks/') || pathname === '/api/candidate/product'
+        || pathname?.startsWith('/api/candidate/product/')) {
       req.rawBody = buf.toString('utf-8');
     }
   }
@@ -119,8 +127,34 @@ app.use((req, res, next) => {
 import { initWebSocketServer } from "./websocket";
 import { consentDeliveryConfig, startConsentProcessor } from "./candidate-consent/processor";
 import { candidateIndexProcessorConfig, startCandidateIndexProcessor } from "./candidate-index/processor";
+import { startFoundationProcessor } from "./candidate-product/processor";
+import { startProfileProcessor, startProfileExpiryProcessor } from "./candidate-product/profile-processor";
+import { profileRepository } from "./candidate-product/profile-repository";
+import { deliverProfile, recoverProfileExpiry,readSparkProfile } from "./candidate-product/profile-client";
+import { profileDeliveryEnabled,consentV2DeliveryEnabled,sparkEnabled,resumeSourceEnabled,lookupSourceEnabled } from "./candidate-product/config";
+import {resumeSourceRepository} from "./candidate-product/resume-source-repository";
+import {sourceObjectDependencies,withCachedResumeExtraction,lookupRepository,lookupQueueRepository} from "./candidate-product/source-repository";
+import {startLookupQueue,runLookupAttempt,runLookupDelivery} from "./candidate-product/source-processor";
+import {startBudgetAlerts} from './candidate-product/budget-alerts';
+import {lookupProfessionalProfile,deliverLookupTransfer} from "./candidate-product/source-adapters";
+import {startResumeSourceWorker,processResumeSource} from "./candidate-product/resume-source-processor";
+import {getGroqModel} from "./lib/aiModelConfig";
+import {randomUUID} from "node:crypto";
+import { requireCandidatePrivacyAllowed,CandidatePrivacyRestrictedError } from "./candidate-privacy/decision";
+import { startConsentV2Worker } from "./candidate-product/consent-v2";
+import { sendConsentV2 } from "./candidate-product/spark-client";
+import { foundationMemoryOrigin } from "./candidate-product/memory-client";
+import { signServiceJwt } from "./lib/services/jwt-signer";
+import { pool } from "./db";
 let stopConsentProcessor: (() => void) | undefined;
 let stopCandidateIndexProcessor: (() => Promise<void>) | undefined;
+let stopFoundationProcessor: (() => Promise<void>) | undefined;
+let stopProfileProcessor: (() => Promise<void>) | undefined;
+let stopProfileExpiryProcessor: (() => Promise<void>) | undefined;
+let stopConsentV2Processor: (() => Promise<void>) | undefined;
+let stopResumeSourceProcessor: (() => Promise<void>) | undefined;
+let stopLookupProcessor: (() => Promise<void>) | undefined;
+let stopBudgetAlerts: (() => Promise<void>) | undefined;
 
 (async () => {
   const indexConfig = candidateIndexProcessorConfig();
@@ -198,12 +232,64 @@ let stopCandidateIndexProcessor: (() => Promise<void>) | undefined;
     // Privacy delivery/feed starts first so every candidate processor consumes
     // the freshest local restrictive projection available for this runtime.
     startCandidatePrivacyProcessor();
+    // Delivery is independently gated. V2 capture is not registered yet and
+    // must never be enabled before this worker is healthy (cross-version order).
+    if(consentV2DeliveryEnabled()){
+      const origin=foundationMemoryOrigin();
+      stopConsentV2Processor=startConsentV2Worker({db:pool,workerId:`consent-v2-${process.pid}`,
+        privacy:async userId=>{
+          try{await requireCandidatePrivacyAllowed({type:'candidate_user',id:userId},{globalUse:true,newGlobalOperation:true});return 'allowed';}
+          catch(error){return error instanceof CandidatePrivacyRestrictedError&&error.code==='candidate_privacy_restricted'?'restricted':'unavailable';}
+        },deliver:(raw,hash)=>sendConsentV2(raw,hash,{origin,sign:signServiceJwt})},
+        {enabled:true,onError:()=>log('[candidate-consent-v2] delivery cycle failed')});
+    }
 
     // The schema-ready launch command has completed before this process starts;
     // configuration is asserted above before any 4B delivery timer is armed.
     startOrganizationCandidateProcessor();
     stopConsentProcessor = startConsentProcessor(consentConfig);
     stopCandidateIndexProcessor = startCandidateIndexProcessor(indexConfig);
+    stopFoundationProcessor = startFoundationProcessor({db:pool, privacy:userId => requireCandidatePrivacyAllowed(
+      {type:'candidate_user',id:userId},{globalUse:true,newGlobalOperation:true})});
+    const profiles=profileRepository(pool,userId=>requireCandidatePrivacyAllowed(
+      {type:'candidate_user',id:userId},{globalUse:false}));
+    stopProfileProcessor=startProfileProcessor({enabled:profileDeliveryEnabled,claim:profiles.claim,
+      authority:profiles.authority,finish:profiles.finish,deliver:deliverProfile});
+    stopProfileExpiryProcessor=startProfileExpiryProcessor({enabled:sparkEnabled,redactDue:profiles.redactDue,
+      claimExpiry:profiles.claimExpiry,prepareExpiry:profiles.prepareExpiry,settleExpiry:profiles.settleExpiry,
+      refuseExpiry:profiles.refuseExpiry,recoveryReviewCount:profiles.recoveryReviewCount,recover:recoverProfileExpiry});
+    stopBudgetAlerts=startBudgetAlerts(pool,sparkEnabled);
+    if(resumeSourceEnabled()){
+      // Validate model configuration before any claim/file/OCR work. No credentials
+      // or provider call is made by constructing these dependencies.
+      const modelName=getGroqModel();
+      const privacy=(userId:number)=>requireCandidatePrivacyAllowed(
+        {type:'candidate_user',id:userId},{globalUse:false});
+      const sources=resumeSourceRepository(pool,privacy);
+      const objects=sourceObjectDependencies(pool,privacy);
+      const worker=startResumeSourceWorker({workerId:randomUUID(),
+        claim:workerId=>resumeSourceEnabled()?sources.claim(workerId):Promise.resolve(null),
+        process:lease=>resumeSourceEnabled()
+          ?processResumeSource(lease,{repo:sources,reader:objects,modelName,extract:withCachedResumeExtraction(pool,lease)})
+          :Promise.resolve({result:'lease_lost' as const})});
+      stopResumeSourceProcessor=()=>worker.stop();
+    }
+
+    if(lookupSourceEnabled()){
+      // Explicit candidate configuration; never fetch credentials from another service.
+      const apiKey=process.env.CANDIDATE_RC_API_KEY;
+      if(!apiKey||apiKey.length>8192||/[\s\0]/.test(apiKey))throw Error('candidate_lookup_configuration_required');
+      const queue=lookupQueueRepository(pool);
+      const repository=(work:{userId:number;authVersion:number})=>lookupRepository(pool,userId=>requireCandidatePrivacyAllowed(
+        {type:'candidate_user',id:userId},{globalUse:true,newGlobalOperation:true}),{userId:work.userId,authVersion:work.authVersion});
+      stopLookupProcessor=startLookupQueue({...queue,enabled:lookupSourceEnabled,
+        purchase:work=>runLookupAttempt(work.attemptId,{...repository(work),enabled:lookupSourceEnabled,
+          lookup:operation=>lookupProfessionalProfile(operation,{apiKey})}),
+        deliver:work=>runLookupDelivery(work.attemptId,{repository:repository(work),deliver:deliverLookupTransfer,
+          readVersions:async(subject,binding)=>{const v=await readSparkProfile(subject,binding);
+            return {originalDraftVersion:v.draftVersion,originalProfileVersion:v.profileVersion,
+              originalPreferenceVersion:v.preferenceVersion,originalPreferenceDraftRevision:v.preferenceDraft?.preferenceDraftRevision??0};}})});
+    }
 
     // Start job scheduler for automatic job expiration
     startJobScheduler();
@@ -241,8 +327,12 @@ let stopCandidateIndexProcessor: (() => Promise<void>) | undefined;
     void stopOrganizationCandidateProcessor();
     stopConsentProcessor?.();
     const indexStopped = stopCandidateIndexProcessor?.();
+    const foundationStopped = stopFoundationProcessor?.();
+    const profileStopped = Promise.all([stopProfileProcessor?.(),stopProfileExpiryProcessor?.(),stopResumeSourceProcessor?.(),stopLookupProcessor?.(),stopBudgetAlerts?.()]);
+    const consentV2Stopped = stopConsentV2Processor?.();
     server.close(() => {
-      void Promise.resolve(indexStopped).then(() => process.exit(0), () => process.exit(1));
+      void Promise.allSettled([Promise.resolve(indexStopped), foundationStopped, profileStopped, consentV2Stopped])
+        .then(results => process.exit(results.some(result => result.status === 'rejected') ? 1 : 0));
     });
   };
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));

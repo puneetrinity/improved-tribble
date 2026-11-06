@@ -39,7 +39,9 @@ import {
 import { createHash, randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {applicantContactBlocked,readSourcingCandidateOrigin} from '@shared/sourcing-candidate-origin';
-import {filterStoredPrivateCandidates} from './sourcing-authority/candidate-origin';
+import {filterStoredPrivateCandidates,networkPublicationAuthority} from './sourcing-authority/candidate-origin';
+import {checkMemoryEligibilityBatch} from './candidate-privacy/memory-client';
+import {loadCandidatePrivacyConfig} from './candidate-privacy/config';
 import { sourcingJobState } from './sourcing-authority/job-state';
 import { generateJDDigest, CURRENT_DIGEST_VERSION } from './lib/jdDigest';
 import { jobBriefEnabled } from './job-brief/contracts';
@@ -770,9 +772,22 @@ export function registerSignalRoutes(app: Express, csrfProtection: any) {
 
       // Flatten to UI shape and preserve Signal's assembly order when rank exists.
       const currentlyEligible=await filterStoredPrivateCandidates(db,organizationId,jobId,latestRunForMeta?.requestId??'',binding,candidates);
+      const nativeSubjects=currentlyEligible.flatMap(candidate=>{
+        const summary=candidate.candidateSummary as Record<string,unknown>|null;
+        if(readSourcingCandidateOrigin(summary?.candidateOrigin).kind!=='candidate_network')return [];
+        const identity=networkPublicationAuthority.parse(summary?.networkPublication);
+        return [{id:candidate.id,requestRef:randomUUID(),identity}];
+      });
+      const nativeDecisions=nativeSubjects.length?await checkMemoryEligibilityBatch({
+        subjects:nativeSubjects.map(item=>({requestRef:item.requestRef,identifiers:[{
+          identifier_type:'signal_candidate_id' as const,value:`network:${item.identity.subjectId}`}]})),
+        timeoutMs:loadCandidatePrivacyConfig().memoryTimeoutMs,
+      }):new Map();
+      const nativeAllowed=new Set(nativeSubjects.filter(item=>nativeDecisions.get(item.requestRef)==='allow').map(item=>item.id));
       const stillAllowed = (await Promise.all(currentlyEligible.map(async (candidate) => {
         try {
           const origin=readSourcingCandidateOrigin((candidate.candidateSummary as Record<string,unknown>|null)?.candidateOrigin);
+          if(origin.kind==='candidate_network')return nativeAllowed.has(candidate.id)?candidate:null;
           await requireCandidatePrivacyAllowed(
             { type: 'job_sourced_candidate', id: candidate.id },
             { globalUse: origin.kind!=='organization_candidate' },

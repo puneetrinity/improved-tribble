@@ -28,7 +28,35 @@ jobs:
       - run: node --import tsx --test scripts/test-sourcing-extra-searches.mjs
       - name: Prepare separate disposable owner databases
         run: |
-          sudo systemctl start postgresql
+          # Runner images now ship a newer local PostgreSQL. Install and start exactly 16 on 5432
+          # (isolated Ubuntu/PGDG apt sources, as in Memory CI); the version check below still fails closed.
+          sudo systemctl stop postgresql || true
+          if [ ! -x /usr/lib/postgresql/16/bin/postgres ]; then
+            pg_apt_sources="$(mktemp -d)"; chmod 755 "$pg_apt_sources"
+            cp /etc/apt/sources.list.d/ubuntu.sources "$pg_apt_sources/ubuntu.sources"
+            for pg_source in /etc/apt/sources.list.d/pgdg.list /etc/apt/sources.list.d/pgdg.sources; do
+              if [ -f "$pg_source" ]; then cp "$pg_source" "$pg_apt_sources/"; fi
+            done
+            pg_apt_options=(-o "Dir::Etc::sourcelist=/dev/null" -o "Dir::Etc::sourceparts=$pg_apt_sources"
+              -o "Acquire::Retries=3" -o "Acquire::http::Timeout=30" -o "Acquire::https::Timeout=30" -o "APT::Update::Error-Mode=any")
+            sudo apt-get "${pg_apt_options[@]}" update
+            sudo apt-get "${pg_apt_options[@]}" install -y postgresql-common
+            if [ ! -f "$pg_apt_sources/pgdg.list" ] && [ ! -f "$pg_apt_sources/pgdg.sources" ]; then
+              . /etc/os-release
+              pg_keyring=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+              [ -r "$pg_keyring" ] || pg_keyring=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+              test -r "$pg_keyring"
+              printf 'deb [signed-by=%s] https://apt.postgresql.org/pub/repos/apt %s-pgdg main\n' \
+                "$pg_keyring" "${VERSION_CODENAME:?}" > "$pg_apt_sources/pgdg.list"
+            fi
+            sudo apt-get "${pg_apt_options[@]}" update
+            sudo apt-get "${pg_apt_options[@]}" install -y postgresql-16
+          fi
+          while read -r version cluster _; do sudo pg_ctlcluster "$version" "$cluster" stop || true; done < <(pg_lsclusters --no-header)
+          if pg_lsclusters --no-header | awk '$1 == "16" && $2 == "main" { found=1 } END { exit !found }'; then
+            sudo pg_dropcluster --stop 16 main
+          fi
+          sudo pg_createcluster -p 5432 16 main --start
           sudo -u postgres psql -v ON_ERROR_STOP=1 <<'SQL'
           CREATE ROLE org_setup_owner_test LOGIN NOSUPERUSER NOBYPASSRLS PASSWORD 'fixture-only';
           CREATE ROLE org_setup_runtime_test NOLOGIN NOSUPERUSER NOBYPASSRLS;
@@ -120,7 +148,35 @@ jobs:
           cache-dependency-path: VantaHireWebsite/package-lock.json
       - name: Start runner-local PostgreSQL 16 and prepare test identities
         run: |
-          sudo systemctl start postgresql
+          # Runner images now ship a newer local PostgreSQL. Install and start exactly 16 on 5432
+          # (isolated Ubuntu/PGDG apt sources, as in Memory CI); the version check below still fails closed.
+          sudo systemctl stop postgresql || true
+          if [ ! -x /usr/lib/postgresql/16/bin/postgres ]; then
+            pg_apt_sources="$(mktemp -d)"; chmod 755 "$pg_apt_sources"
+            cp /etc/apt/sources.list.d/ubuntu.sources "$pg_apt_sources/ubuntu.sources"
+            for pg_source in /etc/apt/sources.list.d/pgdg.list /etc/apt/sources.list.d/pgdg.sources; do
+              if [ -f "$pg_source" ]; then cp "$pg_source" "$pg_apt_sources/"; fi
+            done
+            pg_apt_options=(-o "Dir::Etc::sourcelist=/dev/null" -o "Dir::Etc::sourceparts=$pg_apt_sources"
+              -o "Acquire::Retries=3" -o "Acquire::http::Timeout=30" -o "Acquire::https::Timeout=30" -o "APT::Update::Error-Mode=any")
+            sudo apt-get "${pg_apt_options[@]}" update
+            sudo apt-get "${pg_apt_options[@]}" install -y postgresql-common
+            if [ ! -f "$pg_apt_sources/pgdg.list" ] && [ ! -f "$pg_apt_sources/pgdg.sources" ]; then
+              . /etc/os-release
+              pg_keyring=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg
+              [ -r "$pg_keyring" ] || pg_keyring=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+              test -r "$pg_keyring"
+              printf 'deb [signed-by=%s] https://apt.postgresql.org/pub/repos/apt %s-pgdg main\n' \
+                "$pg_keyring" "${VERSION_CODENAME:?}" > "$pg_apt_sources/pgdg.list"
+            fi
+            sudo apt-get "${pg_apt_options[@]}" update
+            sudo apt-get "${pg_apt_options[@]}" install -y postgresql-16
+          fi
+          while read -r version cluster _; do sudo pg_ctlcluster "$version" "$cluster" stop || true; done < <(pg_lsclusters --no-header)
+          if pg_lsclusters --no-header | awk '$1 == "16" && $2 == "main" { found=1 } END { exit !found }'; then
+            sudo pg_dropcluster --stop 16 main
+          fi
+          sudo pg_createcluster -p 5432 16 main --start
           server_version_num="$(sudo -u postgres psql -d postgres -Atqc 'SHOW server_version_num')"
           if [[ "$server_version_num" != 16* ]]; then
             echo "Expected runner-local PostgreSQL 16; got server_version_num=$server_version_num" >&2
@@ -152,7 +208,27 @@ jobs:
       - run: npm run check:sourcing-authority
       - run: npm run check:server
       - run: npm run check:client
+      - run: npx tsc -p scripts/tsconfig.spark-private-job.json --noEmit
       - run: npm run test:server
+      - run: npm run check:candidate-product
+      - name: Candidate foundation, profile and consent full-schema rehearsal
+        env:
+          NODE_ENV: test
+          NO_COLOR: '1'
+        run: |
+          set -euo pipefail
+          foundation_dir=$(mktemp -d /tmp/candidate-s1-ci-XXXXXX)
+          foundation_bin=/usr/lib/postgresql/16/bin  # pg_config resolves to the runner default (18); production is 17, tests pin 16
+          "$foundation_bin/initdb" -D "$foundation_dir/data" -U ews -A trust --encoding=UTF8 --no-locale
+          "$foundation_bin/pg_ctl" -D "$foundation_dir/data" -l "$foundation_dir/postgres.log" -o "-k $foundation_dir -p 55495 -c listen_addresses='127.0.0.1' -c shared_buffers=32MB -c max_connections=12" start
+          trap '"$foundation_bin/pg_ctl" -D "$foundation_dir/data" -m fast stop' EXIT
+          export CANDIDATE_FOUNDATION_TEST_SOCKET="$foundation_dir" CANDIDATE_FOUNDATION_TEST_PORT=55495
+          npx vitest run --config vitest.server.config.ts server/candidate-product/authority.pg.test.ts | tee "$foundation_dir/authority.log"
+          export CANDIDATE_FOUNDATION_FLOW_TEST_DATABASE=$(awk '/Retained Flow release fixture/{value=$NF} END{print value}' "$foundation_dir/authority.log")
+          test -n "$CANDIDATE_FOUNDATION_FLOW_TEST_DATABASE"
+          npx vitest run --config vitest.server.config.ts server/candidate-product/lifecycle.pg.test.ts
+          export S2_FLOW_TEST_ADMIN_URL=postgresql://ews@127.0.0.1:55495/postgres S2_PROTOTYPE_DISPOSABLE=1
+          npx vitest run --config vitest.server.config.ts server/candidate-product/profile-lifecycle.pg.test.ts server/candidate-product/consent-v2.pg.test.ts server/candidate-product/spark-lifecycle.pg.test.ts --maxWorkers=1
       - run: npm run test:candidate-consent
       - run: npm run test:candidate-index
       - run: npm run test:candidate-history
