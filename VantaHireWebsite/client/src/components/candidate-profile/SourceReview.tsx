@@ -199,6 +199,11 @@ export function resumeAdapters(o: {
         return await extraction(await startResumeRead(id, () => {}, undefined, deps));
       } catch (e) { throw asReadError(e); }
     },
+    /** Read a résumé already in the library (the candidate's default), by its id. */
+    async readResumeById(resumeId: number) {
+      try { return await extraction(await startResumeRead(resumeId, () => {}, undefined, deps)); }
+      catch (e) { throw asReadError(e); }
+    },
     /** Returning: reopen the newest unreviewed résumé suggestion, if any (lookups are skipped). */
     async restore(summaries: { proposalId: string; kind: string; sourceId: string | null }[]) {
       for (const s of summaries) {

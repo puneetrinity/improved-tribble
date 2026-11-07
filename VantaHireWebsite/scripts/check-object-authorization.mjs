@@ -2251,7 +2251,9 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   }
   // P4 adds a source-order test containing the existing apply-route anchor.
   // This lexical census includes that witness; no extra public route was added.
-  if (manifest.route_registration_census !== 356) {
+  // Spark release fixes (2026-11-07) add one owner-only candidate route:
+  // PATCH /api/ai/resume/:id/default (verified candidate, CSRF, own résumé only).
+  if (manifest.route_registration_census !== 357) {
     problems.push("object authorization route census contract is invalid.");
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {

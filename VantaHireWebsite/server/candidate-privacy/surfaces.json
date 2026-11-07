@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "1fe19ef82148ede5669cba4884e258252a9dc8b116430293a4c1db86d51d0e91",
+  "source_census_sha256": "e8c7bffe60e8fba21faa9d362301ffbf94dff050c22101645611776a19220ccf",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "client/src/lib/candidate-profile-api.ts",
@@ -323,6 +323,10 @@
     },
     {
       "file": "server/lib/profileCompletion.ts",
+      "classification": "fenced"
+    },
+    {
+      "file": "server/lib/candidateResumeDefault.ts",
       "classification": "fenced"
     },
     {
@@ -1694,6 +1698,17 @@
       "organization_scope": "candidate_self",
       "enforcement": "Self-only derived completeness is called from candidate-authenticated/profile-fenced paths and is not presented to another organization.",
       "anchors": ["computeProfileCompletion", "syncProfileCompletionStatus"]
+    },
+    {
+      "id": "candidate-resume-default",
+      "file": "server/lib/candidateResumeDefault.ts",
+      "symbol": "insertLibraryResume",
+      "models": ["candidate_resumes"],
+      "direction": "write",
+      "privacy_action": ["request_erasure"],
+      "organization_scope": "candidate_self",
+      "enforcement": "Called only from the verified-candidate, CSRF-protected library routes after their privacy checks; changes only the caller's own résumé rows (owner predicate in every statement) and their default flag.",
+      "anchors": ["insertLibraryResume", "makeLibraryResumeDefault", "lockCandidateResumeDefault"]
     },
     {
       "id": "email-provider-final-fence",

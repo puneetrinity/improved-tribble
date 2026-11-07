@@ -253,7 +253,7 @@ function PortalPreview({ initial = (qs.get("section") as PortalSection) ?? (MATC
   useEffect(() => { window.scrollTo(0, 0); }, [section]);
   return (
     <AuthProvider>
-      <CandidatePortal firstName="Priya" section={section} onNavigate={setSection} discovery={discovery} matching={matching} justFinishedOnboarding={justFinished || qs.get("welcome") === "1"}
+      <CandidatePortal firstName="Priya" userId={1} section={section} onNavigate={setSection} discovery={discovery} matching={matching} justFinishedOnboarding={justFinished || qs.get("welcome") === "1"}
         publicJobs={PUBLIC_JOBS} profile={<CareerProfilePanel deps={{ load }} />}
         recommendations={<JobMatches jobs={sampleJobs} checkedCount={1284} preferences={jobPrefs} onPreferencesChange={() => undefined} onProposeSkill={() => undefined} interpret={simulateSpark} exclusions={savedExclusions} />}
         onSignOut={() => { location.href = "?view=journey"; }} />

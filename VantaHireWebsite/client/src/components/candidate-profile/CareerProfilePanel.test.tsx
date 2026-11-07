@@ -7,7 +7,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { existsSync, readFileSync } from "node:fs";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { CareerProfilePanel, CONFIRM_NOTE, DISCARD_CONFIRM, DISCARDED, SAVE_FIRST } from "./CareerProfilePanel";
+import { CareerProfilePanel, CONFIRM_NOTE, CONFIRM_NOTE_PUBLISHED, DISCARD_CONFIRM, DISCARDED, SAVE_FIRST } from "./CareerProfilePanel";
 import { lookupProfile } from "./SourceReview";
 import { NOT_FOUND_COPY, UNCERTAIN_COPY } from "@/hooks/use-profile-command";
 import { CAPABILITY_COPY, GENERIC_ERROR, REASONS, describeReason } from "@/lib/candidate-profile-api";
@@ -568,6 +568,14 @@ function sparkServer() {
 }
 
 describe("CareerProfilePanel on a spark profile", () => {
+  it("a published profile says employers can see it, and the confirm note says confirming updates what they see", async () => {
+    route("GET", BASE, () => ({ status: 200, body: sparkRead({ capabilities: { ...sparkRead().capabilities, canDiscover: true } }) }));
+    await mountSpark();
+    expect(text()).toContain("Visible to employers in the ealana network.");
+    expect(text()).toContain(CONFIRM_NOTE_PUBLISHED);
+    expect(text()).not.toContain(CONFIRM_NOTE);
+  });
+
   it("reads the v3 profile: answered sections show, unanswered ones say Not answered, gaps read plainly", async () => {
     route("GET", BASE, () => ({ status: 200, body: sparkRead() }));
     await mountSpark();

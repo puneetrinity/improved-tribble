@@ -148,7 +148,7 @@ describe('candidate resume-backed application contracts', () => {
 });
 
 describe('candidate resume library contracts', () => {
-  it('keeps upload, list, and delete available without the Groq feature flag', () => {
+  it('keeps upload, list, make-default, and delete available without the Groq feature flag', () => {
     const source = read('../../ai.routes.ts');
     const resumeRoutesStart = source.indexOf('// Resume Management Routes');
     const fitRoutesStart = source.indexOf('// AI Fit Computation Routes');
@@ -156,8 +156,9 @@ describe('candidate resume library contracts', () => {
 
     expect(resumeRoutes).toContain("'/api/ai/resume'");
     expect(resumeRoutes).toContain("'/api/ai/resume/:id'");
+    expect(resumeRoutes).toContain("'/api/ai/resume/:id/default'");
     expect(resumeRoutes).not.toContain("requireFeatureFlag('resume')");
-    expect(resumeRoutes.match(/requireVerifiedCandidate/g)).toHaveLength(3);
+    expect(resumeRoutes.match(/requireVerifiedCandidate/g)).toHaveLength(4);
   });
 
   it('detaches only the owner applications before deleting a resume library record', () => {
@@ -173,5 +174,23 @@ describe('candidate resume library contracts', () => {
     expect(transaction).toContain('eq(applications.resumeId, resumeId)');
     expect(transaction).toContain('eq(applications.userId, userId)');
     expect(deletion).toBeGreaterThan(detach);
+  });
+});
+
+describe('default résumé', () => {
+  it('upload and make-default go through the locked default-résumé module, owner-only', () => {
+    const source = read('../../ai.routes.ts');
+    expect(source).toContain("const resume = await insertLibraryResume(db, { userId, label, gcsPath, extractedText: extractionResult.text, requestDefault: !!isDefault });");
+    const route = source.slice(source.indexOf("'/api/ai/resume/:id/default'"), source.indexOf("app.delete(\n    '/api/ai/resume/:id'"));
+    expect(route).toContain('requireVerifiedCandidate');
+    expect(route).toContain('doubleCsrfProtection');
+    expect(route).toContain('const changed = await makeLibraryResumeDefault(db, userId, resumeId);');
+    expect(route).toContain("res.status(404).json({ error: 'Resume not found' })");
+    const lib = read('../candidateResumeDefault.ts');
+    for (const fn of ['insertLibraryResume', 'makeLibraryResumeDefault']) {
+      const body = lib.slice(lib.indexOf(`export async function ${fn}`));
+      expect(body.indexOf('lockCandidateResumeDefault(tx,')).toBeGreaterThan(-1);
+      expect(body.indexOf('lockCandidateResumeDefault(tx,')).toBeLessThan(body.indexOf('.set({ isDefault: false })'));
+    }
   });
 });

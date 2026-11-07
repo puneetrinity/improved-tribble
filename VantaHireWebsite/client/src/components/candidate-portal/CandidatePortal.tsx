@@ -6,7 +6,7 @@
 // Not shown here (per the reuse map): the legacy profile form (data kept) and candidate
 // Compute fit / AI limits (retired by the D1 lock; historical data kept).
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Bookmark, BookmarkX, Briefcase, CheckCircle2, ChevronDown, ClipboardList, Clock, ExternalLink, FileText, LogOut, MapPin, Search, Shield, Trash2, UserRound, X, XCircle } from "lucide-react";
+import { Bookmark, BookmarkX, Briefcase, CheckCircle2, ChevronDown, ClipboardList, Clock, ExternalLink, FileText, Loader2, LogOut, MapPin, Search, Shield, Trash2, UserRound, X, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -24,6 +24,7 @@ import { candidateApplicationsQueryKey, candidateResumesQueryKey } from "@/hooks
 import { cn } from "@/lib/utils";
 import ealanaLogo from "@/assets/ealana_logo.svg";
 import { OfflineBanner, StillWorking } from "@/components/candidate-profile/SparkStates";
+import { DefaultResumeUpdate } from "@/components/candidate-profile/DefaultResumeUpdate";
 
 const RESUME_PROMPT_KEY = "spark.resumePromptDismissed";
 export type PortalSection = "find" | "jobs" | "profile" | "privacy";
@@ -50,6 +51,13 @@ type Props = {
   loadingMoreJobs?: boolean | undefined;
   /** spark candidates use the v2 talent-network consent; the older panel is only for legacy candidates. */
   sparkConsent?: boolean | undefined;
+  /** How a library upload is read. "spark": Spark reads it later (budgeted, on request), so the
+   * upload skips the ordinary OCR and a scan is OCR'd at most once. "checking" / "unavailable": not
+   * known yet, so uploads wait; they never fall back to the ordinary OCR path. Omitted: ordinary. */
+  resumeRouting?: "spark" | "ordinary" | "checking" | "unavailable" | undefined;
+  onRetryResumeRouting?: (() => void) | undefined;
+  /** The signed-in candidate; "Not now" on the résumé offer is remembered per account. */
+  userId?: number | undefined;
   /** The last "Show more jobs" request failed; the jobs already shown stay. */
   loadMoreFailed?: boolean | undefined;
   /** The profile page (CareerProfilePanel) and, once matching is live, recommendations. */
@@ -332,25 +340,42 @@ function Empty({ icon: Icon, title, body, action, onAction }: { icon: typeof Sea
 }
 
 /* ---------------- My profile ---------------- */
-function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openUpload }: Props & { openUpload: number }) {
+function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openUpload, resumeRouting = "ordinary", onRetryResumeRouting, userId }: Props & { openUpload: number }) {
+  const routingKnown = resumeRouting === "spark" || resumeRouting === "ordinary";
   const { resumes = [], resumesQuery } = useCandidateJobState() as any;
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  // The résumé that just became the default: offer to update the profile from it (only the default does).
+  const [offerFor, setOfferFor] = useState<{ id: number; label: string } | null>(null);
   // "Add résumé" in the reminder opens the uploader here and scrolls to it.
   useEffect(() => { if (openUpload) { setShowUpload(true); setTimeout(() => document.getElementById("resumes-title")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); } }, [openUpload]);
 
   async function upload() {
-    if (!file) return;
+    if (!file || !routingKnown) return;
     if (resumes.length >= 3) { setError("You can keep up to 3 résumés. Delete one before adding another."); return; }
     setUploading(true); setError(null);
     try {
       const form = new FormData(); form.append("resume", file); form.append("label", file.name.replace(/\.[^.]+$/, ""));
+      if (resumeRouting === "spark") form.append("readBy", "spark");
       const r = await fetchWithCsrf("/api/ai/resume", { method: "POST", body: form });
       if (!r.ok) throw new Error();
+      const saved = (await r.json().catch(() => null))?.resume;
       setFile(null); setShowUpload(false); await queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
+      // A new upload is stored only, unless it became the default (the first one does). Only a
+      // Spark-routed upload is offered for Spark reading: an ordinary upload was already OCR'd.
+      if (resumeRouting === "spark" && saved?.isDefault === true && typeof saved.id === "number") setOfferFor({ id: saved.id, label: String(saved.label ?? file.name) });
     } catch { setError("Upload failed. Please try again."); } finally { setUploading(false); }
+  }
+  async function makeDefault(r: { id: number; label: string }) {
+    setError(null);
+    try {
+      const res = await fetchWithCsrf(`/api/ai/resume/${r.id}/default`, { method: "PATCH" });
+      if (!res.ok) throw new Error();
+      await queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
+      if (resumeRouting === "spark") setOfferFor({ id: r.id, label: r.label });
+    } catch { setError("Couldn't make that your default résumé. Please try again."); }
   }
   async function remove(id: number) {
     try { await apiRequest("DELETE", `/api/ai/resume/${id}`); await queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey }); }
@@ -372,16 +397,23 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
 
       <div className="space-y-4 rounded-xl border border-border bg-card p-5" aria-labelledby="resumes-title">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div><h2 id="resumes-title" className="text-lg font-semibold">Résumés</h2><p className="text-sm text-muted-foreground">Up to 3. Used when you apply and to fill in your profile.</p></div>
+          <div><h2 id="resumes-title" className="text-lg font-semibold">Résumés</h2><p className="text-sm text-muted-foreground">Up to 3. Your default résumé is used when you apply and to update your profile.</p></div>
           {!showUpload && resumes.length < 3 && <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={() => setShowUpload(true)}>Add a résumé</Button>}
         </div>
         {showUpload && (
           <div className="space-y-3">
             <FileDropzone label="Résumé" accept=".pdf,.doc,.docx" maxSizeMB={5} value={file} onChange={setFile} />
             <div className="flex gap-2">
-              <Button type="button" className="min-h-11 cursor-pointer" disabled={!file || uploading} onClick={() => void upload()}>{uploading ? "Uploading…" : "Upload"}</Button>
+              <Button type="button" className="min-h-11 cursor-pointer" disabled={!file || uploading || !routingKnown} onClick={() => void upload()}>{uploading ? "Uploading…" : "Upload"}</Button>
               <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => { setShowUpload(false); setFile(null); setError(null); }}>Cancel</Button>
             </div>
+            {resumeRouting === "checking" && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />Checking your account before uploading…</p>}
+            {resumeRouting === "unavailable" && (
+              <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-foreground">
+                <span>We couldn't check your account just now, so uploading is paused.</span>
+                {onRetryResumeRouting && <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={onRetryResumeRouting}>Try again</Button>}
+              </div>
+            )}
           </div>
         )}
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
@@ -391,11 +423,13 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
               <li key={r.id} className="flex items-center gap-3 py-3">
                 <FileText className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
                 <div className="min-w-0 flex-1"><p className="truncate font-medium">{r.label}{r.isDefault && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Default</span>}</p><p className="text-sm text-muted-foreground">Uploaded {new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
+                {!r.isDefault && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer text-muted-foreground" onClick={() => void makeDefault(r)} aria-label={`Make ${r.label} your default résumé`}>Make default</Button>}
                 <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1.5 text-muted-foreground" onClick={() => void remove(r.id)} aria-label={`Delete ${r.label}`}><Trash2 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Delete</span></Button>
               </li>
             ))}
           </ul>
         ) : !showUpload && <p className="text-sm text-muted-foreground">No résumés yet.</p>}
+        {offerFor && userId !== undefined && <DefaultResumeUpdate key={offerFor.id} userId={userId} resumeId={offerFor.id} label={offerFor.label} onClose={() => setOfferFor(null)} />}
       </div>
     </section>
   );

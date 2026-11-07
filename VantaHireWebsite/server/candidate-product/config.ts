@@ -12,8 +12,17 @@ export const sparkEnabled = () => profileDeliveryEnabled() && consentV2DeliveryE
 // Separate source admission/worker gate; existing Spark saving never enables paid work.
 export const resumeSourceEnabled = () => sparkEnabled()
   && process.env.CANDIDATE_RESUME_SOURCE_ENABLED === 'true';
-export const lookupSourceEnabled = () => sparkEnabled()
+/** The lookup switch as configured, before checking its provider key. */
+export const lookupSourceRequested = () => sparkEnabled()
   && process.env.CANDIDATE_LOOKUP_SOURCE_ENABLED === 'true';
+/** The candidate lookup key is present and well-formed (its value is never logged). */
+export const lookupKeyConfigured = (env: NodeJS.ProcessEnv = process.env) => {
+  const key = env.CANDIDATE_RC_API_KEY;
+  return !!key && key.length <= 8192 && !/[\s\0]/.test(key);
+};
+// A missing or malformed key switches off lookup only (routes answer "not available",
+// no worker starts); it never stops Flow starting or any other processor.
+export const lookupSourceEnabled = () => lookupSourceRequested() && lookupKeyConfigured();
 export const interpretationEnabled = () => sparkEnabled()
   && process.env.CANDIDATE_INTERPRETATION_ENABLED === 'true';
 export const networkSourcingEnabled = () => sparkEnabled()
@@ -23,7 +32,9 @@ export const networkSourcingEnabled = () => sparkEnabled()
 // consent copy; provider dispatch still requires its durable budget reservation.
 export const candidateSparkSignupEnabled = (): boolean =>
   process.env.CANDIDATE_SPARK_SIGNUP_ENABLED === 'true'
-  && foundationDeliveryEnabled() && consentV2CaptureEnabled() && lookupSourceEnabled();
+  // Requested, not key-checked: a broken lookup key must not silently switch sign-up back to
+  // the old page; the wizard continues without the lookup (résumé or typed details).
+  && foundationDeliveryEnabled() && consentV2CaptureEnabled() && lookupSourceRequested();
 // No public copy has policy approval yet. Only disposable tests may capture draft intent.
 export const foundationIntentCaptureEnabled = () => foundationEnabled()
   && process.env.NODE_ENV === 'test' && process.env.CANDIDATE_FOUNDATION_DISPOSABLE_TEST === '1';

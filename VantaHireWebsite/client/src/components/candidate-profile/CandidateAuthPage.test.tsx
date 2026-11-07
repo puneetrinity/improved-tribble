@@ -53,6 +53,33 @@ async function signUp(email = "new@example.com", password = "Str0ng!pass") {
 }
 
 describe("candidate auth page", () => {
+  it("spark sign-in offers Forgot password: one neutral answer, never 'sent' when rate-limited", async () => {
+    window.location.hash = "#signin";
+    let status = 200;
+    const calls = await mount(true, { "POST /api/forgot-password": () => json(status, { message: "If an account exists with this email, a password reset link has been sent." }) });
+    await type("si-email", "someone@example.com");
+    await act(async () => { button("Forgot password?").click(); }); await flush(1);
+    expect((document.getElementById("fp-email") as HTMLInputElement).value).toBe("someone@example.com");
+    status = 429;
+    await act(async () => { button("Send reset link").click(); }); await flush();
+    expect(text()).toContain("Too many reset requests");
+    expect(text()).not.toContain("we've sent a link");
+    status = 200;
+    await act(async () => { button("Send reset link").click(); }); await flush();
+    expect(calls.filter(c => c.path === "/api/forgot-password").map(c => c.body)).toEqual([{ email: "someone@example.com" }, { email: "someone@example.com" }]);
+    expect(text()).toContain("If there's an account for someone@example.com, we've sent a link to reset your password.");
+    await act(async () => { button("Back to sign in").click(); }); await flush(1);
+    expect(document.getElementById("si-password")).not.toBeNull();
+  });
+
+  it("the old candidate page also offers Forgot password", async () => {
+    await mount(false, { "POST /api/forgot-password": () => json(200, {}) });
+    await act(async () => { button("Forgot password?").click(); }); await flush(1);
+    await type("fp-email", "someone@example.com");
+    await act(async () => { button("Send reset link").click(); }); await flush();
+    expect(text()).toContain("we've sent a link to reset your password");
+  });
+
   it("keeps the current page when spark sign-up is off", async () => {
     await mount(false);
     expect(text()).toContain("Candidate Portal");

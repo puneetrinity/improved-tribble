@@ -51,6 +51,14 @@ export default function CandidatePortalPage() {
   const live = (v: unknown) => v === "ready" || v === "active";
   const matching = live((raw as any)?.matchingState) ? "ready" : "not_ready";
   const discovery = live((raw as any)?.discoveryState) ? "ready" : "not_ready";
+  // Spark sign-ups have no account first name: greet them by the name on their profile instead.
+  const profileName = ((raw as any)?.confirmedProfile?.displayName ?? (raw as any)?.draft?.displayName ?? "") as string;
+  const greetingName = user?.firstName || profileName.trim().split(/\s+/)[0] || "there";
+  // How library uploads are read. Until the profile read settles, uploads wait: a slow or failed
+  // read must never send a Spark candidate's scan through the ordinary OCR (SF-R1b).
+  const resumeRouting = profile.data?.kind === "ready" ? ((raw as any)?.capabilities?.canRequestResume === true ? "spark" : "ordinary")
+    : profile.data?.kind === "disabled" ? "ordinary"
+    : profile.isPending || profile.isFetching ? "checking" : "unavailable";
 
   // The server searches every open job; pages load on "Show more jobs".
   const [search, setSearch] = useState("");
@@ -73,9 +81,11 @@ export default function CandidatePortalPage() {
   if (!user && hadUser.current && !signingOut.current) return <SessionEnded />;
   if (!user || user.role !== "candidate" || !user.emailVerified) return <Redirect to="/candidate-auth#signin" />;
   return (
-    <CandidatePortal firstName={user.firstName || "there"} section={section} onNavigate={go}
+    <CandidatePortal firstName={greetingName} section={section} onNavigate={go}
       discovery={discovery} matching={matching} justFinishedOnboarding={welcome}
       sparkConsent={profile.data?.kind === "ready" && !!profile.data.profile.spark}
+      resumeRouting={resumeRouting} onRetryResumeRouting={() => void profile.refetch()}
+      userId={user?.id}
       publicJobs={publicJobs} publicJobsState={jobs.isLoading ? "loading" : jobs.isError && !jobs.data ? "error" : "ready"} onRetryJobs={() => void jobs.refetch()}
       onSearchJobs={setSearch} publicJobsTotal={total} onLoadMoreJobs={jobs.hasNextPage ? () => void jobs.fetchNextPage() : undefined} loadingMoreJobs={jobs.isFetchingNextPage} loadMoreFailed={jobs.isFetchNextPageError} profile={<CareerProfilePanel />}
       onSignOut={() => { signingOut.current = true; logoutMutation.mutate(undefined, { onSettled: () => navigate("/candidate-auth#signin") }); }} />

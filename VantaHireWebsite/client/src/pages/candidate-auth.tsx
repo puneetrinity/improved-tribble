@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, isApiError } from "@/lib/queryClient";
 import { CandidateAuthShell } from "@/components/candidate-profile/CandidateAuthShell";
-import { CandidateAuthError, CandidateSignIn, CandidateSignup, CheckYourEmail } from "@/components/candidate-profile/CandidateSignup";
+import { CandidateAuthError, CandidateSignIn, CandidateSignup, CheckYourEmail, ForgotPasswordForm } from "@/components/candidate-profile/CandidateSignup";
 import { CONSENT_COPY_CURRENT, CONSENT_COPY_CURRENT_HASH } from "@/components/candidate-profile/consent-copy";
 import { candidateAuthPageCopy } from "@/lib/internal-copy";
 
@@ -24,6 +24,7 @@ function LegacyCandidateAuth() {
   const { toast } = useToast();
   const [verificationEmail, setVerificationEmail] = useState("");
   const [resendLoading, setResendLoading] = useState(false);
+  const [forgotPassword, setForgotPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     username: "",
     password: "",
@@ -164,6 +165,9 @@ function LegacyCandidateAuth() {
                       </TabsList>
 
                       <TabsContent value="login">
+                        {forgotPassword ? (
+                          <ForgotPasswordForm initialEmail={loginData.username} onBack={() => setForgotPassword(false)} />
+                        ) : (
                         <form onSubmit={handleLogin} className="space-y-4">
                           <div className="space-y-2">
                             <Label htmlFor="candidate-login-email">{candidateAuthPageCopy.card.email}</Label>
@@ -188,6 +192,8 @@ function LegacyCandidateAuth() {
                               placeholder={candidateAuthPageCopy.card.passwordPlaceholder}
                               required
                             />
+                            <button type="button" onClick={() => setForgotPassword(true)}
+                              className="min-h-11 cursor-pointer text-sm font-medium underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Forgot password?</button>
                           </div>
                           <Button
                             type="submit"
@@ -197,6 +203,7 @@ function LegacyCandidateAuth() {
                             {loginMutation.isPending ? candidateAuthPageCopy.card.signingIn : candidateAuthPageCopy.card.signIn}
                           </Button>
                         </form>
+                        )}
                       </TabsContent>
 
                       <TabsContent value="register">

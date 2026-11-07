@@ -7,6 +7,7 @@
 // the candidate goes to the dashboard instead of seeing a lookup that never ran.
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Helmet } from "react-helmet-async";
 import { Redirect, useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,9 @@ type Stage =
   | { kind: "error" } | { kind: "wizard"; profile: SparkProfileRead } | { kind: "signed_out" };
 const signedOut = (e: unknown) => e instanceof ProfileApiError && e.status === 401;
 
-export default function CandidateSetupRoute() { return <CandidateSetupPage />; }
+export default function CandidateSetupRoute() {
+  return <><Helmet><title>Set up your profile | ealana</title><meta name="robots" content="noindex, nofollow" /></Helmet><CandidateSetupPage /></>;
+}
 
 export function CandidateSetupPage({ deps = {} }: { deps?: SetupDeps }) {
   const { user } = useAuth();
@@ -77,9 +80,13 @@ function Setup({ firstName, deps }: { firstName: string; deps: SetupDeps }) {
     if (loaded.profile.profileVersion > 0 || loaded.profile.pendingCommands?.length) return navigate("/my-dashboard");
     latestDraft.current = loaded.profile.draft;
     setStage({ kind: "wizard", profile: loaded.profile });
+    // The lookup is paid: it starts when the candidate presses "Let's start" (onStart), never on load.
+  }
+  const lookupStarted = useRef(false);
+  function startLookup(p: SparkProfileRead) {
     // Returning with a profile already in the draft: nothing to look up again.
-    if (loaded.profile.draft && hasProfileContent(loaded.profile.draft)) return;
-    void runFirstLookup(loaded.profile);
+    if (lookupStarted.current || (p.draft && hasProfileContent(p.draft))) return;
+    lookupStarted.current = true; void runFirstLookup(p);
   }
 
   /** The first lookup. A genuine miss is "none"; an unsettled outcome or a failure is its own state,
@@ -92,8 +99,8 @@ function Setup({ firstName, deps }: { firstName: string; deps: SetupDeps }) {
       if (o.kind === "not_found") { setLinkedinAllowed(o.canRequestLinkedin); setImported("none"); return; }
       setImported("none"); setLookupIssue({ kind: "unconfirmed" });
     } catch (e) {
-      // The lookup isn't switched on: go to the dashboard rather than show a lookup that never runs.
-      if (e instanceof ProfileApiError && e.status === 404) return navigate("/my-dashboard");
+      // The lookup isn't switched on: carry on without it (résumé or typed details), never a lookup that never runs.
+      if (e instanceof ProfileApiError && e.status === 404) { setLinkedinAllowed(false); setImported("none"); setLookupIssue({ kind: "unconfirmed" }); return; }
       if (signedOut(e)) return setStage({ kind: "signed_out" });
       setImported("none"); setLookupIssue({ kind: "failed", retry: () => void runFirstLookup(p) });
     }
@@ -195,7 +202,7 @@ function Setup({ firstName, deps }: { firstName: string; deps: SetupDeps }) {
         }}
         acceptLookup={async () => { const p = await lookup.accept(); latestDraft.current = p; return p; }} rejectLookup={lookup.reject}
         serverVersions={() => { const sv = session.versions(); return { profile: String(sv.draftVersion), preferences: String(sv.preferenceDraftRevision) }; }}
-        lookupIssue={lookupIssue} linkedinAllowed={linkedinAllowed} profileUrl="/my-dashboard#profile"
+        lookupIssue={lookupIssue} linkedinAllowed={linkedinAllowed} profileUrl="/my-dashboard#profile" onStart={() => startLookup(stage.profile)}
         initialVersions={{ profile: String(v.draftVersion), preferences: String(v.preferenceDraftRevision) }}
         saved={savedFrom(stage.profile)}
         onSave={onSave}

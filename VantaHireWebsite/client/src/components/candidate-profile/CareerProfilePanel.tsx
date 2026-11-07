@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, CheckCircle2, CircleDashed, EyeOff, Lock, RefreshCw } from "lucide-react";
+import { BadgeCheck, CheckCircle2, CircleDashed, Eye, EyeOff, Lock, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,8 @@ import { DEALBREAKERS_HELP, DEALBREAKERS_TITLE, DealbreakersEditor, Dealbreakers
 
 export const PROFILE_QUERY_KEY = ["candidate-product", "profile"] as const;
 export const CONFIRM_NOTE = "Confirming saves this as your profile. Employers can't see it yet.";
+/** Shown instead when the profile is already published: confirming changes what employers see. */
+export const CONFIRM_NOTE_PUBLISHED = "Confirming updates the profile employers see.";
 export const SAVE_FIRST = "Save your changes first. Confirming uses your saved details, not unsaved edits.";
 
 type Deps = { load?: (() => Promise<ProfileLoad>) | undefined; command?: Parameters<typeof useProfileCommand>[1] | undefined;
@@ -174,7 +176,7 @@ function Ready({ profile, cmd: base, spark, refresh, syncing, resolution }: { pr
             </Badge>
           </div>
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <EyeOff className="h-4 w-4 shrink-0" aria-hidden />
+            {profile.publicationActive ? <Eye className="h-4 w-4 shrink-0" aria-hidden /> : <EyeOff className="h-4 w-4 shrink-0" aria-hidden />}
             {profile.publicationActive ? "Visible to employers in the ealana network." : needsReconfirm(profile) ? RECONFIRM_NOTE : "Only you can see this. Employers can't see your profile yet."}
           </p>
         </div>
@@ -186,7 +188,7 @@ function Ready({ profile, cmd: base, spark, refresh, syncing, resolution }: { pr
               : cmd.run(body("confirm", { draftHash: profile.draftHash, consentVersion: profile.confirmedConsentVersion ?? 0 })))}>
             <BadgeCheck className="mr-2 h-4 w-4" aria-hidden />{confirmed ? "Confirm changes" : "Confirm profile"}
           </Button>
-          <p id="confirm-note" className="text-xs text-muted-foreground md:text-right">{CONFIRM_NOTE}</p>
+          <p id="confirm-note" className="text-xs text-muted-foreground md:text-right">{profile.publicationActive ? CONFIRM_NOTE_PUBLISHED : CONFIRM_NOTE}</p>
           {blocked && <p id="confirm-blocked" className="text-xs text-muted-foreground md:text-right">{CAPABILITY_COPY[caps.confirmBlockedReason!] ?? CAPABILITY_COPY.feature_unavailable}</p>}
           {canConfirm && unsaved && <p id="confirm-unsaved" className="text-xs text-muted-foreground md:text-right">{SAVE_FIRST}</p>}
         </div>

@@ -96,7 +96,56 @@ export function CandidateSignup({ onCreate, onDeclined, signInUrl, privacyUrl, t
 }
 
 /** Returning candidates: email and password. An unverified email goes to Check your email. */
-export function CandidateSignIn({ onSignIn, signUpUrl }: { onSignIn: (email: string, password: string) => Promise<void>; signUpUrl: string }) {
+export type ResetRequest = "sent" | "too_many" | "failed";
+/** Asks the server to email a reset link. The server answers the same way whether or not the
+ * account exists; only "too many requests" is told apart, and never shown as sent. */
+export async function requestPasswordReset(email: string): Promise<ResetRequest> {
+  try {
+    const r = await fetch("/api/forgot-password", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ email }) });
+    return r.ok ? "sent" : r.status === 429 ? "too_many" : "failed";
+  } catch { return "failed"; }
+}
+
+/** Forgot password: one email field, then the same neutral answer for every address. */
+export function ForgotPasswordForm({ initialEmail = "", onRequest = requestPasswordReset, onBack }: { initialEmail?: string | undefined; onRequest?: ((email: string) => Promise<ResetRequest>) | undefined; onBack: () => void }) {
+  const [email, setEmail] = useState(initialEmail); const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<"idle" | "sending" | ResetRequest>("idle");
+  async function submit() {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setError("Enter your email address, like name@example.com"); return; }
+    setError(null); setState("sending"); setState(await onRequest(email.trim()));
+  }
+  if (state === "sent") return (
+    <section className="space-y-4" aria-live="polite">
+      <h2 className="text-xl font-semibold text-foreground">Check your email</h2>
+      <p className="text-sm text-muted-foreground">If there's an account for <span className="font-medium text-foreground">{email.trim()}</span>, we've sent a link to reset your password. It works for one hour.</p>
+      <Button type="button" variant="outline" className="min-h-11 w-full cursor-pointer" onClick={onBack}>Back to sign in</Button>
+    </section>
+  );
+  return (
+    <form className="space-y-4" noValidate onSubmit={e => { e.preventDefault(); void submit(); }} aria-label="Reset your password">
+      <div className="space-y-1">
+        <h2 className="text-xl font-semibold text-foreground">Reset your password</h2>
+        <p className="text-sm text-muted-foreground">Enter the email you signed up with and we'll send you a link to choose a new password.</p>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="fp-email">Email</Label>
+        <Input id="fp-email" type="email" autoComplete="email" inputMode="email" className="min-h-11 text-base" value={email}
+          aria-invalid={!!error} aria-describedby={error ? "fp-email-err" : undefined} onChange={e => { setEmail(e.target.value); setError(null); }} />
+        {error && <p id="fp-email-err" role="alert" className="text-sm text-destructive">{error}</p>}
+      </div>
+      {state === "too_many" && <p role="alert" className="text-sm text-destructive">Too many reset requests. Please wait a few minutes and try again.</p>}
+      {state === "failed" && <p role="alert" className="text-sm text-destructive">We couldn't send the reset link. Please try again.</p>}
+      <Button type="submit" className="min-h-11 w-full cursor-pointer" disabled={state === "sending"}>
+        {state === "sending" ? <><Loader2 className="mr-2 h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />Sending…</> : "Send reset link"}
+      </Button>
+      <Button type="button" variant="ghost" className="min-h-11 w-full cursor-pointer" onClick={onBack}>Back to sign in</Button>
+    </form>
+  );
+}
+
+export function CandidateSignIn({ onSignIn, signUpUrl, onRequestReset }: { onSignIn: (email: string, password: string) => Promise<void>; signUpUrl: string;
+  onRequestReset?: ((email: string) => Promise<ResetRequest>) | undefined }) {
+  const [forgot, setForgot] = useState(false);
   const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [show, setShow] = useState(false);
   const [errors, setErrors] = useState<{ email?: string | undefined; password?: string | undefined }>({});
   const [busy, setBusy] = useState(false); const [failed, setFailed] = useState<string | null>(null);
@@ -110,6 +159,11 @@ export function CandidateSignIn({ onSignIn, signUpUrl }: { onSignIn: (email: str
     catch (err) { setFailed(err instanceof CandidateAuthError ? err.message : "We couldn't sign you in. Please try again."); }
     finally { setBusy(false); }
   }
+  if (forgot) return (
+    <section className="mx-auto w-full max-w-md">
+      <ForgotPasswordForm initialEmail={email} onRequest={onRequestReset} onBack={() => setForgot(false)} />
+    </section>
+  );
   return (
     <section className="mx-auto w-full max-w-md space-y-6">
       <div className="space-y-2">
@@ -134,6 +188,8 @@ export function CandidateSignIn({ onSignIn, signUpUrl }: { onSignIn: (email: str
             </button>
           </div>
           {errors.password && <p id="si-pw-err" role="alert" className="text-sm text-destructive">{errors.password}</p>}
+          <button type="button" onClick={() => setForgot(true)}
+            className="min-h-11 cursor-pointer text-sm font-medium text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Forgot password?</button>
         </div>
         {failed && <p role="alert" className="text-sm text-destructive">{failed}</p>}
         <Button type="submit" className="min-h-11 w-full cursor-pointer" disabled={busy}>

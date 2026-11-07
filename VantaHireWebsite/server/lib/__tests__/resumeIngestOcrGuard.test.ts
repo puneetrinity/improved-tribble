@@ -48,6 +48,8 @@ const mutations: Array<[string, string, string, string]> = [
   ['candidate writer call', 'server/ai.routes.ts', 'await extractResumeForOrdinaryIngest(file.buffer', 'await Promise.resolve(file.buffer'],
   ['candidate 503', 'server/ai.routes.ts', "code: 'RESUME_EXTRACTION_UNAVAILABLE'", "code: 'INVALID_RESUME'"],
   ['candidate upload ordering', 'server/ai.routes.ts', '// Extract text before upload.', 'const gcsPath = await uploadToGCS(file.buffer, file.originalname); // Extract text before upload.'],
+  // Codex round-2 probe: an early insert before extraction, with the later valid insert kept.
+  ['candidate early insert', 'server/ai.routes.ts', '// Extract text before upload.', 'await db.insert(candidateResumes).values({ userId }); // Extract text before upload.'],
   ['AI on-demand reader', 'server/ai.routes.ts', 'const buffer = await downloadFromGCS(application.resumeUrl);', 'const buffer = Buffer.alloc(0);'],
   ['legacy bulk client', 'server/lib/googleVisionOcrClient.ts', 'files:asyncBatchAnnotate', 'files:annotate'],
   ['legacy bulk helper', 'server/lib/resumeImportExtraction.ts', 'extractTextWithGoogleVisionOcr', 'extractTextWithGoogleVisionIngestOcr'],

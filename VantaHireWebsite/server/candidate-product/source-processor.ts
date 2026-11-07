@@ -67,7 +67,13 @@ export async function runLookupAttempt(attemptId:string,deps:LookupWorkerDepende
  }
  let result:LookupResult;
  try{result=await deps.lookup(grant.operation);}
- catch(error){await deps.hold(grant,'dispatch_uncertain',error instanceof LookupError?error.observedCredits:null);return 'held';}
+ catch(error){
+  // Fixed metadata only (code, HTTP status, credits): never the request, response, email or key.
+  console.warn('[candidate-lookup] held',{kind:grant.operation.kind,
+   code:error instanceof LookupError?error.code:'unexpected',
+   httpStatus:error instanceof LookupError?error.httpStatus:null,
+   observedCredits:error instanceof LookupError?error.observedCredits:null});
+  await deps.hold(grant,'dispatch_uncertain',error instanceof LookupError?error.observedCredits:null);return 'held';}
  try{await deps.settle(grant,result);return 'settled';}
  catch{await deps.hold(grant,'settlement_uncertain',result.creditsConsumed);return 'held';}
 }

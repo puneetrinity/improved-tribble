@@ -816,7 +816,8 @@ export function setupAuth(app: Express) {
       const emailService = await getEmailService();
       if (emailService) {
         const baseUrl = getPublicBaseUrl();
-        const resetUrl = `${baseUrl}/reset-password/${token}`;
+        // Candidates go back to the candidate sign-in after resetting; everyone else to the recruiter one.
+        const resetUrl = `${baseUrl}/reset-password/${token}${user.role === 'candidate' ? '?for=candidate' : ''}`;
         const name = user.firstName || 'there';
 
         await emailService.sendEmail({
