@@ -29,6 +29,8 @@ export default {
         // spark (candidate product) brand colour, alongside discover #4B8EF0, memory #34D17A, flow #F5C842.
         // DEFAULT: logo, icons, progress, large text (3.3:1 on white). ink: small text (5.2:1). soft: tinted backgrounds.
         spark: { DEFAULT: "#F25C2E", ink: "#C2410C", soft: "#FEF0EA" },
+        // Tetris loader pieces (Tailwind 3 equivalent of the component's @theme colours).
+        tetris: { 1: "var(--tetris-1)", 2: "var(--tetris-2)", 3: "var(--tetris-3)", 4: "var(--tetris-4)", 5: "var(--tetris-5)", 6: "var(--tetris-6)", 7: "var(--tetris-7)" },
         "e-text": "#F4F5FA",
         "e-text2": "#8891AA",
         "e-text3": "#3D4460",

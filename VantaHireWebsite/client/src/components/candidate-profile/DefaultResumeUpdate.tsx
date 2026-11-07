@@ -1,8 +1,9 @@
 // My profile: when a résumé becomes the default, offer to update the profile from it.
 // Only the default résumé ever updates the profile. Nothing is read until the candidate asks,
 // and nothing changes until they accept what we found (the same review as the wizard).
+import { TetrisOrb } from "@/components/ui/tetris-orb";
 import { useEffect, useRef, useState } from "react";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { queryClient } from "@/lib/queryClient";
 import { createSparkSession, loadSparkProfile, type SparkProfileRead } from "@/lib/candidate-profile-api";
@@ -91,7 +92,7 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
           </p>
         </div>
       </div>
-      {stage.kind === "reading" && <p className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />This can take a minute.</p>}
+      {stage.kind === "reading" && <p className="flex items-center gap-2 text-sm text-muted-foreground"><TetrisOrb label="Reading your résumé" decorative />This can take a minute.</p>}
       {(stage.kind === "review" || stage.kind === "saving" || stage.kind === "save_failed") && (
         // Locked while a save is in flight or unresolved, so the screen always shows what was submitted.
         <fieldset disabled={stage.kind !== "review"} className="min-w-0 disabled:opacity-80">

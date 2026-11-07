@@ -3,6 +3,7 @@
 // the candidate taps "Use this". Unclear text gets one clarifying question; anything outside the
 // allowed fields gets "can't help" and the candidate edits directly. Candidate text is data, not
 // instructions. In the prototype `interpret` is simulated; the real one is a Codex backend call.
+import Orb from "@/components/ui/orb";
 import { exclusionEffects } from "@shared/candidate-spark-v3";
 import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Check, Loader2, Pencil, Plus, Sparkles, X } from "lucide-react";
@@ -127,7 +128,7 @@ export function SparkAssist({ useCase, label, placeholder, hint, context, interp
           <Label htmlFor={id} className="flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5 text-spark" aria-hidden />{label}</Label>
           <Textarea ref={boxRef} id={id} value={text} onChange={e => { setText(e.target.value); setError(null); }} placeholder={placeholder} rows={3} maxLength={1000} style={{ overflow: "hidden", resize: "none" }}
             autoFocus={autoFocus} aria-describedby={`${id}-hint`} aria-invalid={!!error} className="text-base" />
-          {suggestion === "loading" && <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status"><Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />Finding ideas in your profile…</p>}
+          {suggestion === "loading" && <p className="flex items-center gap-2 text-xs text-muted-foreground" role="status"><span aria-hidden className="inline-flex shrink-0"><Orb variant="pulse" size={14} color="#F25C2E" /></span>Finding ideas in your profile…</p>}
           {suggestion && suggestion !== "loading" && suggestion.items.some(i => !used.includes(i.text)) && (
             <div className="space-y-1.5">
               <p className="text-xs text-muted-foreground">Ideas from {FROM[suggestion.source]}. Tap to add, then edit:</p>

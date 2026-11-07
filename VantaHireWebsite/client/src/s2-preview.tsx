@@ -14,6 +14,11 @@ import { OnboardingWizard, type ImportedProfile, type ResumeExtraction, type Sav
 import { searchCompanies, simulateSpark } from "./s2-preview-spark";
 import { Button } from "@/components/ui/button";
 import { CandidateSignup, CheckYourEmail } from "@/components/candidate-profile/CandidateSignup";
+import { SaveStatus } from "@/components/candidate-profile/SaveStatus";
+import { ResumeReadStatus } from "@/components/candidate-profile/SourceReview";
+import { FindingJobs } from "@/components/candidate-profile/FindingJobs";
+import { TetrisOrb } from "@/components/ui/tetris-orb";
+import Orb from "@/components/ui/orb";
 import { CandidatePortal, type PortalSection } from "@/components/candidate-portal/CandidatePortal";
 import { AuthProvider } from "@/hooks/use-auth";
 import { queryClient as appQueryClient } from "@/lib/queryClient";
@@ -260,6 +265,30 @@ function PortalPreview({ initial = (qs.get("section") as PortalSection) ?? (MATC
     </AuthProvider>
   );
 }
+/** Every motion element in its real component, for review. */
+function MotionPreview() {
+  const box = "space-y-3 rounded-xl border border-border bg-card p-5";
+  const h = "text-xs font-medium uppercase tracking-wide text-muted-foreground";
+  return (
+    <div className="space-y-6">
+      <FindingJobs state={{ kind: "searching", step: 2 }} onViewJobs={() => undefined} onRetry={() => undefined} onEditPreferences={() => undefined} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className={box}><p className={h}>Wizard · lookup (Tetris orb)</p>
+          <p className="flex items-center gap-2 text-sm"><TetrisOrb label="Finding your professional profile" decorative />Finding your professional profile</p></div>
+        <div className={box}><p className={h}>Résumé reading (Tetris orb)</p><ResumeReadStatus read={{ kind: "reading" } as any} fileName="Priya_CV.pdf" onRetry={() => undefined} onContinue={() => undefined} /></div>
+        <div className={box}><p className={h}>Saving (Orb)</p><SaveStatus state={{ kind: "sending" }} /></div>
+        <div className={box}><p className={h}>Privacy &amp; Data · applying (Orb sweep)</p>
+          <p className="flex items-center gap-2 text-sm"><span aria-hidden className="inline-flex"><Orb variant="sweep" size={18} color="#F25C2E" /></span>Your choice is saved and being applied.</p></div>
+        <div className={box}><p className={h}>Profile visible (Orb globe)</p>
+          <p className="flex items-center gap-1.5 text-sm text-muted-foreground"><span aria-hidden className="inline-flex"><Orb variant="globe" size={16} color="#F25C2E" /></span>Visible to employers in the ealana network.</p></div>
+        <div className={box}><p className={h}>My jobs · empty (still board)</p>
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border p-6 text-center"><TetrisOrb label="No saved jobs" decorative still cell={6} className="rounded-xl bg-spark-soft p-3" /><p className="font-medium">No saved jobs</p></div></div>
+      </div>
+      <CheckYourEmail email="priya@example.com" onResend={() => new Promise(r => setTimeout(r, 600))} onChangeEmail={() => undefined} />
+    </div>
+  );
+}
+
 function ConsentPreview() {
   const [choice, setChoice] = useState<string | null>(null);
   if (choice) return <pre className="mx-auto max-w-xl whitespace-pre-wrap rounded-lg border border-border bg-card p-4 text-xs">{choice}</pre>;
@@ -268,7 +297,7 @@ function ConsentPreview() {
 const view = new URLSearchParams(location.search).get("view") ?? "profile";
 const scenarios = ["draft", "ready", "confirmed", "held", "stuck", "restricted", "unavailable"];
 const LINKS: [string, string][] = [["?view=journey", "full journey (matching live)"], ["?view=journey&matching=off", "full journey (launch day, no matching)"], ["?view=portal&welcome=1", "portal (just onboarded)"], ["?view=portal&section=jobs", "portal: my jobs"], ["?view=portal&matching=ready&discovery=ready", "portal (matching live)"],
-  ["?view=consent", "consent"], ["?view=wizard", "setup wizard"], ["?view=jobs", "jobs"], ["?state=draft", "profile states"]];
+  ["?view=consent", "consent"], ["?view=wizard", "setup wizard"], ["?view=jobs", "jobs"], ["?state=draft", "profile states"], ["?view=motion", "motion (all spots)"]];
 function PreviewBar() {
   return (
     <nav aria-label="Preview scenarios" className="border-t border-dashed border-border bg-amber-50 px-4 py-3 text-sm text-amber-950">
@@ -395,7 +424,7 @@ function BrandSheet() {
 createRoot(document.getElementById("root")!).render(
   <QueryClientProvider client={appQueryClient}>
     {view === "portal" ? <PortalPreview /> : view === "journey" ? <JourneyOrPortal /> : (
-      <Framed>{view === "brand" ? <BrandSheet /> : view === "consent" ? <ConsentPreview /> : view === "jobs" ? <JobsPreview /> : view === "wizard" ? <WizardPreview /> : <CareerProfilePanel deps={{ load }} />}</Framed>
+      <Framed>{view === "brand" ? <BrandSheet /> : view === "consent" ? <ConsentPreview /> : view === "motion" ? <MotionPreview /> : view === "jobs" ? <JobsPreview /> : view === "wizard" ? <WizardPreview /> : <CareerProfilePanel deps={{ load }} />}</Framed>
     )}
     <PreviewBar />
   </QueryClientProvider>,
