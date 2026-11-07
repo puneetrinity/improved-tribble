@@ -2,6 +2,7 @@
 // Withdrawal never asks the candidate to accept the copy again; rejoining goes through the
 // setup page, which shows the approved consent text and needs an explicit tick.
 // Wording approved by the user on 2 Nov 2026.
+import Orb from "@/components/ui/orb";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
@@ -85,7 +86,7 @@ export function SparkConsentPanel({ fetcher, postFetcher, setupUrl = "/candidate
             </div>
           ) : state === "applying" ? (
             <div className="space-y-3">
-              <p role="status" className="text-foreground">Your choice is saved and being applied.</p>
+              <p role="status" className="flex items-center gap-2 text-foreground"><span aria-hidden className="inline-flex shrink-0"><Orb variant="sweep" size={18} color="#F25C2E" /></span>Your choice is saved and being applied.</p>
               <Button type="button" variant="outline" className="min-h-11 cursor-pointer" disabled={status.isFetching} onClick={() => void status.refetch()}>Check again</Button>
             </div>
           ) : state === "none" ? (

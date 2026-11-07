@@ -4,9 +4,10 @@
 // external jobs open the official employer site, we never apply for the candidate. Feedback is
 // recorded, but a "Not for me" alone never changes a preference: a change happens only when the
 // candidate answers the single follow-up question, and every change can be undone.
+import { TetrisOrb } from "@/components/ui/tetris-orb";
 import { useMemo, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { AlertTriangle, ArrowRight, Loader2, Sparkles, Bookmark, BookmarkCheck, Building2, Check, Clock, ExternalLink, MapPin, RotateCcw, SlidersHorizontal, ThumbsDown, Wallet, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, Sparkles, Bookmark, BookmarkCheck, Building2, Check, Clock, ExternalLink, MapPin, RotateCcw, SlidersHorizontal, ThumbsDown, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { Preferences } from "@/lib/candidate-profile-api";
@@ -227,7 +228,7 @@ export function JobMatches({ jobs: allJobs, preferences, checkedCount, onPrefere
               <Button type="button" variant="outline" className="min-h-11 w-full cursor-pointer gap-2" onClick={() => setChangingSearch(true)}><Sparkles className="h-4 w-4 text-spark" aria-hidden />Change my search</Button>
             )}
           </div>
-          {updating && <p role="status" className="flex items-center gap-2 px-1 text-sm text-foreground"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />Updating your matches…</p>}
+          {updating && <p role="status" className="flex items-center gap-2 px-1 text-sm text-foreground"><TetrisOrb label="Updating your matches" decorative />Updating your matches…</p>}
           {saved.size > 0 && <p className="flex items-center gap-2 px-1 text-sm text-muted-foreground"><BookmarkCheck className="h-4 w-4" aria-hidden />{saved.size} saved to My jobs</p>}
         </aside>
       </div>

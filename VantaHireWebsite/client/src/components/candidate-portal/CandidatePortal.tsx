@@ -5,8 +5,10 @@
 // second upload flow. See ealana-index/CANDIDATE_PORTAL_REUSE_MAP_20261028.md.
 // Not shown here (per the reuse map): the legacy profile form (data kept) and candidate
 // Compute fit / AI limits (retired by the D1 lock; historical data kept).
+import { TetrisOrb } from "@/components/ui/tetris-orb";
+import Orb from "@/components/ui/orb";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Bookmark, BookmarkX, Briefcase, CheckCircle2, ChevronDown, ClipboardList, Clock, ExternalLink, FileText, Loader2, LogOut, MapPin, Search, Shield, Trash2, UserRound, X, XCircle } from "lucide-react";
+import { Bookmark, BookmarkX, Briefcase, CheckCircle2, ChevronDown, ClipboardList, Clock, ExternalLink, FileText, LogOut, MapPin, Search, Shield, Trash2, UserRound, X, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -303,7 +305,7 @@ function MyJobs({ onBrowse }: { onBrowse: () => void }) {
           </div>
         )
       ) : (
-        savedJobs.length === 0 && !savedJobsQuery?.isLoading ? <Empty icon={Bookmark} title="No saved jobs" body="Save jobs you like to come back to them later." action="Find jobs" onAction={onBrowse} /> : (
+        savedJobs.length === 0 && !savedJobsQuery?.isLoading ? <Empty board icon={Bookmark} title="No saved jobs" body="Save jobs you like to come back to them later." action="Find jobs" onAction={onBrowse} /> : (
           <ul className="grid gap-3 md:grid-cols-2">
             {savedJobs.map((s: any) => (
               <li key={s.id} className="space-y-3 rounded-xl border border-border bg-card p-5">
@@ -329,10 +331,12 @@ function StatusPill({ status, label }: { status: string; label: string }) {
   return <span className={cn("inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium", tone)}>{label}</span>;
 }
 
-function Empty({ icon: Icon, title, body, action, onAction }: { icon: typeof Search; title: string; body: string; action: string; onAction: () => void }) {
+function Empty({ icon: Icon, title, body, action, onAction, board }: { icon: typeof Search; title: string; body: string; action: string; onAction: () => void;
+  /** Show a still, part-built Tetris board instead of the icon. */ board?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card p-10 text-center">
-      <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-muted"><Icon className="h-6 w-6 text-muted-foreground" /></span>
+      {board ? <TetrisOrb label={title} decorative still cell={6} className="rounded-xl bg-spark-soft p-3" />
+        : <span aria-hidden className="flex h-12 w-12 items-center justify-center rounded-full bg-muted"><Icon className="h-6 w-6 text-muted-foreground" /></span>}
       <p className="font-medium text-foreground">{title}</p><p className="max-w-sm text-sm text-muted-foreground">{body}</p>
       <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={onAction}>{action}</Button>
     </div>
@@ -407,7 +411,7 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
               <Button type="button" className="min-h-11 cursor-pointer" disabled={!file || uploading || !routingKnown} onClick={() => void upload()}>{uploading ? "Uploading…" : "Upload"}</Button>
               <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => { setShowUpload(false); setFile(null); setError(null); }}>Cancel</Button>
             </div>
-            {resumeRouting === "checking" && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />Checking your account before uploading…</p>}
+            {resumeRouting === "checking" && <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground"><span aria-hidden className="inline-flex shrink-0"><Orb variant="pulse" size={16} color="#F25C2E" /></span>Checking your account before uploading…</p>}
             {resumeRouting === "unavailable" && (
               <div role="status" className="flex flex-wrap items-center gap-2 text-sm text-foreground">
                 <span>We couldn't check your account just now, so uploading is paused.</span>

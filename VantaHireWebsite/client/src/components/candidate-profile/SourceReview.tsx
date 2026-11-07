@@ -3,8 +3,9 @@
 // file, enforced by the server) and a way to carry on without the résumé.
 // Nothing here starts work on render or on a status read: only a click does.
 // The suggestion list itself waits for the proposal read/accept routes (P0).
+import { TetrisOrb } from "@/components/ui/tetris-orb";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Check, FileWarning, LoaderCircle, RefreshCw } from "lucide-react";
+import { Check, FileWarning, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ImportedProfile, ResumeItem } from "./OnboardingWizard";
 import type { ManualProfile } from "@/lib/candidate-profile-api";
@@ -95,7 +96,7 @@ export function ResumeReadStatus({ read, fileName, onRetry, onContinue }: Props)
   if (read.kind === "idle") return null;
   const title = fileName ?? "Your résumé";
   if (read.kind === "reading") {
-    return <Card role="status" title={title} icon={<LoaderCircle className="h-4 w-4 animate-spin motion-reduce:animate-none text-foreground" />}
+    return <Card role="status" title={title} icon={<TetrisOrb label="Reading your résumé" decorative />}
       line={<>Reading your résumé… This can take a little while. Please keep this page open.</>} />;
   }
   if (read.kind === "ready") {

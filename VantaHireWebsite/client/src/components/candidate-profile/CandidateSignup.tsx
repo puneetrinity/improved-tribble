@@ -4,8 +4,9 @@
 // consent creates nothing and offers ealana jobs as a guest. Returning candidates sign in and
 // resume where they left off; verification, consent and paid lookups aren't repeated.
 // Prototype for the real page, which extends Flow's existing candidate-auth.tsx.
+import { TetrisLoader } from "@/components/ui/loader-tetris";
 import { useState } from "react";
-import { Eye, EyeOff, Loader2, MailCheck } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -202,13 +203,17 @@ export function CandidateSignIn({ onSignIn, signUpUrl, onRequestReset }: { onSig
 }
 
 /** After sign-up: verify the email. Nothing is looked up until this is done. */
+/** Coral shades: a quiet board while the candidate goes to their inbox. */
+const WAIT_SHADES = ["#F25C2E", "#F47A52", "#C2410C", "#F25C2E", "#E0552B", "#F68E6C", "#D9481F"] as const;
+
 export function CheckYourEmail({ email, onResend, onChangeEmail, lookupReady = false, children }: { email: string; onResend: () => Promise<void>; onChangeEmail: () => void;
   /** The profile lookup line is shown only once the lookup is really connected. */
   lookupReady?: boolean; children?: React.ReactNode }) {
   const [sent, setSent] = useState<"idle" | "sending" | "sent">("idle");
   return (
     <section className="mx-auto w-full max-w-md space-y-5 text-center">
-      <span aria-hidden className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary"><MailCheck className="h-6 w-6" /></span>
+      <span aria-hidden className="mx-auto flex w-fit rounded-xl bg-spark-soft p-3"><TetrisLoader columns={6} rows={8} cellSize={6} gap={2} speed={90} label="Waiting for you to verify" aria-hidden role={undefined}
+        colors={WAIT_SHADES} dotClassName="bg-background" flashColor="hsl(var(--foreground))" deadColor="hsl(var(--foreground) / 0.3)" /></span>
       <div className="space-y-2">
         <h1 className="text-2xl font-semibold text-foreground">Check your email</h1>
         <p className="text-base text-muted-foreground">We sent a link to <span className="font-medium text-foreground">{email}</span>. Open it to verify your email and continue.</p>

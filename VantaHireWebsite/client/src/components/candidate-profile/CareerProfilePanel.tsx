@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import Orb from "@/components/ui/orb";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BadgeCheck, CheckCircle2, CircleDashed, Eye, EyeOff, Lock, RefreshCw } from "lucide-react";
+import { BadgeCheck, CheckCircle2, CircleDashed, EyeOff, Lock, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -176,7 +177,7 @@ function Ready({ profile, cmd: base, spark, refresh, syncing, resolution }: { pr
             </Badge>
           </div>
           <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            {profile.publicationActive ? <Eye className="h-4 w-4 shrink-0" aria-hidden /> : <EyeOff className="h-4 w-4 shrink-0" aria-hidden />}
+            {profile.publicationActive ? <span aria-hidden className="orb-still inline-flex shrink-0"><Orb variant="globe" size={16} color="#F25C2E" /></span> : <EyeOff className="h-4 w-4 shrink-0" aria-hidden />}
             {profile.publicationActive ? "Visible to employers in the ealana network." : needsReconfirm(profile) ? RECONFIRM_NOTE : "Only you can see this. Employers can't see your profile yet."}
           </p>
         </div>
@@ -210,7 +211,8 @@ function Ready({ profile, cmd: base, spark, refresh, syncing, resolution }: { pr
       )}
       <PendingList commands={profile.pendingCommands ?? []} more={!!profile.hasMorePendingCommands} watch={cmd.watch} active={cmd.busy} onSettled={refresh} resolution={resolution} />
       <div aria-live="polite" className="flex flex-wrap items-center gap-3 empty:hidden">
-        <SaveStatus state={cmd.state} />
+        {/* While a sheet is open it shows this save's status itself: one status, one moving indicator. */}
+        {editing === null && <SaveStatus state={cmd.state} />}
         {cmd.unresolved && (
           <Button type="button" variant="outline" className="min-h-11 cursor-pointer" disabled={cmd.inFlight} onClick={() => void cmd.resend()}>Send again</Button>
         )}

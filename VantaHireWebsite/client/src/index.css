@@ -79,6 +79,14 @@
     --font-display: "Outfit", sans-serif;
     --font-body: "DM Sans", sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    /* Tetris loader pieces (I O T S Z J L), light theme. */
+    --tetris-1: oklch(0.609 0.111 221.7);
+    --tetris-2: oklch(0.666 0.157 58.3);
+    --tetris-3: oklch(0.541 0.247 293);
+    --tetris-4: oklch(0.627 0.17 149.2);
+    --tetris-5: oklch(0.577 0.215 27.3);
+    --tetris-6: oklch(0.546 0.215 262.9);
+    --tetris-7: oklch(0.646 0.194 41.1);
     --background: 255 0% 100%;
     --foreground: 240 10% 3.9%;
     
@@ -148,6 +156,13 @@
   }
   
   .dark {
+    --tetris-1: oklch(0.797 0.134 211.5);
+    --tetris-2: oklch(0.861 0.173 91.9);
+    --tetris-3: oklch(0.709 0.159 293.5);
+    --tetris-4: oklch(0.8 0.182 151.7);
+    --tetris-5: oklch(0.711 0.166 22.2);
+    --tetris-6: oklch(0.714 0.143 254.6);
+    --tetris-7: oklch(0.758 0.159 55.9);
     --background: 262 69% 15%;
     --foreground: 0 0% 98%;
 
@@ -726,4 +741,40 @@
 .scrollbar-hide {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Orb (Halaska Kit via 21st.dev): agent-activity indicator keyframes. */
+@keyframes halaska-orb-swell {
+  0%, 60%, 100% { transform: scale(0.4); opacity: 0.25; }
+  25% { transform: scale(1); opacity: 1; }
+}
+@keyframes halaska-orb-globe {
+  0% { transform: translate(9px, 0) scale(1); opacity: 0.9; }
+  12.5% { transform: translate(6.4px, 3.2px) scale(0.95); opacity: 0.75; }
+  25% { transform: translate(0, 4.5px) scale(0.85); opacity: 0.55; }
+  37.5% { transform: translate(-6.4px, 3.2px) scale(0.76); opacity: 0.4; }
+  50% { transform: translate(-9px, 0) scale(0.7); opacity: 0.3; }
+  62.5% { transform: translate(-6.4px, -3.2px) scale(0.76); opacity: 0.4; }
+  75% { transform: translate(0, -4.5px) scale(0.85); opacity: 0.55; }
+  87.5% { transform: translate(6.4px, -3.2px) scale(0.95); opacity: 0.75; }
+  100% { transform: translate(9px, 0) scale(1); opacity: 0.9; }
+}
+@keyframes halaska-orb-spark {
+  0%, 100% { transform: rotate(0deg) scale(1); opacity: 0.9; }
+  50% { transform: rotate(90deg) scale(0.7); opacity: 0.5; }
+}
+@keyframes halaska-star-burst {
+  0% { transform: scale(1); opacity: 0.9; }
+  60% { opacity: 0.4; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+/* A still orb: a status badge (e.g. "visible in the network") never moves, so the one moving
+   element on a screen is always the work in progress (saving, reading). */
+.orb-still [data-halaska-orb] span { animation: none !important; }
+.orb-still [data-halaska-orb] span span { opacity: 0.85 !important; transform: none !important; }
+
+/* Less motion requested: the orb stays still (dots fully visible). */
+@media (prefers-reduced-motion: reduce) {
+  [data-halaska-orb] span { animation: none !important; }
+  [data-halaska-orb] span span { opacity: 0.85 !important; transform: none !important; }
 }

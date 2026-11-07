@@ -4,6 +4,8 @@
 // fixing an imported profile, describing what they did in a role, and deal-breakers. Every AI
 // proposal is shown before it changes anything. Imported and résumé values are proposals; nothing
 // is saved until the candidate confirms at the end.
+import { TetrisOrb } from "@/components/ui/tetris-orb";
+import Orb from "@/components/ui/orb";
 import { CandidatePhoto } from "./ProfileOverview";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
@@ -625,7 +627,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
                   onRetry={id => { if (retryResume) void loadResume(() => retryResume(id)); }}
                   onContinue={() => { setResume(null); setResumeFailure(null); go(step + 1); }} />
               ) : resumeItems === null ? (
-                <ul className="space-y-3 rounded-xl border border-border bg-card p-5 text-sm"><li className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />Reading your résumé…</li></ul>
+                <p role="status" className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-sm"><TetrisOrb label="Reading your résumé" decorative />Reading your résumé…</p>
               ) : resumeItems.length === 0 ? (
                 <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">We couldn't find anything new in your résumé. You can continue.</p>
               ) : (
@@ -1007,7 +1009,7 @@ function SaveNote({ state, onRetry }: { state: "idle" | "saving" | "saved" | "fa
   );
   return (
     <p role="status" className="flex items-center gap-1.5 text-sm text-muted-foreground">
-      {state === "saving" && <><Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" aria-hidden />{slow ? STILL_WORKING : "Saving…"}</>}
+      {state === "saving" && <><span aria-hidden className="inline-flex shrink-0"><Orb variant="pulse" size={14} color="#F25C2E" /></span>{slow ? STILL_WORKING : "Saving…"}</>}
       {state === "saved" && <><Check className="h-3.5 w-3.5" aria-hidden />Saved privately</>}
     </p>
   );
@@ -1028,7 +1030,7 @@ function Question({ title, why, optional, children }: { title: string; why: stri
 function LookupProgress() {
   return (
     <ul className="space-y-3 rounded-xl border border-border bg-card p-5 text-sm">
-      <li className="flex items-center gap-2 text-foreground"><Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden />Finding your professional profile</li>
+      <li className="flex items-center gap-2 text-foreground"><TetrisOrb label="Finding your professional profile" decorative />Finding your professional profile</li>
       <li className="flex items-center gap-2 text-muted-foreground"><span className="h-4 w-4" />Reading your work history and skills</li>
       <li className="pt-1 text-xs text-muted-foreground">This can take up to 30 seconds. You can continue and come back to it.</li>
     </ul>

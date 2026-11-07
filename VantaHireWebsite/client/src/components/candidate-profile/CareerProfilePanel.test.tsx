@@ -89,6 +89,24 @@ async function until(check: () => boolean, tries = 60) { for (let i = 0; i < tri
 beforeEach(installFetch);
 afterEach(() => { if (root) act(() => root!.unmount()); root = null; host?.remove(); host = null; vi.unstubAllGlobals(); });
 
+/** Indicators that can move: busy Tetris boards and orbs that aren't held still. */
+const moving = () => document.querySelectorAll('[role="status"][aria-busy="true"], [data-halaska-orb]:not(.orb-still [data-halaska-orb])').length;
+
+describe("one moving element per screen", () => {
+  it("a published profile's globe stays still, so a save is the only thing moving", async () => {
+    route("GET", BASE, () => ({ status: 200, body: profile({ publicationActive: true, capabilities: { ...profile().capabilities, canDiscover: true } }) }));
+    route("POST", `${BASE}/commands`, () => ({ status: 202, body: { schemaVersion: 2, commandId: CMD, status: "pending" } }));
+    route("GET", `${BASE}/commands/${CMD}`, () => receipt("pending"));
+    await mount();
+    expect(text()).toContain("Visible to employers in the ealana network.");
+    expect(document.querySelector(".orb-still [data-halaska-orb]")).not.toBeNull();
+    expect(moving()).toBe(0);
+    await saveBasics();
+    await until(() => text().includes("Saving…"));
+    expect(moving()).toBe(1);
+  });
+});
+
 describe("reason catalogue", () => {
   it("matches the S2 UI contract message-for-message", () => {
     const path = "/home/ews/ealana-index/CANDIDATE_PRODUCT_S2_UI_CONTRACT.json";
