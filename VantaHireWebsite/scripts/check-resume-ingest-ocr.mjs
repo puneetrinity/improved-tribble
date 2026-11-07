@@ -43,7 +43,7 @@ const FROZEN = {
   'server/lib/resumeImportProcessor.ts': '1314be8df83e520c46c1eab5831d468f42659f3a4783a124e38c224381ad92e2',
   // P0 approved private, generation-pinned source reader; old application helpers unchanged.
   'server/gcs-storage.ts': '1e663e8e93bb1533b15635aaf6693c27fcfb20df0f8ae09c991e3881fb2d80bb',
-  'package.json': '52835160492361c90b890e2b58daede78a73154c204819335bc040b0bbe178a6',
+  'package.json': 'b964e5890f8fb073adf571201bae4b253daa9fd2fb9b83005c315e820c472cf7',
   'package-lock.json': 'b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539',
   'vitest.server.config.ts': '55c7e7f394abe4fcdf61554aa9c44fe3cc208b99b27071dde419e4396136b768',
   'server/schema-control/manifest.ts': '16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2',
@@ -254,8 +254,15 @@ export function validateResumeIngestOcrSources(files) {
   ]) requireAnchor(problems, candidateRoute, anchor, `candidate route anchor missing: ${anchor}`);
   const candidateExtractionAt = candidateRoute.indexOf('await extractResumeForOrdinaryIngest(');
   const candidateUploadAt = candidateRoute.indexOf('const gcsPath = await uploadToGCS');
-  const candidateInsertAt = candidateRoute.indexOf('.insert(candidateResumes)');
-  if (candidateExtractionAt < 0 || candidateUploadAt < candidateExtractionAt || candidateInsertAt < candidateUploadAt) {
+  // The library insert moved into the locked default-résumé module (Spark release fixes, 2026-11-07).
+  // Every insert must come after extraction and upload: an early insert must not hide behind a later valid one.
+  const candidateInserts = ['.insert(candidateResumes)', 'await insertLibraryResume('].flatMap((needle) => {
+    const found = [];
+    for (let at = candidateRoute.indexOf(needle); at >= 0; at = candidateRoute.indexOf(needle, at + 1)) found.push(at);
+    return found;
+  });
+  if (candidateExtractionAt < 0 || candidateUploadAt < candidateExtractionAt
+      || candidateInserts.length === 0 || candidateInserts.some((at) => at < candidateUploadAt)) {
     problems.push('candidate extraction/upload/insert ordering drifted.');
   }
 

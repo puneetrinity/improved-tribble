@@ -10,7 +10,7 @@ import {dirname,resolve} from 'node:path';
 // @ts-expect-error The build guard is intentionally plain ESM.
 import {checkCandidateProduct} from '../../scripts/check-candidate-product.mjs';
 import {FoundationDeliveryError} from './memory-client';
-import {candidateSparkSignupEnabled} from './config';
+import {candidateSparkSignupEnabled,lookupSourceEnabled,lookupSourceRequested} from './config';
 const raw='{"schemaVersion":1,"commandId":"11111111-1111-4111-8111-111111111111","subjectId":"22222222-2222-4222-8222-222222222222","bindingId":"33333333-3333-4333-8333-333333333333","sequence":1,"action":"ensure_subject"}';
 const fixture={valid:{raw,sha256:'a8c757f9ce898180424e867102eaee22dcc3339a99770ca89588b4cae5b2fa65'},invalid:[
  {name:'extra field',raw:raw.replace('"sequence":1','"email":"synthetic@example.invalid","sequence":1')},
@@ -38,6 +38,25 @@ describe('public Spark signup capability',()=>{
  it.each(prerequisites)('fails closed without %s',missing=>{
   prerequisites.forEach(flag=>vi.stubEnv(flag,'true'));vi.stubEnv(missing,'false');
   expect(candidateSparkSignupEnabled()).toBe(false);
+ });
+ it('a missing or malformed lookup key switches off lookup only, not sign-up',()=>{
+  prerequisites.forEach(flag=>vi.stubEnv(flag,'true'));
+  for(const key of ['','has space','x'.repeat(8193)]){
+   vi.stubEnv('CANDIDATE_RC_API_KEY',key);
+   expect(lookupSourceRequested()).toBe(true);
+   expect(lookupSourceEnabled()).toBe(false);
+   expect(candidateSparkSignupEnabled()).toBe(true);
+  }
+  vi.stubEnv('CANDIDATE_RC_API_KEY','synthetic-key');
+  expect(lookupSourceEnabled()).toBe(true);
+ });
+ it('never throws at startup for a bad lookup key, so later processors still start',()=>{
+  const source=readFileSync('server/index.ts','utf8');
+  expect(source).not.toContain("throw Error('candidate_lookup_configuration_required')");
+  const fault=source.indexOf('if(lookupSourceRequested()&&!lookupKeyConfigured()){');
+  expect(fault).toBeGreaterThan(0);
+  expect(source.indexOf('startJobScheduler();')).toBeGreaterThan(fault);
+  expect(source.slice(fault,source.indexOf('if(lookupSourceEnabled()){',fault))).toContain("sendConfigurationAlert('candidate_lookup_configuration_required')");
  });
  it('publishes only the capability and disables caching in the existing public config route',()=>{
   const source=readFileSync('server/routes.ts','utf8');

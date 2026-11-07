@@ -163,7 +163,9 @@ function cleanPerson(value:unknown):{profile:LookupPerson;dropped:boolean}{
 }
 export class LookupError extends Error {
  constructor(public readonly code:'invalid_request'|'invalid_configuration'|'deadline'|'outcome_unknown'|'invalid_response'|'credits_breach'|'identity_mismatch',
-  public readonly dispatched:boolean,public readonly observedCredits:number|null=null){super(code);}
+  public readonly dispatched:boolean,public readonly observedCredits:number|null=null,
+  /** Provider HTTP status when one was received; metadata only, never a body. */
+  public readonly httpStatus:number|null=null){super(code);}
 }
 export function parseLookupResponse(raw:string,status:number,operation:LookupOperation):LookupResult{
  let credits:number|null=null;
@@ -172,9 +174,12 @@ export function parseLookupResponse(raw:string,status:number,operation:LookupOpe
   const envelope=z.object({success:z.boolean(),error:z.unknown(),data:z.unknown(),quotas:z.object({creditsConsumed:z.number().int().nonnegative().safe()})}).parse(parseProfileJson(raw,LOOKUP_RESPONSE_BYTES));
   credits=envelope.quotas.creditsConsumed;
   if(credits>(operation.kind==='email'?2:1))throw new LookupError('credits_breach',true,credits);
-  if(status===404&&envelope.success===false&&envelope.error==='REQUEST_ERROR'&&envelope.data===null&&credits===0)
+  // ReverseContact sends the miss code as {code:'REQUEST_ERROR',...}; the bare string form is kept for compatibility.
+  const missCode=typeof envelope.error==='string'?envelope.error
+   :z.object({code:z.string()}).safeParse(envelope.error).data?.code;
+  if(status===404&&envelope.success===false&&missCode==='REQUEST_ERROR'&&envelope.data===null&&credits===0)
    return {outcome:'not_found',creditsConsumed:0,person:null,alternativeCount:0,partial:false};
-  if(status!==200||!envelope.success||envelope.error!==null)throw new LookupError('invalid_response',true,credits);
+  if(status!==200||!envelope.success||envelope.error!==null)throw new LookupError('invalid_response',true,credits,status);
   const data=operation.kind==='email'?z.object({person:z.record(z.unknown()),isFullProfile:z.boolean(),alternativePersons:z.array(z.unknown()).max(9)}).parse(envelope.data):null;
   const {profile,dropped}=cleanPerson(data?.person??envelope.data);
   if(operation.kind==='linkedin'&&profile.linkedinUrl!==operation.url)throw new LookupError('identity_mismatch',true,credits);
@@ -182,5 +187,5 @@ export function parseLookupResponse(raw:string,status:number,operation:LookupOpe
   // Do not retain other people's profiles or interpret absence as confidence.
   const partial=dropped||data?.isFullProfile===false||profile.experience===undefined||profile.education===undefined||profile.skills===undefined;
   return {outcome:alternatives?'ambiguous':partial?'partial':'matched',creditsConsumed:credits,person:profile,alternativeCount:alternatives,partial};
- }catch(e){if(e instanceof LookupError)throw e;throw new LookupError('invalid_response',true,credits);}
+ }catch(e){if(e instanceof LookupError)throw e;throw new LookupError('invalid_response',true,credits,status);}
 }

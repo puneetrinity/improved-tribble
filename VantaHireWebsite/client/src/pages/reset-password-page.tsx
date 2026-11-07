@@ -21,6 +21,9 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const token = params?.token;
+  // Candidate reset links carry ?for=candidate so they return to the candidate sign-in.
+  const signInUrl = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("for") === "candidate"
+    ? "/candidate-auth#signin" : "/recruiter-auth";
 
   // Fade-in animation on mount
   useEffect(() => {
@@ -99,7 +102,7 @@ export default function ResetPasswordPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/recruiter-auth">
+              <Link href={signInUrl}>
                 <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                   Go to Login
                 </Button>
@@ -198,7 +201,7 @@ export default function ResetPasswordPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Link href="/recruiter-auth">
+                  <Link href={signInUrl}>
                     <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                       Continue to Login
                     </Button>
@@ -224,7 +227,7 @@ export default function ResetPasswordPage() {
                   <p className="text-sm text-muted-foreground text-center">
                     The reset link may be invalid or already used.
                   </p>
-                  <Link href="/recruiter-auth">
+                  <Link href={signInUrl}>
                     <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                       Go to Login
                     </Button>
@@ -250,7 +253,7 @@ export default function ResetPasswordPage() {
                   <p className="text-sm text-muted-foreground text-center">
                     Please request a new password reset link.
                   </p>
-                  <Link href="/recruiter-auth">
+                  <Link href={signInUrl}>
                     <Button className="w-full bg-[linear-gradient(135deg,#4B8EF0_0%,#34D17A_100%)] hover:opacity-95">
                       Go to Login
                     </Button>

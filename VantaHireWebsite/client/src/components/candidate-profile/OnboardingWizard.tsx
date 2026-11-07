@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import type { ManualProfile, Preferences } from "@/lib/candidate-profile-api";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { DEFAULT_PREFERENCES } from "./PreferencesForm";
-import { EMPTY_PROFILE } from "./ProfessionalDetailsForm";
+import { EMPTY_PROFILE, ProfessionalDetailsForm } from "./ProfessionalDetailsForm";
 import { ResumeReadError, ResumeReadStatus, type ResumeRead } from "./SourceReview";
 import { ProfileOverview, dateRange, groupByEmployer, duration } from "./ProfileOverview";
 import { PreferencesSummary } from "./PreferencesSummary";
@@ -121,6 +121,9 @@ type Props = {
   serverVersions?: (() => { profile: string; preferences: string }) | undefined;
   /** The server's current draft versions, so the first confirm matches what's saved. */
   initialVersions?: { profile: string; preferences: string } | undefined;
+  /** Real mode: called once when the candidate presses "Let's start". The paid lookup starts here,
+   * never on page load, so nobody is looked up before they begin. */
+  onStart?: (() => void) | undefined;
 };
 export type Company = { id: string; name: string; domain: string | null };
 
@@ -131,8 +134,8 @@ export function normaliseLinkedin(raw: string): string | null {
 }
 
 const SECTIONS = ["About you", "What you want", "Review"] as const;
-type StepKey = "welcome" | "match" | "resume" | "resumeReview" | "impact" | "impact2" | "skills" | "roles" | "where" | "authorisation" | "pay" | "dealbreakers" | "review";
-const SECTION_OF: Record<StepKey, number> = { welcome: 0, match: 0, resume: 0, resumeReview: 0, impact: 0, impact2: 0, skills: 0, roles: 1, where: 1, authorisation: 1, pay: 1, dealbreakers: 1, review: 2 };
+type StepKey = "welcome" | "match" | "resume" | "resumeReview" | "details" | "impact" | "impact2" | "skills" | "roles" | "where" | "authorisation" | "pay" | "dealbreakers" | "review";
+const SECTION_OF: Record<StepKey, number> = { welcome: 0, match: 0, resume: 0, resumeReview: 0, details: 0, impact: 0, impact2: 0, skills: 0, roles: 1, where: 1, authorisation: 1, pay: 1, dealbreakers: 1, review: 2 };
 const ARRANGEMENTS = [["remote", "Remote"], ["hybrid", "Hybrid"], ["onsite", "On-site"]] as const;
 // Pick any that suit (several = "either"). Nothing is pre-selected: we don't assume permanent.
 const JOB_TYPES = [["permanent", "Permanent"], ["contract", "Contract"], ["gig_freelance", "Gig / freelance"]] as const;
@@ -179,12 +182,56 @@ function resumeLabel(it: ResumeItem): string {
 }
 /** Only free text is edited inline; structured items are kept or removed, then edited on the profile. */
 function editable(it: ResumeItem): string | null { return it.kind === "skill" || it.kind === "project" ? it.value : it.kind === "responsibility" ? it.text : null; }
+
+type Choice = Record<string, "keep" | "remove" | "profile" | "resume">;
+/** The résumé suggestions to keep, edit or remove. Shared by the wizard and My profile. */
+export function ResumeReviewList({ items, choice, setChoice, edits, setEdits }: { items: ResumeItem[];
+  choice: Choice; setChoice: React.Dispatch<React.SetStateAction<Choice>>;
+  edits: Record<string, string>; setEdits: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
+  return (
+    <ul className="space-y-3">
+      {items.map(it => it.kind === "conflict" ? (
+        <li key={it.id} className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-4">
+          <p className="text-sm font-medium text-foreground">{it.title} at {it.employer}: {it.field === "start" ? "start" : "end"} date doesn't match</p>
+          <p className="text-xs text-muted-foreground">From your résumé: <q className="italic">{it.evidence}</q></p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {(["profile", "resume"] as const).map(src => (
+              <button key={src} type="button" aria-pressed={choice[it.id] === src} onClick={() => setChoice(c => ({ ...c, [it.id]: src }))}
+                className={cn("min-h-11 cursor-pointer rounded-lg border p-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  choice[it.id] === src ? "border-primary bg-background ring-1 ring-primary" : "border-border bg-background hover:bg-muted")}>
+                <span className="block text-xs text-muted-foreground">{src === "profile" ? "Professional profile" : "Your résumé"}</span>
+                <span className="font-medium text-foreground">{src === "profile" ? it.profileValue : it.resumeValue}</span>
+              </button>
+            ))}
+          </div>
+        </li>
+      ) : (
+        <li key={it.id} className={cn("flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-4", choice[it.id] === "remove" && "opacity-60")}>
+          <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">{RESUME_KIND[it.kind]}</p>
+            {edits[it.id] !== undefined
+              ? <Input aria-label={`Edit ${RESUME_KIND[it.kind].toLowerCase()}`} value={edits[it.id]} onChange={e => setEdits(m => ({ ...m, [it.id]: e.target.value }))} className="mt-1 min-h-11" />
+              : <p className={cn("text-sm text-foreground", choice[it.id] === "remove" && "line-through")}>{resumeLabel(it)}</p>}
+            <p className="mt-1 text-xs text-muted-foreground">From your résumé: <q className="italic">{it.evidence}</q></p>
+          </div>
+          {choice[it.id] === "remove"
+            ? <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setChoice(c => ({ ...c, [it.id]: "keep" }))}>Keep it</Button>
+            : <div className="flex gap-1">
+                {edits[it.id] === undefined && editable(it) !== null && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setEdits(m => ({ ...m, [it.id]: editable(it)! }))}>Edit</Button>}
+                <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1" onClick={() => setChoice(c => ({ ...c, [it.id]: "remove" }))}><Trash2 className="h-4 w-4" aria-hidden />Remove</Button>
+              </div>}
+        </li>
+      ))}
+    </ul>
+  );
+}
 const yearDate = (y: string | null) => y ? { value: y, precision: (y.length === 4 ? "year" : "month") as "year" | "month" } : null;
 const sortedRows = (p: ManualProfile) => [...p.employment].sort((a, b) => (b.current ? "9999" : b.start?.value ?? "").localeCompare(a.current ? "9999" : a.start?.value ?? ""))
   .map(r => ({ id: r.id, employer: r.employer, title: r.title }));
 
 const NO_AI: Interpret = async () => ({ kind: "cannot_help", message: "This isn't available yet. You can change it directly." });
-export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, imported: firstLookup, onSave, onConfirm, consentVersion, discovery, matching, lookupByLinkedin, readResume, interpret: realInterpret, suggestRole, searchCompanies, features, acceptResume, retryResume, initialVersions, acceptLookup, rejectLookup, saved, lookupIssue, linkedinAllowed, profileUrl, serverVersions }: Props) {
+export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, imported: firstLookup, onSave, onConfirm, consentVersion, discovery, matching, lookupByLinkedin, readResume, interpret: realInterpret, suggestRole, searchCompanies, features, acceptResume, retryResume, initialVersions, acceptLookup, rejectLookup, saved, lookupIssue, linkedinAllowed, profileUrl, serverVersions, onStart }: Props) {
   const interpret = realInterpret ?? NO_AI;
   const hasAi = !!realInterpret;
   const resumeOn = features?.resume !== false, dealbreakersOn = features?.dealbreakers !== false;
@@ -219,8 +266,8 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   const [linkedinIssue, setLinkedinIssue] = useState<{ kind: "unconfirmed" | "failed"; retry?: () => void } | null>(null);
   const canRetry = !!lookupByLinkedin && retry.phase === "idle" && linkedinOk;
   const askLinkedin = canRetry && (imported === "none" || match === "no");
-  // Real mode only: an unsettled or failed lookup, or a miss with no retry left, ends here with a way
-  // to add details on the profile page (there's no manual-details step in the wizard).
+  // Real mode only: an unsettled or failed lookup, or a miss with no retry left. It never ends the
+  // wizard: the candidate continues to the résumé and details steps.
   const matchIssue: { kind: "unconfirmed" | "failed" | "final"; retry?: (() => void) | undefined } | null = !profileUrl ? null
     : linkedinIssue ?? lookupIssue ?? (imported === "none" && !askLinkedin && retry.phase !== "looking" ? { kind: "final" } : match === "no" && !askLinkedin ? { kind: "final" } : null);
   const [profile, setProfile] = useState<ManualProfile>(saved?.profile ?? EMPTY_PROFILE);
@@ -261,9 +308,11 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
     suggestRole(row, resumeVersionId ?? null).then(r => setRoleDrafts(m => ({ ...m, [row.id]: r })), () => setRoleDrafts(m => ({ ...m, [row.id]: null })));
   }, [impactRow?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const steps = useMemo<StepKey[]>(() => ([
-    ...(resuming ? [] : ["welcome" as const, "match" as const]), ...(resumeOn ? ["resume" as const] : []), ...(resume || restoredResume ? ["resumeReview" as const] : []), ...(recentRoles.length ? ["impact" as const] : []), ...(recentRoles.length > 1 ? ["impact2" as const] : []), "skills",
+    ...(resuming ? [] : ["welcome" as const, "match" as const]), ...(resumeOn ? ["resume" as const] : []), ...(resume || restoredResume ? ["resumeReview" as const] : []),
+    // No accepted lookup: the candidate types or checks their details here, so onboarding never ends at a failed lookup.
+    ...(!resuming && match !== "yes" ? ["details" as const] : []), ...(recentRoles.length ? ["impact" as const] : []), ...(recentRoles.length > 1 ? ["impact2" as const] : []), "skills",
     "roles", "where", ...(abroad.length ? ["authorisation" as const] : []), "pay", ...(dealbreakersOn ? ["dealbreakers" as const] : []), "review",
-  ]), [resume, restoredResume, recentRoles.length, abroad.length, resumeOn, dealbreakersOn, resuming]);
+  ]), [resume, restoredResume, recentRoles.length, abroad.length, resumeOn, dealbreakersOn, resuming, match]);
   useEffect(() => {
     if (!resuming || !resumeOn || !pendingResume) return;
     let live = true;
@@ -272,6 +321,9 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const step = Math.max(0, steps.indexOf(key));
   const go = (n: number) => setKey(steps[Math.max(0, Math.min(steps.length - 1, n))]!);
+  /** After the lookup is accepted the details step drops out of the list; move on from the
+   * current list without it (the index-based go() would land on the step that is disappearing). */
+  const afterAccepted = () => setKey(steps.slice(step + 1).find(k => k !== "details") ?? steps[steps.length - 1]!);
 
   // Suggestions come from the confirmed import only; they change nothing until picked.
   const roleSuggestions = useMemo(() => {
@@ -295,8 +347,8 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   }
   function acceptImport() {
     if (!found) return;
-    if (acceptLookup) return void serverStep(async () => { const p = await acceptLookup(); setProfile(p); setMatch("yes"); go(step + 1); }, acceptImport);
-    void saveProfile(found, () => { setProfile(found); setMatch("yes"); go(step + 1); });
+    if (acceptLookup) return void serverStep(async () => { const p = await acceptLookup(); setProfile(p); setMatch("yes"); afterAccepted(); }, acceptImport);
+    void saveProfile(found, () => { setProfile(found); setMatch("yes"); afterAccepted(); });
   }
   function rejectImport() {
     const local = () => { setProfile({ ...EMPTY_PROFILE }); setMatch("no"); setCorrecting(false); if (!canRetry) go(step + 1); };
@@ -435,6 +487,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   async function continueFrom(k: StepKey) {
     const mark = (f: PrefField[]) => { const a = [...new Set([...answered, ...f])]; setAnswered(a); return a; };
     const next = () => go(step + 1);
+    if (k === "welcome") { onStart?.(); return next(); }
     if (k === "resumeReview" && resumeVersionId && acceptResume) {
       // The server applies the review to the private draft; we show what it saved.
       setSaving("saving");
@@ -463,13 +516,13 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
     next();
   }
   const canContinue: Record<StepKey, boolean> = {
-    welcome: true, match: imported !== null && !correcting && !matchIssue, resume: true, resumeReview: resumeItems !== null && (resumeItems.every(i => i.kind !== "conflict" || resumeChoice[i.id])),
+    welcome: true, details: true, match: imported !== null && !correcting, resume: true, resumeReview: resumeItems !== null && (resumeItems.every(i => i.kind !== "conflict" || resumeChoice[i.id])),
     impact: true, impact2: true, skills: profile.skills.length > 0, roles: prefs.desiredRoles.length > 0, where: prefs.workArrangements.length > 0 && prefs.employmentTypes.length > 0,
     authorisation: abroad.every(c => auth[c]), pay: payOpen || !!pay.min, dealbreakers: !pending, review: true,
   };
   const nextKey = steps[step + 1];
   const NEXT_LABEL: Partial<Record<StepKey, string>> = { roles: "the roles you want", where: "where you'll work", authorisation: "working abroad", pay: "pay", dealbreakers: "deal-breakers", review: "review" };
-  const next = key === "welcome" ? "Let's start" : key === "review" ? "Confirm profile" : key === "match" && askLinkedin ? "Skip, I'll add my details"
+  const next = key === "welcome" ? "Let's start" : key === "review" ? "Confirm profile" : key === "match" && (askLinkedin || matchIssue) ? "Skip, I'll add my details"
     : key === "dealbreakers" ? (notes.length || exclusions.length ? "Review my profile" : "Skip, review my profile")
     : key === "impact" || key === "impact2" ? "Continue" : nextKey && NEXT_LABEL[nextKey] ? `Next: ${NEXT_LABEL[nextKey]}` : "Continue";
 
@@ -494,14 +547,12 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
           )}
 
           {key === "match" && matchIssue && (
-            <Question title={matchIssue.kind === "unconfirmed" ? "We couldn't confirm the lookup outcome." : matchIssue.kind === "failed" ? "We couldn't check your professional profile" : "We couldn't find your profile"}
-              why={matchIssue.kind === "failed" ? "Please try again." : "You can add your details yourself on your profile page."}>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                {matchIssue.kind === "failed" && matchIssue.retry && <Button type="button" className="min-h-11 cursor-pointer" onClick={matchIssue.retry}>Try again</Button>}
-                <Button asChild variant={matchIssue.kind === "failed" ? "outline" : "default"} className="min-h-11 cursor-pointer">
-                  <a href={profileUrl}>{matchIssue.kind === "failed" ? "Add my details myself" : "Go to my profile"}</a>
-                </Button>
-              </div>
+            <Question title={matchIssue.kind === "final" ? "We couldn't find your profile" : "We couldn't check your professional profile"}
+              why={matchIssue.kind === "failed" ? "You can try again, or add your details yourself in the next steps."
+                : "No problem. Add your details yourself in the next steps, or upload a résumé and we'll read it for you."}>
+              {matchIssue.kind === "failed" && matchIssue.retry && (
+                <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={matchIssue.retry}>Try again</Button>
+              )}
             </Question>
           )}
           {key === "match" && !matchIssue && (
@@ -525,11 +576,11 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
                         onApply={pr => { if (isStale(pr, "profile")) return STALE;
                           if (acceptCorrection && pr.server) {
                             // Try again re-sends the same acceptance (the key is fixed per proposal).
-                            const run = (): void => void serverStep(async () => { const p = await acceptCorrection(pr); setProfile(p); setMatch("yes"); setCorrecting(false); go(step + 1); }, run);
+                            const run = (): void => void serverStep(async () => { const p = await acceptCorrection(pr); setProfile(p); setMatch("yes"); setCorrecting(false); afterAccepted(); }, run);
                             run(); return undefined;
                           }
                           const p = applyProfileOps(found, pr.ops);
-                          void persist([{ kind: "profile_draft", baseVersion: pr.baseVersion, profile: p }], () => { setProfile(p); setMatch("yes"); setCorrecting(false); go(step + 1); }); return undefined; }} />
+                          void persist([{ kind: "profile_draft", baseVersion: pr.baseVersion, profile: p }], () => { setProfile(p); setMatch("yes"); setCorrecting(false); afterAccepted(); }); return undefined; }} />
                       <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setCorrecting(false)}>Back to the profile</Button>
                     </>
                   ) : (
@@ -578,45 +629,18 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
               ) : resumeItems.length === 0 ? (
                 <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">We couldn't find anything new in your résumé. You can continue.</p>
               ) : (
-                <ul className="space-y-3">
-                  {resumeItems.map(it => it.kind === "conflict" ? (
-                    <li key={it.id} className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/60 p-4">
-                      <p className="text-sm font-medium text-foreground">{it.title} at {it.employer}: {it.field === "start" ? "start" : "end"} date doesn't match</p>
-                      <p className="text-xs text-muted-foreground">From your résumé: <q className="italic">{it.evidence}</q></p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {(["profile", "resume"] as const).map(src => (
-                          <button key={src} type="button" aria-pressed={resumeChoice[it.id] === src} onClick={() => setResumeChoice(c => ({ ...c, [it.id]: src }))}
-                            className={cn("min-h-11 cursor-pointer rounded-lg border p-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                              resumeChoice[it.id] === src ? "border-primary bg-background ring-1 ring-primary" : "border-border bg-background hover:bg-muted")}>
-                            <span className="block text-xs text-muted-foreground">{src === "profile" ? "Professional profile" : "Your résumé"}</span>
-                            <span className="font-medium text-foreground">{src === "profile" ? it.profileValue : it.resumeValue}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </li>
-                  ) : (
-                    <li key={it.id} className={cn("flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-4", resumeChoice[it.id] === "remove" && "opacity-60")}>
-                      <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs uppercase tracking-wide text-muted-foreground">{RESUME_KIND[it.kind]}</p>
-                        {resumeEdits[it.id] !== undefined
-                          ? <Input aria-label={`Edit ${RESUME_KIND[it.kind].toLowerCase()}`} value={resumeEdits[it.id]} onChange={e => setResumeEdits(m => ({ ...m, [it.id]: e.target.value }))} className="mt-1 min-h-11" />
-                          : <p className={cn("text-sm text-foreground", resumeChoice[it.id] === "remove" && "line-through")}>{resumeLabel(it)}</p>}
-                        <p className="mt-1 text-xs text-muted-foreground">From your résumé: <q className="italic">{it.evidence}</q></p>
-                      </div>
-                      {resumeChoice[it.id] === "remove"
-                        ? <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setResumeChoice(c => ({ ...c, [it.id]: "keep" }))}>Keep it</Button>
-                        : <div className="flex gap-1">
-                            {resumeEdits[it.id] === undefined && editable(it) !== null && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setResumeEdits(m => ({ ...m, [it.id]: editable(it)! }))}>Edit</Button>}
-                            <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1" onClick={() => setResumeChoice(c => ({ ...c, [it.id]: "remove" }))}><Trash2 className="h-4 w-4" aria-hidden />Remove</Button>
-                          </div>}
-                    </li>
-                  ))}
-                </ul>
+                <ResumeReviewList items={resumeItems} choice={resumeChoice} setChoice={setResumeChoice} edits={resumeEdits} setEdits={setResumeEdits} />
               )}
             </Question>
           )}
 
+          {key === "details" && (
+            <Question title={hasProfileContent(profile) ? "Check your details" : "Add your details"}
+              why="This is what recruiters see once you confirm. Add your name, headline, location, skills and the roles you've had.">
+              <ProfessionalDetailsForm key={`details-${versions.profile}`} initial={profile} disabled={locked} busy={saving === "saving"}
+                onSave={p => void saveProfile(p, () => { setProfile(p); go(step + 1); })} />
+            </Question>
+          )}
           {(key === "impact" || key === "impact2") && (() => {
             // One role per screen: the latest role at each of their two most recent employers.
             const r = recentRoles[key === "impact" ? 0 : 1];
@@ -827,7 +851,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
               <SaveNote state={saving} onRetry={() => void retrySave()} />
               {key === "resume" && !resume && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" disabled={locked} onClick={() => go(step + 1)}>Skip for now</Button>}
               {(key === "impact" || key === "impact2") && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" disabled={locked} onClick={() => go(step + 1)}>Skip</Button>}
-              {key !== "match" || !(found && match !== "no") ? (
+              {key !== "details" && (key !== "match" || !(found && match !== "no")) ? (
                 <Button type="button" variant={key === "match" && askLinkedin ? "ghost" : "default"} className="min-h-11 cursor-pointer gap-1.5" disabled={!canContinue[key] || locked}
                   onClick={() => void continueFrom(key)}>
                   {next}{key !== "review" && !(key === "match" && askLinkedin) && <ArrowRight className="h-4 w-4" aria-hidden />}

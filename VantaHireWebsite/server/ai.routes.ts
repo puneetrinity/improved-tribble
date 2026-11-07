@@ -16,6 +16,7 @@ import rateLimit from 'express-rate-limit';
 import { db } from './db';
 import { candidateResumes, applications, jobs, users, BatchFitResult } from '../shared/schema';
 import { eq, and, inArray, sql, desc, count } from 'drizzle-orm';
+import { insertLibraryResume, makeLibraryResumeDefault } from './lib/candidateResumeDefault';
 import { upload, uploadToGCS, downloadFromGCS } from './gcs-storage';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
 import { extractResumeForOrdinaryIngest, checkResumeForSparkReading } from './lib/resumeIngestExtraction';
@@ -450,29 +451,14 @@ export function registerAIRoutes(app: Express): void {
         );
         const gcsPath = await uploadToGCS(file.buffer, file.originalname);
 
-        // If this is set as default, unset other defaults
-        if (isDefault) {
-          await db
-            .update(candidateResumes)
-            .set({ isDefault: false })
-            .where(eq(candidateResumes.userId, userId));
-        }
-
         // Save resume
         await requireCandidatePrivacyAllowed(
           { type: 'candidate_user', id: userId },
           { globalUse: true, newGlobalOperation: true },
         );
-        const [resume] = await db
-          .insert(candidateResumes)
-          .values({
-            userId,
-            label,
-            gcsPath,
-            extractedText: extractionResult.text,
-            isDefault: isDefault || false,
-          })
-          .returning();
+        // The first résumé (or any upload while none is the default) becomes the default; one
+        // locked transaction, so an insert failure never removes the candidate's old default.
+        const resume = await insertLibraryResume(db, { userId, label, gcsPath, extractedText: extractionResult.text, requestDefault: !!isDefault });
 
         await syncProfileCompletionStatus(req.user!, { resumeCount: existingResumes.length + 1 });
 
@@ -547,6 +533,41 @@ export function registerAIRoutes(app: Express): void {
    * DELETE /api/ai/resume/:id
    * Delete a saved resume
    */
+  /**
+   * PATCH /api/ai/resume/:id/default
+   * Make one of the candidate's own résumés the default. Exactly one default per candidate:
+   * the others are unset in the same transaction. Reads and changes nothing else.
+   */
+  app.patch(
+    '/api/ai/resume/:id/default',
+    requireVerifiedCandidate,
+    doubleCsrfProtection,
+    async (req, res): Promise<void> => {
+      try {
+        const userId = req.user!.id;
+        const resumeId = Number(req.params.id);
+        if (!Number.isSafeInteger(resumeId) || resumeId < 1 || String(resumeId) !== req.params.id) {
+          res.status(400).json({ error: 'Invalid resume ID' });
+          return;
+        }
+        await requireCandidatePrivacyAllowed({ type: 'candidate_user', id: userId }, { globalUse: false });
+        const changed = await makeLibraryResumeDefault(db, userId, resumeId);
+        if (!changed) {
+          res.status(404).json({ error: 'Resume not found' });
+          return;
+        }
+        res.json({ resume: { id: resumeId, isDefault: true } });
+      } catch (error) {
+        if (error instanceof CandidatePrivacyRestrictedError) {
+          res.status(503).json({ code: error.code });
+          return;
+        }
+        console.error('Resume default error:', (error as Error)?.name ?? 'unknown');
+        res.status(500).json({ error: 'Internal server error' });
+      }
+    }
+  );
+
   app.delete(
     '/api/ai/resume/:id',
     requireVerifiedCandidate,

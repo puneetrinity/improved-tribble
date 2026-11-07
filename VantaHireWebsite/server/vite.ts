@@ -70,6 +70,7 @@ function isProtectedAppRoute(path: string): boolean {
   if (
     path === '/onboarding' ||
     path === '/my-dashboard' ||
+    path === '/candidate-setup' ||
     path === '/recruiter-dashboard' ||
     path === '/hiring-manager' ||
     path === '/applications' ||
@@ -735,7 +736,7 @@ export async function serveStatic(app: Express) {
     '/register-hiring-manager', '/accept-co-recruiter', '/register-co-recruiter',
     '/recruiter-dashboard', '/admin', '/admin-dashboard', '/admin-super-dashboard',
     '/unified-admin-dashboard', '/applications', '/candidates', '/my-jobs',
-    '/jobs/post', '/clients', '/profile/settings', '/my-dashboard',
+    '/jobs/post', '/clients', '/profile/settings', '/my-dashboard', '/candidate-setup',
     '/hiring-manager', '/application-management', '/analytics',
     '/org/settings', '/org/team', '/org/billing', '/org/domain', '/org/analytics', '/org/choice',
     '/blocked/seat-removed', '/admin/forms', '/admin/email-templates',
@@ -748,6 +749,8 @@ export async function serveStatic(app: Express) {
     if (/^\/recruiters\/[^/]+/.test(path)) return true;
     if (/^\/form\//.test(path)) return true;
     if (/^\/client-shortlist\//.test(path)) return true;
+    // Emailed links: /verify-email/:token and /reset-password/:token.
+    if (/^\/(verify-email|reset-password)\/[^/]+$/.test(path)) return true;
     if (/^\/admin\//.test(path)) return true;
     return false;
   }

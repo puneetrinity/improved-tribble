@@ -91,7 +91,7 @@ describe('P6 owner interpretation routes',()=>{
 describe('RC owner routes',()=>{
  const post='POST /api/candidate/product/lookups',get='GET /api/candidate/product/lookups/:attemptId';
  const rawBody=JSON.stringify({schemaVersion:1,idempotencyKey:key,expectedConsentRevision:1,kind:'email'});
- const enabled=()=>{for(const flag of ['CANDIDATE_PROFILE_DELIVERY_ENABLED','CANDIDATE_CONSENT_V2_DELIVERY_ENABLED','CANDIDATE_SPARK_ENABLED','CANDIDATE_LOOKUP_SOURCE_ENABLED'])vi.stubEnv(flag,'true');};
+ const enabled=()=>{for(const flag of ['CANDIDATE_PROFILE_DELIVERY_ENABLED','CANDIDATE_CONSENT_V2_DELIVERY_ENABLED','CANDIDATE_SPARK_ENABLED','CANDIDATE_LOOKUP_SOURCE_ENABLED'])vi.stubEnv(flag,'true');vi.stubEnv('CANDIDATE_RC_API_KEY','synthetic-key');};
  it('is dark by default and queues only session-owned requests without calling RC',async()=>{
   expect((await request(post,{rawBody})).statusCode).toBe(404);expect(deps.lookupAdmit).not.toHaveBeenCalled();enabled();
   deps.lookupAdmit.mockResolvedValue({state:'queued'});const r=await request(post,{rawBody});expect(r.statusCode).toBe(202);
@@ -182,7 +182,7 @@ describe('S2 registered owner routes',()=>{
   expect((await request(`GET ${base}`)).body.capabilities.discoveryBlockedReason).toBe('feature_unavailable');
  });
  it('reports source/AI availability only behind its own switch and delivered consent',async()=>{
-  enableSpark();vi.stubEnv('CANDIDATE_RESUME_SOURCE_ENABLED','true');vi.stubEnv('CANDIDATE_LOOKUP_SOURCE_ENABLED','true');
+  enableSpark();vi.stubEnv('CANDIDATE_RESUME_SOURCE_ENABLED','true');vi.stubEnv('CANDIDATE_LOOKUP_SOURCE_ENABLED','true');vi.stubEnv('CANDIDATE_RC_API_KEY','synthetic-key');
   let response=await request(`GET ${base}`);
   expect(response.body.capabilities).toMatchObject({canRequestResume:true,resumeBlockedReason:null,canEnrich:true,canInterpret:true});
   const consent=await deps.consentRead();deps.consentRead.mockResolvedValue({...consent,deliveryStatus:'pending'});

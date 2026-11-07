@@ -166,18 +166,24 @@ describe("candidate setup", () => {
     expect(text()).toContain("Let's start");
   });
 
-  it("without the profile lookup, goes to the dashboard instead of a lookup that never ran", async () => {
-    await mount({ [CONSENT]: () => json(200, ACTIVE), [PROFILE]: () => json(200, profile()), [LOOKUP]: () => json(404, { code: "not_found" }) });
-    expect(window.location.pathname).toBe("/my-dashboard");
-    expect(text()).not.toContain("Looking up your professional profile");
+  it("without the profile lookup, carries on to the details step instead of a lookup that never ran", async () => {
+    const calls = await mount({ [CONSENT]: () => json(200, ACTIVE), [PROFILE]: () => json(200, profile()), [LOOKUP]: () => json(404, { code: "not_found" }) });
+    // The paid lookup never starts on page load, only when the candidate presses "Let's start".
+    expect(calls.some(c => c.key === LOOKUP)).toBe(false);
+    await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Let's start")!.click(); }); await flush();
+    expect(window.location.pathname).not.toBe("/my-dashboard");
+    expect(text()).toContain("We couldn't check your professional profile");
+    expect(document.getElementById("linkedin-url")).toBeNull();
+    await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Skip, I'll add my details")!.click(); }); await flush();
+    expect(text()).toContain("Add your details");
   });
 
   it("shows the lookup as 'Is this you?'; yes accepts every suggestion on the server", async () => {
     const calls = await mount({ [CONSENT]: () => json(200, ACTIVE), [PROFILE]: () => json(200, profile({ draft: { ...proposalDraft() } })),
       [LOOKUP]: () => json(202, lookupStatus("running")), [`GET /api/candidate/product/lookups/${ATTEMPT}`]: () => json(200, lookupStatus("review_ready", { proposalId: PROPOSAL })),
       [`GET /api/candidate/product/sources/${ATTEMPT}/proposals/${PROPOSAL}`]: () => json(200, proposal), ...commandServer() });
-    expect(calls.find(c => c.key === LOOKUP)!.body).toMatchObject({ schemaVersion: 1, kind: "email", expectedConsentRevision: 1 });
     await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Let's start")!.click(); }); await flush();
+    expect(calls.find(c => c.key === LOOKUP)!.body).toMatchObject({ schemaVersion: 1, kind: "email", expectedConsentRevision: 1 });
     expect(text()).toContain("Is this you?");
     expect(text()).toContain("Synthetic Person");
     await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent?.includes("Yes, this is me"))!.click(); }); await flush();
@@ -251,16 +257,19 @@ describe("candidate setup", () => {
   it("an unsettled (held) lookup is never shown as 'not found' and offers no paid retry", async () => {
     const calls = await mount({ ...base(), [LOOKUP]: () => json(202, lookupStatus("held", { reason: "outcome_unknown" })) });
     await start();
-    expect(text()).toContain("We couldn't confirm the lookup outcome.");
-    expect(text()).toContain("You can add your details yourself on your profile page.");
+    expect(text()).toContain("We couldn't check your professional profile");
     expect(text()).not.toContain("couldn't find");
     expect(document.getElementById("linkedin-url")).toBeNull();
-    expect(Array.from(document.querySelectorAll("a")).find(a => a.textContent === "Go to my profile")!.getAttribute("href")).toBe("/my-dashboard#profile");
+    expect(calls.filter(c => c.key === LOOKUP)).toHaveLength(1);
+    // Never a dead end: the candidate carries on and adds their details in the wizard.
+    await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Skip, I'll add my details")!.click(); }); await flush();
+    expect(text()).toContain("Add your details");
     expect(calls.filter(c => c.key === LOOKUP)).toHaveLength(1);
   });
 
   it("a signed-out lookup shows the signed-out screen", async () => {
     await mount({ ...base(), [LOOKUP]: () => json(401, { error: "Not authenticated" }) });
+    await start();
     expect(text()).toContain("You've been signed out");
   });
 
@@ -286,7 +295,31 @@ describe("candidate setup", () => {
     await start();
     expect(document.getElementById("linkedin-url")).toBeNull();
     expect(text()).toContain("We couldn't find your profile");
-    expect(text()).toContain("You can add your details yourself on your profile page.");
+    expect(text()).toContain("Add your details yourself in the next steps");
+  });
+
+  it("when both lookups find nothing, the candidate types their details in the wizard and carries on", async () => {
+    const calls = await mount({ ...base(), [LOOKUP]: (init) => json(202, lookupStatus("not_found", { canRequestLinkedin: JSON.parse(String(init!.body)).kind === "email" })), ...commandServer() });
+    await start();
+    const input = document.getElementById("linkedin-url") as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(input, "linkedin.com/in/synthetic-person"); input.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent?.includes("Look me up"))!.click(); }); await flush();
+    expect(calls.filter(c => c.key === LOOKUP)).toHaveLength(2);
+    expect(text()).toContain("We couldn't find your profile");
+    await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Skip, I'll add my details")!.click(); }); await flush();
+    expect(text()).toContain("Add your details");
+    const field = (label: string) => Array.from(document.querySelectorAll("label")).find(l => l.textContent?.startsWith(label))!;
+    const type = async (label: string, value: string) => { const el = document.getElementById(field(label).htmlFor) as HTMLInputElement;
+      await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(el, value); el.dispatchEvent(new Event("input", { bubbles: true })); }); };
+    await type("Name", "Synthetic Person"); await type("Headline", "Technical recruiter");
+    const skill = document.querySelector('input[placeholder="Type a skill and press Enter"]') as HTMLInputElement;
+    await act(async () => { Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!.call(skill, "Sourcing"); skill.dispatchEvent(new Event("input", { bubbles: true })); });
+    await act(async () => { skill.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })); }); await flush(1);
+    await act(async () => { Array.from(document.querySelectorAll("button")).find(b => b.textContent === "Save details")!.click(); }); await flush();
+    const save = calls.find(c => c.key === COMMANDS)!.body;
+    expect(save).toMatchObject({ action: "save_draft" });
+    expect(save.payload.profile).toMatchObject({ displayName: "Synthetic Person", headline: "Technical recruiter", skills: ["Sourcing"] });
+    expect(text()).not.toContain("Add your details");
   });
 
   // Résumé step: shown only when the server says reading is available; upload → read → review → accept_source.

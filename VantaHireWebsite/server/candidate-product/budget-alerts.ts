@@ -33,3 +33,15 @@ export function startBudgetAlerts(db:FoundationDb,enabled:()=>boolean,send:(a:Bu
  const timer=setInterval(tick,30000);timer.unref();tick();
  return async()=>{stopped=true;clearInterval(timer);await active;};
 }
+
+/** One best-effort operator email for a configuration fault found at startup. Fixed text only:
+ * never a key, value or candidate detail. Returns false when no alert address or email service. */
+export async function sendConfigurationAlert(code:'candidate_lookup_configuration_required',env:NodeJS.ProcessEnv=process.env):Promise<boolean>{
+ const to=env.FLOW_OPS_ALERT_EMAIL;
+ if(!to||!/^[^\s@<>"]{1,64}@[A-Za-z0-9.-]{1,190}\.[A-Za-z]{2,24}$/.test(to))return false;
+ try{
+  const service=await getEmailService();if(!service)return false;
+  return await service.sendEmail({to,subject:'ealana spark: candidate lookup switched off — configuration required',
+   text:`Problem: ${code}\nCANDIDATE_RC_API_KEY is missing or malformed, so the candidate profile lookup is off.\nEverything else started normally. Candidates continue onboarding with a résumé or by typing their details.\nFix the variable and redeploy Flow web to switch the lookup back on.`});
+ }catch{return false;}
+}

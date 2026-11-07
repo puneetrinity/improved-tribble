@@ -64,7 +64,7 @@ export async function lookupProfessionalProfile(input:unknown,deps:{apiKey:strin
    body:JSON.stringify(op.kind==='email'?{email:op.email}:{url:op.url}),
   }).then(response=>{if(controller.signal.aborted)void response.body?.cancel().catch(()=>{});return response;}));
   if(controller.signal.aborted){void response.body?.cancel().catch(()=>{});throw new LookupError('deadline',true);}
-  if(response.status!==200&&response.status!==404){void response.body?.cancel().catch(()=>{});throw new LookupError('outcome_unknown',true);}
+  if(response.status!==200&&response.status!==404){void response.body?.cancel().catch(()=>{});throw new LookupError('outcome_unknown',true,null,response.status);}
   const length=response.headers.get('content-length');
   if(length!==null&&(!/^\d+$/.test(length)||Number(length)>LOOKUP_RESPONSE_BYTES)){
    void response.body?.cancel().catch(()=>{});throw new LookupError('invalid_response',true);

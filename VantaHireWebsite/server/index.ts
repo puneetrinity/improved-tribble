@@ -131,11 +131,11 @@ import { startFoundationProcessor } from "./candidate-product/processor";
 import { startProfileProcessor, startProfileExpiryProcessor } from "./candidate-product/profile-processor";
 import { profileRepository } from "./candidate-product/profile-repository";
 import { deliverProfile, recoverProfileExpiry,readSparkProfile } from "./candidate-product/profile-client";
-import { profileDeliveryEnabled,consentV2DeliveryEnabled,sparkEnabled,resumeSourceEnabled,lookupSourceEnabled } from "./candidate-product/config";
+import { profileDeliveryEnabled,consentV2DeliveryEnabled,sparkEnabled,resumeSourceEnabled,lookupSourceEnabled,lookupSourceRequested,lookupKeyConfigured } from "./candidate-product/config";
 import {resumeSourceRepository} from "./candidate-product/resume-source-repository";
 import {sourceObjectDependencies,withCachedResumeExtraction,lookupRepository,lookupQueueRepository} from "./candidate-product/source-repository";
 import {startLookupQueue,runLookupAttempt,runLookupDelivery} from "./candidate-product/source-processor";
-import {startBudgetAlerts} from './candidate-product/budget-alerts';
+import {startBudgetAlerts,sendConfigurationAlert} from './candidate-product/budget-alerts';
 import {lookupProfessionalProfile,deliverLookupTransfer} from "./candidate-product/source-adapters";
 import {startResumeSourceWorker,processResumeSource} from "./candidate-product/resume-source-processor";
 import {getGroqModel} from "./lib/aiModelConfig";
@@ -275,10 +275,14 @@ let stopBudgetAlerts: (() => Promise<void>) | undefined;
       stopResumeSourceProcessor=()=>worker.stop();
     }
 
+    if(lookupSourceRequested()&&!lookupKeyConfigured()){
+      // Lookup only is off; every other processor below still starts.
+      console.error('[candidate-lookup] operator_attention lookup_configuration_required');
+      void sendConfigurationAlert('candidate_lookup_configuration_required');
+    }
     if(lookupSourceEnabled()){
       // Explicit candidate configuration; never fetch credentials from another service.
-      const apiKey=process.env.CANDIDATE_RC_API_KEY;
-      if(!apiKey||apiKey.length>8192||/[\s\0]/.test(apiKey))throw Error('candidate_lookup_configuration_required');
+      const apiKey=process.env.CANDIDATE_RC_API_KEY!;
       const queue=lookupQueueRepository(pool);
       const repository=(work:{userId:number;authVersion:number})=>lookupRepository(pool,userId=>requireCandidatePrivacyAllowed(
         {type:'candidate_user',id:userId},{globalUse:true,newGlobalOperation:true}),{userId:work.userId,authVersion:work.authVersion});

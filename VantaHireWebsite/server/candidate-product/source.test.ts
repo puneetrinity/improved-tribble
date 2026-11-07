@@ -232,6 +232,14 @@ describe('candidate profile lookup: synthetic only, no runtime dispatch',()=>{
   const {run}=setup(()=>Promise.resolve(new Response(JSON.stringify(miss),{status:404})));expect((await run()).outcome).toBe('not_found');
   expect(()=>parseLookupResponse(JSON.stringify({...miss,quotas:{creditsConsumed:1}}),404,email)).toThrow('invalid_response');
  });
+ it('accepts the live ReverseContact miss envelope with an error object',()=>{
+  // Shape observed from POST /v2/enrich/persons on 2026-11-07 (values redacted).
+  const live={success:false,data:null,error:{code:'REQUEST_ERROR',message:'x',details:{error:'x'}},
+   quotas:{creditsConsumed:0,workspace:{id:'w'},key:{id:'k'}},metadata:{requestId:'r',executionTimeMs:995}};
+  expect(parseLookupResponse(JSON.stringify(live),404,email).outcome).toBe('not_found');
+  expect(()=>parseLookupResponse(JSON.stringify({...live,error:{code:'OTHER'}}),404,email)).toThrow('invalid_response');
+  expect(()=>parseLookupResponse(JSON.stringify({...live,quotas:{creditsConsumed:2}}),404,email)).toThrow('invalid_response');
+ });
  it.each([301,401,403,429,500,503])('does not infer free failure or retry HTTP %s',async status=>{
   const {run,fetch}=setup(()=>Promise.resolve(new Response('secret upstream body',{status})));
   await expect(run()).rejects.toMatchObject({code:'outcome_unknown',dispatched:true});expect(fetch).toHaveBeenCalledOnce();
