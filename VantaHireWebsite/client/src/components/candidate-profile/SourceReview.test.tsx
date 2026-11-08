@@ -219,6 +219,61 @@ describe("résumé suggestions", () => {
     expect(accept.mock.calls[0]![0]).toBe(accept.mock.calls[1]![0]);
   });
 
+  it("nothing kept closes the review as 'not needed' (never an empty accept, which the server refuses)", async () => {
+    for (const [label, prop, decisions] of [
+      ["no suggestions", { ...proposal(), facts: [] }, {}],
+      ["every suggestion removed", proposal(), Object.fromEntries(proposal().facts.map((f: any) => [f.factId, "remove"]))],
+    ] as const) {
+      const { f: fetcher } = stub({
+        [`POST ${RESUME_SOURCE.snapshot}`]: [json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) })],
+        [`POST ${RESUME_SOURCE.queue}`]: [json(202, st({ state: "review_ready", proposalId: PROP }))],
+      });
+      const accept = vi.fn(); const reject = vi.fn(async () => undefined);
+      const current = { skills: ["Kafka"] } as any;
+      const a = resumeAdapters({ session: { acceptSource: accept, rejectSource: reject }, currentProfile: () => current,
+        deps: { fetcher, postFetcher: fetcher, wait: noWait, newKey, upload: async () => 12, fetchProposal: async () => prop } });
+      await a.readResume(new File(["x"], "cv.pdf"));
+      expect(await a.acceptResume(PROP, decisions as any, {}), label).toBe(current);
+      await a.acceptResume(PROP, decisions as any, {});
+      expect(accept, label).not.toHaveBeenCalled();
+      expect(reject, label).toHaveBeenCalledTimes(2);
+      expect((reject.mock.calls as any)[0][1], label).toEqual({ proposalId: PROP, sourceVersion: prop.sourceVersion, proposalHash: prop.proposalHash, reason: "not_needed" });
+      expect((reject.mock.calls as any)[0][0], label).toBe((reject.mock.calls as any)[1][0]);
+    }
+  });
+
+  it("a failed 'not needed' close is retried with the same key, and nothing is accepted (Codex round 1)", async () => {
+    const { f: fetcher } = stub({
+      [`POST ${RESUME_SOURCE.snapshot}`]: [json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) })],
+      [`POST ${RESUME_SOURCE.queue}`]: [json(202, st({ state: "review_ready", proposalId: PROP }))],
+    });
+    const accept = vi.fn(); let n = 0;
+    const reject = vi.fn(async () => { if (++n === 1) throw new Error("network"); });
+    const a = resumeAdapters({ session: { acceptSource: accept, rejectSource: reject }, currentProfile: () => ({ skills: [] }) as any,
+      deps: { fetcher, postFetcher: fetcher, wait: noWait, newKey, upload: async () => 12, fetchProposal: async () => ({ ...proposal(), facts: [] }) } });
+    await a.readResume(new File(["x"], "cv.pdf"));
+    await expect(a.acceptResume(PROP, {}, {})).rejects.toThrow("network");
+    await a.acceptResume(PROP, {}, {});
+    expect(reject).toHaveBeenCalledTimes(2);
+    expect((reject.mock.calls as any)[0][0]).toBe((reject.mock.calls as any)[1][0]);
+    expect(accept).not.toHaveBeenCalled();
+  });
+
+  it("flags a proposal whose suggestions could not be matched to the résumé text", async () => {
+    const { RESUME_UNMATCHED_NOTE, RESUME_UNREADABLE_NOTE } = await import("@shared/resume-review-notes");
+    for (const [notes, expected, unreadable] of [[[RESUME_UNMATCHED_NOTE], true, false], [[], false, false], [[RESUME_UNREADABLE_NOTE], false, true]] as const) {
+      const { f: fetcher } = stub({
+        [`POST ${RESUME_SOURCE.snapshot}`]: [json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) })],
+        [`POST ${RESUME_SOURCE.queue}`]: [json(202, st({ state: "review_ready", proposalId: PROP }))],
+      });
+      const a = resumeAdapters({ session: { acceptSource: vi.fn() }, currentProfile: () => null,
+        deps: { fetcher, postFetcher: fetcher, wait: noWait, newKey, upload: async () => 12, fetchProposal: async () => ({ ...proposal(), facts: [], reviewNotes: [...notes] }) } });
+      const x = await a.readResume(new File(["x"], "cv.pdf"));
+      expect(x.unmatched).toBe(expected);
+      expect(x.unreadable).toBe(unreadable);
+    }
+  });
+
   it("a reading that ends without suggestions becomes the failure card, never 'nothing new'", async () => {
     const { f: fetcher } = stub({
       [`POST ${RESUME_SOURCE.snapshot}`]: [json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) })],

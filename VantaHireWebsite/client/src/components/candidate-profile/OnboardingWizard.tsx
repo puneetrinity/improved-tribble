@@ -18,7 +18,7 @@ import type { ManualProfile, Preferences } from "@/lib/candidate-profile-api";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { DEFAULT_PREFERENCES } from "./PreferencesForm";
 import { EMPTY_PROFILE, ProfessionalDetailsForm } from "./ProfessionalDetailsForm";
-import { ResumeReadError, ResumeReadStatus, type ResumeRead } from "./SourceReview";
+import { ResumeReadError, ResumeReadStatus, resumeRequestCopy, type ResumeRead } from "./SourceReview";
 import { ProfileOverview, dateRange, groupByEmployer, duration } from "./ProfileOverview";
 import { PreferencesSummary } from "./PreferencesSummary";
 import { SegmentedControl } from "./SegmentedControl";
@@ -40,7 +40,15 @@ export type ResumeItem = { id: string; source: ResumeSource; evidence: string } 
   | { kind: "skill" | "project"; value: string }
   | { kind: "location"; city: string; countryCode: string; displayCountry: string }
   | { kind: "conflict"; rowId: string; employer: string; title: string; field: "start" | "end"; profileValue: string; resumeValue: string });
-export type ResumeExtraction = { resumeVersionId: string; items: ResumeItem[] };
+/** Shown when suggestions were found but none matched the résumé text. */
+export const RESUME_UNMATCHED_COPY = "We found details in your résumé but couldn’t match them reliably to its text, so nothing was added. You can add them in the next steps.";
+/** Shown when the résumé reader's output could not be read at all. */
+export const RESUME_UNREADABLE_COPY = "We couldn’t read suggestions from your résumé this time, so nothing was added. You can add your details in the next steps.";
+
+/** `unmatched`: suggestions came back but none could be checked against the résumé text. */
+const emptyKind = (x: { unmatched?: boolean | undefined; unreadable?: boolean | undefined }) => x.unreadable ? "unreadable" as const : x.unmatched ? "unmatched" as const : "none" as const;
+
+export type ResumeExtraction = { resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined };
 export type Authorisation = "allowed" | "needs_visa" | "not_sure";
 export type PrefField = "roles" | "where" | "how" | "pay";
 /** Saved as the candidate goes (private, versioned), so refreshing or leaving loses nothing.
@@ -174,9 +182,9 @@ export function applyPrefOps(p: Preferences, ops: Op[]): Preferences {
 const RESUME_KIND: Record<ResumeItem["kind"], string> = { employment: "New role", responsibility: "What you did", education: "Education", skill: "Skill", project: "Project", location: "Current location", conflict: "Date" };
 function resumeLabel(it: ResumeItem): string {
   switch (it.kind) {
-    case "employment": return `${it.title} at ${it.employer}${it.start ? ` · ${it.start} – ${it.current ? "Present" : it.end ?? ""}` : ""}`;
+    case "employment": return `${it.title} at ${it.employer} · ${it.start ? `${it.start} – ${it.current ? "Present" : it.end ?? ""}` : NO_DATES}`;
     case "responsibility": return `${it.title} at ${it.employer}: ${it.text}`;
-    case "education": return `${it.qualification}, ${it.institution}${it.start ? ` · ${it.start} – ${it.end ?? ""}` : ""}`;
+    case "education": return `${it.qualification}, ${it.institution} · ${it.start ? `${it.start} – ${it.end ?? ""}` : NO_DATES}`;
     case "location": return `${it.city}, ${it.displayCountry}`;
     case "conflict": return "";
     default: return it.value;
@@ -187,6 +195,9 @@ function editable(it: ResumeItem): string | null { return it.kind === "skill" ||
 
 type Choice = Record<string, "keep" | "remove" | "profile" | "resume">;
 /** The résumé suggestions to keep, edit or remove. Shared by the wizard and My profile. */
+/** Shown on a résumé job/education row whose dates we could not confirm; the candidate adds them. */
+export const NO_DATES = "dates not confirmed, add them in your profile";
+
 export function ResumeReviewList({ items, choice, setChoice, edits, setEdits }: { items: ResumeItem[];
   choice: Choice; setChoice: React.Dispatch<React.SetStateAction<Choice>>;
   edits: Record<string, string>; setEdits: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
@@ -245,6 +256,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   const [resume, setResume] = useState<File | null>(null);
   const [resumeItems, setResumeItems] = useState<ResumeItem[] | null>(null);
   const [resumeVersionId, setResumeVersionId] = useState<string | null>(null);
+  const [resumeEmpty, setResumeEmpty] = useState<"none" | "unmatched" | "unreadable">("none");
   /** Returning with résumé suggestions still to review (there's no file in this session). */
   const [restoredResume, setRestoredResume] = useState(false);
   // Real mode only: a reading that ended without suggestions, shown with Try again.
@@ -318,7 +330,8 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   useEffect(() => {
     if (!resuming || !resumeOn || !pendingResume) return;
     let live = true;
-    pendingResume().then(x => { if (live && x && x.items.length) { setResumeVersionId(x.resumeVersionId); setResumeItems(x.items); setRestoredResume(true); setKey("resumeReview"); } }, () => undefined);
+    // An empty review that says why (couldn't read / couldn't match) is restored too, with its message.
+    pendingResume().then(x => { if (live && x && (x.items.length || emptyKind(x) !== "none")) { setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); setRestoredResume(true); setKey("resumeReview"); } }, () => undefined);
     return () => { live = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const step = Math.max(0, steps.indexOf(key));
@@ -372,9 +385,10 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
     if (result !== "none") setProfile(p => ({ ...p, linkedinUrl: url }));
   }
   async function loadResume(read: () => Promise<ResumeExtraction>) {
-    setResumeItems(null); setResumeFailure(null); setResumeVersionId(null); setResumeChoice({}); setResumeEdits({});
-    try { const x = await read(); setResumeVersionId(x.resumeVersionId); setResumeItems(x.items); }
-    catch (e) { if (e instanceof ResumeReadError) setResumeFailure(e.read); else setResumeItems([]); }
+    setResumeItems(null); setResumeFailure(null); setResumeVersionId(null); setResumeChoice({}); setResumeEdits({}); setResumeEmpty("none");
+    try { const x = await read(); setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); }
+    // An unexpected error is a failed read (with its retry card), never "nothing new".
+    catch (e) { setResumeFailure(e instanceof ResumeReadError ? e.read : { kind: "error", message: resumeRequestCopy(e) }); }
   }
   async function chooseResume(f: File | null) {
     setResume(f); setResumeItems(null); setResumeVersionId(null); setResumeChoice({}); setResumeEdits({}); setResumeFailure(null);
@@ -629,7 +643,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
               ) : resumeItems === null ? (
                 <p role="status" className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-sm"><TetrisOrb label="Reading your résumé" decorative />Reading your résumé…</p>
               ) : resumeItems.length === 0 ? (
-                <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">We couldn't find anything new in your résumé. You can continue.</p>
+                <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">{resumeEmpty === "unreadable" ? RESUME_UNREADABLE_COPY : resumeEmpty === "unmatched" ? RESUME_UNMATCHED_COPY : "We couldn't find anything new in your résumé. You can continue."}</p>
               ) : (
                 <ResumeReviewList items={resumeItems} choice={resumeChoice} setChoice={setResumeChoice} edits={resumeEdits} setEdits={setResumeEdits} />
               )}

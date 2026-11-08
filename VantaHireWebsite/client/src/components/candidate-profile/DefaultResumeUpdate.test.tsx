@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { DefaultResumeUpdate, offerDismissed } from "./DefaultResumeUpdate";
+import { RESUME_UNMATCHED_NOTE, RESUME_UNREADABLE_NOTE } from "@shared/resume-review-notes";
 
 let root: Root | null = null, host: HTMLDivElement | null = null;
 afterEach(() => { if (root) act(() => root!.unmount()); root = null; host?.remove(); host = null; vi.unstubAllGlobals(); window.localStorage.clear(); });
@@ -121,6 +122,56 @@ describe("default résumé profile update", () => {
     expect(button("Keep it")).toBeUndefined();
     release(); await flush();
     expect(text()).toContain("Added to your profile");
+  });
+
+  it("removing every suggestion closes the review as 'not needed', never an empty accept (live test 8 Nov)", async () => {
+    const base = (proposal: unknown) => ({
+      "POST /api/candidate/product/sources/resume-snapshots": () => json(200, { schemaVersion: 1, sourceId: RSRC, sourceVersion: 1, contentHash: "e".repeat(64) }),
+      "POST /api/candidate/product/sources/resume": () => json(202, { commandId: RCMD, sourceId: RSRC, sourceVersion: 1, state: "review_ready", reason: null, proposalId: RPROP }),
+      [`GET /api/candidate/product/sources/${RSRC}/proposals/${RPROP}`]: () => json(200, proposal),
+      "POST /api/candidate/product/profile/commands": () => json(202, { schemaVersion: 3, commandId: "50000000-0000-4000-8000-000000000002", status: "pending" }),
+      "GET /api/candidate/product/profile/commands/50000000-0000-4000-8000-000000000002": () => json(200, { schemaVersion: 3, commandId: "50000000-0000-4000-8000-000000000002", status: "applied", reason: null, draftVersion: 2, preferenceDraftRevision: 5 }),
+    });
+    const { calls } = await mount(true, base(resumeProposal));
+    await act(async () => { button("Review suggestions")!.click(); }); await flush();
+    for (const name of ["Kubernetes", "Terraform"]) {
+      const row = Array.from(document.querySelectorAll("li")).find(li => li.textContent?.includes(name))!;
+      await act(async () => { Array.from(row.querySelectorAll("button")).find(b => b.textContent === "Remove")!.click(); });
+    }
+    const save = Array.from(document.querySelectorAll("button")).find(b => /Add to my profile|Done|Continue|Save/.test(b.textContent ?? "") && !b.matches(":disabled"))!;
+    await act(async () => { save.click(); }); await flush();
+    const commands = calls.filter(c => c.key === "POST /api/candidate/product/profile/commands").map(c => c.body);
+    expect(commands.map(b => b.action)).toEqual(["reject_source"]);
+    expect(commands[0].payload).toMatchObject({ proposalId: RPROP, reason: "not_needed" });
+  });
+
+  it("says it couldn't match the résumé when suggestions came back but none were usable", async () => {
+    const base = (proposal: unknown) => ({
+      "POST /api/candidate/product/sources/resume-snapshots": () => json(200, { schemaVersion: 1, sourceId: RSRC, sourceVersion: 1, contentHash: "e".repeat(64) }),
+      "POST /api/candidate/product/sources/resume": () => json(202, { commandId: RCMD, sourceId: RSRC, sourceVersion: 1, state: "review_ready", reason: null, proposalId: RPROP }),
+      [`GET /api/candidate/product/sources/${RSRC}/proposals/${RPROP}`]: () => json(200, proposal),
+      "POST /api/candidate/product/profile/commands": () => json(202, { schemaVersion: 3, commandId: "50000000-0000-4000-8000-000000000002", status: "pending" }),
+      "GET /api/candidate/product/profile/commands/50000000-0000-4000-8000-000000000002": () => json(200, { schemaVersion: 3, commandId: "50000000-0000-4000-8000-000000000002", status: "applied", reason: null, draftVersion: 2, preferenceDraftRevision: 5 }),
+    });
+    await mount(true, base({ ...resumeProposal, facts: [], reviewNotes: [RESUME_UNMATCHED_NOTE] }));
+    await act(async () => { button("Review suggestions")!.click(); }); await flush();
+    expect(text()).toContain("couldn’t match them reliably");
+    expect(text()).not.toContain("didn't find anything new");
+  });
+
+  it("says it couldn't read the résumé when the reader's output was unusable, and never claims the profile is up to date", async () => {
+    const base = {
+      "POST /api/candidate/product/sources/resume-snapshots": () => json(200, { schemaVersion: 1, sourceId: RSRC, sourceVersion: 1, contentHash: "e".repeat(64) }),
+      "POST /api/candidate/product/sources/resume": () => json(202, { commandId: RCMD, sourceId: RSRC, sourceVersion: 1, state: "review_ready", reason: null, proposalId: RPROP }),
+    };
+    await mount(true, { ...base, [`GET /api/candidate/product/sources/${RSRC}/proposals/${RPROP}`]: () => json(200, { ...resumeProposal, facts: [], reviewNotes: [RESUME_UNREADABLE_NOTE] }) });
+    await act(async () => { button("Review suggestions")!.click(); }); await flush();
+    expect(text()).toContain("couldn’t read suggestions");
+    act(() => root!.unmount()); root = null; host!.remove();
+    await mount(true, { ...base, [`GET /api/candidate/product/sources/${RSRC}/proposals/${RPROP}`]: () => json(200, { ...resumeProposal, facts: [] }) });
+    await act(async () => { button("Review suggestions")!.click(); }); await flush();
+    expect(text()).toContain("didn't find anything to add");
+    expect(text()).not.toContain("up to date");
   });
 
   it("a failed read offers only the server's own retry, never a fresh read", async () => {
