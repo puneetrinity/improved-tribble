@@ -81,7 +81,12 @@ function hasContact(value: unknown, key = ''): boolean {
 const modelDate = z.object({ value: z.string().max(10), precision: z.enum(['year', 'month']) }).strict().nullable().optional();
 const modelEvidence = z.array(z.object({ quote: z.string().max(MODEL_QUOTE_MAX), before: z.string().max(80).optional() }).passthrough()).max(MAX_EVIDENCE * 2);
 const modelFact = z.object({ kind: z.string().max(40), evidence: modelEvidence }).passthrough();
-const modelOutput = z.object({ facts: z.array(z.unknown()).max(MAX_FACTS * 2), notes: z.array(z.unknown()).max(50).optional() }).passthrough();
+// "notes" is advisory. The model sometimes returns it as one string instead of a list (live test,
+// 8 Nov 2026: that alone made the whole reply "invalid" and threw away every good fact). Accept a
+// string as one note, and drop any other unusable notes value; it must never sink the facts.
+const modelNotes = z.preprocess(v => typeof v === 'string' ? (v.trim() ? [v] : []) : Array.isArray(v) ? v.slice(0, 50) : undefined,
+  z.array(z.unknown()).max(50).optional());
+const modelOutput = z.object({ facts: z.array(z.unknown()).max(MAX_FACTS * 2), notes: modelNotes }).passthrough();
 
 let countryNames: Map<string, string> | undefined;
 function countryCode(name: string): { code: string; display: string } | null {
@@ -424,7 +429,20 @@ function buildValue(fact: Record<string, unknown>, quotes: string[], ctx: ParseC
     // proof, so it is left empty for the candidate to fill in; the rest of the
     // row is still checked against its own quotes.
     if (d.trim().length > QUOTE_MAX) return '';
-    return d === '' || quotes.some(q => layout(q) === layout(d)) ? d : null;
+    if (d === '' || quotes.some(q => layout(q) === layout(d))) return d;
+    // A description spanning several résumé bullets: the model quotes each bullet separately and joins
+    // them in the description (live test, 8 Nov 2026). Accept it only when it is exactly a run of this
+    // row's own verified quotes, in order, so every word is still proven word for word.
+    const want = layout(d);
+    for (let i = 0; i < quotes.length; i++) {
+      let joined = '';
+      for (let j = i; j < quotes.length; j++) {
+        joined = joined ? `${joined} ${layout(quotes[j]!)}` : layout(quotes[j]!);
+        if (joined === want) return d;
+        if (!want.startsWith(joined)) break;
+      }
+    }
+    return null;
   };
   const row = (key: 'employment' | 'education' | 'projects', candidate: Record<string, unknown>) => {
     const r = rowSchema(key).safeParse({ id: ctx.newId(), ...candidate });
