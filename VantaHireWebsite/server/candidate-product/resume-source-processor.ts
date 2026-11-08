@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { RESUME_UNREADABLE_NOTE } from '@shared/resume-review-notes';
 import { getGroqClient } from '../lib/groqClient';
 import { getGroqModel } from '../lib/aiModelConfig';
 import { canonicalProfileJson } from './profile-contracts';
@@ -26,7 +27,7 @@ import {
 export const SEMANTIC_DISPATCH_MS = 20_000;
 export const PROPOSAL_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const RESUME_WORKER_CONCURRENCY = 2;
-const INVALID_OUTPUT_NOTE = 'We could not read suggestions from this résumé. Please fill in your profile yourself.';
+const INVALID_OUTPUT_NOTE = RESUME_UNREADABLE_NOTE;
 
 export interface SemanticModelRequest {
   model: string; messages: Array<{ role: 'system' | 'user'; content: string }>; maxOutputTokens: number; signal: AbortSignal;
@@ -232,8 +233,11 @@ export async function processResumeSource(input: Lease, deps: ResumeProcessorDep
           return { result: 'held', status: await fail(outcome.reason === 'budget_breach' ? 'budget_unavailable' : 'outcome_unknown') };
         }
         let parsed;
+        let outputInvalid = false;
         try { parsed = parseSemanticFacts(outcome.content, { source: src, newId: deps.newId ?? randomUUID }); }
-        catch { parsed = { facts: [], reviewNotes: [INVALID_OUTPUT_NOTE], dropped: 0 }; }
+        catch { outputInvalid = true; parsed = { facts: [], reviewNotes: [INVALID_OUTPUT_NOTE], dropped: 0, returned: 0, rejected: {} }; }
+        // Counts only (never résumé text or model output): shows why a review came back empty.
+        console.info('[resume-proposal]', { outputInvalid, returned: outputInvalid ? null : parsed.returned, kept: parsed.facts.length, rejected: parsed.rejected });
         proposal = assembleResumeProposal(src, {
           proposalId, originalDraftVersion: claim.originalDraftVersion, originalProfileVersion: claim.originalProfileVersion,
           originalPreferenceVersion: claim.originalPreferenceVersion, originalPreferenceDraftRevision: claim.originalPreferenceDraftRevision,

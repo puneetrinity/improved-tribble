@@ -3,6 +3,10 @@
 // file, enforced by the server) and a way to carry on without the résumé.
 // Nothing here starts work on render or on a status read: only a click does.
 // The suggestion list itself waits for the proposal read/accept routes (P0).
+import { RESUME_UNMATCHED_NOTE, RESUME_UNREADABLE_NOTE } from "@shared/resume-review-notes";
+/** Why an empty review is empty, from the server's fixed notes. */
+const emptyReason = (raw: { reviewNotes?: string[] }) => ({
+  unmatched: (raw.reviewNotes ?? []).includes(RESUME_UNMATCHED_NOTE), unreadable: (raw.reviewNotes ?? []).includes(RESUME_UNREADABLE_NOTE) });
 import { TetrisOrb } from "@/components/ui/tetris-orb";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Check, FileWarning, RefreshCw } from "lucide-react";
@@ -177,7 +181,8 @@ export class ResumeReadError extends Error {
 /** Real résumé adapters for the journey: upload to the library, read, fetch the
  * suggestions, and accept the review as one command. */
 export function resumeAdapters(o: {
-  session: { acceptSource: (key: string, payload: Record<string, unknown>) => Promise<ManualProfile> };
+  session: { acceptSource: (key: string, payload: Record<string, unknown>) => Promise<ManualProfile>;
+    rejectSource?: (key: string, payload: { proposalId: string; sourceVersion: number; proposalHash: string; reason: "not_needed" }) => Promise<void> };
   currentProfile: () => ManualProfile | null;
   deps?: ResumeRunDeps & { upload?: (f: File) => Promise<number>; fetchProposal?: (sourceId: string, proposalId: string) => Promise<unknown> };
 }) {
@@ -189,7 +194,7 @@ export function resumeAdapters(o: {
     const raw = await (deps.fetchProposal ?? fetchSourceProposal)(s.sourceId, s.proposalId) as SourceProposal;
     if (!raw || raw.proposalId !== s.proposalId || raw.sourceId !== s.sourceId || !Array.isArray(raw.facts)) throw new ResumeReadError({ kind: "error", message: REQUEST_GENERIC });
     proposals.set(raw.proposalId, raw);
-    return { resumeVersionId: raw.proposalId, items: proposalItems(raw) };
+    return { resumeVersionId: raw.proposalId, items: proposalItems(raw), ...emptyReason(raw) };
   }
   const asReadError = (e: unknown) => e instanceof ResumeReadError ? e
     : new ResumeReadError({ kind: "error", message: resumeRequestCopy(e) });
@@ -212,7 +217,7 @@ export function resumeAdapters(o: {
         const raw = await (deps.fetchProposal ?? fetchSourceProposal)(s.sourceId, s.proposalId).catch(() => null) as SourceProposal & { sourceKind?: string } | null;
         if (!raw || raw.proposalId !== s.proposalId || raw.sourceKind !== "resume" || !Array.isArray(raw.facts)) continue;
         proposals.set(raw.proposalId, raw);
-        return { resumeVersionId: raw.proposalId, items: proposalItems(raw) };
+        return { resumeVersionId: raw.proposalId, items: proposalItems(raw), ...emptyReason(raw) };
       }
       return null;
     },
@@ -224,7 +229,16 @@ export function resumeAdapters(o: {
       const p = proposals.get(proposalId);
       if (!p) throw new ProfileApiError(409, "source_not_found");
       if (!acceptKeys.has(proposalId)) acceptKeys.set(proposalId, newKey());
-      return o.session.acceptSource(acceptKeys.get(proposalId)!, acceptPayload(p, decisions, edits, o.currentProfile()));
+      const payload = acceptPayload(p, decisions, edits, o.currentProfile());
+      // Nothing kept (no suggestions, or every one removed): the server refuses an empty
+      // accept_source, so the review is closed as "not needed" and the draft is unchanged.
+      if (payload.selectedFactIds.length === 0) {
+        const current = o.currentProfile();
+        if (!o.session.rejectSource || !current) throw new ProfileApiError(409, "source_not_found");
+        await o.session.rejectSource(acceptKeys.get(proposalId)!, { proposalId: p.proposalId, sourceVersion: p.sourceVersion, proposalHash: p.proposalHash, reason: "not_needed" });
+        return current;
+      }
+      return o.session.acceptSource(acceptKeys.get(proposalId)!, payload);
     },
   };
 }

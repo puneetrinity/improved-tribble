@@ -22,7 +22,7 @@ function dismiss(userId: number, resumeId: number) {
 
 type Stage =
   | { kind: "checking" } | { kind: "hidden" } | { kind: "offer" } | { kind: "reading" }
-  | { kind: "review"; proposalId: string; items: ResumeItem[] } | { kind: "nothing_new" }
+  | { kind: "review"; proposalId: string; items: ResumeItem[] } | { kind: "nothing_new"; why: "empty" | "unmatched" | "unreadable" }
   | { kind: "saving"; proposalId: string; items: ResumeItem[] }
   // The save may or may not have been applied: same proposal, choices and command key; never re-read.
   | { kind: "save_failed"; proposalId: string; items: ResumeItem[] }
@@ -52,11 +52,11 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
     return () => { live = false; };
   }, [userId, resumeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function load(run: () => Promise<{ resumeVersionId: string; items: ResumeItem[] }>) {
+  async function load(run: () => Promise<{ resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined }>) {
     setStage({ kind: "reading" }); setChoice({}); setEdits({});
     try {
       const x = await run();
-      setStage(x.items.length ? { kind: "review", proposalId: x.resumeVersionId, items: x.items } : { kind: "nothing_new" });
+      setStage(x.items.length ? { kind: "review", proposalId: x.resumeVersionId, items: x.items } : { kind: "nothing_new", why: x.unreadable ? "unreadable" : x.unmatched ? "unmatched" : "empty" });
     } catch (e) {
       setStage({ kind: "read_failed", read: e instanceof ResumeReadError ? e.read : { kind: "error", message: "We couldn't read this résumé." } });
     }
@@ -84,7 +84,9 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
           <p className="text-sm text-muted-foreground">
             {stage.kind === "offer" ? "This is now your default résumé. We can read it and suggest updates to your profile. You choose what to keep."
               : stage.kind === "reading" ? "Reading your résumé…"
-              : stage.kind === "nothing_new" ? "We didn't find anything new in this résumé. Your profile is up to date."
+              : stage.kind === "nothing_new" ? (stage.why === "unreadable" ? "We couldn’t read suggestions from this résumé this time, so nothing was added. You can edit your profile yourself."
+                : stage.why === "unmatched" ? "We found details in this résumé but couldn’t match them reliably to its text, so nothing was added. You can edit your profile yourself."
+                : "We didn't find anything to add from this résumé.")
               : stage.kind === "done" ? "Saved to your draft. Confirm changes on your profile to update what employers see."
               : stage.kind === "save_failed" ? "We couldn't confirm your changes were saved. Try again to check — your choices are kept."
               : stage.kind === "read_failed" ? "We couldn't read this résumé."
