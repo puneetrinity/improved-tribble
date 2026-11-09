@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import type { ManualProfile, Preferences } from "@/lib/candidate-profile-api";
+import { ProfileApiError, type ManualProfile, type Preferences } from "@/lib/candidate-profile-api";
 import { FileDropzone } from "@/components/ui/file-dropzone";
 import { DEFAULT_PREFERENCES } from "./PreferencesForm";
 import { EMPTY_PROFILE, ProfessionalDetailsForm } from "./ProfessionalDetailsForm";
@@ -285,6 +285,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   const matchIssue: { kind: "unconfirmed" | "failed" | "final"; retry?: (() => void) | undefined } | null = !profileUrl ? null
     : linkedinIssue ?? lookupIssue ?? (imported === "none" && !askLinkedin && retry.phase !== "looking" ? { kind: "final" } : match === "no" && !askLinkedin ? { kind: "final" } : null);
   const [profile, setProfile] = useState<ManualProfile>(saved?.profile ?? EMPTY_PROFILE);
+  const [confirmBlock, setConfirmBlock] = useState<string[] | null>(null);
   const [prefs, setPrefs] = useState<Preferences>(saved?.preferences ?? { ...DEFAULT_PREFERENCES, workArrangements: [], employmentTypes: [] });
   const savedPay = saved?.answered.includes("pay") ? payFromCompensation(saved.preferences?.compensation) : null;
   const [payOpen, setPayOpen] = useState(savedPay?.open ?? false);
@@ -321,12 +322,16 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
     setRoleDrafts(m => ({ ...m, [row.id]: "loading" }));
     suggestRole(row, resumeVersionId ?? null).then(r => setRoleDrafts(m => ({ ...m, [row.id]: r })), () => setRoleDrafts(m => ({ ...m, [row.id]: null })));
   }, [impactRow?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // What Confirm needs from the details step (the server refuses confirm with incomplete_profile otherwise).
+  const confirmGaps = useMemo(() => confirmGapsOf(profile), [profile]);
   const steps = useMemo<StepKey[]>(() => ([
     ...(resuming ? [] : ["welcome" as const, "match" as const]), ...(resumeOn ? ["resume" as const] : []), ...(resume || restoredResume ? ["resumeReview" as const] : []),
     // No accepted lookup: the candidate types or checks their details here, so onboarding never ends at a failed lookup.
-    ...(!resuming && match !== "yes" ? ["details" as const] : []), ...(recentRoles.length ? ["impact" as const] : []), ...(recentRoles.length > 1 ? ["impact2" as const] : []), "skills",
+    // Details stays in the flow whenever something Confirm needs is missing (name, current location),
+    // even after a matched lookup or when returning; otherwise nothing ever asks for it (live test, 9 Nov).
+    ...((!resuming && match !== "yes") || confirmGaps.length ? ["details" as const] : []), ...(recentRoles.length ? ["impact" as const] : []), ...(recentRoles.length > 1 ? ["impact2" as const] : []), "skills",
     "roles", "where", ...(abroad.length ? ["authorisation" as const] : []), "pay", ...(dealbreakersOn ? ["dealbreakers" as const] : []), "review",
-  ]), [resume, restoredResume, recentRoles.length, abroad.length, resumeOn, dealbreakersOn, resuming, match]);
+  ]), [resume, restoredResume, recentRoles.length, abroad.length, resumeOn, dealbreakersOn, resuming, match, confirmGaps.length]);
   useEffect(() => {
     if (!resuming || !resumeOn || !pendingResume) return;
     let live = true;
@@ -338,7 +343,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   const go = (n: number) => setKey(steps[Math.max(0, Math.min(steps.length - 1, n))]!);
   /** After the lookup is accepted the details step drops out of the list; move on from the
    * current list without it (the index-based go() would land on the step that is disappearing). */
-  const afterAccepted = () => setKey(steps.slice(step + 1).find(k => k !== "details") ?? steps[steps.length - 1]!);
+  const afterAccepted = () => setKey(steps.slice(step + 1).find(k => k !== "details" || confirmGaps.length > 0) ?? steps[steps.length - 1]!);
 
   // Suggestions come from the confirmed import only; they change nothing until picked.
   const roleSuggestions = useMemo(() => {
@@ -460,9 +465,14 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
     if (!(await flush())) { afterSave.current = () => void confirm(); return; }
     // Built once, from the versions the server acknowledged, then never rebuilt.
     confirmCmd.current ??= { idempotencyKey: crypto.randomUUID(), profileVersion: versionsRef.current.profile, preferencesVersion: versionsRef.current.preferences, consentVersion };
+    if (confirmGaps.length) { setConfirmBlock(confirmGaps); return; }
     setSaving("saving");
-    try { await onConfirm(confirmCmd.current); setSaving("saved"); }
-    catch { setSaving("failed"); }
+    try { await onConfirm(confirmCmd.current); setSaving("saved"); setConfirmBlock(null); }
+    catch (e) {
+      // The server says what is missing; say it too, with a way to fix it, not "Couldn't save".
+      if (e instanceof ProfileApiError && e.code === "incomplete_profile") { setSaving("idle"); setConfirmBlock(confirmGaps.length ? confirmGaps : ["your details"]); }
+      else setSaving("failed");
+    }
   }
   /** A proposal made against an older version is rejected, never applied over newer edits. */
   const STALE = "Your profile changed since this suggestion was made, so we didn't use it. Please ask again.";
@@ -811,7 +821,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
 
               {hasAi && <SparkAssist useCase="exclusions" interpret={interpret} context={{ baseVersion: versionsRef.current.preferences }} label="Or tell us in your own words" placeholder="e.g. No travel, no on-call, no early-stage startups"
                 applyLabel={pr => pr.ops.some(o => o.op === "exclude") ? "Exclude these" : "Save as private notes"}
-                proposalTitle="Check this before we save it"
+                proposalTitle="Check this before we save it" submitLabel="Turn into deal-breakers"
                 onApply={pr => {
                   if (isStale(pr, "preferences")) return STALE;
                   const rules = pr.ops.flatMap(o => o.op === "exclude" ? [o.rule] : []);
@@ -864,6 +874,12 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
           <div className="mt-8 flex items-center justify-between gap-3">
             {step > 0 ? <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1.5" disabled={locked} onClick={() => key === "match" && match === "no" && found ? setMatch("pending") : go(step - 1)}><ArrowLeft className="h-4 w-4" aria-hidden />Back</Button> : <span />}
             <div className="flex flex-wrap items-center justify-end gap-2">
+              {confirmBlock && key === "review" && (
+                <p role="alert" className="flex flex-wrap items-center gap-2 text-sm text-destructive">
+                  {`Add ${listOf(confirmBlock)} before you confirm.`}
+                  <Button type="button" variant="outline" size="sm" className="min-h-11 cursor-pointer" onClick={() => { setConfirmBlock(null); setKey("details"); }}>Add it now</Button>
+                </p>
+              )}
               <SaveNote state={saving} onRetry={() => void retrySave()} />
               {key === "resume" && !resume && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" disabled={locked} onClick={() => go(step + 1)}>Skip for now</Button>}
               {(key === "impact" || key === "impact2") && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" disabled={locked} onClick={() => go(step + 1)}>Skip</Button>}
@@ -1004,6 +1020,15 @@ function StepBar({ active, onBack, position, count, locked }: { active: number; 
 }
 
 /** Quiet save status beside the buttons. A failed save keeps them on the step with a clear retry. */
+/** Fields Confirm requires that only the details step collects, named for the candidate. */
+export function confirmGapsOf(p: ManualProfile): string[] {
+  const gaps: string[] = [];
+  if (!p.displayName?.trim()) gaps.push("your name");
+  if (!p.currentLocation?.city?.trim() || !p.currentLocation?.countryCode) gaps.push("your current city and country");
+  return gaps;
+}
+const listOf = (xs: string[]) => xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+
 /** What confirming does, stated only for what is actually switched on. */
 function confirmCopy(discovery: "ready" | "not_ready", matching: "ready" | "not_ready"): string {
   if (discovery === "ready" && matching === "ready") return "When you confirm, recruiters can find your profile and we start matching you with jobs.";

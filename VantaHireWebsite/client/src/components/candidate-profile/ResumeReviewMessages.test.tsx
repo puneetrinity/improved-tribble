@@ -3,7 +3,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { NO_DATES, OnboardingWizard, RESUME_UNMATCHED_COPY, RESUME_UNREADABLE_COPY, type ResumeItem } from "./OnboardingWizard";
+import { SparkAssist } from "./SparkAssist";
+import { confirmGapsOf, NO_DATES, OnboardingWizard, RESUME_UNMATCHED_COPY, RESUME_UNREADABLE_COPY, type ResumeItem } from "./OnboardingWizard";
 
 let root: Root | null = null, host: HTMLDivElement | null = null;
 afterEach(() => { if (root) act(() => root!.unmount()); root = null; host?.remove(); host = null; vi.unstubAllGlobals(); });
@@ -45,5 +46,33 @@ describe("résumé review messages", () => {
     expect(text()).toContain(`Engineer at Acme · ${NO_DATES}`);
     expect(text()).toContain("Manager at Beta · 2022 – 2024");
     expect(text()).not.toContain(`Manager at Beta · ${NO_DATES}`);
+  });
+});
+
+describe("what Confirm needs", () => {
+  const base = { displayName: "Test Person", headline: "", linkedinUrl: null, currentLocation: null, skills: ["Sourcing"], employment: [], education: [], projects: [] } as any;
+  it("names the missing current location, and nothing when it is complete", () => {
+    expect(confirmGapsOf(base)).toEqual(["your current city and country"]);
+    expect(confirmGapsOf({ ...base, currentLocation: { city: "Pune", countryCode: "IN", displayCountry: "India" } })).toEqual([]);
+    expect(confirmGapsOf({ ...base, currentLocation: { city: " ", countryCode: "IN", displayCountry: "India" } })).toEqual(["your current city and country"]);
+    expect(confirmGapsOf({ ...base, displayName: "" })).toEqual(["your name", "your current city and country"]);
+  });
+});
+
+describe("assist button says what it does", () => {
+  async function mountAssist(submitLabel?: string) {
+    host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
+    await act(async () => { root!.render(<SparkAssist useCase="exclusions" label="Or tell us in your own words" placeholder="e.g. No travel"
+      context={{ baseVersion: "1" }} interpret={async () => ({ kind: "cannot_help", message: "x" }) as never} onApply={() => undefined}
+      {...(submitLabel ? { submitLabel } : {})} />); });
+  }
+  it("deal-breakers: Turn into deal-breakers", async () => {
+    await mountAssist("Turn into deal-breakers");
+    expect(text()).toContain("Turn into deal-breakers");
+    expect(text()).not.toContain("Show me the changes");
+  });
+  it("elsewhere keeps Show me the changes", async () => {
+    await mountAssist();
+    expect(text()).toContain("Show me the changes");
   });
 });

@@ -351,7 +351,11 @@ describe("candidate setup", () => {
     await mount({ ...lookupYes(false), ...commandServer() });
     await start(); await yes();
     expect(text()).not.toContain("Add your résumé");
-    expect(text()).toContain("Your skills");
+    // The lookup supplied no current location, which Confirm requires, so details is asked next
+    // instead of being skipped (live test, 9 Nov: nothing ever asked for it).
+    expect(text()).toMatch(/(Add|Check) your details/);
+    expect(text()).toContain("Current city");
+    expect(text()).not.toContain("Your skills");
   });
 
   it("reads an uploaded résumé, shows the suggestions, and accepts the kept ones on the server", async () => {
