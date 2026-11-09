@@ -478,3 +478,47 @@ describe('entry-bound dates and honest empty results (Codex LR1–LR3)', () => {
     expect(() => parseSemanticFacts('not json', ctx(source('Skills: Python')))).toThrow('model_output_invalid');
   });
 });
+
+// Live test 8 Nov 2026: gpt-oss-120b returned "notes" as one string. The strict top-level check
+// rejected the whole reply, so every good fact was thrown away ("couldn't read suggestions").
+describe('a malformed notes field never discards the facts', () => {
+  const t = 'Skills: Python, Go';
+  const fact = { kind: 'skill', value: 'Python', evidence: [{ quote: 'Python' }] };
+  const parse = (notes: unknown) => parseSemanticFacts(JSON.stringify({ facts: [fact], notes }), ctx(source(t)));
+  it('keeps the facts when notes is a string, and uses it as one note', () => {
+    const r = parse('Please confirm your current city.');
+    expect(r.facts).toHaveLength(1);
+    expect(r.reviewNotes).toContain('Please confirm your current city.');
+  });
+  it('keeps the facts when notes is empty text, an object, a number or null', () => {
+    for (const notes of ['', { a: 1 }, 7, null]) expect(parse(notes).facts, JSON.stringify(notes)).toHaveLength(1);
+  });
+  it('keeps the facts when there are too many notes', () => {
+    expect(parse(Array.from({ length: 80 }, (_, i) => `note ${i}`)).facts).toHaveLength(1);
+  });
+  it('still refuses a reply with no facts list', () => {
+    expect(() => parseSemanticFacts(JSON.stringify({ notes: [] }), ctx(source(t)))).toThrow('model_output_invalid');
+    expect(() => parseSemanticFacts(JSON.stringify({ facts: 'Python', notes: [] }), ctx(source(t)))).toThrow('model_output_invalid');
+  });
+});
+
+// Live test 8 Nov 2026: a description spanning several résumé bullets is quoted bullet by bullet and
+// joined in the description. It must be kept when it is exactly those verified quotes, in order.
+describe('multi-bullet job descriptions', () => {
+  const t = 'Founder | Acme   Jan 2022 – Dec 2024\n\uF0B7 Built the hiring platform.\n\uF0B7 Hired the first ten engineers.\n\uF0B7 Ran sourcing.';
+  const job = (description: string, quotes: string[]) => ({ kind: 'employment', employer: 'Acme', title: 'Founder', current: false, description,
+    start: { value: '2022-01', precision: 'month' }, end: { value: '2024-12', precision: 'month' }, evidence: quotes.map(x => ({ quote: x })) });
+  const head = 'Founder | Acme   Jan 2022 – Dec 2024';
+  it('keeps a description made of consecutive verified bullets, with its dates', () => {
+    const r = parseSemanticFacts(JSON.stringify({ facts: [job('Built the hiring platform. Hired the first ten engineers.', [head, 'Built the hiring platform.', 'Hired the first ten engineers.'])] }), ctx(source(t)));
+    expect(r.facts).toHaveLength(1);
+    expect(r.facts[0]!.value).toMatchObject({ description: 'Built the hiring platform. Hired the first ten engineers.', start: { value: '2022-01' } });
+  });
+  it('refuses a description with invented words, reordered bullets or a gap', () => {
+    for (const [d, q] of [
+      ['Built the hiring platform. Hired the first hundred engineers.', [head, 'Built the hiring platform.', 'Hired the first ten engineers.']],
+      ['Hired the first ten engineers. Built the hiring platform.', [head, 'Built the hiring platform.', 'Hired the first ten engineers.']],
+      ['Built the hiring platform. Ran sourcing.', [head, 'Built the hiring platform.', 'Hired the first ten engineers.', 'Ran sourcing.']],
+    ] as Array<[string, string[]]>) expect(parseSemanticFacts(JSON.stringify({ facts: [job(d, q)] }), ctx(source(t))).facts, d).toHaveLength(0);
+  });
+});
