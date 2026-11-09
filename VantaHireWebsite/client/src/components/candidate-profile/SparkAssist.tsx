@@ -85,6 +85,8 @@ type Props = {
   onApply: (proposal: Proposal) => string | void;
   /** Shown on the confirm button, e.g. "Use this" or "Update my search". */
   applyLabel?: string | ((proposal: Proposal) => string);
+  /** Label of the button that sends the text (default "Show me the changes"). Say what it does on this step. */
+  submitLabel?: string | undefined;
   /** Heading of the confirmation card (default "Here's what would change"). */
   proposalTitle?: string | undefined;
   autoFocus?: boolean;
@@ -97,7 +99,7 @@ type Props = {
 };
 const FROM: Record<Suggestion["source"], string> = { linkedin: "your LinkedIn profile", resume: "your résumé" };
 
-export function SparkAssist({ useCase, label, placeholder, hint, context, interpret, onApply, applyLabel = "Use this", proposalTitle = "Here's what would change", autoFocus, suggestion, value, onValueChange }: Props) {
+export function SparkAssist({ useCase, label, placeholder, hint, context, interpret, onApply, applyLabel = "Use this", submitLabel = "Show me the changes", proposalTitle = "Here's what would change", autoFocus, suggestion, value, onValueChange }: Props) {
   const id = useId();
   const [ownText, setOwnText] = useState("");
   const direct = !!onValueChange;
@@ -148,7 +150,7 @@ export function SparkAssist({ useCase, label, placeholder, hint, context, interp
             </p>
             {!direct && <Button type="submit" variant="outline" className="min-h-11 cursor-pointer gap-1.5" disabled={busy}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <ArrowRight className="h-4 w-4" aria-hidden />}
-              {busy ? "Reading…" : "Show me the changes"}
+              {busy ? "Reading…" : submitLabel}
             </Button>}
           </div>
           {result?.kind === "cannot_help" && <p className="rounded-lg bg-muted p-3 text-sm text-foreground" role="status">{result.message}</p>}
