@@ -22,7 +22,14 @@ import { SaveStatus, type SaveState } from "./SaveStatus";
 import { ReauthDialog } from "./SparkStates";
 import { DEALBREAKERS_HELP, DEALBREAKERS_TITLE, DealbreakersEditor, DealbreakersSummary, dealbreakersFrom, type DealbreakerState } from "./DealbreakersPanel";
 
-export const PROFILE_QUERY_KEY = ["candidate-product", "profile"] as const;
+export const PROFILE_QUERY_KEY = ["/api/candidate/product/profile"] as const;
+/** Poll only while publication is catching up, for at most a minute per pending version. */
+export function publicationPoll(data: ProfileLoad | undefined, window: { current: { version: string; until: number } | null }): number | false {
+  if (data?.kind !== "ready" || data.profile.capabilities.discoveryBlockedReason !== "publication_pending") { window.current = null; return false; }
+  const version = `${data.profile.profileVersion}:${data.profile.preferenceVersion}`;
+  if (window.current?.version !== version) window.current = { version, until: Date.now() + 60_000 };
+  return Date.now() < window.current.until ? 4000 : false;
+}
 export const CONFIRM_NOTE = "Confirming saves this as your profile. Employers can't see it yet.";
 /** Shown instead when the profile is already published: confirming changes what employers see. */
 export const CONFIRM_NOTE_PUBLISHED = "Confirming updates the profile employers see.";
@@ -36,9 +43,11 @@ type Deps = { load?: (() => Promise<ProfileLoad>) | undefined; command?: Paramet
 type ResolutionDeps = { fetcher?: typeof fetch | undefined; postFetcher?: typeof fetch | undefined; pollMs?: number | undefined };
 
 /** Owner-only career profile. Renders nothing while the feature is off (404). */
-export function CareerProfilePanel({ deps = {} }: { deps?: Deps | undefined }) {
+export function CareerProfilePanel({ deps = {}, userId = null }: { deps?: Deps | undefined; userId?: number | null }) {
   const qc = useQueryClient();
-  const query = useQuery({ queryKey: PROFILE_QUERY_KEY, queryFn: deps.load ?? (() => loadProfile()), staleTime: 0, retry: false });
+  const publicationWindow = useRef<{ version: string; until: number } | null>(null);
+  const query = useQuery({ queryKey: [...PROFILE_QUERY_KEY, "candidate", userId], queryFn: deps.load ?? (() => loadProfile()), staleTime: 0, retry: false, refetchOnWindowFocus: true,
+    refetchInterval: q => publicationPoll(q.state.data, publicationWindow) });
   const refresh = useCallback(() => qc.invalidateQueries({ queryKey: PROFILE_QUERY_KEY }), [qc]);
   // A privacy refusal while saving: reload, so the panel shows the restricted view.
   const onBlocked = useCallback((reason: string) => { if (reason === "candidate_privacy_restricted") void refresh(); }, [refresh]);
@@ -96,10 +105,15 @@ function useSparkActions(refresh: () => unknown, setState: (s: SaveState) => voi
   }
   /** Returns "reauth" when the server needs a recent password check first (nothing was confirmed). */
   async function confirm(spark: SparkProfileRead): Promise<"done" | "reauth" | "failed"> {
+    if (!pending.current) {
+      const session = createSparkSession(spark, deps);
+      const reviewed = { profileVersion: String(spark.draftVersion), preferencesVersion: String(spark.preferenceDraft?.preferenceDraftRevision ?? 0) };
+      pending.current = { key: newKey(), session, run: () => session.confirm(reviewed) };
+    }
     setBusy(true); setState({ kind: "sending" });
     try {
-      await createSparkSession(spark, deps).confirm({ profileVersion: String(spark.draftVersion), preferencesVersion: String(spark.preferenceDraft?.preferenceDraftRevision ?? 0) });
-      setState({ kind: "saved" }); return "done";
+      await pending.current.run();
+      pending.current = null; setUnresolved(false); setState({ kind: "saved" }); return "done";
     } catch (e) {
       if (e instanceof ProfileApiError && e.code === "recent_auth_required") { setState({ kind: "idle" }); return "reauth"; }
       fail(e); return "failed";

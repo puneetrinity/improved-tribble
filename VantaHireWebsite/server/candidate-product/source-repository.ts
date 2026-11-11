@@ -334,6 +334,7 @@ export const SOURCE_TABLES = ['candidate_source_objects','candidate_source_reque
 // tables, budget table, trigger, validator or internal helper is granted here.
 // Résumé reading (B2): the web routes and the background worker call exactly these.
 export const RESUME_SOURCE_RUNTIME_FUNCTIONS = [
+ 'flow_candidate_source_library_status(bigint)',
  ...Object.values(sql).map(s=>s.replace(/^public\./,'')),
  'flow_candidate_source_locator(bigint,integer)','flow_candidate_source_register_object(bigint,jsonb)',
  'flow_candidate_source_object_read(bigint,uuid)','flow_candidate_source_retry(bigint,jsonb)',
@@ -392,6 +393,7 @@ export const SOURCE_OWNER_FUNCTIONS = [...Object.values(sql).map(s=>s.replace(/^
   'flow_candidate_source_lookup_work_finish(uuid,uuid,bigint,text)','flow_candidate_source_lookup_rejection()',
   'flow_candidate_source_shape(jsonb,text[])','flow_candidate_source_uint(jsonb,boolean)',
   'flow_candidate_source_status_value(uuid)','flow_candidate_source_owned_value(uuid)',
+  'flow_candidate_source_library_status(bigint)','flow_candidate_source_library_remove()',
   'flow_candidate_source_owner(bigint)','flow_candidate_source_paid_identity(jsonb)',
   'flow_candidate_source_paid_record(jsonb,boolean)','flow_candidate_source_document(jsonb)'] as const;
 // All SQL returns jsonb matching the return interface; null claim/prepare uses

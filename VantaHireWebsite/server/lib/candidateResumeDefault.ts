@@ -2,7 +2,28 @@
 // unique index enforces at most one); changes are serialized per candidate with an advisory lock
 // so concurrent uploads and make-default calls decide from the rows as they are now.
 import { and, eq, sql } from 'drizzle-orm';
-import { candidateResumes } from '../../shared/schema';
+import { candidateResumes, applications } from '../../shared/schema';
+
+/** Remove only an owned library row. Application snapshots and storage objects are retained. */
+export async function removeLibraryResume(db: any, userId: number, resumeId: number): Promise<boolean> {
+  return db.transaction(async (tx: any) => {
+    // Same ordering as source workers, then library upload/default operations.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(41943, ${userId}::integer)`);
+    await lockCandidateResumeDefault(tx, userId);
+    const own = await tx.select({ id: candidateResumes.id }).from(candidateResumes)
+      .where(and(eq(candidateResumes.userId, userId), eq(candidateResumes.id, resumeId))).limit(1);
+    if (!own.length) return false;
+    await tx.update(applications).set({ resumeId: null })
+      .where(and(eq(applications.resumeId, resumeId), eq(applications.userId, userId)));
+    await tx.delete(candidateResumes).where(and(eq(candidateResumes.id, resumeId), eq(candidateResumes.userId, userId)));
+    const remaining = await tx.select({ id: candidateResumes.id, isDefault: candidateResumes.isDefault }).from(candidateResumes)
+      .where(eq(candidateResumes.userId, userId)).orderBy(candidateResumes.id);
+    if (remaining.length && !remaining.some((r: any) => r.isDefault))
+      await tx.update(candidateResumes).set({ isDefault: true }).where(eq(candidateResumes.id, remaining[0].id));
+    return true;
+  });
+
+}
 
 export const CANDIDATE_RESUME_DEFAULT_LOCK = 0x52534d44; // "RSMD"
 

@@ -10,6 +10,7 @@ import { createSparkSession, loadSparkProfile, type SparkProfileRead } from "@/l
 import { resumeAdapters, ResumeReadError, ResumeReadStatus, type ResumeRead } from "./SourceReview";
 import { ResumeReviewList, type ResumeItem } from "./OnboardingWizard";
 import { PROFILE_QUERY_KEY } from "./CareerProfilePanel";
+import { candidateResumesQueryKey } from "@/hooks/use-candidate-job-state";
 
 /** "Not now" is remembered per account and résumé, so we don't ask again about the same file. */
 const dismissKey = (userId: number, resumeId: number) => `ealana:resume-offer-dismissed:${userId}:${resumeId}`;
@@ -27,7 +28,7 @@ type Stage =
   // The save may or may not have been applied: same proposal, choices and command key; never re-read.
   | { kind: "save_failed"; proposalId: string; items: ResumeItem[] }
   // Reading failed: only the server's own retry (when it allows one) — never a fresh read.
-  | { kind: "read_failed"; read: Extract<ResumeRead, { kind: "failed" | "error" }> }
+  | { kind: "read_failed"; read: Extract<ResumeRead, { kind: "failed" | "error" | "pending" }> }
   | { kind: "done" };
 
 export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProfile = () => loadSparkProfile() }: {
@@ -37,8 +38,10 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
   const [choice, setChoice] = useState<Record<string, "keep" | "remove" | "profile" | "resume">>({});
   const [edits, setEdits] = useState<Record<string, string>>({});
   const adapters = useRef<ReturnType<typeof resumeAdapters> | null>(null);
+  const generation = useRef(0);
 
   useEffect(() => {
+    generation.current++;
     let live = true;
     if (offerDismissed(userId, resumeId)) { setStage({ kind: "hidden" }); return; }
     loadProfile().then(l => {
@@ -49,16 +52,21 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
       adapters.current = resumeAdapters({ session: createSparkSession(p), currentProfile: () => p.draft ?? p.confirmedProfile });
       setStage({ kind: "offer" });
     }, () => { if (live) setStage({ kind: "hidden" }); });
-    return () => { live = false; };
+    return () => { live = false; generation.current++; };
   }, [userId, resumeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function load(run: () => Promise<{ resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined }>) {
+    const current = generation.current;
     setStage({ kind: "reading" }); setChoice({}); setEdits({});
     try {
       const x = await run();
+      if (current !== generation.current) return;
       setStage(x.items.length ? { kind: "review", proposalId: x.resumeVersionId, items: x.items } : { kind: "nothing_new", why: x.unreadable ? "unreadable" : x.unmatched ? "unmatched" : "empty" });
     } catch (e) {
+      if (current !== generation.current) return;
       setStage({ kind: "read_failed", read: e instanceof ResumeReadError ? e.read : { kind: "error", message: "We couldn't read this résumé." } });
+    } finally {
+      if (current === generation.current) void queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
     }
   }
   const read = () => load(() => adapters.current!.readResumeById(resumeId));
@@ -70,7 +78,9 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
     await queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY }).catch(() => undefined);
     setStage({ kind: "done" });
   }
-  function notNow() { dismiss(userId, resumeId); onClose(); }
+  function notNow() { generation.current++; dismiss(userId, resumeId); onClose(); }
+  // Closing a running or pending read is not a permanent rejection of its offer.
+  function closeRead() { generation.current++; setStage({ kind: "hidden" }); onClose(); }
 
   if (stage.kind === "checking" || stage.kind === "hidden") return null;
   return (
@@ -89,12 +99,12 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
                 : "We didn't find anything to add from this résumé.")
               : stage.kind === "done" ? "Saved to your draft. Confirm changes on your profile to update what employers see."
               : stage.kind === "save_failed" ? "We couldn't confirm your changes were saved. Try again to check — your choices are kept."
-              : stage.kind === "read_failed" ? "We couldn't read this résumé."
+              : stage.kind === "read_failed" ? (stage.read.kind === "pending" ? "The résumé result is still pending." : "We couldn't read this résumé.")
               : "Keep what's right, edit or remove the rest. Only what's different from your profile is shown."}
           </p>
         </div>
       </div>
-      {stage.kind === "reading" && <p className="flex items-center gap-2 text-sm text-muted-foreground"><TetrisOrb label="Reading your résumé" decorative />This can take a minute.</p>}
+      {stage.kind === "reading" && <><p className="flex items-center gap-2 text-sm text-muted-foreground"><TetrisOrb label="Reading your résumé" decorative />This can take a minute. Closing this panel doesn't cancel the read.</p><Button variant="outline" onClick={closeRead}>Close</Button></>}
       {(stage.kind === "review" || stage.kind === "saving" || stage.kind === "save_failed") && (
         // Locked while a save is in flight or unresolved, so the screen always shows what was submitted.
         <fieldset disabled={stage.kind !== "review"} className="min-w-0 disabled:opacity-80">
@@ -103,7 +113,7 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
       )}
       {stage.kind === "read_failed" && (
         <ResumeReadStatus read={stage.read} fileName={label}
-          onRetry={commandId => void load(() => adapters.current!.retryResume(commandId))} onContinue={notNow} />
+          onRetry={commandId => void load(() => adapters.current!.retryResume(commandId))} onContinue={closeRead} continueLabel="Close" />
       )}
       <div className="flex flex-wrap gap-2">
         {stage.kind === "offer" && <>

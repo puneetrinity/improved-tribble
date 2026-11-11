@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 const state = vi.hoisted(() => ({ props: null as any, load: vi.fn() }));
 vi.mock("@/hooks/use-auth", () => ({ useAuth: () => ({ user: { id: 9, role: "candidate", emailVerified: true }, logoutMutation: { mutate: vi.fn() } }) }));
 vi.mock("@/components/candidate-portal/CandidatePortal", () => ({ CandidatePortal: (props: any) => { state.props = props; return null; } }));
-vi.mock("@/components/candidate-profile/CareerProfilePanel", () => ({ PROFILE_QUERY_KEY: ["candidate-product", "profile"], CareerProfilePanel: () => null }));
+vi.mock("@/components/candidate-profile/CareerProfilePanel", async importOriginal => ({ ...await importOriginal<typeof import('./CareerProfilePanel')>(), CareerProfilePanel: () => null }));
 vi.mock("@/lib/candidate-profile-api", () => ({ loadProfile: () => state.load() }));
 import CandidatePortalPage from "@/pages/candidate-portal-page";
 

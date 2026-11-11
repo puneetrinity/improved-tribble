@@ -32,7 +32,7 @@ describe.skipIf(!url)('v3 queue on the full Flow schema and restricted runtime',
   const roleUrl=(role:string)=>`postgresql://${role}:synthetic-local-only@127.0.0.1:${port}/${database}`;
   const migrationsDir=resolve('server/schema-migrations'),target='spark-queue-'+suffix;
   const input={migrationsDir,creds:{migrateUrl:roleUrl(owner),expectedTargetId:target,environment:'development' as const,allowFreshInitialization:true},connect:()=>adapter(owner)};
-  expect((await runReleaseMigration(input)).applied).toHaveLength(31);
+  expect((await runReleaseMigration(input)).applied).toHaveLength(32);
   expect((await runReleaseMigration(input)).applied).toEqual([]);
   console.log('Retained full-schema Spark queue fixture',database);
   const catalogClient=await connect(owner);try{console.log('Source catalogue', (await catalogClient.query(SOURCE_CATALOG_SQL,[owner,[]])).rows[0].digest);

@@ -26,7 +26,6 @@ export interface ResumeSourceRouteDependencies {
   identity: (req: Request) => Promise<Actor>;
   requireCandidate: Middleware;
   csrf: Middleware;
-  recentAuth: Middleware;
 }
 
 export const RESUME_SOURCE_PATHS = {
@@ -67,7 +66,9 @@ export function registerResumeSourceRoutes(app: Express, deps: ResumeSourceRoute
     res.setHeader('Cache-Control', 'no-store');
     next();
   };
-  const post = [available, deps.requireCandidate, deps.csrf, deps.recentAuth];
+  // Reading an owned résumé does not publish a profile or change consent.
+  // Keep the authenticated candidate and CSRF checks, without a fresh-login gate.
+  const post = [available, deps.requireCandidate, deps.csrf];
   const parse = <T>(schema: z.ZodType<T>, req: Request, res: Response): T | null => {
     try { const r = schema.safeParse(jsonBody(req)); if (r.success) return r.data; } catch { /* falls through */ }
     res.status(422).json({ code: 'invalid_request' });

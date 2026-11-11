@@ -351,20 +351,35 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUpload, setShowUpload] = useState(false);
+  const [removeFor, setRemoveFor] = useState<{ id: number; label: string } | null>(null);
+  const [removing, setRemoving] = useState(false);
   // The résumé that just became the default: offer to update the profile from it (only the default does).
   const [offerFor, setOfferFor] = useState<{ id: number; label: string } | null>(null);
   // "Add résumé" in the reminder opens the uploader here and scrolls to it.
   useEffect(() => { if (openUpload) { setShowUpload(true); setTimeout(() => document.getElementById("resumes-title")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); } }, [openUpload]);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("resumes") !== "1") return;
+    const timer = setTimeout(() => document.getElementById("resumes-title")?.scrollIntoView({ block: "start" }), 50);
+    return () => clearTimeout(timer);
+  }, []);
 
   async function upload() {
     if (!file || !routingKnown) return;
-    if (resumes.length >= 3) { setError("You can keep up to 3 résumés. Delete one before adding another."); return; }
+    if (resumes.length >= 3) { setError("Your résumé library already has 3 files. Use a résumé from My profile, or remove a file there before uploading another."); return; }
     setUploading(true); setError(null);
     try {
       const form = new FormData(); form.append("resume", file); form.append("label", file.name.replace(/\.[^.]+$/, ""));
       if (resumeRouting === "spark") form.append("readBy", "spark");
       const r = await fetchWithCsrf("/api/ai/resume", { method: "POST", body: form });
-      if (!r.ok) throw new Error();
+      if (!r.ok) {
+        const refusal = await r.json().catch(() => null);
+        if (refusal?.code === "resume_limit_reached" || refusal?.error === "Maximum 3 resumes allowed") {
+          setError("Your résumé library already has 3 files. Use a résumé from My profile, or remove a file there before uploading another.");
+          await queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
+          return;
+        }
+        throw new Error();
+      }
       const saved = (await r.json().catch(() => null))?.resume;
       setFile(null); setShowUpload(false); await queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
       // A new upload is stored only, unless it became the default (the first one does). Only a
@@ -382,8 +397,15 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
     } catch { setError("Couldn't make that your default résumé. Please try again."); }
   }
   async function remove(id: number) {
-    try { await apiRequest("DELETE", `/api/ai/resume/${id}`); await queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey }); }
-    catch { setError("Couldn't delete that résumé. Please try again."); }
+    if (removing) return;
+    setRemoving(true); setError(null);
+    try {
+      await apiRequest("DELETE", `/api/ai/resume/${id}`);
+      setRemoveFor(null);
+      if (offerFor?.id === id) setOfferFor(null);
+      await queryClient.invalidateQueries({ queryKey: candidateResumesQueryKey });
+    } catch { setError("Couldn't remove that résumé. Please try again."); }
+    finally { setRemoving(false); }
   }
 
   return (
@@ -420,15 +442,21 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
             )}
           </div>
         )}
-        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        {error && <p role="alert" className="text-sm text-destructive">{error}{error.includes("3 files") && <> <a href="#profile" onClick={e => { e.preventDefault(); document.getElementById("resumes-title")?.scrollIntoView({ block: "start" }); }} className="underline">Manage résumés</a></>}</p>}
+        {removeFor && <div role="group" aria-label="Confirm résumé removal" className="space-y-2 rounded-lg border p-3">
+          <p>Remove “{removeFor.label}” from your library? Résumés already submitted with applications will stay available to those employers.</p>
+          <Button disabled={removing} onClick={() => void remove(removeFor.id)}>{removing ? "Removing…" : "Remove résumé"}</Button>
+          <Button variant="ghost" disabled={removing} onClick={() => setRemoveFor(null)}>Cancel removal</Button>
+        </div>}
         {resumes.length > 0 ? (
-          <ul className="divide-y divide-border">
+          <ul id="resume-library" className="divide-y divide-border">
             {resumes.map((r: any) => (
               <li key={r.id} className="flex items-center gap-3 py-3">
                 <FileText className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
                 <div className="min-w-0 flex-1"><p className="truncate font-medium">{r.label}{r.isDefault && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Default</span>}</p><p className="text-sm text-muted-foreground">Uploaded {new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
                 {!r.isDefault && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer text-muted-foreground" onClick={() => void makeDefault(r)} aria-label={`Make ${r.label} your default résumé`}>Make default</Button>}
-                <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1.5 text-muted-foreground" onClick={() => void remove(r.id)} aria-label={`Delete ${r.label}`}><Trash2 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Delete</span></Button>
+                {r.readFailed === true && <span className="text-sm text-destructive">Couldn’t read</span>}
+                <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1.5 text-muted-foreground" disabled={removing} onClick={() => setRemoveFor({ id: r.id, label: r.label })} aria-label={`Remove ${r.label}`}><Trash2 className="h-4 w-4" aria-hidden /><span>Remove</span></Button>
               </li>
             ))}
           </ul>

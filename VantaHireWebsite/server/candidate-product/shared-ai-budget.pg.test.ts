@@ -22,12 +22,13 @@ describe.skipIf(!adminUrl)('shared AI monetary allowance (real PostgreSQL)',()=>
   const input={migrationsDir:resolve('server/schema-migrations'),creds:{migrateUrl:`postgresql://${owner}@127.0.0.1:${port}/${database}`,expectedTargetId:'shared-ai-'+suffix,environment:'development' as const,allowFreshInitialization:true},
    connect:async()=>{const c=await connection();return {query:(s:string,p?:readonly unknown[])=>c.query(s,p as any),end:()=>c.end()};}};
   const prior=mkdtempSync(resolve(tmpdir(),'spark-budget-upgrade-'));
-  for(const file of readdirSync(input.migrationsDir))if(!file.startsWith('0029_')&&!file.startsWith('0030_'))copyFileSync(resolve(input.migrationsDir,file),resolve(prior,file));
+  for(const file of readdirSync(input.migrationsDir))if(!file.startsWith('0029_')&&!file.startsWith('0030_')&&!file.startsWith('0031_'))copyFileSync(resolve(input.migrationsDir,file),resolve(prior,file));
   const priorLock=JSON.parse(readFileSync(resolve(prior,'checksums.lock'),'utf8'));delete priorLock.migrations['0029'];
   delete priorLock.migrations['0030'];
+  delete priorLock.migrations['0031'];
   writeFileSync(resolve(prior,'checksums.lock'),JSON.stringify(priorLock));
   expect((await runReleaseMigration({...input,migrationsDir:prior})).applied).toHaveLength(29);
-  expect((await runReleaseMigration(input)).applied).toEqual(['0029','0030']);
+  expect((await runReleaseMigration(input)).applied).toEqual(['0029','0030','0031']);
   expect((await runReleaseMigration(input)).applied).toEqual([]);
   db=await connection();console.log('SHARED_AI_FIXTURE',database,'SOURCE_DIGEST',(await db.query(SOURCE_CATALOG_SQL,[owner,[]])).rows[0].digest);
  },60000);

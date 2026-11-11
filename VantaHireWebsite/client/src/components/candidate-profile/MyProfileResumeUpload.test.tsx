@@ -14,13 +14,13 @@ const flush = async (n = 10) => { for (let i = 0; i < n; i++) await act(async ()
 const button = (name: string) => Array.from(document.querySelectorAll("button")).find(b => b.textContent?.trim() === name);
 
 type Routing = "spark" | "ordinary" | "checking" | "unavailable";
-async function uploadOnce(routing: Routing, isDefault: boolean, onRetry?: () => void) {
+async function uploadOnce(routing: Routing, isDefault: boolean, onRetry?: () => void, limitRefusal = false) {
   const uploads: FormData[] = []; const paths: string[] = [];
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost"); paths.push(`${init?.method ?? "GET"} ${url.pathname}`);
     if (url.pathname === "/api/csrf-token") return json(200, { token: "t" });
-    if (url.pathname === "/api/ai/resume" && init?.method === "POST") { uploads.push(init.body as FormData); return json(200, { resume: { id: 7, label: "cv", isDefault } }); }
+    if (url.pathname === "/api/ai/resume" && init?.method === "POST") { uploads.push(init.body as FormData); return limitRefusal ? json(400, { code: "resume_limit_reached" }) : json(200, { resume: { id: 7, label: "cv", isDefault } }); }
     if (url.pathname === "/api/ai/resume") return json(200, { resumes: [] });
     return json(503, {});
   }));
@@ -41,6 +41,12 @@ async function uploadOnce(routing: Routing, isDefault: boolean, onRetry?: () => 
 }
 
 describe("My profile résumé upload", () => {
+  it("a server-side library limit is explained even when the browser's list is stale", async () => {
+    await uploadOnce("spark", true, undefined, true);
+    expect(document.body.textContent).toContain("Your résumé library already has 3 files.");
+    expect(document.body.textContent).toContain("remove a file there before uploading another");
+    expect(document.body.textContent).not.toContain("Upload failed");
+  });
   it("a Spark candidate's upload asks for the no-OCR path and reads nothing until asked", async () => {
     const { form, paths } = await uploadOnce("spark", true);
     expect(form.get("readBy")).toBe("spark");

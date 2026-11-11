@@ -333,10 +333,11 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
     "roles", "where", ...(abroad.length ? ["authorisation" as const] : []), "pay", ...(dealbreakersOn ? ["dealbreakers" as const] : []), "review",
   ]), [resume, restoredResume, recentRoles.length, abroad.length, resumeOn, dealbreakersOn, resuming, match, confirmGaps.length]);
   useEffect(() => {
-    if (!resuming || !resumeOn || !pendingResume) return;
+    if (!resumeOn || !pendingResume) return;
     let live = true;
+    const generation = resumeGeneration.current;
     // An empty review that says why (couldn't read / couldn't match) is restored too, with its message.
-    pendingResume().then(x => { if (live && x && (x.items.length || emptyKind(x) !== "none")) { setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); setRestoredResume(true); setKey("resumeReview"); } }, () => undefined);
+    pendingResume().then(x => { if (live && generation === resumeGeneration.current && x) { setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); setRestoredResume(true); setKey("resumeReview"); } }, () => undefined);
     return () => { live = false; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const step = Math.max(0, steps.indexOf(key));
@@ -389,13 +390,17 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
     setRetry(r => ({ ...r, phase: "done", result }));
     if (result !== "none") setProfile(p => ({ ...p, linkedinUrl: url }));
   }
+  const resumeGeneration = useRef(0);
+  useEffect(() => () => { resumeGeneration.current++; }, []);
   async function loadResume(read: () => Promise<ResumeExtraction>) {
+    const generation = ++resumeGeneration.current;
     setResumeItems(null); setResumeFailure(null); setResumeVersionId(null); setResumeChoice({}); setResumeEdits({}); setResumeEmpty("none");
-    try { const x = await read(); setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); }
+    try { const x = await read(); if (generation !== resumeGeneration.current) return; setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); }
     // An unexpected error is a failed read (with its retry card), never "nothing new".
-    catch (e) { setResumeFailure(e instanceof ResumeReadError ? e.read : { kind: "error", message: resumeRequestCopy(e) }); }
+    catch (e) { if (generation !== resumeGeneration.current) return; setResumeFailure(e instanceof ResumeReadError ? e.read : { kind: "error", message: resumeRequestCopy(e) }); }
   }
   async function chooseResume(f: File | null) {
+    resumeGeneration.current++;
     setResume(f); setResumeItems(null); setResumeVersionId(null); setResumeChoice({}); setResumeEdits({}); setResumeFailure(null);
     if (f && readResume) await loadResume(() => readResume(f, sortedRows(profile)));
   }

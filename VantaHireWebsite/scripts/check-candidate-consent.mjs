@@ -10,7 +10,7 @@ export const FROZEN = {
   "server/schema-migrations/catalog.lock.json": "999636b7722cc305b10f71b9a096cc75701400ff49aea91435f839cadf13b90c",
   "server/applications.routes.ts": "eb7ed48fe615c4566429863128675214fa07bf4ac2e2a824a8567566bba911a0",
   "server/storage.ts": "a8680da684c2363ab56d1a0749cc561db08a201771af0a437f23d739a158eed7",
-  "server/ai.routes.ts": "9277e81d5804df46568f90c62e6e44fe338abd87d2b21537fe0a5e994801f748",
+  "server/ai.routes.ts": "a55028d089dc1504c3ebbeb000063faa1e2912a968abea51e8df8de749d683bf",
   "server/profile.routes.ts": "c5a54f2f4c9146c2032079cccf4730580aea4df10ec24bd8f82d95a3c0fc9376",
   "server/auth.ts": "5f4d5f97219e88ab38e71753d5c201707081de5ac10a2c6a78a596a6bbb712e7",
   "server/candidatePortal.routes.ts": "ca44e6ece78601511681bf33bcf5308353a8ccd41198c24726a36e1d394c4da6",

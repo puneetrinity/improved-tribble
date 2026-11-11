@@ -12,7 +12,7 @@ export const FROZEN = {
   "client/src/components/candidate/CandidateConsentPanel.tsx": "2f5f4541548f0fc02808f3d005c8a75f00c2d2fa9984f54c78ce661725d5afaa",
   "package-lock.json": "b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539",
   "playwright.config.ts": "98cf29f15ddd205e42c713db919a54737bedcf2437b410c61f33df4f75d43e46",
-  "server/ai.routes.ts": "9277e81d5804df46568f90c62e6e44fe338abd87d2b21537fe0a5e994801f748",
+  "server/ai.routes.ts": "a55028d089dc1504c3ebbeb000063faa1e2912a968abea51e8df8de749d683bf",
   "server/auth.ts": "5f4d5f97219e88ab38e71753d5c201707081de5ac10a2c6a78a596a6bbb712e7",
   "server/candidate-consent/contracts.ts": "07bf05a48f5c475f3b44d30d1092196b106a5423174e4794a816ff8e9edb756e",
   "server/candidate-consent/memory-client.ts": "af32e401541bf21a8fdf33e09cc78c095948efaa62f151bd641a194b6eed8371",

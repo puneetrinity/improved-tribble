@@ -40,6 +40,27 @@ async function mount(canRequestResume: boolean, routes: Record<string, () => Res
 }
 
 describe("default résumé profile update", () => {
+  it("closing a running read is temporary and a late result cannot reopen it", async () => {
+    let finish!: (r: Response) => void;
+    const pending = new Promise<Response>(resolve => { finish = resolve; });
+    const { onClose } = await mount(true, {
+      "POST /api/candidate/product/sources/resume-snapshots": () => pending,
+      "POST /api/candidate/product/sources/resume": () => json(202, { commandId: RCMD, sourceId: RSRC, sourceVersion: 1, state: "review_ready", reason: null, proposalId: RPROP }),
+      [`GET /api/candidate/product/sources/${RSRC}/proposals/${RPROP}`]: () => json(200, resumeProposal),
+    });
+    await act(async () => { button("Review suggestions")!.click(); });
+    expect(button("Continue without résumé")).toBeUndefined();
+    await act(async () => { button("Close")!.click(); });
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(offerDismissed(9, 7)).toBe(false);
+    finish(json(200, { schemaVersion: 1, sourceId: RSRC, sourceVersion: 1, contentHash: "e".repeat(64) }));
+    await flush();
+    expect(text()).toBe("");
+    act(() => root!.unmount()); root = null; host!.remove();
+    await mount(true);
+    expect(button("Review suggestions")).toBeDefined();
+  });
+
   it("shows nothing when résumé reading is off", async () => {
     const { calls } = await mount(false);
     expect(text()).toBe("");
