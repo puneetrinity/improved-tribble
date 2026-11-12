@@ -79,6 +79,16 @@ it('restores a fresh candidate résumé proposal without an existing draft',asyn
  } finally {await act(async()=>root.unmount());host.remove();}
 });
 
+it('restore skips an empty past résumé read and reopens the newest one with suggestions',async()=>{
+ const empty={proposalId:'old',sourceId:'s-old',sourceKind:'resume',facts:[],reviewNotes:['unreadable']};
+ const full={proposalId:'new',sourceId:'s-new',sourceKind:'resume',facts:[{factId:'f1',kind:'skill',value:'SYNTH_SKILL',evidence:'SYNTH_SKILL'}]};
+ const fetchProposal=vi.fn(async(sourceId:string)=>sourceId==='s-old'?empty:full);
+ const adapter=resumeAdapters({session:{acceptSource:vi.fn()},currentProfile:()=>null,deps:{fetchProposal:fetchProposal as any}});
+ await expect(adapter.restore([{proposalId:'old',kind:'source',sourceId:'s-old'}])).resolves.toBeNull();
+ await expect(adapter.restore([{proposalId:'old',kind:'source',sourceId:'s-old'},{proposalId:'new',kind:'source',sourceId:'s-new'}]))
+  .resolves.toMatchObject({resumeVersionId:'new'});
+});
+
 it('account-change cleanup removes the prior candidate Spark profile',()=>{
  const privateProfile={displayName:'Synthetic previous account',privateNotes:['private synthetic note']};
  queryClient.setQueryData(PROFILE_QUERY_KEY,privateProfile);

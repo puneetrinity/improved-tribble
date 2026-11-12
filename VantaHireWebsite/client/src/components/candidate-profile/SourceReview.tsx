@@ -259,6 +259,9 @@ export function resumeAdapters(o: {
         if (s.kind !== "source" || !s.sourceId) continue;
         const raw = await (deps.fetchProposal ?? fetchSourceProposal)(s.sourceId, s.proposalId).catch(() => null) as SourceProposal & { sourceKind?: string } | null;
         if (!raw || raw.proposalId !== s.proposalId || raw.sourceKind !== "resume" || !Array.isArray(raw.facts)) continue;
+        // An empty past read (unreadable or unmatched file) has nothing to review: reopening it
+        // would show an old "couldn't read" result instead of letting the candidate upload again.
+        if (raw.facts.length === 0) continue;
         proposals.set(raw.proposalId, raw);
         return { resumeVersionId: raw.proposalId, items: proposalItems(raw), ...emptyReason(raw) };
       }
