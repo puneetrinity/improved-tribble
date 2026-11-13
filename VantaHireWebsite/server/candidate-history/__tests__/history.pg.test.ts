@@ -58,8 +58,14 @@ describe.skipIf(!enabled)("history exact 4D-to-4E release", () => {
       expect((await owner.query("SELECT row_to_json(m) AS value FROM schema_control.applied m WHERE version<'0013' ORDER BY version")).rows).toEqual(before);
       expect((await owner.query("SELECT count(*)::int AS n FROM decision_events")).rows[0].n).toBe(0);
       expect((await release(migrations)).applied).toEqual(loadManifest(migrations).filter(e=>Number(e.version)>=14).map(e=>e.version));
-      await provisionRuntimeRole({ migrateUrl: dsn, runtimeUrl, runtimeRole: runtimeTarget.username,
-        expectedTargetId: target, connectMigration: connector, connectRuntime: connector });
+      try { await provisionRuntimeRole({ migrateUrl: dsn, runtimeUrl, runtimeRole: runtimeTarget.username,
+        expectedTargetId: target, connectMigration: connector, connectRuntime: connector }); }
+      catch (e) { // TEMP ONB-2 diagnostic
+        const { SOURCE_CATALOG_SQL } = await import("../../schema-control/readiness");
+        const { SOURCE_RUNTIME_FUNCTIONS } = await import("../../candidate-product/source-repository");
+        const r = (await owner.query(SOURCE_CATALOG_SQL, [runtimeTarget.username, [...SOURCE_RUNTIME_FUNCTIONS]])).rows[0];
+        const cols = (await owner.query("SELECT attname FROM pg_attribute WHERE attrelid='public.candidate_source_jobs'::regclass AND attnum>0 AND NOT attisdropped ORDER BY attnum")).rows.map((x: { attname: string }) => x.attname).join(",");
+        console.log("ONB2DIAG", r.digest, r.privileges, cols); throw e; }
       await runtime.query("BEGIN READ ONLY");
       expect((await runtime.query("SELECT flow_read_candidate_history_context(1,1,1) AS value")).rows[0].value).toBeNull();
       await runtime.query("ROLLBACK");
