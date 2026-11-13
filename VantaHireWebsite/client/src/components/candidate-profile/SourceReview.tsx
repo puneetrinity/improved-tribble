@@ -16,7 +16,7 @@ import type { ManualProfile } from "@/lib/candidate-profile-api";
 import { EMPTY_PROFILE } from "./ProfessionalDetailsForm";
 import {
   fetchSourceProposal, lookupStatus, newKey, ProfileApiError, resumeFailureCopy, resumeInProgress, startLookup, startResumeRead, tryResumeAgain, uploadLibraryResume,
-  watchLookup, watchResume, type LookupStatus, type ResumeRunDeps, type ResumeSourceStatus,
+  watchLookup, watchResume, rereadCompletedResume, type LookupStatus, type ResumeRunDeps, type ResumeSourceStatus,
 } from "@/lib/candidate-profile-api";
 
 export type ResumeRead =
@@ -25,7 +25,7 @@ export type ResumeRead =
   | { kind: "ready"; status: ResumeSourceStatus }
   | { kind: "failed"; status: ResumeSourceStatus }
   | { kind: "pending"; commandId: string }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string; rereadCommandId?: string };
 
 const REQUEST_COPY: Record<number, string> = {
   409: "This résumé changed. Please choose it again.",
@@ -36,6 +36,8 @@ const REQUEST_GENERIC = "We couldn't start reading your résumé. Please try aga
 // OCR/server failures keep the generic copy and the bounded Try again.
 const REQUEST_UNREADABLE = "We couldn't read this résumé. Try another PDF or Word file with selectable text, or fill in your profile yourself.";
 export function resumeRequestCopy(e: unknown): string {
+  if (e instanceof ProfileApiError && e.code === "source_attempt_limit")
+    return "This file has reached its 3-reading limit. You can add your details manually; your saved résumé and applications are unchanged.";
   if (e instanceof ProfileApiError && (e.code === "resume_limit_reached" || e.code === "Maximum 3 resumes allowed"))
     return "Your résumé library already has 3 files. Use a résumé from My profile, or remove a file there before uploading another.";
   if (e instanceof ProfileApiError && (e.status === 401 || e.code === "recent_auth_required"))
@@ -130,6 +132,7 @@ export function ResumeReadStatus({ read, fileName, onRetry, onContinue, continue
           <RefreshCw className="mr-2 h-4 w-4" aria-hidden />Try again
         </Button>
       )}
+      {read.kind === "error" && read.rereadCommandId && <Button onClick={() => onRetry(read.rereadCommandId!)}>Read file again</Button>}
       <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={onContinue}>{continueLabel ?? "Fill in my profile myself"}</Button>
     </Card>
   );
@@ -207,6 +210,29 @@ export function resumeAdapters(o: {
   const commands = new Map<number, ResumeSourceStatus>();
   const pendingChecks = new Set<string>();
   const retryKeys = new Map<string, string>();
+  const rereadKeys = new Map<string, string>();
+  const completed = new Map<string, ResumeSourceStatus>();
+  async function reread(commandId: string) {
+    const prior = completed.get(commandId);
+    if (!prior) throw new ResumeReadError({ kind: "error", message: REQUEST_GENERIC });
+    if (!rereadKeys.has(commandId)) rereadKeys.set(commandId, (deps.newKey ?? newKey)());
+    let last: ResumeSourceStatus | null = null;
+    try {
+      return await extraction(await rereadCompletedResume(prior, rereadKeys.get(commandId)!, s => {
+        last = s;
+        for (const [id, old] of commands) if (old.sourceId === s.sourceId) commands.set(id, s);
+      }, deps));
+    } catch (e) {
+      const status = last as ResumeSourceStatus | null;
+      if (e instanceof ProfileApiError && e.code === "resume_status_pending" && status) {
+        pendingChecks.add(status.commandId);
+        throw new ResumeReadError({ kind: "pending", commandId: status.commandId });
+      }
+      // Retrying a lost queue reply reuses the original completed command/key.
+      if (e instanceof ProfileApiError && (e.status === 0 || e.status >= 500)) throw new ResumeReadError({ kind: "error", message: "We couldn't confirm the new reading. Retry to check the same request.", rereadCommandId: commandId });
+      throw asReadError(e);
+    }
+  }
   async function readStored(resumeId: number) {
     if (!requestKeys.has(resumeId)) requestKeys.set(resumeId, { snapshot: (deps.newKey ?? newKey)(), queue: (deps.newKey ?? newKey)() });
     let last = commands.get(resumeId);
@@ -226,14 +252,22 @@ export function resumeAdapters(o: {
   }
   async function extraction(s: ResumeSourceStatus) {
     if (s.state !== "review_ready" || !s.proposalId) throw new ResumeReadError({ kind: "failed", status: s });
-    const raw = await (deps.fetchProposal ?? fetchSourceProposal)(s.sourceId, s.proposalId) as SourceProposal;
+    completed.set(s.commandId, s);
+    let raw: SourceProposal;
+    try { raw = await (deps.fetchProposal ?? fetchSourceProposal)(s.sourceId, s.proposalId) as SourceProposal; }
+    catch (e) {
+      if (e instanceof ProfileApiError && (e.status >= 500 || e.status === 404))
+        throw new ResumeReadError({ kind: "error", message: "We couldn't load the saved suggestions. You can request a new reading of this file without uploading another copy.", rereadCommandId: s.commandId });
+      throw e;
+    }
     if (!raw || raw.proposalId !== s.proposalId || raw.sourceId !== s.sourceId || !Array.isArray(raw.facts)) throw new ResumeReadError({ kind: "error", message: REQUEST_GENERIC });
     proposals.set(raw.proposalId, raw);
-    return { resumeVersionId: raw.proposalId, items: proposalItems(raw), ...emptyReason(raw) };
+    return { resumeVersionId: raw.proposalId, items: proposalItems(raw), rereadCommandId: s.commandId, ...emptyReason(raw) };
   }
   const asReadError = (e: unknown) => e instanceof ResumeReadError ? e
     : new ResumeReadError({ kind: "error", message: resumeRequestCopy(e) });
   return {
+    rereadResume: reread,
     async readResume(file: File) {
       try {
         if (!uploaded.has(file)) {
@@ -273,6 +307,7 @@ export function resumeAdapters(o: {
       return null;
     },
     async retryResume(commandId: string) {
+      if (completed.has(commandId)) return reread(commandId);
       if (pendingChecks.has(commandId)) {
         try {
           const result = await watchResume(commandId, s => {

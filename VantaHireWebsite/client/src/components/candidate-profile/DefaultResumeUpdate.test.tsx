@@ -23,7 +23,7 @@ const fact = (n: number, kind: string, value: unknown) => ({ factId: `40000000-0
 const resumeProposal = { schemaVersion: 1, proposalId: RPROP, sourceId: RSRC, sourceVersion: 1, proposalHash: "d".repeat(64), reviewNotes: [], expiresAt: "2026-11-09T00:00:00.000Z",
   facts: [fact(7, "skill", "Kubernetes"), fact(8, "skill", "Terraform")] };
 
-async function mount(canRequestResume: boolean, routes: Record<string, () => Response | Promise<Response>> = {}) {
+async function mount(canRequestResume: boolean, routes: Record<string, () => Response | Promise<Response>> = {}, explicit = false) {
   const calls: { key: string; body: any }[] = [];
   vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input), "http://localhost"), key = `${init?.method ?? "GET"} ${url.pathname}`;
@@ -33,13 +33,19 @@ async function mount(canRequestResume: boolean, routes: Record<string, () => Res
   }));
   const onClose = vi.fn();
   host = document.createElement("div"); document.body.appendChild(host); root = createRoot(host);
-  await act(async () => { root!.render(<DefaultResumeUpdate userId={9} resumeId={7} label="cv" onClose={onClose}
+  await act(async () => { root!.render(<DefaultResumeUpdate userId={9} resumeId={7} label="cv" onClose={onClose} explicit={explicit}
     loadProfile={async () => ({ kind: "ready", profile: sparkProfile(canRequestResume) }) as never} />); });
   await flush();
   return { calls, onClose };
 }
 
 describe("default résumé profile update", () => {
+  it("an explicit library request can reopen a dismissed offer without starting a read on mount", async () => {
+    window.localStorage.setItem('ealana:resume-offer-dismissed:9:7','1');
+    const { calls } = await mount(true, {}, true);
+    expect(button('Review suggestions')).toBeDefined();
+    expect(calls).toEqual([]);
+  });
   it("closing a running read is temporary and a late result cannot reopen it", async () => {
     let finish!: (r: Response) => void;
     const pending = new Promise<Response>(resolve => { finish = resolve; });

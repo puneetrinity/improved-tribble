@@ -51,7 +51,7 @@ export async function validateNetworkDelivery(organizationId:number,authorities:
  finally{controller.abort();clearTimeout(timer);void reader?.cancel().catch(()=>{});}
 }
 export class ProfileTransportError extends Error {
- constructor(public readonly code:'identity_conflict'|'memory_unavailable'|'delivery_outcome_unknown'|'invalid_request'|'candidate_privacy_restricted'){super(code);}
+ constructor(public readonly code:'identity_conflict'|'memory_unavailable'|'delivery_outcome_unknown'|'invalid_request'|'candidate_privacy_restricted'|'source_proposal_unavailable'){super(code);}
 }
 
 /** Owner reads fail explicitly; an outage never becomes an empty profile. */
@@ -88,7 +88,7 @@ export async function readNetworkStatus(subjectId:string,bindingId:string,
 }
 
 async function readOwnerProfile<T>(subjectId:string,bindingId:string,path:string,parse:(raw:string)=>T,
- deps:{fetch?:typeof fetch;sign?:typeof signServiceJwt;env?:NodeJS.ProcessEnv},maxBytes=PROFILE_RESPONSE_MAX_BYTES){
+ deps:{fetch?:typeof fetch;sign?:typeof signServiceJwt;env?:NodeJS.ProcessEnv},maxBytes=PROFILE_RESPONSE_MAX_BYTES,sourceProposal=false){
  profileUuid.parse(subjectId);profileUuid.parse(bindingId);
  const controller=new AbortController();let timer:ReturnType<typeof setTimeout>|undefined;
  const operation=async()=>{
@@ -96,7 +96,7 @@ async function readOwnerProfile<T>(subjectId:string,bindingId:string,path:string
   if(controller.signal.aborted)throw new ProfileTransportError('memory_unavailable');
   const response=await(deps.fetch??fetch)(`${foundationMemoryOrigin(deps.env)}${path}?binding=${bindingId}`,
    {redirect:'error',signal:controller.signal,headers:{authorization:`Bearer ${token}`}});
-  if(response.status!==200){void response.body?.cancel().catch(()=>{});throw new ProfileTransportError(response.status===451?'candidate_privacy_restricted':'memory_unavailable');}
+  if(response.status!==200){void response.body?.cancel().catch(()=>{});throw new ProfileTransportError(response.status===451?'candidate_privacy_restricted':response.status===404&&sourceProposal?'source_proposal_unavailable':'memory_unavailable');}
   const reader=response.body?.getReader();if(!reader)throw new ProfileTransportError('memory_unavailable');
   const chunks:Uint8Array[]=[];let bytes=0;
   const cancel=()=>{void reader.cancel().catch(()=>{});};controller.signal.addEventListener('abort',cancel,{once:true});
@@ -122,7 +122,7 @@ export async function readSourceProposal(subjectId:string,bindingId:string,sourc
    ||createHash('sha256').update(canonicalProfileJson(body)).digest('hex')!==proposalHash)
    throw new ProfileTransportError('identity_conflict');
   return value;
- },deps,2*1024*1024);
+ },deps,2*1024*1024,true);
 }
 
 export async function readInterpretationProposal(subjectId:string,bindingId:string,proposalId:string,

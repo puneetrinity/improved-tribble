@@ -7,7 +7,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { ResumeReadStatus, useResumeRead, type ResumeRead } from "./SourceReview";
 import {
-  RESUME_GENERIC_COPY, RESUME_SOURCE, startResumeRead, tryResumeAgain, watchResume, type ResumeSourceStatus,
+  RESUME_GENERIC_COPY, RESUME_SOURCE, startResumeRead, tryResumeAgain, watchResume, ProfileApiError, type ResumeSourceStatus,
 } from "@/lib/candidate-profile-api";
 
 const SRC = "22222222-2222-4222-8222-222222222222";
@@ -181,6 +181,65 @@ const proposal = (): SourceProposal => ({ schemaVersion: 1, proposalId: PROP, so
 const id = (n: number) => `66666666-6666-4666-8666-${String(n).padStart(12, "0")}`;
 
 describe("résumé suggestions", () => {
+  it.each([404,503])("saved proposal HTTP %s offers an explicit new read using the existing file, never an automatic upload or paid retry", async status => {
+    const { f: fetcher } = stub({
+      [`POST ${RESUME_SOURCE.snapshot}`]: [json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) })],
+      [`POST ${RESUME_SOURCE.queue}`]: [json(202, st({ state: "review_ready", proposalId: PROP })), json(202, st({ commandId: NEXT, state: "review_ready", proposalId: PROP }))],
+    });
+    const upload = vi.fn();
+    const fetchProposal = vi.fn().mockRejectedValueOnce(new ProfileApiError(status, status===404?"source_proposal_unavailable":"profile_temporarily_unavailable")).mockResolvedValue(proposal());
+    const a = resumeAdapters({ session: { acceptSource: vi.fn() }, currentProfile: () => null,
+      deps: { fetcher, postFetcher: fetcher, wait: noWait, newKey, upload, fetchProposal } });
+    await expect(a.readResumeById(12)).rejects.toMatchObject({ read: { kind: "error", rereadCommandId: CMD } });
+    expect(upload).not.toHaveBeenCalled();
+    const result = await a.retryResume(CMD);
+    expect(result.items).toHaveLength(4);
+    expect(upload).not.toHaveBeenCalled();
+    expect(result.rereadCommandId).toBe(NEXT);
+  });
+
+  it("an old empty proposal can explicitly be read again without uploading another library file", async () => {
+    const bodies: any[] = [];
+    const fetcher = vi.fn(async (_url: any, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)); bodies.push(body);
+      if ('resumeId' in body) return json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) });
+      return json(202, st({ commandId: body.rereadOfCommandId ? NEXT : CMD, state: "review_ready", proposalId: PROP }));
+    });
+    const fetchProposal = vi.fn().mockResolvedValueOnce({ ...proposal(), facts: [] }).mockResolvedValue(proposal());
+    const a = resumeAdapters({ session: { acceptSource: vi.fn() }, currentProfile: () => null,
+      deps: { fetcher, postFetcher: fetcher, wait: noWait, newKey, fetchProposal } });
+    const old = await a.readResumeById(12);
+    expect(old.items).toEqual([]);
+    expect(bodies).toHaveLength(2);
+    expect((await a.rereadResume(old.rereadCommandId)).items).toHaveLength(4);
+    await a.rereadResume(old.rereadCommandId);
+    expect(bodies[2]).toEqual(bodies[3]);
+    expect(bodies[2].rereadOfCommandId).toBe(CMD);
+    expect(bodies.filter(b => 'resumeId' in b)).toHaveLength(1);
+  });
+  it("a refused re-read never bypasses admission through an ordinary queue request", async () => {
+    const bodies: any[] = [];
+    const fetcher = vi.fn(async (_url: any, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)); bodies.push(body);
+      if ('resumeId' in body) return json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) });
+      if (body.rereadOfCommandId) return json(409, { code: "source_changed" });
+      return json(202, st({ commandId: CMD, state: "review_ready", proposalId: PROP }));
+    });
+    const upload = vi.fn();
+    const fetchProposal = vi.fn().mockResolvedValueOnce({ ...proposal(), facts: [] }).mockResolvedValue(proposal());
+    const a = resumeAdapters({ session: { acceptSource: vi.fn() }, currentProfile: () => null,
+      deps: { fetcher, postFetcher: fetcher, wait: noWait, newKey, upload, fetchProposal } });
+    const old = await a.readResumeById(12);
+    expect(old.items).toEqual([]);
+    await expect(a.rereadResume(old.rereadCommandId)).rejects.toBeDefined();
+    const queue = bodies.filter(b => !('resumeId' in b));
+    expect(queue.map(b => !!b.rereadOfCommandId)).toEqual([false, true]);
+    await expect(a.rereadResume(old.rereadCommandId)).rejects.toBeDefined();
+    const again = bodies.filter(b => !('resumeId' in b));
+    expect(again).toHaveLength(3);
+    expect(again[2]).toEqual(again[1]);
+    expect(upload).not.toHaveBeenCalled();
+  });
   it("shows each server fact with the journey's review rows and the quoted evidence", () => {
     const items = proposalItems(proposal());
     expect(items.map(i => [i.kind, i.id])).toEqual([["skill", id(1)], ["project", id(2)], ["employment", id(3)], ["location", id(4)]]);

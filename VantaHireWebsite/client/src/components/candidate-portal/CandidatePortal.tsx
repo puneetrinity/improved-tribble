@@ -354,7 +354,7 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
   const [removeFor, setRemoveFor] = useState<{ id: number; label: string } | null>(null);
   const [removing, setRemoving] = useState(false);
   // The résumé that just became the default: offer to update the profile from it (only the default does).
-  const [offerFor, setOfferFor] = useState<{ id: number; label: string } | null>(null);
+  const [offerFor, setOfferFor] = useState<{ id: number; label: string; explicit?: boolean } | null>(null);
   // "Add résumé" in the reminder opens the uploader here and scrolls to it.
   useEffect(() => { if (openUpload) { setShowUpload(true); setTimeout(() => document.getElementById("resumes-title")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); } }, [openUpload]);
   useEffect(() => {
@@ -426,6 +426,7 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
           <div><h2 id="resumes-title" className="text-lg font-semibold">Résumés</h2><p className="text-sm text-muted-foreground">Up to 3. Your default résumé is used when you apply and to update your profile.</p></div>
           {!showUpload && resumes.length < 3 && <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={() => setShowUpload(true)}>Add a résumé</Button>}
         </div>
+        {resumes.length >= 3 && <p role="status" className="text-sm text-muted-foreground">Your résumé library already has 3 files. Remove a file below before uploading another. Résumés already submitted with applications stay available to those employers.</p>}
         {showUpload && (
           <div className="space-y-3">
             <FileDropzone label="Résumé" accept=".pdf,.doc,.docx" maxSizeMB={5} value={file} onChange={setFile} />
@@ -450,18 +451,21 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
         </div>}
         {resumes.length > 0 ? (
           <ul id="resume-library" className="divide-y divide-border">
-            {resumes.map((r: any) => (
-              <li key={r.id} className="flex items-center gap-3 py-3">
+            {[...resumes].sort((a: any, b: any) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)) || b.id - a.id).map((r: any) => (
+              <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
                 <FileText className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-                <div className="min-w-0 flex-1"><p className="truncate font-medium">{r.label}{r.isDefault && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Default</span>}</p><p className="text-sm text-muted-foreground">Uploaded {new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
+                <div className="min-w-0 flex-1 basis-56"><p className="flex min-w-0 items-center gap-2"><span className="truncate font-medium">{r.label}</span>{r.isDefault && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Default</span>}</p><p className="whitespace-nowrap text-sm text-muted-foreground">Uploaded {new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
                 {!r.isDefault && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer text-muted-foreground" onClick={() => void makeDefault(r)} aria-label={`Make ${r.label} your default résumé`}>Make default</Button>}
+                {r.isDefault && resumeRouting === "spark" && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setOfferFor({ id: r.id, label: r.label, explicit: true })}>Update profile</Button>}
                 {r.readFailed === true && <span className="text-sm text-destructive">Couldn’t read</span>}
                 <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1.5 text-muted-foreground" disabled={removing} onClick={() => setRemoveFor({ id: r.id, label: r.label })} aria-label={`Remove ${r.label}`}><Trash2 className="h-4 w-4" aria-hidden /><span>Remove</span></Button>
+                </div>
               </li>
             ))}
           </ul>
         ) : !showUpload && <p className="text-sm text-muted-foreground">No résumés yet.</p>}
-        {offerFor && userId !== undefined && <DefaultResumeUpdate key={offerFor.id} userId={userId} resumeId={offerFor.id} label={offerFor.label} onClose={() => setOfferFor(null)} />}
+        {offerFor && userId !== undefined && <DefaultResumeUpdate key={`${offerFor.id}:${Boolean(offerFor.explicit)}`} userId={userId} resumeId={offerFor.id} label={offerFor.label} explicit={offerFor.explicit ?? false} onClose={() => setOfferFor(null)} />}
       </div>
     </section>
   );

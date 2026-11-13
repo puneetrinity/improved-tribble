@@ -132,6 +132,12 @@ describe('P0 mounted resume routes',()=>{
   expect(result.statusCode).toBe(200);expect(result.headers['Cache-Control']).toBe('no-store');
   expect(deps.readSourceProposal).toHaveBeenCalledWith(key,key,key,key);expect(deps.owner).toHaveBeenCalledTimes(2);
  });
+ it('reports an unavailable stored proposal as non-retryable, not a service outage',async()=>{
+  enabled();const {ProfileTransportError}=await import('./profile-client');
+  deps.readSourceProposal.mockRejectedValue(new ProfileTransportError('source_proposal_unavailable'));
+  const result=await request('GET /api/candidate/product/sources/:sourceId/proposals/:proposalId',{params:{sourceId:key,proposalId:key}});
+  expect(result.statusCode).toBe(404);expect(result.body).toEqual({code:'source_proposal_unavailable',retryable:false});
+ });
  it('does not return a proposal after the source switch is turned off mid-read',async()=>{
   enabled();deps.readSourceProposal.mockImplementation(async()=>{vi.stubEnv('CANDIDATE_RESUME_SOURCE_ENABLED','false');return {proposalId:key};});
   expect((await request('GET /api/candidate/product/sources/:sourceId/proposals/:proposalId',{params:{sourceId:key,proposalId:key}})).statusCode).toBe(409);

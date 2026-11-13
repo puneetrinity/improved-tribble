@@ -48,7 +48,7 @@ export const RESUME_UNREADABLE_COPY = "We couldn’t read suggestions from your 
 /** `unmatched`: suggestions came back but none could be checked against the résumé text. */
 const emptyKind = (x: { unmatched?: boolean | undefined; unreadable?: boolean | undefined }) => x.unreadable ? "unreadable" as const : x.unmatched ? "unmatched" as const : "none" as const;
 
-export type ResumeExtraction = { resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined };
+export type ResumeExtraction = { resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined; rereadCommandId?: string | undefined };
 export type Authorisation = "allowed" | "needs_visa" | "not_sure";
 export type PrefField = "roles" | "where" | "how" | "pay";
 /** Saved as the candidate goes (private, versioned), so refreshing or leaving loses nothing.
@@ -221,16 +221,16 @@ export function ResumeReviewList({ items, choice, setChoice, edits, setEdits }: 
       ) : (
         <li key={it.id} className={cn("flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-4", choice[it.id] === "remove" && "opacity-60")}>
           <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-48">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{RESUME_KIND[it.kind]}</p>
             {edits[it.id] !== undefined
               ? <Input aria-label={`Edit ${RESUME_KIND[it.kind].toLowerCase()}`} value={edits[it.id]} onChange={e => setEdits(m => ({ ...m, [it.id]: e.target.value }))} className="mt-1 min-h-11" />
-              : <p className={cn("text-sm text-foreground", choice[it.id] === "remove" && "line-through")}>{resumeLabel(it)}</p>}
+              : <p className={cn("break-words text-sm text-foreground", choice[it.id] === "remove" && "line-through")}>{resumeLabel(it)}</p>}
             <p className="mt-1 text-xs text-muted-foreground">From your résumé: <q className="italic">{it.evidence}</q></p>
           </div>
           {choice[it.id] === "remove"
-            ? <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setChoice(c => ({ ...c, [it.id]: "keep" }))}>Keep it</Button>
-            : <div className="flex gap-1">
+            ? <Button type="button" variant="ghost" className="ml-auto min-h-11 cursor-pointer" onClick={() => setChoice(c => ({ ...c, [it.id]: "keep" }))}>Keep it</Button>
+            : <div className="ml-auto flex gap-1">
                 {edits[it.id] === undefined && editable(it) !== null && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setEdits(m => ({ ...m, [it.id]: editable(it)! }))}>Edit</Button>}
                 <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1" onClick={() => setChoice(c => ({ ...c, [it.id]: "remove" }))}><Trash2 className="h-4 w-4" aria-hidden />Remove</Button>
               </div>}
@@ -256,6 +256,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   const [resume, setResume] = useState<File | null>(null);
   const [resumeItems, setResumeItems] = useState<ResumeItem[] | null>(null);
   const [resumeVersionId, setResumeVersionId] = useState<string | null>(null);
+  const [rereadCommandId, setRereadCommandId] = useState<string | null>(null);
   const [resumeEmpty, setResumeEmpty] = useState<"none" | "unmatched" | "unreadable">("none");
   /** Returning with résumé suggestions still to review (there's no file in this session). */
   const [restoredResume, setRestoredResume] = useState(false);
@@ -395,7 +396,8 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   async function loadResume(read: () => Promise<ResumeExtraction>) {
     const generation = ++resumeGeneration.current;
     setResumeItems(null); setResumeFailure(null); setResumeVersionId(null); setResumeChoice({}); setResumeEdits({}); setResumeEmpty("none");
-    try { const x = await read(); if (generation !== resumeGeneration.current) return; setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); }
+    setRereadCommandId(null);
+    try { const x = await read(); if (generation !== resumeGeneration.current) return; setResumeVersionId(x.resumeVersionId); setRereadCommandId(x.rereadCommandId ?? null); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); }
     // An unexpected error is a failed read (with its retry card), never "nothing new".
     catch (e) { if (generation !== resumeGeneration.current) return; setResumeFailure(e instanceof ResumeReadError ? e.read : { kind: "error", message: resumeRequestCopy(e) }); }
   }
@@ -658,7 +660,9 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
               ) : resumeItems === null ? (
                 <p role="status" className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-sm"><TetrisOrb label="Reading your résumé" decorative />Reading your résumé…</p>
               ) : resumeItems.length === 0 ? (
-                <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">{resumeEmpty === "unreadable" ? RESUME_UNREADABLE_COPY : resumeEmpty === "unmatched" ? RESUME_UNMATCHED_COPY : "We couldn't find anything new in your résumé. You can continue."}</p>
+                <div className="space-y-3"><p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">{resumeEmpty === "unreadable" ? RESUME_UNREADABLE_COPY : resumeEmpty === "unmatched" ? RESUME_UNMATCHED_COPY : "We couldn't find anything new in your résumé. You can continue."}</p>
+                  {rereadCommandId && retryResume && <Button onClick={() => void loadResume(() => retryResume(rereadCommandId))}>Read file again</Button>}
+                </div>
               ) : (
                 <ResumeReviewList items={resumeItems} choice={resumeChoice} setChoice={setResumeChoice} edits={resumeEdits} setEdits={setResumeEdits} />
               )}

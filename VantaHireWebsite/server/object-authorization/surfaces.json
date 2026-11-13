@@ -895,7 +895,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "0ae5bf95d6e257df91d6f0845fffdcc19f65bffbc77af3291aacc21c0e061da7"
+      "sha256": "998bb457fd1f773395be42633f6dba6462faf5073465dc8aff9ba1406b051e9a"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -1055,15 +1055,15 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "7f68bde36e2ab8736824af9aa07743168251152d56d64ab98bc130a9de2ef559"
+      "sha256": "38c37be7e8a5f9dabd1948063ca1ff7bc4936f671cd2ca232558529955d18bf7"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "b676423ff6bc94f13a2bf7dda919b9b2aa8287294ac866553459efd2e930a3a1"
+      "sha256": "5e5b0bceb0d50b381f202f1450147d41f3b5d7becb24ded69933f4bd9d2fc3a8"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "9c3410442080aaaf7acaae12854af7e5c6d7891b7a088f9e1be17cc8ed94a478"
+      "sha256": "523bcf768a24ab15fc9043d0edb6bb2604601da85af96674c0854161ac3a0223"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
