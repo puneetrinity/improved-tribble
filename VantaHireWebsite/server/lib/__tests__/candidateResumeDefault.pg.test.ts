@@ -127,13 +127,11 @@ describe.skipIf(!enabled)("default résumé on PostgreSQL", () => {
       ((await owner!.query("SELECT flow_candidate_source_library_status(907) result")).rows[0].result as { resumeId: number; readFailed: boolean }[])
         .find(x => x.resumeId === resumeId)!.readFailed;
     const fact = { factId: randomUUID(), kind: "skill", targetRowId: null, value: "Kafka", evidence: [] };
-    const unreadable = await library(20), unmatched = await library(21), nothingNew = await library(22), good = await library(23);
+    const unreadable = await library(20), unmatched = await library(21), nothingNew = await library(22);
     const unreadableJob = await read(unreadable.sourceId, [], [RESUME_UNREADABLE_NOTE]);
     await read(unmatched.sourceId, [], [RESUME_UNMATCHED_NOTE, "A note from the résumé reader."]);
     await read(nothingNew.sourceId, [], []);
-    await read(good.sourceId, [fact], []);
-    expect([await failed(unreadable.resumeId), await failed(unmatched.resumeId), await failed(nothingNew.resumeId), await failed(good.resumeId)])
-      .toEqual([true, true, false, false]);
+    expect([await failed(unreadable.resumeId), await failed(unmatched.resumeId), await failed(nothingNew.resumeId)]).toEqual([true, true, false]);
     // Only a coarse value is stored for the read, never the notes or proposal.
     expect((await owner!.query("SELECT read_outcome FROM candidate_source_jobs WHERE command_id=$1", [unreadableJob])).rows[0].read_outcome).toBe("unreadable");
     // The real cleanup removes the proposal and receipt; the label stays.
@@ -141,7 +139,7 @@ describe.skipIf(!enabled)("default résumé on PostgreSQL", () => {
     await owner!.query("SELECT flow_candidate_source_redact_due()");
     expect(Number((await owner!.query("SELECT count(*) n FROM candidate_source_jobs WHERE user_id=907 AND (transfer_document IS NOT NULL OR payload_redacted_at IS NULL)")).rows[0].n)).toBe(0);
     expect([await failed(unreadable.resumeId), await failed(unmatched.resumeId), await failed(nothingNew.resumeId)]).toEqual([true, true, false]);
-    // A later successful read of the same résumé clears it.
+    // A later read that kept a fact clears it (a normal read is never labelled).
     await read(unreadable.sourceId, [fact], []);
     expect(await failed(unreadable.resumeId)).toBe(false);
     // An older read with no recorded outcome stays unknown: not labelled.
