@@ -43,7 +43,7 @@ const FROZEN = {
   'server/lib/resumeImportProcessor.ts': '1314be8df83e520c46c1eab5831d468f42659f3a4783a124e38c224381ad92e2',
   // P0 approved private, generation-pinned source reader; old application helpers unchanged.
   'server/gcs-storage.ts': '1e663e8e93bb1533b15635aaf6693c27fcfb20df0f8ae09c991e3881fb2d80bb',
-  'package.json': 'b964e5890f8fb073adf571201bae4b253daa9fd2fb9b83005c315e820c472cf7',
+  'package.json': 'a3bad82c5f1f95e791dfdd65b9f148c5a9101893e61ae09f5a8b024ee99f896a',
   'package-lock.json': 'b985825f298cda976afa6f46792d4eab13ceaa19560efc48098168f187337539',
   'vitest.server.config.ts': '55c7e7f394abe4fcdf61554aa9c44fe3cc208b99b27071dde419e4396136b768',
   'server/schema-control/manifest.ts': '16e6b04b6a67467eb0319fe3c9a09fccbed9be55c65a0c866723467ea613bda2',
