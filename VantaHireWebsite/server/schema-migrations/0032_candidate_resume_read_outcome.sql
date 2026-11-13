@@ -7,8 +7,10 @@
 ALTER TABLE public.candidate_source_jobs ADD COLUMN read_outcome text
  CHECK (read_outcome IS NULL OR read_outcome IN ('unreadable','unmatched'));
 
--- The texts below are the server-added notes in shared/resume-review-notes.ts (the first review note,
--- only when no facts were kept). The library-status database test builds them from that file.
+-- The two hashes are SHA-256 (UTF-8) of the server-added notes in shared/resume-review-notes.ts
+-- (RESUME_UNREADABLE_NOTE, RESUME_UNMATCHED_NOTE), checked only as the first review note when no facts
+-- were kept. Hashes keep the routine ASCII-only, so its catalogue digest does not depend on database
+-- encoding. The library-status database test builds the notes from that file.
 CREATE OR REPLACE FUNCTION public.flow_candidate_source_transfer_finish(p_lease jsonb,p_document jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public SET statement_timeout='5s' SET lock_timeout='2s' AS $$
 DECLARE j public.candidate_source_jobs%ROWTYPE;v jsonb;t jsonb;k text;
@@ -41,7 +43,8 @@ BEGIN
  proposal_id=CASE WHEN v->>'outcome'='stored' THEN (v->>'proposalId')::uuid ELSE NULL END,
  reason=CASE WHEN v->>'outcome'='stored' THEN NULL WHEN v->>'reason'='consent_changed' THEN 'consent_changed' ELSE 'source_changed' END,
  read_outcome=CASE WHEN v->>'outcome'='stored' AND jsonb_typeof(t->'proposal'->'facts')='array' AND jsonb_array_length(t->'proposal'->'facts')=0
-  THEN CASE t->'proposal'->'reviewNotes'->>0 WHEN 'We could not read suggestions from this résumé. Please fill in your profile yourself.' THEN 'unreadable' WHEN 'We found details in your résumé but couldn’t match them reliably to its text, so nothing was added. You can add them yourself.' THEN 'unmatched' END END
+  THEN CASE encode(sha256(convert_to(t->'proposal'->'reviewNotes'->>0,'UTF8')),'hex')
+   WHEN '73d7fedfffefde7b0f497474c2372f1c1e3bf004b1d7ef5f2faecf49e970740d' THEN 'unreadable' WHEN '6fed697a736f24cd30f74d6559b2edd89f463396b4ec1f78ac930156af0e5759' THEN 'unmatched' END END
  WHERE command_id=j.command_id;
  RETURN public.flow_candidate_source_status_value(j.command_id);
 END $$;

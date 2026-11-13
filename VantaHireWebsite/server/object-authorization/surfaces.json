@@ -1055,7 +1055,7 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "7a57ce91a70a2aada2d7315cd8fbe83460179ef52d67c7e0e94c6fbcd131514b"
+      "sha256": "0cf956ef1527ee1a2a687ce1568e113f0f8354356743e7d6b90c6efa6f3d2eac"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
