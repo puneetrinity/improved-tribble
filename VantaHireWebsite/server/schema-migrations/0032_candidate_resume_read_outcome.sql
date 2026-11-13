@@ -70,3 +70,14 @@ BEGIN
   ORDER BY x.created_at DESC,x.command_id DESC LIMIT 1
  ) j ON true WHERE r.user_id=p_user);
 END $$;
+
+-- Erasure clears the outcome too (Codex review ONB-R1, 13 Nov 2026). The scrub is re-applied on every replay
+-- of an erasure, including after an older table is restored, so a restored outcome is cleared again.
+DO $$
+DECLARE s text;o text;n text;
+BEGIN
+ SELECT pg_get_functiondef('public.flow_candidate_source_erasure_finish(uuid,uuid,uuid)'::regprocedure) INTO s;
+ o:='transfer_document=NULL,receipt_document=NULL,extraction_document=NULL,extraction_context_hash=NULL WHERE user_id=e.user_id;';
+ n:='transfer_document=NULL,receipt_document=NULL,extraction_document=NULL,extraction_context_hash=NULL,read_outcome=NULL WHERE user_id=e.user_id;';
+ IF array_length(string_to_array(s,o),1)<>2 THEN RAISE EXCEPTION 'read_outcome_erasure_anchor_drift';END IF;EXECUTE replace(s,o,n);
+END $$;

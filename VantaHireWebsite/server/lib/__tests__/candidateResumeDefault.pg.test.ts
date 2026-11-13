@@ -153,6 +153,45 @@ describe.skipIf(!enabled)("default résumé on PostgreSQL", () => {
     console.log('ONB-2 source catalogue digest', (await owner!.query(SOURCE_CATALOG_SQL,['postgres',[...SOURCE_RUNTIME_FUNCTIONS]])).rows[0].digest);
   });
 
+  it("ONB-R1: erasure clears the read outcome, and clears it again on replay after a restore", async () => {
+    const sha = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
+    await owner!.query("INSERT INTO users (id,username,password,role,email_verified) VALUES (908,'h@example.invalid','x','candidate',true)");
+    await owner!.query("SELECT flow_candidate_foundation_ensure(id,auth_version,encode(sha256(convert_to(password,'UTF8')),'hex'),clock_timestamp(),gen_random_uuid()) FROM users WHERE id=908");
+    const acct = (await owner!.query("SELECT subject_id,binding_id FROM candidate_product_accounts WHERE user_id=908")).rows[0];
+    const read = async (n: number, note: string) => {
+      const r = await insertLibraryResume(db, resume(908, n));
+      const sourceId = (await owner!.query(`INSERT INTO candidate_source_objects
+        (user_id,resume_id,source_version,content_hash,byte_length,media_type,policy_version,gcs_path,gcs_generation,original_versions)
+        VALUES(908,$1,1,repeat('a',64),100,'application/pdf','test',$2,'1','{}') RETURNING source_id`, [r.id, r.gcsPath])).rows[0].source_id;
+      const commandId = randomUUID(), claimToken = randomUUID(), proposalId = randomUUID(), proposalHash = sha(proposalId);
+      const transfer = JSON.stringify({ commandId, subjectId: acct.subject_id, bindingId: acct.binding_id, sourceId, sourceVersion: 1,
+        proposal: { proposalId, proposalHash, facts: [], reviewNotes: [note] } });
+      await owner!.query(`INSERT INTO candidate_source_jobs(command_id,user_id,source_id,subject_id,binding_id,consent_revision,admitted_auth_version,
+        state,lease_token,lease_until,generation,transfer_document) VALUES($1,908,$2,$3,$4,1,0,'transferring',$5,clock_timestamp()+interval '1 minute',1,$6)`,
+        [commandId, sourceId, acct.subject_id, acct.binding_id, claimToken, JSON.stringify({ canonical: transfer, sha256: sha(transfer) })]);
+      const receipt = canonicalProfileJson({ schemaVersion: 1, commandId, subjectId: acct.subject_id, bindingId: acct.binding_id, commandHash: sha(transfer),
+        sourceId, sourceVersion: 1, proposalId, proposalHash, outcome: "stored", reason: null, canonicalProfileChanged: false, publicationActive: false });
+      await owner!.query("SELECT flow_candidate_source_transfer_finish($1,$2)",
+        [JSON.stringify({ commandId, claimToken, generation: 1 }), JSON.stringify({ canonical: receipt, sha256: sha(receipt) })]);
+    };
+    await read(30, RESUME_UNREADABLE_NOTE);
+    await read(31, RESUME_UNMATCHED_NOTE);
+    const outcomes = async () => (await owner!.query("SELECT read_outcome FROM candidate_source_jobs WHERE user_id=908 ORDER BY read_outcome NULLS LAST"))
+      .rows.map(r => r.read_outcome);
+    expect(await outcomes()).toEqual(["unmatched", "unreadable"]);
+    const request = randomUUID();
+    await owner!.query("INSERT INTO candidate_privacy_requests(request_id,action,authority_type,actor_user_id,reason_code) VALUES($1,'request_erasure','verified_candidate',908,'candidate_erasure_request')", [request]);
+    await owner!.query("INSERT INTO candidate_privacy_subject_links(link_id,request_id,subject_type,candidate_user_id) VALUES($1,$2,'candidate_user',908)", [randomUUID(), request]);
+    await owner!.query("SELECT flow_candidate_source_erasure_prepare($1)", [request]);
+    const finish = () => owner!.query("SELECT flow_candidate_source_erasure_finish($1,$2,$3) ok", [request, acct.subject_id, acct.binding_id]);
+    expect((await finish()).rows[0].ok).toBe(true);
+    expect(await outcomes()).toEqual([null, null]);
+    // An older copy of the table restored after the erasure: the replayed scrub clears it again.
+    await owner!.query("UPDATE candidate_source_jobs SET read_outcome='unreadable' WHERE user_id=908");
+    expect((await finish()).rows[0].ok).toBe(true);
+    expect(await outcomes()).toEqual([null, null]);
+  });
+
   it("make-default racing an upload leaves exactly one default, owned by the candidate", async () => {
     const first = await insertLibraryResume(db, resume(902, 1));
     const second = await insertLibraryResume(db, resume(902, 2));
