@@ -39,6 +39,7 @@ export type CandidateApplicationSummary = Pick<
 };
 
 export type CandidateResumeSummary = {
+  readFailed?: boolean;
   id: number;
   label: string;
   isDefault: boolean | null;

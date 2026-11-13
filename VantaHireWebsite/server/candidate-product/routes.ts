@@ -133,7 +133,7 @@ export function registerCandidateResumeRoutes(app: Express, csrfProtection: Midd
       const owner=await profiles.owner(actor(req));
       return {userId:req.user!.id,subjectId:owner.subjectId,bindingId:owner.bindingId};
     },
-    requireCandidate:requireVerifiedCandidate,csrf:csrfProtection,recentAuth:recent,
+    requireCandidate:requireVerifiedCandidate,csrf:csrfProtection,
   });
 }
 export function registerCandidateProfileRoutes(app: Express, csrfProtection: Middleware): void {

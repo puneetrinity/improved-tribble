@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "894c3f2dc1f8fb4803662433a17995911eedcca93649546b37992cf1cf56ab4d",
+  "source_census_sha256": "d41e3330b121cab8d8580fe21c7c9c24cf93e5ecb32c45f2595f8941a75e49ed",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "client/src/lib/candidate-profile-api.ts",
@@ -893,8 +893,8 @@
       "direction": "owner_private",
       "privacy_action": ["request_erasure"],
       "organization_scope": "candidate_self",
-      "enforcement": "Default-off owner endpoints; verified candidate, CSRF/recent auth for paid-work admission, strict bodies, status projection and read-only GET.",
-      "anchors": ["deps.enabled()", "deps.requireCandidate, deps.csrf, deps.recentAuth", "deps.identity(req)", "statusView(status)", "message: retry.message"]
+      "enforcement": "Default-off owner endpoints; verified candidate and CSRF for paid-work admission, strict bodies, status projection and read-only GET. Résumé reading does not require a fresh login; confirmation still does.",
+      "anchors": ["deps.enabled()", "deps.requireCandidate, deps.csrf", "deps.identity(req)", "statusView(status)", "message: retry.message"]
     },
     {
       "id": "spark-contracts",
@@ -1703,12 +1703,12 @@
       "id": "candidate-resume-default",
       "file": "server/lib/candidateResumeDefault.ts",
       "symbol": "insertLibraryResume",
-      "models": ["candidate_resumes"],
+      "models": ["candidate_resumes", "applications"],
       "direction": "write",
       "privacy_action": ["request_erasure"],
       "organization_scope": "candidate_self",
-      "enforcement": "Called only from the verified-candidate, CSRF-protected library routes after their privacy checks; changes only the caller's own résumé rows (owner predicate in every statement) and their default flag.",
-      "anchors": ["insertLibraryResume", "makeLibraryResumeDefault", "lockCandidateResumeDefault"]
+      "enforcement": "Verified-candidate and CSRF-protected library routes. Owned removal shares source and default locks, detaches only owner application library references, preserves copied URLs/text and stored blobs, and migration 0031 restricts/detaches source history. No automatic deletion.",
+      "anchors": ["insertLibraryResume", "makeLibraryResumeDefault", "removeLibraryResume", "lockCandidateResumeDefault"]
     },
     {
       "id": "email-provider-final-fence",

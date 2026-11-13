@@ -33,9 +33,10 @@ describe("résumé review messages", () => {
     await restore({ items: [], unmatched: true });
     expect(text()).toContain(RESUME_UNMATCHED_COPY);
   });
-  it("a genuinely empty proposal is not restored as a review", async () => {
+  it("a genuinely empty proposal can be restored and closed without an empty acceptance", async () => {
     await restore({ items: [] });
-    expect(text()).not.toContain("What we found in your résumé");
+    expect(text()).toContain("What we found in your résumé");
+    expect(text()).toContain("We couldn't find anything new");
   });
   it("asks for the dates of a job whose dates could not be confirmed, and shows confirmed dates as read", async () => {
     const source = { resumeVersionId: "62000000-0000-4000-8000-0000000000aa", extractionVersion: "h" };

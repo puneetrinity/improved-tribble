@@ -277,12 +277,14 @@ export function resumeFailureCopy(s: Pick<ResumeSourceStatus, "reason" | "retry"
 
 async function postResume<T>(url: string, body: Record<string, unknown>, ok: number, fetcher: typeof fetch): Promise<T> {
   let res: Response;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
   try {
-    res = await fetcher(url, { method: "POST", credentials: "include",
+    res = await fetcher(url, { method: "POST", credentials: "include", signal: controller.signal,
       headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
   } catch {
     throw new ProfileApiError(0, "uncertain", "Network error");
-  }
+  } finally { clearTimeout(timer); }
   const data = await readJson(res);
   if (res.status === ok && data) return data as T;
   throw new ProfileApiError(res.status, data?.code ?? null);
@@ -298,8 +300,8 @@ export function queueResume(snap: Pick<ResumeSnapshot, "sourceId" | "sourceVersi
 export function retryResume(commandId: string, idempotencyKey: string, fetcher: typeof fetch = fetchWithCsrf as typeof fetch) {
   return postResume<ResumeSourceStatus>(RESUME_SOURCE.retry(commandId), { schemaVersion: 1, idempotencyKey, retryOfCommandId: commandId }, 202, fetcher);
 }
-export async function resumeStatus(commandId: string, fetcher: typeof fetch = fetch): Promise<ResumeSourceStatus> {
-  const res = await fetcher(RESUME_SOURCE.status(commandId), { credentials: "include", headers: { Accept: "application/json" } });
+export async function resumeStatus(commandId: string, fetcher: typeof fetch = fetch, signal?: AbortSignal): Promise<ResumeSourceStatus> {
+  const res = await fetcher(RESUME_SOURCE.status(commandId), { credentials: "include", headers: { Accept: "application/json" }, ...(signal ? { signal } : {}) });
   const data = await readJson(res);
   if (!res.ok || !data?.state) throw new ProfileApiError(res.status, data?.code ?? null);
   return data as ResumeSourceStatus;
@@ -326,20 +328,30 @@ export type ResumeRunDeps = { fetcher?: typeof fetch; postFetcher?: typeof fetch
 /** Poll one command until it leaves the in-progress states. GET never retries work. */
 export async function watchResume(commandId: string, onUpdate: (s: ResumeSourceStatus) => void, signal?: AbortSignal, deps: ResumeRunDeps = {}): Promise<ResumeSourceStatus> {
   const wait = deps.wait ?? sleep;
-  for (let attempt = 0; ; attempt++) {
+  const deadline = Date.now() + 60_000;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    if (signal?.aborted) throw new DOMException("aborted", "AbortError");
+    if (Date.now() >= deadline) break;
     let s: ResumeSourceStatus | null = null;
-    try { s = await resumeStatus(commandId, deps.fetcher); } catch (e) {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    signal?.addEventListener("abort", abort, { once: true });
+    const timer = setTimeout(abort, Math.min(10_000, deadline - Date.now()));
+    try { s = await resumeStatus(commandId, deps.fetcher, controller.signal); } catch (e) {
       // A transient read failure is not a result: keep watching.
-      if (!(e instanceof ProfileApiError) || (e.status !== 0 && e.status < 500)) throw e;
-    }
+      if (signal?.aborted) throw new DOMException("aborted", "AbortError");
+      if (e instanceof ProfileApiError && e.status !== 0 && e.status < 500 && e.status !== 429) throw e;
+      if (!(e instanceof ProfileApiError) && !(e instanceof TypeError) && !(e instanceof DOMException && e.name === "AbortError")) throw e;
+    } finally { clearTimeout(timer); signal?.removeEventListener("abort", abort); }
     if (s) { onUpdate(s); if (!resumeInProgress(s.state)) return s; }
     await wait(pollDelay(attempt), signal);
   }
+  throw new ProfileApiError(0, "resume_status_pending");
 }
 
 /** Start reading one library résumé: snapshot → queue → watch. */
-export async function startResumeRead(resumeId: number, onUpdate: (s: ResumeSourceStatus) => void, signal?: AbortSignal, deps: ResumeRunDeps = {}): Promise<ResumeSourceStatus> {
-  const key = (deps.newKey ?? newKey)(); const queueKey = (deps.newKey ?? newKey)();
+export async function startResumeRead(resumeId: number, onUpdate: (s: ResumeSourceStatus) => void, signal?: AbortSignal, deps: ResumeRunDeps = {}, keys?: { snapshot: string; queue: string }): Promise<ResumeSourceStatus> {
+  const key = keys?.snapshot ?? (deps.newKey ?? newKey)(); const queueKey = keys?.queue ?? (deps.newKey ?? newKey)();
   const snap = await sameKey(() => snapshotResume(resumeId, key, deps.postFetcher), signal, deps.wait);
   const queued = await sameKey(() => queueResume(snap, queueKey, deps.postFetcher), signal, deps.wait);
   onUpdate(queued);
@@ -347,8 +359,8 @@ export async function startResumeRead(resumeId: number, onUpdate: (s: ResumeSour
 }
 
 /** The candidate pressed "Try again": one explicit successor, then watch it. */
-export async function tryResumeAgain(commandId: string, onUpdate: (s: ResumeSourceStatus) => void, signal?: AbortSignal, deps: ResumeRunDeps = {}): Promise<ResumeSourceStatus> {
-  const key = (deps.newKey ?? newKey)();
+export async function tryResumeAgain(commandId: string, onUpdate: (s: ResumeSourceStatus) => void, signal?: AbortSignal, deps: ResumeRunDeps = {}, requestKey?: string): Promise<ResumeSourceStatus> {
+  const key = requestKey ?? (deps.newKey ?? newKey)();
   const next = await sameKey(() => retryResume(commandId, key, deps.postFetcher), signal, deps.wait);
   onUpdate(next);
   return resumeInProgress(next.state) ? watchResume(next.commandId, onUpdate, signal, deps) : next;
@@ -600,6 +612,12 @@ export function createSparkSession(initial: SparkProfileRead, deps: SparkRunDeps
     /** Promote the reviewed preference draft (if not already), then confirm the exact
      * reviewed versions. Refuses if the server state moved on since the review. */
     async confirm(reviewed: { profileVersion: string; preferencesVersion: string }, fetchProfile: () => Promise<SparkLoad> = () => loadSparkProfile(deps.fetcher)): Promise<void> {
+      const planKey = `confirmation:${reviewed.profileVersion}:${reviewed.preferencesVersion}`;
+      const confirmKey = `${planKey}:confirm`;
+      // Resolve an uncertain write before interpreting a newer readback. Never replace
+      // its key or body: the original confirmation may already have been applied.
+      const original = sent.get(confirmKey)?.[0];
+      if (original) { await runSparkCommand(original, deps); return; }
       if (String(v.draftVersion) !== reviewed.profileVersion || String(v.preferenceDraftRevision) !== reviewed.preferencesVersion) throw new ProfileApiError(409, "confirmation_conflict");
       let loaded = await fetchProfile();
       if (loaded.kind !== "ready") throw new ProfileApiError(503, "authority_unavailable");
@@ -611,7 +629,9 @@ export function createSparkSession(initial: SparkProfileRead, deps: SparkRunDeps
       const promoted = pd.promotedDraftRevision === pd.preferenceDraftRevision && pd.promotedPreferenceVersion === p.preferenceVersion && p.preferenceVersion > 0;
       const reviewedDraftHash = p.draftHash;
       if (!promoted) {
-        absorb(await runSparkCommand(v3("promote_preferences", { preferenceDraftHash }), deps));
+        const promoteKey = `${planKey}:promote`;
+        if (!sent.has(promoteKey)) sent.set(promoteKey, [v3("promote_preferences", { preferenceDraftHash })]);
+        absorb(await runSparkCommand(sent.get(promoteKey)![0]!, deps));
         loaded = await fetchProfile();
         if (loaded.kind !== "ready") throw new ProfileApiError(503, "authority_unavailable");
         p = loaded.profile; v = sparkVersions(p);
@@ -623,7 +643,9 @@ export function createSparkSession(initial: SparkProfileRead, deps: SparkRunDeps
       }
       if (p.effectiveConsentRevision === null) throw new ProfileApiError(409, "consent_required");
       if (!p.capabilities.canConfirm) throw new ProfileApiError(p.capabilities.confirmBlockedReason === "recent_auth_required" ? 403 : 409, p.capabilities.confirmBlockedReason ?? "unknown");
-      await runSparkCommand(v3("confirm", { draftHash: p.draftHash, preferenceDraftHash: p.preferenceDraft!.preferenceDraftHash, consentRevision: p.effectiveConsentRevision }), deps);
+      const command = v3("confirm", { draftHash: p.draftHash, preferenceDraftHash: p.preferenceDraft!.preferenceDraftHash, consentRevision: p.effectiveConsentRevision });
+      sent.set(confirmKey, [command]);
+      await runSparkCommand(command, deps);
     },
   };
 }

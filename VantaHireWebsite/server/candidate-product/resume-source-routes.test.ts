@@ -72,12 +72,18 @@ describe('résumé source routes', () => {
 
   it.each([
     ['no session', { user: null }, 401], ['a recruiter', { user: { id: 8, role: 'recruiter' } }, 403],
-    ['no CSRF token', { csrf: false }, 403], ['no recent login', { recent: false }, 403],
+    ['no CSRF token', { csrf: false }, 403],
   ])('every paid-work POST refuses %s', async (_l, change, code) => {
     for (const [route, rawBody, params] of allPosts) expect((await call(route, { rawBody, ...change }, params)).statusCode).toBe(code);
     expect(deps.snapshot).not.toHaveBeenCalled();
     expect(deps.repo.enqueue).not.toHaveBeenCalled();
     expect(deps.repo.retry).not.toHaveBeenCalled();
+  });
+
+  it('allows an authenticated candidate with an older login to snapshot, queue and retry', async () => {
+    for (const [route, rawBody, params] of allPosts) {
+      expect((await call(route, { rawBody, recent: false }, params)).statusCode).toBeLessThan(300);
+    }
   });
 
   it('snapshots only the owner\'s library résumé by id, with the session identity', async () => {

@@ -36,7 +36,7 @@ SELECT md5(jsonb_build_object(
   (SELECT jsonb_agg(jsonb_build_array(p.polname,p.polcmd,p.polpermissive,p.polroles=ARRAY[c.relowner],pg_get_expr(p.polqual,p.polrelid),pg_get_expr(p.polwithcheck,p.polrelid)) ORDER BY p.polname COLLATE "C") FROM pg_policy p WHERE p.polrelid=c.oid)
  ) ORDER BY c.relname COLLATE "C") FROM relations c),
  'routines',(SELECT jsonb_agg(jsonb_build_array(p.oid::regprocedure::text,p.proowner=(SELECT relowner FROM relations WHERE relname='candidate_product_accounts'),pg_get_functiondef(p.oid)) ORDER BY p.oid::regprocedure::text COLLATE "C") FROM routines p),
- 'triggers',(SELECT jsonb_agg(jsonb_build_array(t.tgenabled,pg_get_triggerdef(t.oid)) ORDER BY t.tgname COLLATE "C") FROM pg_trigger t WHERE t.tgfoid IN(SELECT oid FROM routines)),
+ 'triggers',(SELECT jsonb_agg(jsonb_build_array(t.tgenabled,pg_get_triggerdef(t.oid)) ORDER BY t.tgname COLLATE "C",pg_get_triggerdef(t.oid) COLLATE "C") FROM pg_trigger t WHERE t.tgfoid IN(SELECT oid FROM routines)),
  'anchor_index',pg_get_indexdef(to_regclass('public.candidate_consent_subject_user_identity'))
 )::text) AS digest,
  NOT EXISTS(SELECT 1 FROM relations c CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) v(privilege)
@@ -69,7 +69,7 @@ export async function profilePrivilegesReady(pg:PgLike,role:string,required:bool
 }
 
 export const CONSENT_V2_CATALOG_MD5='53023911157addbac8df92d2535b2f50';
-export const SOURCE_CATALOG_MD5='4ffc69994784680c162ea9ed6e9d7b4d';
+export const SOURCE_CATALOG_MD5='652231225eb2bcf0f4806ba01b95b830';
 export const SOURCE_CATALOG_SQL=FOUNDATION_CATALOG_SQL
  .replace("(c.relname LIKE 'candidate_product_%' OR c.relname='candidate_network_intents')","c.relname LIKE 'candidate_source_%'")
  .replace("p.proname LIKE 'flow_candidate_foundation_%'","p.proname LIKE 'flow_candidate_source_%'")

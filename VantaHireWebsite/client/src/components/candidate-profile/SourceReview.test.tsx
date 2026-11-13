@@ -305,7 +305,8 @@ describe("résumé upload copy (approved 4 Nov)", () => {
     const unreadable = "We couldn't read this résumé. Try another PDF or Word file with selectable text, or fill in your profile yourself.";
     expect(resumeRequestCopy(new ProfileApiError(400, "Invalid resume"))).toBe(unreadable);
     expect(resumeRequestCopy(new ProfileApiError(415, "Resume extraction failed"))).toBe(unreadable);
-    for (const e of [new ProfileApiError(503, "Resume extraction unavailable"), new ProfileApiError(400, "Maximum 3 resumes allowed"), new ProfileApiError(0, "uncertain"), new Error("x")])
+    expect(resumeRequestCopy(new ProfileApiError(400, "Maximum 3 resumes allowed"))).toContain("already has 3 files");
+    for (const e of [new ProfileApiError(503, "Resume extraction unavailable"), new ProfileApiError(0, "uncertain"), new Error("x")])
       expect(resumeRequestCopy(e)).toBe("We couldn't start reading your résumé. Please try again in a moment.");
   });
 });

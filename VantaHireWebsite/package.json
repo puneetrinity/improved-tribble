@@ -37,6 +37,7 @@
     "test:candidate-consent": "vitest run --config vitest.candidate-consent.config.ts --exclude '**/*.pg.test.ts'",
     "test:candidate-consent:pg": "vitest run --config vitest.candidate-consent.config.ts server/candidate-consent/__tests__/lifecycle.pg.test.ts",
     "test:client-components": "vitest run --config vitest.client-components.config.ts",
+    "test:candidate-profile-ui": "vitest run --config vitest.candidate-profile-ui.config.ts",
     "test:candidate-consent:client": "cross-env FLOW_CONSENT_CLIENT_TEST=1 vitest run --config vitest.candidate-consent.config.ts",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

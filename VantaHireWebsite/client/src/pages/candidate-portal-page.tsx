@@ -7,7 +7,7 @@ import { Redirect, useLocation } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { CandidatePortal, type PortalSection, type PublicJob } from "@/components/candidate-portal/CandidatePortal";
-import { CareerProfilePanel, PROFILE_QUERY_KEY } from "@/components/candidate-profile/CareerProfilePanel";
+import { CareerProfilePanel, PROFILE_QUERY_KEY, publicationPoll } from "@/components/candidate-profile/CareerProfilePanel";
 import { loadProfile, type ProfileLoad } from "@/lib/candidate-profile-api";
 import { SessionEnded } from "@/components/candidate-profile/SparkStates";
 
@@ -46,7 +46,9 @@ export default function CandidatePortalPage() {
   const go = (s: PortalSection) => { setSection(s); window.history.replaceState(null, "", `#${s}`); window.scrollTo({ top: 0 }); };
 
   // Same query as the profile panel, so the page and panel share one read.
-  const profile = useQuery<ProfileLoad>({ queryKey: PROFILE_QUERY_KEY, queryFn: () => loadProfile(), staleTime: 0, retry: false, enabled: !!user });
+  const publicationWindow = useRef<{ version: string; until: number } | null>(null);
+  const profile = useQuery<ProfileLoad>({ queryKey: [...PROFILE_QUERY_KEY, "candidate", user?.id ?? null], queryFn: () => loadProfile(), staleTime: 0, retry: false, enabled: !!user, refetchOnWindowFocus: true,
+    refetchInterval: q => publicationPoll(q.state.data, publicationWindow) });
   const raw = profile.data?.kind === "ready" ? (profile.data.profile.spark as Record<string, unknown> | undefined) ?? profile.data.profile : undefined;
   const live = (v: unknown) => v === "ready" || v === "active";
   const matching = live((raw as any)?.matchingState) ? "ready" : "not_ready";
@@ -87,7 +89,7 @@ export default function CandidatePortalPage() {
       resumeRouting={resumeRouting} onRetryResumeRouting={() => void profile.refetch()}
       userId={user?.id}
       publicJobs={publicJobs} publicJobsState={jobs.isLoading ? "loading" : jobs.isError && !jobs.data ? "error" : "ready"} onRetryJobs={() => void jobs.refetch()}
-      onSearchJobs={setSearch} publicJobsTotal={total} onLoadMoreJobs={jobs.hasNextPage ? () => void jobs.fetchNextPage() : undefined} loadingMoreJobs={jobs.isFetchingNextPage} loadMoreFailed={jobs.isFetchNextPageError} profile={<CareerProfilePanel />}
+      onSearchJobs={setSearch} publicJobsTotal={total} onLoadMoreJobs={jobs.hasNextPage ? () => void jobs.fetchNextPage() : undefined} loadingMoreJobs={jobs.isFetchingNextPage} loadMoreFailed={jobs.isFetchNextPageError} profile={<CareerProfilePanel key={user.id} userId={user.id} />}
       onSignOut={() => { signingOut.current = true; logoutMutation.mutate(undefined, { onSettled: () => navigate("/candidate-auth#signin") }); }} />
   );
 }

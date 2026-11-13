@@ -52,13 +52,16 @@ export function SparkConsentPanel({ fetcher, postFetcher, setupUrl = "/candidate
     const s = status.data; if (!s) return;
     pending.current ??= { idempotencyKey: newKey(), expectedConsentRevision: s.consentRevision };
     setBusy(true); setFailed(false);
-    try { await withdrawConsent(pending.current, postFetcher); pending.current = null; setConfirming(false); await qc.invalidateQueries({ queryKey: KEY }); }
+    try { await withdrawConsent(pending.current, postFetcher); pending.current = null; setConfirming(false); await qc.invalidateQueries({ queryKey: KEY }); await qc.invalidateQueries({ queryKey: ["/api/candidate/product/profile"] }); }
     catch { setFailed(true); }
     finally { setBusy(false); }
   }
 
   const s = status.data;
   const state = s ? panelState(s) : null;
+  useEffect(() => {
+    if (state) void qc.invalidateQueries({ queryKey: ["/api/candidate/product/profile"] });
+  }, [qc, state, s?.acknowledgedRevision]);
   // Bounded automatic re-check while applying; "Check again" is always there too.
   const polls = useRef(0);
   useEffect(() => {

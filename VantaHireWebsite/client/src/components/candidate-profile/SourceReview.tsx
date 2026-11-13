@@ -13,9 +13,10 @@ import { Check, FileWarning, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { ImportedProfile, ResumeItem } from "./OnboardingWizard";
 import type { ManualProfile } from "@/lib/candidate-profile-api";
+import { EMPTY_PROFILE } from "./ProfessionalDetailsForm";
 import {
   fetchSourceProposal, lookupStatus, newKey, ProfileApiError, resumeFailureCopy, resumeInProgress, startLookup, startResumeRead, tryResumeAgain, uploadLibraryResume,
-  watchLookup, type LookupStatus, type ResumeRunDeps, type ResumeSourceStatus,
+  watchLookup, watchResume, type LookupStatus, type ResumeRunDeps, type ResumeSourceStatus,
 } from "@/lib/candidate-profile-api";
 
 export type ResumeRead =
@@ -23,6 +24,7 @@ export type ResumeRead =
   | { kind: "reading"; status: ResumeSourceStatus | null }
   | { kind: "ready"; status: ResumeSourceStatus }
   | { kind: "failed"; status: ResumeSourceStatus }
+  | { kind: "pending"; commandId: string }
   | { kind: "error"; message: string };
 
 const REQUEST_COPY: Record<number, string> = {
@@ -34,6 +36,10 @@ const REQUEST_GENERIC = "We couldn't start reading your résumé. Please try aga
 // OCR/server failures keep the generic copy and the bounded Try again.
 const REQUEST_UNREADABLE = "We couldn't read this résumé. Try another PDF or Word file with selectable text, or fill in your profile yourself.";
 export function resumeRequestCopy(e: unknown): string {
+  if (e instanceof ProfileApiError && (e.code === "resume_limit_reached" || e.code === "Maximum 3 resumes allowed"))
+    return "Your résumé library already has 3 files. Use a résumé from My profile, or remove a file there before uploading another.";
+  if (e instanceof ProfileApiError && (e.status === 401 || e.code === "recent_auth_required"))
+    return "Please sign in again, then return to your résumé. Your saved profile has not changed.";
   if (e instanceof ProfileApiError && ((e.status === 400 && e.code === "Invalid resume") || (e.status === 415 && e.code === "Resume extraction failed")))
     return REQUEST_UNREADABLE;
   return REQUEST_COPY[e instanceof ProfileApiError ? e.status : 0] ?? REQUEST_GENERIC;
@@ -77,6 +83,7 @@ type Props = {
   onRetry: (commandId: string) => void;
   /** Carry on without the résumé (always allowed, no penalty). */
   onContinue: () => void;
+  continueLabel?: string;
 };
 
 // Layout follows 21st.dev "Attachment States" (uiable): file title, state line,
@@ -96,9 +103,14 @@ function Card({ icon, title, line, children, role }: { icon: ReactNode; title: s
   );
 }
 
-export function ResumeReadStatus({ read, fileName, onRetry, onContinue }: Props) {
+export function ResumeReadStatus({ read, fileName, onRetry, onContinue, continueLabel }: Props) {
   if (read.kind === "idle") return null;
   const title = fileName ?? "Your résumé";
+  if (read.kind === "pending") return <Card role="status" title={title} icon={<FileWarning aria-hidden />}
+    line="We haven't received the result yet. Checking status won't read or charge for your résumé again.">
+    <Button onClick={() => onRetry(read.commandId)}>Check status</Button>
+    <Button variant="outline" onClick={onContinue}>{continueLabel ?? "Continue without résumé"}</Button>
+  </Card>;
   if (read.kind === "reading") {
     return <Card role="status" title={title} icon={<TetrisOrb label="Reading your résumé" decorative />}
       line={<>Reading your résumé… This can take a little while. Please keep this page open.</>} />;
@@ -112,13 +124,13 @@ export function ResumeReadStatus({ read, fileName, onRetry, onContinue }: Props)
   const tries = read.kind === "failed" ? read.status.retry : null;
   return (
     <Card role="alert" title={title} icon={<FileWarning className="h-4 w-4 text-destructive" />}
-      line={<><span className="text-foreground">{message}</span>{tries && <span className="mt-1 block">Tries used: {tries.attemptsUsed} of {tries.maxAttempts}</span>}</>}>
+      line={<><span className="text-foreground">{message}</span>{message.includes("library already has 3 files") && <a className="ml-1 underline" href="/my-dashboard?resumes=1#profile">Manage résumés</a>}{tries && <span className="mt-1 block">Tries used: {tries.attemptsUsed} of {tries.maxAttempts}</span>}</>}>
       {retry && (
         <Button type="button" className="min-h-11 cursor-pointer" onClick={() => onRetry(retry)}>
           <RefreshCw className="mr-2 h-4 w-4" aria-hidden />Try again
         </Button>
       )}
-      <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={onContinue}>Fill in my profile myself</Button>
+      <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={onContinue}>{continueLabel ?? "Fill in my profile myself"}</Button>
     </Card>
   );
 }
@@ -175,7 +187,7 @@ export function acceptPayload(p: SourceProposal, decisions: Record<string, "keep
 
 /** Reading finished without suggestions: carries the server status for the card. */
 export class ResumeReadError extends Error {
-  constructor(public read: Extract<ResumeRead, { kind: "failed" | "error" }>) { super("resume_read_failed"); }
+  constructor(public read: Extract<ResumeRead, { kind: "failed" | "error" | "pending" }>) { super("resume_read_failed"); }
 }
 
 /** Real résumé adapters for the journey: upload to the library, read, fetch the
@@ -189,6 +201,29 @@ export function resumeAdapters(o: {
   const proposals = new Map<string, SourceProposal>();
   const acceptKeys = new Map<string, string>();
   const deps = o.deps ?? {};
+  const uploaded = new WeakMap<File, Promise<number>>();
+  const uploadsByDigest = new Map<string, Promise<number>>();
+  const requestKeys = new Map<number, { snapshot: string; queue: string }>();
+  const commands = new Map<number, ResumeSourceStatus>();
+  const pendingChecks = new Set<string>();
+  const retryKeys = new Map<string, string>();
+  async function readStored(resumeId: number) {
+    if (!requestKeys.has(resumeId)) requestKeys.set(resumeId, { snapshot: (deps.newKey ?? newKey)(), queue: (deps.newKey ?? newKey)() });
+    let last = commands.get(resumeId);
+    const update = (s: ResumeSourceStatus) => { last = s; commands.set(resumeId, s); };
+    try {
+      const result = last
+        ? (resumeInProgress(last.state) ? await watchResume(last.commandId, update, undefined, deps) : last)
+        : await startResumeRead(resumeId, update, undefined, deps, requestKeys.get(resumeId));
+      return await extraction(result);
+    } catch (e) {
+      if (e instanceof ProfileApiError && e.code === "resume_status_pending" && last) {
+        pendingChecks.add(last.commandId);
+        throw new ResumeReadError({ kind: "pending", commandId: last.commandId });
+      }
+      throw asReadError(e);
+    }
+  }
   async function extraction(s: ResumeSourceStatus) {
     if (s.state !== "review_ready" || !s.proposalId) throw new ResumeReadError({ kind: "failed", status: s });
     const raw = await (deps.fetchProposal ?? fetchSourceProposal)(s.sourceId, s.proposalId) as SourceProposal;
@@ -201,14 +236,27 @@ export function resumeAdapters(o: {
   return {
     async readResume(file: File) {
       try {
-        const id = await (deps.upload ?? uploadLibraryResume)(file);
-        return await extraction(await startResumeRead(id, () => {}, undefined, deps));
+        if (!uploaded.has(file)) {
+          // Same bytes selected again in this session reuse the owned library file.
+          // Never equate files using only their name/size; those can collide.
+          // Hashing only enables reuse of an identical earlier upload; if it fails, upload anyway.
+          let digest: string | null = null;
+          if (globalThis.crypto?.subtle && typeof file.arrayBuffer === "function") {
+            try {
+              digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())), b => b.toString(16).padStart(2, "0")).join("");
+            } catch { digest = null; }
+          }
+          const upload = (digest && uploadsByDigest.get(digest)) || (deps.upload ?? uploadLibraryResume)(file);
+          uploaded.set(file, upload);
+          if (digest) uploadsByDigest.set(digest, upload);
+          void upload.catch(() => { uploaded.delete(file); if (digest) uploadsByDigest.delete(digest); });
+        }
+        return await readStored(await uploaded.get(file)!);
       } catch (e) { throw asReadError(e); }
     },
     /** Read a résumé already in the library (the candidate's default), by its id. */
     async readResumeById(resumeId: number) {
-      try { return await extraction(await startResumeRead(resumeId, () => {}, undefined, deps)); }
-      catch (e) { throw asReadError(e); }
+      return readStored(resumeId);
     },
     /** Returning: reopen the newest unreviewed résumé suggestion, if any (lookups are skipped). */
     async restore(summaries: { proposalId: string; kind: string; sourceId: string | null }[]) {
@@ -216,14 +264,41 @@ export function resumeAdapters(o: {
         if (s.kind !== "source" || !s.sourceId) continue;
         const raw = await (deps.fetchProposal ?? fetchSourceProposal)(s.sourceId, s.proposalId).catch(() => null) as SourceProposal & { sourceKind?: string } | null;
         if (!raw || raw.proposalId !== s.proposalId || raw.sourceKind !== "resume" || !Array.isArray(raw.facts)) continue;
+        // An empty past read (unreadable or unmatched file) has nothing to review: reopening it
+        // would show an old "couldn't read" result instead of letting the candidate upload again.
+        if (raw.facts.length === 0) continue;
         proposals.set(raw.proposalId, raw);
         return { resumeVersionId: raw.proposalId, items: proposalItems(raw), ...emptyReason(raw) };
       }
       return null;
     },
     async retryResume(commandId: string) {
-      try { return await extraction(await tryResumeAgain(commandId, () => {}, undefined, deps)); }
-      catch (e) { throw asReadError(e); }
+      if (pendingChecks.has(commandId)) {
+        try {
+          const result = await watchResume(commandId, s => {
+            for (const [id, prior] of commands) if (prior.commandId === commandId) commands.set(id, s);
+          }, undefined, deps);
+          pendingChecks.delete(commandId);
+          return await extraction(result);
+        } catch (e) {
+          if (e instanceof ProfileApiError && e.code === "resume_status_pending") throw new ResumeReadError({ kind: "pending", commandId });
+          throw asReadError(e);
+        }
+      }
+      let next: ResumeSourceStatus | null = null;
+      if (!retryKeys.has(commandId)) retryKeys.set(commandId, (deps.newKey ?? newKey)());
+      try { return await extraction(await tryResumeAgain(commandId, s => {
+        next = s;
+        for (const [id, prior] of commands) if (prior.commandId === commandId || prior.commandId === s.commandId) commands.set(id, s);
+      }, undefined, deps, retryKeys.get(commandId))); }
+      catch (e) {
+        const latest = next as ResumeSourceStatus | null;
+        if (e instanceof ProfileApiError && e.code === "resume_status_pending" && latest) {
+          pendingChecks.add(latest.commandId);
+          throw new ResumeReadError({ kind: "pending", commandId: latest.commandId });
+        }
+        throw asReadError(e);
+      }
     },
     async acceptResume(proposalId: string, decisions: Record<string, "keep" | "remove" | "profile" | "resume">, edits: Record<string, string>) {
       const p = proposals.get(proposalId);
@@ -234,9 +309,9 @@ export function resumeAdapters(o: {
       // accept_source, so the review is closed as "not needed" and the draft is unchanged.
       if (payload.selectedFactIds.length === 0) {
         const current = o.currentProfile();
-        if (!o.session.rejectSource || !current) throw new ProfileApiError(409, "source_not_found");
+        if (!o.session.rejectSource) throw new ProfileApiError(409, "source_not_found");
         await o.session.rejectSource(acceptKeys.get(proposalId)!, { proposalId: p.proposalId, sourceVersion: p.sourceVersion, proposalHash: p.proposalHash, reason: "not_needed" });
-        return current;
+        return current ?? structuredClone(EMPTY_PROFILE);
       }
       return o.session.acceptSource(acceptKeys.get(proposalId)!, payload);
     },

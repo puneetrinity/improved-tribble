@@ -16,7 +16,7 @@ import rateLimit from 'express-rate-limit';
 import { db } from './db';
 import { candidateResumes, applications, jobs, users, BatchFitResult } from '../shared/schema';
 import { eq, and, inArray, sql, desc, count } from 'drizzle-orm';
-import { insertLibraryResume, makeLibraryResumeDefault } from './lib/candidateResumeDefault';
+import { insertLibraryResume, makeLibraryResumeDefault, removeLibraryResume } from './lib/candidateResumeDefault';
 import { upload, uploadToGCS, downloadFromGCS } from './gcs-storage';
 import { extractResumeText, validateResumeText } from './lib/resumeExtractor';
 import { extractResumeForOrdinaryIngest, checkResumeForSparkReading } from './lib/resumeIngestExtraction';
@@ -396,6 +396,7 @@ export function registerAIRoutes(app: Express): void {
         if (existingResumes.length >= 3) {
           res.status(400).json({
             error: 'Maximum 3 resumes allowed',
+            code: 'resume_limit_reached',
             message: 'Please delete an existing resume before adding a new one.',
           });
        return;
@@ -516,7 +517,12 @@ export function registerAIRoutes(app: Express): void {
           },
         });
 
-        res.json({ resumes });
+        const statusRows = await db.execute(sql`SELECT public.flow_candidate_source_library_status(${userId}::bigint) AS result`);
+        const statuses = z.array(z.object({ resumeId: z.number().int().positive(), readFailed: z.boolean() }).strict())
+          .parse(statusRows.rows[0]?.result);
+        const failed = new Set(statuses.filter(s => s.readFailed).map(s => s.resumeId));
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({ resumes: resumes.map((r: { id: number }) => ({ ...r, readFailed: failed.has(r.id) })) });
       } catch (error) {
         if (error instanceof CandidatePrivacyRestrictedError) {
           res.status(200).json({ resumes: [], privacyRestricted: true });
@@ -582,40 +588,17 @@ export function registerAIRoutes(app: Express): void {
           return;
         }
 
-        const resumeId = parseInt(resumeIdParam, 10);
+        const resumeId = Number(resumeIdParam);
 
-        if (isNaN(resumeId)) {
+        if (!Number.isSafeInteger(resumeId) || resumeId < 1 || String(resumeId) !== resumeIdParam) {
           res.status(400).json({ error: 'Invalid resume ID' });
           return;
         }
 
-        // Check ownership
-        const resume = await db.query.candidateResumes.findFirst({
-          where: and(
-            eq(candidateResumes.id, resumeId),
-            eq(candidateResumes.userId, userId)
-          ),
-        });
-
-        if (!resume) {
+        if (!await removeLibraryResume(db, userId, resumeId)) {
           res.status(404).json({ error: 'Resume not found' });
        return;
         }
-
-        await db.transaction(async (tx: any) => {
-          // Applications keep their copied resume URL/text after the library item
-          // is removed, but must release the FK first.
-          await tx
-            .update(applications)
-            .set({ resumeId: null })
-            .where(
-              and(
-                eq(applications.resumeId, resumeId),
-                eq(applications.userId, userId)
-              )
-            );
-          await tx.delete(candidateResumes).where(eq(candidateResumes.id, resumeId));
-        });
 
         const remaining = await db
           .select({ count: count() })

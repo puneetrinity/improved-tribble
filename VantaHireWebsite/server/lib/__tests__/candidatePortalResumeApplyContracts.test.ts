@@ -162,11 +162,9 @@ describe('candidate resume library contracts', () => {
   });
 
   it('detaches only the owner applications before deleting a resume library record', () => {
-    const source = read('../../ai.routes.ts');
-    const transaction = source.slice(
-      source.indexOf('await db.transaction(async (tx: any) => {'),
-      source.indexOf('const remaining = await db', source.indexOf('await db.transaction(async (tx: any) => {'))
-    );
+    expect(read('../../ai.routes.ts')).toContain('await removeLibraryResume(db, userId, resumeId)');
+    const source = read('../candidateResumeDefault.ts');
+    const transaction = source.slice(source.indexOf('export async function removeLibraryResume'), source.indexOf('export const CANDIDATE_RESUME_DEFAULT_LOCK'));
 
     const detach = transaction.indexOf('.set({ resumeId: null })');
     const deletion = transaction.indexOf('tx.delete(candidateResumes)');

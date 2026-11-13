@@ -121,6 +121,11 @@ describe('P0 mounted resume routes',()=>{
  const path='POST /api/candidate/product/sources/resume-snapshots';
  const rawBody=JSON.stringify({schemaVersion:1,idempotencyKey:key,resumeId:9});
  const enabled=()=>{for(const flag of ['CANDIDATE_PROFILE_DELIVERY_ENABLED','CANDIDATE_CONSENT_V2_DELIVERY_ENABLED','CANDIDATE_SPARK_ENABLED','CANDIDATE_RESUME_SOURCE_ENABLED'])vi.stubEnv(flag,'true');};
+ it('allows résumé reading with a valid older session',async()=>{
+  enabled();
+  expect((await request(path,{rawBody,session:{privacyReauthenticatedAt:0}})).statusCode).toBe(200);
+  expect(deps.sourceSnapshot).toHaveBeenCalled();
+ });
  it('reads a proposal using session identity only and checks ownership again before replying',async()=>{
   enabled();deps.readSourceProposal.mockResolvedValue({proposalId:key});
   const result=await request('GET /api/candidate/product/sources/:sourceId/proposals/:proposalId',{params:{sourceId:key,proposalId:key}});
@@ -139,7 +144,6 @@ describe('P0 mounted resume routes',()=>{
  it.each([
   ['unverified',{user:{id:7,role:'candidate',emailVerified:false}},403],
   ['CSRF',{csrf:false},403],
-  ['stale login',{session:{privacyReauthenticatedAt:0}},403],
  ])('refuses %s before reading a source',async(_name,change,code)=>{
   enabled();expect((await request(path,{rawBody,...change})).statusCode).toBe(code);
   expect(deps.sourceSnapshot).not.toHaveBeenCalled();
