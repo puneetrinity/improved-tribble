@@ -32,7 +32,7 @@ describe.skipIf(!url)('v3 queue on the full Flow schema and restricted runtime',
   const roleUrl=(role:string)=>`postgresql://${role}:synthetic-local-only@127.0.0.1:${port}/${database}`;
   const migrationsDir=resolve('server/schema-migrations'),target='spark-queue-'+suffix;
   const input={migrationsDir,creds:{migrateUrl:roleUrl(owner),expectedTargetId:target,environment:'development' as const,allowFreshInitialization:true},connect:()=>adapter(owner)};
-  expect((await runReleaseMigration(input)).applied).toHaveLength(33);
+  expect((await runReleaseMigration(input)).applied).toHaveLength(34);
   expect((await runReleaseMigration(input)).applied).toEqual([]);
   console.log('Retained full-schema Spark queue fixture',database);
   const catalogClient=await connect(owner);try{console.log('Source catalogue', (await catalogClient.query(SOURCE_CATALOG_SQL,[owner,[]])).rows[0].digest);
@@ -311,6 +311,53 @@ describe.skipIf(!url)('v3 queue on the full Flow schema and restricted runtime',
    limit:{kind:'semantic_model',model:'synthetic',inputTokens:100,maxOutputTokens:200,textHash:'b'.repeat(64)}};
   return {a,claim,request,resume,sourceId:s};
  };
+ it('explicit reread: completed legacy result gets one new interpretation, current versions, no extra library copy and a content-wide limit',async()=>{
+  const f=await sourceFixture(),old=f.claim.lease.commandId;
+  const versions={originalDraftVersion:7,originalProfileVersion:4,originalPreferenceVersion:2,originalPreferenceDraftRevision:3};
+  const request={schemaVersion:1,idempotencyKey:randomUUID(),sourceId:f.sourceId,sourceVersion:1,rereadOfCommandId:old,_rereadVersions:versions};
+  await expect(sqlSource('enqueue',f.a.userId,request)).rejects.toMatchObject({message:'source_changed'});
+  await db.query("UPDATE candidate_source_jobs SET state='review_ready',proposal_id=gen_random_uuid(),lease_token=NULL,lease_until=NULL WHERE command_id=$1",[old]);
+  const other=await actor();
+  await expect(sqlSource('enqueue',other.userId,request)).rejects.toMatchObject({code:'P0002'});
+  const second=await connect((await db.query('SELECT current_user name')).rows[0].name);
+  let next:any;
+  try {
+   const results=await Promise.all([sqlSource('enqueue',f.a.userId,request),second.query('SELECT flow_candidate_source_enqueue($1,$2) result',[f.a.userId,{...request,idempotencyKey:randomUUID()}]).then(r=>r.rows[0].result)]);
+   expect(results[0].commandId).toBe(results[1].commandId);next=results[0];
+  } finally {await second.end();}
+  expect(next.commandId).not.toBe(old);
+  expect((await sqlSource('enqueue',f.a.userId,{...request,_rereadVersions:{...versions,originalDraftVersion:8}})).commandId).toBe(next.commandId);
+  expect((await db.query('SELECT count(*) n FROM candidate_resumes WHERE user_id=$1',[f.a.userId])).rows[0].n).toBe('1');
+  const claim=await sqlSource('claim',randomUUID());
+  expect(claim).toMatchObject({...versions,lease:{commandId:next.commandId}});
+  await db.query("UPDATE candidate_source_jobs SET state='review_ready',proposal_id=gen_random_uuid(),lease_token=NULL,lease_until=NULL WHERE command_id=$1",[next.commandId]);
+  await db.query("UPDATE candidate_source_jobs SET state='unavailable',reason='empty' WHERE command_id=$1",[next.commandId]);
+  const third=await sqlSource('retry',f.a.userId,{schemaVersion:1,idempotencyKey:randomUUID(),retryOfCommandId:next.commandId});
+  expect(await sqlSource('claim',randomUUID())).toMatchObject({...versions,lease:{commandId:third.commandId}});
+  await db.query("UPDATE candidate_source_jobs SET state='review_ready',proposal_id=gen_random_uuid() WHERE command_id=$1",[third.commandId]);
+  await expect(sqlSource('enqueue',f.a.userId,{...request,idempotencyKey:randomUUID(),rereadOfCommandId:third.commandId})).rejects.toMatchObject({message:'source_attempt_limit'});
+ });
+ it('explicit reread refuses unsettled charges, then reserves a new budgeted model call after settlement; withdrawal still blocks it',async()=>{
+  await budgets();const f=await sourceFixture();
+  const reserved=await sqlSource('paid_reserve',f.request);
+  const dispatch=await sqlSource('paid_dispatch',{lease:f.claim.lease,reservationId:reserved.reservation.reservationId});
+  const request={schemaVersion:1,idempotencyKey:randomUUID(),sourceId:f.sourceId,sourceVersion:1,rereadOfCommandId:f.claim.lease.commandId,
+   _rereadVersions:{originalDraftVersion:0,originalProfileVersion:0,originalPreferenceVersion:0,originalPreferenceDraftRevision:0}};
+  await db.query("UPDATE candidate_source_jobs SET state='review_ready',proposal_id=gen_random_uuid() WHERE command_id=$1",[f.claim.lease.commandId]);
+  await expect(sqlSource('enqueue',f.a.userId,request)).rejects.toMatchObject({message:'source_changed'});
+  await db.query("UPDATE candidate_source_jobs SET state='building' WHERE command_id=$1",[f.claim.lease.commandId]);
+  await sqlSource('paid_settle',{lease:f.claim.lease,grant:dispatch.grant,observedUsage:{kind:'semantic_model',inputTokens:90,outputTokens:20},result:document({synthetic:'old result'})});
+  await db.query("UPDATE candidate_source_jobs SET state='review_ready',lease_token=NULL,lease_until=NULL WHERE command_id=$1",[f.claim.lease.commandId]);
+  const next=await sqlSource('enqueue',f.a.userId,request);
+  const claim=await sqlSource('claim',randomUUID());expect(claim.lease.commandId).toBe(next.commandId);
+  const purchase={...f.request,lease:claim.lease,operationKey:randomUUID()};
+  const freshReservation=await sqlSource('paid_reserve',purchase);
+  expect(freshReservation).toMatchObject({state:'reserved'});
+  await db.query('UPDATE candidate_source_ai_policy SET enabled=false');
+  expect(await sqlSource('paid_dispatch',{lease:claim.lease,reservationId:freshReservation.reservation.reservationId})).toMatchObject({state:'refused',reason:'budget_unavailable'});
+  await capture(f.a,'withdraw',1);
+  expect(await sqlSource('prepare',claim.lease)).toBeNull();
+ });
  const budgets=async()=>{
   await db.query('DELETE FROM candidate_source_budget_windows');
   await db.query(`INSERT INTO candidate_source_budget_windows(kind,period,starts_at,ends_at,global_units,per_candidate_units)

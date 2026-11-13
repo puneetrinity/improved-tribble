@@ -293,9 +293,16 @@ async function postResume<T>(url: string, body: Record<string, unknown>, ok: num
 export function snapshotResume(resumeId: number, idempotencyKey: string, fetcher: typeof fetch = fetchWithCsrf as typeof fetch) {
   return postResume<ResumeSnapshot>(RESUME_SOURCE.snapshot, { schemaVersion: 1, idempotencyKey, resumeId }, 200, fetcher);
 }
-export function queueResume(snap: Pick<ResumeSnapshot, "sourceId" | "sourceVersion">, idempotencyKey: string, fetcher: typeof fetch = fetchWithCsrf as typeof fetch) {
+export function queueResume(snap: Pick<ResumeSnapshot, "sourceId" | "sourceVersion">, idempotencyKey: string, fetcher: typeof fetch = fetchWithCsrf as typeof fetch, rereadOfCommandId?: string) {
   return postResume<ResumeSourceStatus>(RESUME_SOURCE.queue,
-    { schemaVersion: 1, idempotencyKey, sourceId: snap.sourceId, sourceVersion: snap.sourceVersion }, 202, fetcher);
+    { schemaVersion: 1, idempotencyKey, sourceId: snap.sourceId, sourceVersion: snap.sourceVersion,
+      ...(rereadOfCommandId ? { rereadOfCommandId } : {}) }, 202, fetcher);
+}
+/** Explicitly request a NEW interpretation of a completed read; never called by polling. */
+export async function rereadCompletedResume(prior: ResumeSourceStatus, key: string, onUpdate: (s: ResumeSourceStatus) => void, deps: ResumeRunDeps = {}) {
+  const next = await sameKey(() => queueResume(prior, key, deps.postFetcher, prior.commandId), undefined, deps.wait);
+  onUpdate(next);
+  return resumeInProgress(next.state) ? watchResume(next.commandId, onUpdate, undefined, deps) : next;
 }
 export function retryResume(commandId: string, idempotencyKey: string, fetcher: typeof fetch = fetchWithCsrf as typeof fetch) {
   return postResume<ResumeSourceStatus>(RESUME_SOURCE.retry(commandId), { schemaVersion: 1, idempotencyKey, retryOfCommandId: commandId }, 202, fetcher);

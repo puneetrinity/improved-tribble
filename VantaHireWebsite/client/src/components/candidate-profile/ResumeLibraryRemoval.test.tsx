@@ -31,6 +31,8 @@ it('failed-read files require explicit confirmed removal; cancelling makes no re
   </AuthContext.Provider></QueryClientProvider>);});await flush();
   expect(document.body.textContent).toContain('Couldn’t read');
   expect(button('Add a résumé')).toBeUndefined();
+  expect(document.body.textContent).toContain('Remove a file below before uploading another');
+  expect(document.querySelector('#resume-library li')?.textContent).toContain('cv1');
   await act(async()=>{document.querySelector<HTMLButtonElement>('[aria-label="Remove cv1"]')!.click();});
   expect(deletes).toEqual([]);
   expect(document.body.textContent).toContain('already submitted with applications will stay available');
@@ -39,6 +41,7 @@ it('failed-read files require explicit confirmed removal; cancelling makes no re
   await act(async()=>{button('Remove résumé').click();});await flush();
   expect(deletes).toEqual(['/api/ai/resume/1']);
   expect(button('Add a résumé')).toBeDefined();
+  expect(document.body.textContent).not.toContain('Remove a file below before uploading another');
   expect(document.body.textContent).not.toContain('Couldn’t read');
 });
 

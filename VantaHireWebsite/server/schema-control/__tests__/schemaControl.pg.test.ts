@@ -331,6 +331,7 @@ describe.skipIf(!enabled || !databaseUrl)("schema-control disposable PostgreSQL"
         { version: "0030", apply_mode: "adopted" },
         { version: "0031", apply_mode: "adopted" },
         { version: "0032", apply_mode: "adopted" },
+        { version: "0033", apply_mode: "adopted" },
       ]);
       const businessRows = await client.query(
         "SELECT (SELECT COUNT(*)::integer FROM users) AS users, " +

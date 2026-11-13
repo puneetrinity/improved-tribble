@@ -91,7 +91,8 @@ export type SourceClaim = z.infer<typeof sourceClaimSchema>;
 export type FailReason = Exclude<SourceStatus['reason'], null>;
 
 export const snapshotRequestSchema = strict({ schemaVersion: z.literal(1), idempotencyKey: id, resumeId: positive });
-export const queueRequestSchema = strict({ schemaVersion: z.literal(1), idempotencyKey: id, sourceId: id, sourceVersion: rev });
+export const queueRequestSchema = strict({ schemaVersion: z.literal(1), idempotencyKey: id, sourceId: id, sourceVersion: rev,
+  rereadOfCommandId: id.optional() });
 export const reserveRequestSchema = strict({ schemaVersion: z.literal(1), lease: leaseSchema, source: sourceRefSchema,
   consentRevision: positive, operationKey: id, limit: paidLimitSchema });
 export const dispatchRequestSchema = strict({ lease: leaseSchema, reservationId: id });
@@ -112,6 +113,7 @@ export class ResumeSourceRepositoryError extends Error {
 const knownErrors: Readonly<Record<string, readonly [string, number]>> = {
   not_found: ['P0002', 404], idempotency_conflict: ['23505', 409], invalid_request: ['22023', 422],
   source_changed: ['40001', 409], consent_changed: ['42501', 409], lease_lost: ['40001', 409],
+  source_attempt_limit: ['40001', 409],
   privacy_changed: ['42501', 451], candidate_privacy_restricted: ['42501', 451],
 };
 
@@ -158,7 +160,14 @@ export function resumeSourceRepository(db: FoundationDb, privacy: (userId: numbe
     },
     async enqueue(actor: Actor, request: unknown): Promise<SourceStatus> {
       const a = await owner(actor); const r = parseOr422(queueRequestSchema, request);
-      const status = await one('flow_candidate_source_enqueue', [a.userId, json(r)], sourceStatusSchema);
+      let internal: unknown = r;
+      if (r.rereadOfCommandId) {
+        const profile = await (await import('./profile-client')).readSparkProfile(a.subjectId, a.bindingId);
+        internal = { ...r, _rereadVersions: { originalDraftVersion: profile.draftVersion,
+          originalProfileVersion: profile.profileVersion, originalPreferenceVersion: profile.preferenceVersion,
+          originalPreferenceDraftRevision: profile.preferenceDraft?.preferenceDraftRevision ?? 0 } };
+      }
+      const status = await one('flow_candidate_source_enqueue', [a.userId, json(internal)], sourceStatusSchema);
       if (status.sourceId !== r.sourceId || status.sourceVersion !== r.sourceVersion) throw new ResumeSourceRepositoryError('authority_unavailable', 503);
       return status;
     },

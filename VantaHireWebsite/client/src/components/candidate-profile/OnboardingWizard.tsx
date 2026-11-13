@@ -48,7 +48,7 @@ export const RESUME_UNREADABLE_COPY = "We couldn’t read suggestions from your 
 /** `unmatched`: suggestions came back but none could be checked against the résumé text. */
 const emptyKind = (x: { unmatched?: boolean | undefined; unreadable?: boolean | undefined }) => x.unreadable ? "unreadable" as const : x.unmatched ? "unmatched" as const : "none" as const;
 
-export type ResumeExtraction = { resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined };
+export type ResumeExtraction = { resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined; rereadCommandId?: string | undefined };
 export type Authorisation = "allowed" | "needs_visa" | "not_sure";
 export type PrefField = "roles" | "where" | "how" | "pay";
 /** Saved as the candidate goes (private, versioned), so refreshing or leaving loses nothing.
@@ -256,6 +256,7 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   const [resume, setResume] = useState<File | null>(null);
   const [resumeItems, setResumeItems] = useState<ResumeItem[] | null>(null);
   const [resumeVersionId, setResumeVersionId] = useState<string | null>(null);
+  const [rereadCommandId, setRereadCommandId] = useState<string | null>(null);
   const [resumeEmpty, setResumeEmpty] = useState<"none" | "unmatched" | "unreadable">("none");
   /** Returning with résumé suggestions still to review (there's no file in this session). */
   const [restoredResume, setRestoredResume] = useState(false);
@@ -395,7 +396,8 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
   async function loadResume(read: () => Promise<ResumeExtraction>) {
     const generation = ++resumeGeneration.current;
     setResumeItems(null); setResumeFailure(null); setResumeVersionId(null); setResumeChoice({}); setResumeEdits({}); setResumeEmpty("none");
-    try { const x = await read(); if (generation !== resumeGeneration.current) return; setResumeVersionId(x.resumeVersionId); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); }
+    setRereadCommandId(null);
+    try { const x = await read(); if (generation !== resumeGeneration.current) return; setResumeVersionId(x.resumeVersionId); setRereadCommandId(x.rereadCommandId ?? null); setResumeEmpty(emptyKind(x)); setResumeItems(x.items); }
     // An unexpected error is a failed read (with its retry card), never "nothing new".
     catch (e) { if (generation !== resumeGeneration.current) return; setResumeFailure(e instanceof ResumeReadError ? e.read : { kind: "error", message: resumeRequestCopy(e) }); }
   }
@@ -658,7 +660,9 @@ export function OnboardingWizard({ acceptCorrection, pendingResume, firstName, i
               ) : resumeItems === null ? (
                 <p role="status" className="flex items-center gap-3 rounded-xl border border-border bg-card p-5 text-sm"><TetrisOrb label="Reading your résumé" decorative />Reading your résumé…</p>
               ) : resumeItems.length === 0 ? (
-                <p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">{resumeEmpty === "unreadable" ? RESUME_UNREADABLE_COPY : resumeEmpty === "unmatched" ? RESUME_UNMATCHED_COPY : "We couldn't find anything new in your résumé. You can continue."}</p>
+                <div className="space-y-3"><p className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">{resumeEmpty === "unreadable" ? RESUME_UNREADABLE_COPY : resumeEmpty === "unmatched" ? RESUME_UNMATCHED_COPY : "We couldn't find anything new in your résumé. You can continue."}</p>
+                  {rereadCommandId && retryResume && <Button onClick={() => void loadResume(() => retryResume(rereadCommandId))}>Read file again</Button>}
+                </div>
               ) : (
                 <ResumeReviewList items={resumeItems} choice={resumeChoice} setChoice={setResumeChoice} edits={resumeEdits} setEdits={setResumeEdits} />
               )}

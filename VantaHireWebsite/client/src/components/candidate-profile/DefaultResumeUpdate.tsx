@@ -23,7 +23,7 @@ function dismiss(userId: number, resumeId: number) {
 
 type Stage =
   | { kind: "checking" } | { kind: "hidden" } | { kind: "offer" } | { kind: "reading" }
-  | { kind: "review"; proposalId: string; items: ResumeItem[] } | { kind: "nothing_new"; why: "empty" | "unmatched" | "unreadable" }
+  | { kind: "review"; proposalId: string; items: ResumeItem[] } | { kind: "nothing_new"; why: "empty" | "unmatched" | "unreadable"; rereadCommandId?: string | undefined }
   | { kind: "saving"; proposalId: string; items: ResumeItem[] }
   // The save may or may not have been applied: same proposal, choices and command key; never re-read.
   | { kind: "save_failed"; proposalId: string; items: ResumeItem[] }
@@ -31,8 +31,8 @@ type Stage =
   | { kind: "read_failed"; read: Extract<ResumeRead, { kind: "failed" | "error" | "pending" }> }
   | { kind: "done" };
 
-export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProfile = () => loadSparkProfile() }: {
-  userId: number; resumeId: number; label: string; onClose: () => void;
+export function DefaultResumeUpdate({ userId, resumeId, label, onClose, explicit = false, loadProfile = () => loadSparkProfile() }: {
+  userId: number; resumeId: number; label: string; onClose: () => void; explicit?: boolean;
   loadProfile?: () => ReturnType<typeof loadSparkProfile> }) {
   const [stage, setStage] = useState<Stage>({ kind: "checking" });
   const [choice, setChoice] = useState<Record<string, "keep" | "remove" | "profile" | "resume">>({});
@@ -43,7 +43,7 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
   useEffect(() => {
     generation.current++;
     let live = true;
-    if (offerDismissed(userId, resumeId)) { setStage({ kind: "hidden" }); return; }
+    if (!explicit && offerDismissed(userId, resumeId)) { setStage({ kind: "hidden" }); return; }
     loadProfile().then(l => {
       if (!live) return;
       // Only for a Spark profile with résumé reading switched on.
@@ -53,15 +53,15 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
       setStage({ kind: "offer" });
     }, () => { if (live) setStage({ kind: "hidden" }); });
     return () => { live = false; generation.current++; };
-  }, [userId, resumeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [userId, resumeId, explicit]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function load(run: () => Promise<{ resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined }>) {
+  async function load(run: () => Promise<{ resumeVersionId: string; items: ResumeItem[]; unmatched?: boolean | undefined; unreadable?: boolean | undefined; rereadCommandId?: string | undefined }>) {
     const current = generation.current;
     setStage({ kind: "reading" }); setChoice({}); setEdits({});
     try {
       const x = await run();
       if (current !== generation.current) return;
-      setStage(x.items.length ? { kind: "review", proposalId: x.resumeVersionId, items: x.items } : { kind: "nothing_new", why: x.unreadable ? "unreadable" : x.unmatched ? "unmatched" : "empty" });
+      setStage(x.items.length ? { kind: "review", proposalId: x.resumeVersionId, items: x.items } : { kind: "nothing_new", why: x.unreadable ? "unreadable" : x.unmatched ? "unmatched" : "empty", rereadCommandId: x.rereadCommandId });
     } catch (e) {
       if (current !== generation.current) return;
       setStage({ kind: "read_failed", read: e instanceof ResumeReadError ? e.read : { kind: "error", message: "We couldn't read this résumé." } });
@@ -129,6 +129,7 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, loadProf
           <Button type="button" className="min-h-11 cursor-pointer" onClick={() => void accept(stage.proposalId, stage.items)}>Try again</Button>
           <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={onClose}>Close</Button>
         </>}
+        {stage.kind === "nothing_new" && stage.rereadCommandId && <Button onClick={() => void load(() => adapters.current!.rereadResume(stage.rereadCommandId!))}>Read file again</Button>}
         {(stage.kind === "done" || stage.kind === "nothing_new") && <Button type="button" variant="outline" className="min-h-11 cursor-pointer" onClick={() => { dismiss(userId, resumeId); onClose(); }}>Done</Button>}
       </div>
     </section>

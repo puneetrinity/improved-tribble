@@ -67,6 +67,7 @@ const fixtureFiles = [
   "VantaHireWebsite/server/schema-migrations/0030_candidate_unpaid_budget_retry.sql",
   "VantaHireWebsite/server/schema-migrations/0031_candidate_resume_library_removal.sql",
   "VantaHireWebsite/server/schema-migrations/0032_candidate_resume_read_outcome.sql",
+  "VantaHireWebsite/server/schema-migrations/0033_candidate_resume_explicit_reread.sql",
   "VantaHireWebsite/server/schema-migrations/catalog.lock.json",
   "VantaHireWebsite/server/schema-migrations/checksums.lock",
   "VantaHireWebsite/server/lib/__tests__/applicationWorkflowAuthorization.pg.test.ts",
