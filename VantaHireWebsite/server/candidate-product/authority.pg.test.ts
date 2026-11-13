@@ -5,7 +5,8 @@ import {resolve} from 'node:path';
 import {mkdtempSync,readdirSync,copyFileSync,readFileSync,writeFileSync} from 'node:fs';
 import {runReleaseMigration,type MigrationClient} from '../schema-control/runner';
 import {provisionRuntimeRole} from '../schema-control/runtimeRole';
-import {assertSchemaReady,FLOW_CRITICAL_POSTCONDITIONS,foundationPrivilegesReady} from '../schema-control/readiness';
+import {assertSchemaReady,FLOW_CRITICAL_POSTCONDITIONS,foundationPrivilegesReady,SOURCE_CATALOG_SQL} from '../schema-control/readiness';
+import {SOURCE_RUNTIME_FUNCTIONS} from './source-repository';
 import {FOUNDATION_TABLES,FOUNDATION_FUNCTIONS,FOUNDATION_OWNER_FUNCTIONS} from './contracts';
 
 const socket=process.env.CANDIDATE_FOUNDATION_TEST_SOCKET;
@@ -41,6 +42,7 @@ describe.skipIf(!socket)('foundation actual Flow release and runtime authority',
   }
   const first=await runReleaseMigration({migrationsDir,creds,connect:()=>connect(owner)});
   expect(first.applied).toHaveLength(mode==='fresh'?33:8);
+  {const c=await connect(owner);try{console.log('source catalogue digest',mode,(await c.query(SOURCE_CATALOG_SQL,[owner,[...SOURCE_RUNTIME_FUNCTIONS]])).rows[0].digest);}finally{await c.end();}}
   await provisionRuntimeRole({migrateUrl:url(owner),runtimeUrl:url(runtime),runtimeRole:runtime,
     expectedTargetId:target,connectMigration:()=>connect(owner),connectRuntime:()=>connect(runtime)});
   const replay=await runReleaseMigration({migrationsDir,creds,connect:()=>connect(owner)});
