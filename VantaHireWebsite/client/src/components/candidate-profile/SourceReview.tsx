@@ -239,8 +239,13 @@ export function resumeAdapters(o: {
         if (!uploaded.has(file)) {
           // Same bytes selected again in this session reuse the owned library file.
           // Never equate files using only their name/size; those can collide.
-          const digest = crypto.subtle && typeof file.arrayBuffer === "function"
-            ? Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())), b => b.toString(16).padStart(2, "0")).join("") : null;
+          // Hashing only enables reuse of an identical earlier upload; if it fails, upload anyway.
+          let digest: string | null = null;
+          if (globalThis.crypto?.subtle && typeof file.arrayBuffer === "function") {
+            try {
+              digest = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", await file.arrayBuffer())), b => b.toString(16).padStart(2, "0")).join("");
+            } catch { digest = null; }
+          }
           const upload = (digest && uploadsByDigest.get(digest)) || (deps.upload ?? uploadLibraryResume)(file);
           uploaded.set(file, upload);
           if (digest) uploadsByDigest.set(digest, upload);

@@ -13,13 +13,23 @@ import { PROFILE_QUERY_KEY, publicationPoll } from './CareerProfilePanel';
 import { webcrypto } from 'node:crypto';
 const reply=(status:number, body:unknown)=>new Response(JSON.stringify(body),{status,headers:{'Content-Type':'application/json'}});
 
+it('a file whose hash cannot be computed is still uploaded (no reuse, never blocked)',async()=>{
+ const upload=vi.fn(async()=>17);
+ const post=vi.fn(async()=>reply(403,{code:'consent_required'}));
+ const adapter=resumeAdapters({session:{acceptSource:vi.fn()},currentProfile:()=>null,deps:{upload,postFetcher:post as typeof fetch}});
+ const f=new File(['x'],'cv.pdf');Object.defineProperty(f,'arrayBuffer',{value:async()=>{throw new Error('unreadable bytes');}});
+ await expect(adapter.readResume(f)).rejects.toBeDefined();
+ expect(upload).toHaveBeenCalledOnce();
+});
+
 it('reselecting identical bytes reuses the upload, but a different file with the same name does not',async()=>{
  vi.stubGlobal('crypto',webcrypto);
  try {
   const upload=vi.fn(async()=>17);
   const post=vi.fn(async()=>reply(403,{code:'consent_required'}));
   const adapter=resumeAdapters({session:{acceptSource:vi.fn()},currentProfile:()=>null,deps:{upload,postFetcher:post as typeof fetch}});
-  const file=(byte:number)=>{const f=new File(['x'],'cv.pdf');Object.defineProperty(f,'arrayBuffer',{value:async()=>new Uint8Array([byte]).buffer});return f;};
+  // Node-realm bytes: Node 20's webcrypto rejects ArrayBuffers created in the jsdom realm (CI runs Node 20).
+  const file=(byte:number)=>{const f=new File(['x'],'cv.pdf');Object.defineProperty(f,'arrayBuffer',{value:async()=>{const b=Buffer.from([byte]);return b.buffer.slice(b.byteOffset,b.byteOffset+b.length);}});return f;};
   await expect(adapter.readResume(file(1))).rejects.toBeDefined();
   await expect(adapter.readResume(file(1))).rejects.toBeDefined();
   expect(upload).toHaveBeenCalledOnce();
