@@ -33,9 +33,9 @@ describe.skipIf(!socket)('foundation actual Flow release and runtime authority',
   const creds={migrateUrl:url(owner),expectedTargetId:target,environment:'development' as const,allowFreshInitialization:true};
   if(mode==='upgrade'){
     const before=mkdtempSync('/tmp/candidate-s1-flow-before-');
-    for(const file of readdirSync(migrationsDir))if(!/^00(2[5-9]|3[01])_/.test(file))copyFileSync(resolve(migrationsDir,file),resolve(before,file));
+    for(const file of readdirSync(migrationsDir))if(!/^00(2[5-9]|3[0-2])_/.test(file))copyFileSync(resolve(migrationsDir,file),resolve(before,file));
     const lock=JSON.parse(readFileSync(resolve(before,'checksums.lock'),'utf8'));
-    for(const v of ['0025','0026','0027','0028','0029','0030','0031'])delete lock.migrations[v];writeFileSync(resolve(before,'checksums.lock'),JSON.stringify(lock));
+    for(const v of ['0025','0026','0027','0028','0029','0030','0031','0032'])delete lock.migrations[v];writeFileSync(resolve(before,'checksums.lock'),JSON.stringify(lock));
     const previous=await runReleaseMigration({migrationsDir:before,creds,connect:()=>connect(owner)});
     expect(previous.applied).toHaveLength(25);
   }
@@ -48,7 +48,7 @@ describe.skipIf(!socket)('foundation actual Flow release and runtime authority',
   const reader=await connect(runtime);
   try{
     expect(await assertSchemaReady({pg:reader,migrationsDir,expectedTargetId:target,environment:'development',
-      criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS})).toMatchObject({version:'0031',applied:32});
+      criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS})).toMatchObject({version:'0032',applied:33});
     expect(await foundationPrivilegesReady(reader,runtime,true)).toBe(true);
     for(const table of FOUNDATION_TABLES){
       await expect(reader.query(`SELECT * FROM public.${table}`)).rejects.toThrow();

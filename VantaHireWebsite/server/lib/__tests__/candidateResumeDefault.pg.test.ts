@@ -11,6 +11,9 @@ import { insertLibraryResume, makeLibraryResumeDefault, removeLibraryResume } fr
 import { SOURCE_CATALOG_SQL, sourcePrivilegesReady } from "../../schema-control/readiness";
 import { provisionRuntimeRole } from "../../schema-control/runtimeRole";
 import { SOURCE_RUNTIME_FUNCTIONS } from "../../candidate-product/source-repository";
+import { canonicalProfileJson } from "../../candidate-product/profile-contracts";
+import { RESUME_UNMATCHED_NOTE, RESUME_UNREADABLE_NOTE } from "../../../shared/resume-review-notes";
+import { createHash, randomUUID } from "node:crypto";
 
 const url = (process.env.FLOW_SCHEMA_TEST_DATABASE_URL ?? "").trim();
 const enabled = process.env.FLOW_RESUME_DEFAULT_TEST_DISPOSABLE === "1" && Boolean(url);
@@ -91,6 +94,65 @@ describe.skipIf(!enabled)("default résumé on PostgreSQL", () => {
       SELECT user_id,source_id,subject_id,binding_id,1,0,'queued',created_at+interval '1 second' FROM candidate_source_jobs WHERE command_id=$1`,[command]);
     expect(await status(906)).toContainEqual({resumeId:r.id,readFailed:false});
     console.log('CA10 source catalogue digest', (await owner!.query(SOURCE_CATALOG_SQL,['postgres',[...SOURCE_RUNTIME_FUNCTIONS]])).rows[0].digest);
+  });
+
+  it("ONB-2: unreadable or unmatched reads stay labelled after cleanup; genuine empty does not; a later good read clears it", async () => {
+    const sha = (v: string) => createHash("sha256").update(v, "utf8").digest("hex");
+    await owner!.query("INSERT INTO users (id,username,password,role,email_verified) VALUES (907,'g@example.invalid','x','candidate',true)");
+    await owner!.query("SELECT flow_candidate_foundation_ensure(id,auth_version,encode(sha256(convert_to(password,'UTF8')),'hex'),clock_timestamp(),gen_random_uuid()) FROM users WHERE id=907");
+    const acct = (await owner!.query("SELECT subject_id,binding_id FROM candidate_product_accounts WHERE user_id=907")).rows[0];
+    const library = async (n: number) => {
+      const r = await insertLibraryResume(db, resume(907, n));
+      const sourceId = (await owner!.query(`INSERT INTO candidate_source_objects
+        (user_id,resume_id,source_version,content_hash,byte_length,media_type,policy_version,gcs_path,gcs_generation,original_versions)
+        VALUES(907,$1,1,repeat('a',64),100,'application/pdf','test',$2,'1','{}') RETURNING source_id`, [r.id, r.gcsPath])).rows[0].source_id;
+      return { resumeId: r.id as number, sourceId: sourceId as string };
+    };
+    // Drives the real finish routine: a leased job holding a stored transfer, then the receiver's "stored" receipt.
+    const read = async (sourceId: string, facts: unknown[], reviewNotes: string[]) => {
+      const commandId = randomUUID(), claimToken = randomUUID(), proposalId = randomUUID(), proposalHash = sha(proposalId);
+      const transfer = JSON.stringify({ commandId, subjectId: acct.subject_id, bindingId: acct.binding_id, sourceId, sourceVersion: 1,
+        proposal: { proposalId, proposalHash, facts, reviewNotes } });
+      await owner!.query(`INSERT INTO candidate_source_jobs(command_id,user_id,source_id,subject_id,binding_id,consent_revision,admitted_auth_version,
+        state,lease_token,lease_until,generation,transfer_document) VALUES($1,907,$2,$3,$4,1,0,'transferring',$5,clock_timestamp()+interval '1 minute',1,$6)`,
+        [commandId, sourceId, acct.subject_id, acct.binding_id, claimToken, JSON.stringify({ canonical: transfer, sha256: sha(transfer) })]);
+      const receipt = canonicalProfileJson({ schemaVersion: 1, commandId, subjectId: acct.subject_id, bindingId: acct.binding_id, commandHash: sha(transfer),
+        sourceId, sourceVersion: 1, proposalId, proposalHash, outcome: "stored", reason: null, canonicalProfileChanged: false, publicationActive: false });
+      const status = (await owner!.query("SELECT flow_candidate_source_transfer_finish($1,$2) result",
+        [JSON.stringify({ commandId, claimToken, generation: 1 }), JSON.stringify({ canonical: receipt, sha256: sha(receipt) })])).rows[0].result;
+      expect(status.state).toBe("review_ready");
+      return commandId;
+    };
+    const failed = async (resumeId: number) =>
+      ((await owner!.query("SELECT flow_candidate_source_library_status(907) result")).rows[0].result as { resumeId: number; readFailed: boolean }[])
+        .find(x => x.resumeId === resumeId)!.readFailed;
+    const fact = { factId: randomUUID(), kind: "skill", targetRowId: null, value: "Kafka", evidence: [] };
+    const unreadable = await library(20), unmatched = await library(21), nothingNew = await library(22), good = await library(23);
+    const unreadableJob = await read(unreadable.sourceId, [], [RESUME_UNREADABLE_NOTE]);
+    await read(unmatched.sourceId, [], [RESUME_UNMATCHED_NOTE, "A note from the résumé reader."]);
+    await read(nothingNew.sourceId, [], []);
+    await read(good.sourceId, [fact], []);
+    expect([await failed(unreadable.resumeId), await failed(unmatched.resumeId), await failed(nothingNew.resumeId), await failed(good.resumeId)])
+      .toEqual([true, true, false, false]);
+    // Only a coarse value is stored for the read, never the notes or proposal.
+    expect((await owner!.query("SELECT read_outcome FROM candidate_source_jobs WHERE command_id=$1", [unreadableJob])).rows[0].read_outcome).toBe("unreadable");
+    // The real cleanup removes the proposal and receipt; the label stays.
+    await owner!.query("UPDATE candidate_source_jobs SET acknowledged_at=clock_timestamp()-interval '8 days' WHERE user_id=907");
+    await owner!.query("SELECT flow_candidate_source_redact_due()");
+    expect(Number((await owner!.query("SELECT count(*) n FROM candidate_source_jobs WHERE user_id=907 AND (transfer_document IS NOT NULL OR payload_redacted_at IS NULL)")).rows[0].n)).toBe(0);
+    expect([await failed(unreadable.resumeId), await failed(unmatched.resumeId), await failed(nothingNew.resumeId)]).toEqual([true, true, false]);
+    // A later successful read of the same résumé clears it.
+    await read(unreadable.sourceId, [fact], []);
+    expect(await failed(unreadable.resumeId)).toBe(false);
+    // An older read with no recorded outcome stays unknown: not labelled.
+    await owner!.query("UPDATE candidate_source_jobs SET read_outcome=NULL WHERE source_id=$1", [unmatched.sourceId]);
+    expect(await failed(unmatched.resumeId)).toBe(false);
+    // Removing a library file hides its status; nothing else is touched.
+    await owner!.query("UPDATE candidate_source_jobs SET read_outcome='unmatched' WHERE source_id=$1", [unmatched.sourceId]);
+    await removeLibraryResume(db, 907, unmatched.resumeId);
+    expect(((await owner!.query("SELECT flow_candidate_source_library_status(907) result")).rows[0].result as { resumeId: number }[])
+      .some(x => x.resumeId === unmatched.resumeId)).toBe(false);
+    console.log('ONB-2 source catalogue digest', (await owner!.query(SOURCE_CATALOG_SQL,['postgres',[...SOURCE_RUNTIME_FUNCTIONS]])).rows[0].digest);
   });
 
   it("make-default racing an upload leaves exactly one default, owned by the candidate", async () => {

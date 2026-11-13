@@ -895,7 +895,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "db980baf83d5d7e29bf46c0ca0b38a8a65629d8e2138336dff8241e5540164fc"
+      "sha256": "42f5c5a2a41e15b81e902b3d3ddd5cf62f038033d00a78eb9e10622b6d5be4a9"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -1055,11 +1055,11 @@
     },
     {
       "file": "server/schema-migrations/checksums.lock",
-      "sha256": "ce02f98d2e8aed41b10502290404f269f25687dc836367bb705be805cb57dbc3"
+      "sha256": "7a57ce91a70a2aada2d7315cd8fbe83460179ef52d67c7e0e94c6fbcd131514b"
     },
     {
       "file": "server/schema-control/__tests__/schemaControl.pg.test.ts",
-      "sha256": "e72cc417375e77f2f1619d38631d6a7b5530bfd137b93ff45d252e842c2047e0"
+      "sha256": "b676423ff6bc94f13a2bf7dda919b9b2aa8287294ac866553459efd2e930a3a1"
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
