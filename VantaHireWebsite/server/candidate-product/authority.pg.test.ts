@@ -40,7 +40,7 @@ describe.skipIf(!socket)('foundation actual Flow release and runtime authority',
     expect(previous.applied).toHaveLength(25);
   }
   const first=await runReleaseMigration({migrationsDir,creds,connect:()=>connect(owner)});
-  expect(first.applied).toHaveLength(mode==='fresh'?32:7);
+  expect(first.applied).toHaveLength(mode==='fresh'?33:8);
   await provisionRuntimeRole({migrateUrl:url(owner),runtimeUrl:url(runtime),runtimeRole:runtime,
     expectedTargetId:target,connectMigration:()=>connect(owner),connectRuntime:()=>connect(runtime)});
   const replay=await runReleaseMigration({migrationsDir,creds,connect:()=>connect(owner)});

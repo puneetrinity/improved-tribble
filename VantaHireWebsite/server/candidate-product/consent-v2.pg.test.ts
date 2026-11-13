@@ -38,7 +38,7 @@ describe.skipIf(!url)('S2 consent on the full release schema',()=>{
     await provision();
    }finally{rmSync(before,{recursive:true,force:true});}
   }
-  expect((await runReleaseMigration(input)).applied).toHaveLength(mode==='fresh'?32:6);
+  expect((await runReleaseMigration(input)).applied).toHaveLength(mode==='fresh'?33:7);
   expect((await runReleaseMigration(input)).applied).toEqual([]);
   await provision();
   const db=await connect(),app=await connect(runtime);
