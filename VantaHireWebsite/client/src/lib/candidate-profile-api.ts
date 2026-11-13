@@ -299,8 +299,17 @@ export function queueResume(snap: Pick<ResumeSnapshot, "sourceId" | "sourceVersi
       ...(rereadOfCommandId ? { rereadOfCommandId } : {}) }, 202, fetcher);
 }
 /** Explicitly request a NEW interpretation of a completed read; never called by polling. */
-export async function rereadCompletedResume(prior: ResumeSourceStatus, key: string, onUpdate: (s: ResumeSourceStatus) => void, deps: ResumeRunDeps = {}) {
-  const next = await sameKey(() => queueResume(prior, key, deps.postFetcher, prior.commandId), undefined, deps.wait);
+export async function rereadCompletedResume(prior: ResumeSourceStatus, key: string, onUpdate: (s: ResumeSourceStatus) => void, deps: ResumeRunDeps = {}, fallbackKey?: string) {
+  let next: ResumeSourceStatus;
+  try {
+    next = await sameKey(() => queueResume(prior, key, deps.postFetcher, prior.commandId), undefined, deps.wait);
+  } catch (e) {
+    // The completed read can no longer be re-read as such: the candidate's consent changed since it, or it is
+    // no longer the file's latest read. The ordinary request is the right one then: the server starts a fresh
+    // read after a consent change and otherwise returns the file's current read. It never repeats a charge.
+    if (!(e instanceof ProfileApiError && e.code === "source_changed" && fallbackKey)) throw e;
+    next = await sameKey(() => queueResume(prior, fallbackKey, deps.postFetcher), undefined, deps.wait);
+  }
   onUpdate(next);
   return resumeInProgress(next.state) ? watchResume(next.commandId, onUpdate, undefined, deps) : next;
 }

@@ -217,6 +217,35 @@ describe("résumé suggestions", () => {
     expect(bodies[2].rereadOfCommandId).toBe(CMD);
     expect(bodies.filter(b => 'resumeId' in b)).toHaveLength(1);
   });
+  it("a re-read refused because consent changed falls back to the ordinary request, with a stable key and no upload", async () => {
+    const bodies: any[] = [];
+    const fetcher = vi.fn(async (_url: any, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)); bodies.push(body);
+      if ('resumeId' in body) return json(200, { schemaVersion: 1, sourceId: SRC, sourceVersion: 1, contentHash: "a".repeat(64) });
+      if (body.rereadOfCommandId) return json(409, { code: "source_changed" });
+      // ordinary request: the first one finds the old read, later ones the fresh read the server started
+      return json(202, st({ commandId: bodies.filter(b => !('resumeId' in b) && !b.rereadOfCommandId).length === 1 ? CMD : NEXT, state: "review_ready", proposalId: PROP }));
+    });
+    const upload = vi.fn();
+    const fetchProposal = vi.fn().mockResolvedValueOnce({ ...proposal(), facts: [] }).mockResolvedValue(proposal());
+    const a = resumeAdapters({ session: { acceptSource: vi.fn() }, currentProfile: () => null,
+      deps: { fetcher, postFetcher: fetcher, wait: noWait, newKey, upload, fetchProposal } });
+    const old = await a.readResumeById(12);
+    expect(old.items).toEqual([]);
+    const fresh = await a.rereadResume(old.rereadCommandId);
+    expect(fresh.items).toHaveLength(4);
+    expect(fresh.rereadCommandId).toBe(NEXT);
+    const queue = bodies.filter(b => !('resumeId' in b));
+    expect(queue.map(b => !!b.rereadOfCommandId)).toEqual([false, true, false]);
+    expect(queue[2].idempotencyKey).not.toBe(queue[0].idempotencyKey);
+    expect(queue[2].idempotencyKey).not.toBe(queue[1].idempotencyKey);
+    // pressing again repeats the same two requests with the same keys: no third kind of request, no upload
+    await a.rereadResume(old.rereadCommandId);
+    const again = bodies.filter(b => !('resumeId' in b));
+    expect(again[3]).toEqual(again[1]);
+    expect(again[4]).toEqual(again[2]);
+    expect(upload).not.toHaveBeenCalled();
+  });
   it("shows each server fact with the journey's review rows and the quoted evidence", () => {
     const items = proposalItems(proposal());
     expect(items.map(i => [i.kind, i.id])).toEqual([["skill", id(1)], ["project", id(2)], ["employment", id(3)], ["location", id(4)]]);

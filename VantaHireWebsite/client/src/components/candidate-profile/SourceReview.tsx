@@ -211,17 +211,19 @@ export function resumeAdapters(o: {
   const pendingChecks = new Set<string>();
   const retryKeys = new Map<string, string>();
   const rereadKeys = new Map<string, string>();
+  const rereadFallbackKeys = new Map<string, string>();   // stable key for the ordinary request used when a re-read is refused
   const completed = new Map<string, ResumeSourceStatus>();
   async function reread(commandId: string) {
     const prior = completed.get(commandId);
     if (!prior) throw new ResumeReadError({ kind: "error", message: REQUEST_GENERIC });
     if (!rereadKeys.has(commandId)) rereadKeys.set(commandId, (deps.newKey ?? newKey)());
+    if (!rereadFallbackKeys.has(commandId)) rereadFallbackKeys.set(commandId, (deps.newKey ?? newKey)());
     let last: ResumeSourceStatus | null = null;
     try {
       return await extraction(await rereadCompletedResume(prior, rereadKeys.get(commandId)!, s => {
         last = s;
         for (const [id, old] of commands) if (old.sourceId === s.sourceId) commands.set(id, s);
-      }, deps));
+      }, deps, rereadFallbackKeys.get(commandId)!));
     } catch (e) {
       const status = last as ResumeSourceStatus | null;
       if (e instanceof ProfileApiError && e.code === "resume_status_pending" && status) {
