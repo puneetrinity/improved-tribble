@@ -44,7 +44,7 @@ describe.skipIf(!url)('S2 consent on the full release schema',()=>{
   const db=await connect(),app=await connect(runtime);
   try{
    expect(await assertSchemaReady({pg:app,migrationsDir:input.migrationsDir,expectedTargetId:target,environment:'development',criticalPostconditions:FLOW_CRITICAL_POSTCONDITIONS})).toMatchObject({version:'0032',applied:33});
-   expect((await db.query('SELECT count(*)::int n FROM schema_control.applied')).rows[0].n).toBe(32);
+   expect((await db.query('SELECT count(*)::int n FROM schema_control.applied')).rows[0].n).toBe(33);
    expect((await db.query(PROFILE_CATALOG_SQL,[runtime,[...PROFILE_FUNCTIONS]])).rows[0]).toEqual({digest:PROFILE_CATALOG_MD5,privileges:true});
    expect((await db.query(CONSENT_V2_CATALOG_SQL,[runtime,[...CANDIDATE_CONSENT_FUNCTIONS.slice(0,3).map(s=>s.replace(/^public\./,'')),...CONSENT_V2_RUNTIME_FUNCTIONS]])).rows[0]).toEqual({digest:CONSENT_V2_CATALOG_MD5,privileges:true});
    const constraints=await db.query(`SELECT conrelid::regclass::text relation,conname,md5(pg_get_constraintdef(oid)) digest FROM pg_constraint
