@@ -65,7 +65,9 @@ BEGIN
    v:=public.flow_candidate_source_status_value((previous.receipt->>'commandId')::uuid);
    INSERT INTO public.candidate_source_requests VALUES(p_user,k,p_request,v);RETURN v;
   END IF;
-  IF j.state<>'review_ready' OR j.consent_revision<>revision
+  -- Current consent was checked above. An explicit reread under renewed consent
+  -- must retain the fresh server-read profile versions, not use ordinary enqueue.
+  IF j.state<>'review_ready'
    OR EXISTS(SELECT 1 FROM public.candidate_source_paid_operations WHERE command_id=j.command_id AND state IN ('reserved','dispatched','held'))
    OR j.command_id IS DISTINCT FROM (SELECT command_id FROM public.candidate_source_jobs WHERE source_id=s.source_id ORDER BY created_at DESC,command_id DESC LIMIT 1)
   THEN RAISE EXCEPTION 'source_changed' USING ERRCODE='40001';END IF;

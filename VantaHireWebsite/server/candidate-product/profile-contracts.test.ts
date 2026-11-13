@@ -29,6 +29,13 @@ describe('bound network erasure transport',()=>{
  });
 });
 describe('private source proposal transport',()=>{
+ it.each([404,451,503])('classifies source proposal HTTP %s without retry',async status=>{
+  const deps={fetch:vi.fn().mockResolvedValue(new Response('',{status})),sign:vi.fn().mockResolvedValue('token'),env:{ACTIVEKG_BASE_URL:'https://memory.invalid'}};
+  await expect(readSourceProposal(randomUUID(),randomUUID(),randomUUID(),randomUUID(),deps)).rejects.toMatchObject({code:status===404?'source_proposal_unavailable':status===451?'candidate_privacy_restricted':'memory_unavailable'});
+  expect(deps.fetch).toHaveBeenCalledTimes(1);
+  deps.fetch.mockResolvedValue(new Response('',{status:404}));
+  await expect(readSparkProfile(randomUUID(),randomUUID(),deps)).rejects.toMatchObject({code:'memory_unavailable'});
+ });
  const proposal=()=>{
   const body={schemaVersion:1,proposalId:randomUUID(),sourceId:randomUUID(),sourceVersion:1,
    originalDraftVersion:0,originalProfileVersion:0,originalPreferenceVersion:0,originalPreferenceDraftRevision:0,

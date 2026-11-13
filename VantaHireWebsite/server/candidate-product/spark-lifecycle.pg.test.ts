@@ -337,6 +337,20 @@ describe.skipIf(!url)('v3 queue on the full Flow schema and restricted runtime',
   await db.query("UPDATE candidate_source_jobs SET state='review_ready',proposal_id=gen_random_uuid() WHERE command_id=$1",[third.commandId]);
   await expect(sqlSource('enqueue',f.a.userId,{...request,idempotencyKey:randomUUID(),rereadOfCommandId:third.commandId})).rejects.toMatchObject({message:'source_attempt_limit'});
  });
+ it('explicit reread after consent renewal keeps current profile versions instead of the upload snapshot',async()=>{
+  const f=await sourceFixture(),old=f.claim.lease.commandId;
+  await db.query("UPDATE candidate_source_jobs SET state='review_ready',proposal_id=gen_random_uuid(),lease_token=NULL,lease_until=NULL WHERE command_id=$1",[old]);
+  const c=await capture(f.a,'grant',1);
+  await runConsentV2Once({db:app,workerId:'renew-reread',privacy:async()=> 'allowed',deliver:async raw=>{
+   const x=JSON.parse(raw);return {eventId:x.eventId,version:x.version,effectiveVersion:x.version,outcome:'onboarding_granted'};
+  }},c.eventId);
+  const versions={originalDraftVersion:9,originalProfileVersion:4,originalPreferenceVersion:2,originalPreferenceDraftRevision:3};
+  const request={schemaVersion:1,idempotencyKey:randomUUID(),sourceId:f.sourceId,sourceVersion:1,rereadOfCommandId:old,_rereadVersions:versions};
+  const next=await sqlSource('enqueue',f.a.userId,request);
+  expect(next.commandId).not.toBe(old);
+  expect(await sqlSource('claim',randomUUID())).toMatchObject({...versions,consentRevision:2,lease:{commandId:next.commandId}});
+  expect((await sqlSource('enqueue',f.a.userId,request)).commandId).toBe(next.commandId);
+ });
  it('explicit reread refuses unsettled charges, then reserves a new budgeted model call after settlement; withdrawal still blocks it',async()=>{
   await budgets();const f=await sourceFixture();
   const reserved=await sqlSource('paid_reserve',f.request);

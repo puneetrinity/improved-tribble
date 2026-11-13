@@ -46,6 +46,7 @@ function consentFailure(error:unknown,res:Response){
 }
 const profileAvailable:Middleware=(_req,res,next)=>{if(!profileEnabled()){res.status(404).json({code:'not_found'});return;}res.setHeader('Cache-Control','no-store');next();};
 function profileFailure(error:unknown,res:Response){
+ if(error instanceof ProfileTransportError&&error.code==='source_proposal_unavailable'){res.status(404).json({code:error.code,retryable:false});return;}
  if(error instanceof ProfileTransportError&&error.code==='candidate_privacy_restricted'){res.status(451).json({code:error.code});return;}
  if(error instanceof ProfileRepositoryError){res.status(error.status).json({code:error.code});return;}
  if(error instanceof CandidatePrivacyRestrictedError&&error.code==='candidate_privacy_restricted'){res.status(451).json({code:error.code});return;}
