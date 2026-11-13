@@ -1063,7 +1063,7 @@
     },
     {
       "file": "server/schema-control/__tests__/schemaGuard.test.ts",
-      "sha256": "b4aee9255f5e53c2befc32fa072a87f9d44fedf16e234eaa60b35f8e039c427c"
+      "sha256": "9c3410442080aaaf7acaae12854af7e5c6d7891b7a088f9e1be17cc8ed94a478"
     },
     {
       "file": "server/lib/scopedFinancialAdminPublicAuthorization.ts",
