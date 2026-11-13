@@ -88,7 +88,7 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, explicit
       <div className="flex items-start gap-3">
         <FileText className="mt-0.5 h-5 w-5 shrink-0 text-spark-ink" aria-hidden />
         <div className="min-w-0 space-y-1">
-          <h3 id="resume-update-title" className="font-semibold text-foreground">
+          <h3 id="resume-update-title" className="break-words font-semibold text-foreground [overflow-wrap:anywhere]">
             {stage.kind === "done" ? "Added to your profile" : `Update your profile from “${label}”?`}
           </h3>
           <p className="text-sm text-muted-foreground">
@@ -99,7 +99,7 @@ export function DefaultResumeUpdate({ userId, resumeId, label, onClose, explicit
                 : "We didn't find anything to add from this résumé.")
               : stage.kind === "done" ? "Saved to your draft. Confirm changes on your profile to update what employers see."
               : stage.kind === "save_failed" ? "We couldn't confirm your changes were saved. Try again to check — your choices are kept."
-              : stage.kind === "read_failed" ? (stage.read.kind === "pending" ? "The résumé result is still pending." : "We couldn't read this résumé.")
+              : stage.kind === "read_failed" ? (stage.read.kind === "pending" ? "The résumé result is still pending." : "We couldn't show suggestions from this résumé.")
               : "Keep what's right, edit or remove the rest. Only what's different from your profile is shown."}
           </p>
         </div>

@@ -454,11 +454,13 @@ function MyProfile({ discovery, matching, justFinishedOnboarding, profile, openU
             {[...resumes].sort((a: any, b: any) => Number(Boolean(b.isDefault)) - Number(Boolean(a.isDefault)) || b.id - a.id).map((r: any) => (
               <li key={r.id} className="flex flex-wrap items-center gap-3 py-3">
                 <FileText className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-                <div className="min-w-0 flex-1"><p className="truncate font-medium">{r.label}{r.isDefault && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Default</span>}</p><p className="text-sm text-muted-foreground">Uploaded {new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
+                <div className="min-w-0 flex-1 basis-56"><p className="flex min-w-0 items-center gap-2"><span className="truncate font-medium">{r.label}</span>{r.isDefault && <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">Default</span>}</p><p className="whitespace-nowrap text-sm text-muted-foreground">Uploaded {new Date(r.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</p></div>
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-1">
                 {!r.isDefault && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer text-muted-foreground" onClick={() => void makeDefault(r)} aria-label={`Make ${r.label} your default résumé`}>Make default</Button>}
-                {r.isDefault && resumeRouting === "spark" && <Button type="button" variant="ghost" onClick={() => setOfferFor({ id: r.id, label: r.label, explicit: true })}>Update profile</Button>}
+                {r.isDefault && resumeRouting === "spark" && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setOfferFor({ id: r.id, label: r.label, explicit: true })}>Update profile</Button>}
                 {r.readFailed === true && <span className="text-sm text-destructive">Couldn’t read</span>}
                 <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1.5 text-muted-foreground" disabled={removing} onClick={() => setRemoveFor({ id: r.id, label: r.label })} aria-label={`Remove ${r.label}`}><Trash2 className="h-4 w-4" aria-hidden /><span>Remove</span></Button>
+                </div>
               </li>
             ))}
           </ul>

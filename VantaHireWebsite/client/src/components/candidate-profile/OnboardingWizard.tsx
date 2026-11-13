@@ -221,16 +221,16 @@ export function ResumeReviewList({ items, choice, setChoice, edits, setEdits }: 
       ) : (
         <li key={it.id} className={cn("flex flex-wrap items-start gap-3 rounded-xl border border-border bg-card p-4", choice[it.id] === "remove" && "opacity-60")}>
           <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 basis-48">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">{RESUME_KIND[it.kind]}</p>
             {edits[it.id] !== undefined
               ? <Input aria-label={`Edit ${RESUME_KIND[it.kind].toLowerCase()}`} value={edits[it.id]} onChange={e => setEdits(m => ({ ...m, [it.id]: e.target.value }))} className="mt-1 min-h-11" />
-              : <p className={cn("text-sm text-foreground", choice[it.id] === "remove" && "line-through")}>{resumeLabel(it)}</p>}
+              : <p className={cn("break-words text-sm text-foreground", choice[it.id] === "remove" && "line-through")}>{resumeLabel(it)}</p>}
             <p className="mt-1 text-xs text-muted-foreground">From your résumé: <q className="italic">{it.evidence}</q></p>
           </div>
           {choice[it.id] === "remove"
-            ? <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setChoice(c => ({ ...c, [it.id]: "keep" }))}>Keep it</Button>
-            : <div className="flex gap-1">
+            ? <Button type="button" variant="ghost" className="ml-auto min-h-11 cursor-pointer" onClick={() => setChoice(c => ({ ...c, [it.id]: "keep" }))}>Keep it</Button>
+            : <div className="ml-auto flex gap-1">
                 {edits[it.id] === undefined && editable(it) !== null && <Button type="button" variant="ghost" className="min-h-11 cursor-pointer" onClick={() => setEdits(m => ({ ...m, [it.id]: editable(it)! }))}>Edit</Button>}
                 <Button type="button" variant="ghost" className="min-h-11 cursor-pointer gap-1" onClick={() => setChoice(c => ({ ...c, [it.id]: "remove" }))}><Trash2 className="h-4 w-4" aria-hidden />Remove</Button>
               </div>}
