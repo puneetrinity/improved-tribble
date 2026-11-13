@@ -895,7 +895,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "5798c47346af931566b3a62cb18c9a68a1d1dadf8b183df6992a38f52ee03e12"
+      "sha256": "6bd789b65cd8afde93d66583a58920dc798510115b45ed25d17681acf594a966"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",

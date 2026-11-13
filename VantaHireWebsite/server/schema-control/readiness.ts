@@ -69,7 +69,7 @@ export async function profilePrivilegesReady(pg:PgLike,role:string,required:bool
 }
 
 export const CONSENT_V2_CATALOG_MD5='53023911157addbac8df92d2535b2f50';
-export const SOURCE_CATALOG_MD5='0deac068f514d1777255e71f72262957';
+export const SOURCE_CATALOG_MD5='6ab060c7e8e9c4a468aa7d8c0d52cf04';
 export const SOURCE_CATALOG_SQL=FOUNDATION_CATALOG_SQL
  .replace("(c.relname LIKE 'candidate_product_%' OR c.relname='candidate_network_intents')","c.relname LIKE 'candidate_source_%'")
  .replace("p.proname LIKE 'flow_candidate_foundation_%'","p.proname LIKE 'flow_candidate_source_%'")
