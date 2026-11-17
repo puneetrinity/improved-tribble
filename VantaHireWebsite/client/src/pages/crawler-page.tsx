@@ -43,6 +43,7 @@ const sections: LegalSection[] = [
         <p>It reads only what a visitor to a public careers page can see without signing in:</p>
         <ul className={listCls}>
           <li>Job title, description, location and job reference</li>
+          <li>Salary or pay range, where the posting states one</li>
           <li>Posting and closing dates, where the page shows them</li>
           <li>The link to the employer&apos;s own job page and application page</li>
         </ul>
@@ -63,15 +64,23 @@ const sections: LegalSection[] = [
     content: (
       <ul className={listCls}>
         <li>
-          It reads <code>robots.txt</code> for each site and follows the rules for{" "}
-          <code>EalanaJobsBot</code>, or for <code>*</code> when it is not named.
+          On an employer&apos;s own website it reads <code>robots.txt</code> and follows the rules for{" "}
+          <code>EalanaJobsBot</code>, or for <code>*</code> when it is not named, including a{" "}
+          <code>Crawl-delay</code>.
         </li>
-        <li>It follows a <code>Crawl-delay</code> when your <code>robots.txt</code> sets one.</li>
+        <li>
+          Two hiring platforms are read through their public job-posting interfaces, where the
+          platform&apos;s own <code>robots.txt</code> is not applied: SmartRecruiters (the public Posting
+          API) and Eightfold (the public careers API on <code>eightfold.ai</code> addresses). If your
+          jobs are published through either, a <code>robots.txt</code> rule will not stop collection;
+          write to us instead.
+        </li>
         <li>It spaces its requests to each site instead of sending them in bursts.</li>
         <li>
           When a site answers &quot;429 Too Many Requests&quot; or &quot;503 Service Unavailable&quot;, it stops
-          and waits. It waits for the time in <code>Retry-After</code> when one is given, and
-          longer after repeated refusals.
+          and waits at least one minute, and longer after repeated refusals. When the answer
+          gives a <code>Retry-After</code> time it waits at least that long, up to a limit of 24
+          hours.
         </li>
       </ul>
     ),
@@ -83,13 +92,17 @@ const sections: LegalSection[] = [
     title: "How to slow it down or stop it",
     content: (
       <>
-        <p>To stop EalanaJobsBot from reading your site, add this to your <code>robots.txt</code>:</p>
+        <p>
+          To stop EalanaJobsBot from reading your own website, add this to its{" "}
+          <code>robots.txt</code>:
+        </p>
         <pre className={codeCls}>{"User-agent: EalanaJobsBot\nDisallow: /"}</pre>
         <p>To slow it down, set a delay in seconds between requests:</p>
         <pre className={codeCls}>{"User-agent: EalanaJobsBot\nCrawl-delay: 10"}</pre>
         <p className={noteCls}>
-          You can also write to us. Tell us the careers page address, and we will stop collecting
-          from it and remove its jobs from ealana.
+          These rules apply to websites you control. If your careers page is hosted by a hiring
+          platform, or you would rather not edit <code>robots.txt</code>, write to us with the
+          careers page address. We will stop collecting from it and remove its jobs from ealana.
         </p>
       </>
     ),
