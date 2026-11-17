@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "8ef31cada4ed2169528d2da6c8f075cde77eb26e",
-  "source_census_sha256": "64d3544af8a366c8710ab9446c3ad05d789a22121280cd98eebedd5bab7fc57b",
+  "source_census_sha256": "8d0ab4fc612e93fa15fc0ebe97df785de114b07104e267d3fc2dcfff5a3e8097",
   "contract": "Every discovered candidate-bearing source is hash-pinned and classified. UI is never an enforcement point.",
   "mandatory_files": [
     "client/src/lib/candidate-profile-api.ts",

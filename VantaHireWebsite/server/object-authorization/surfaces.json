@@ -895,7 +895,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "998bb457fd1f773395be42633f6dba6462faf5073465dc8aff9ba1406b051e9a"
+      "sha256": "15a314f40cf9b44eecefdfa204fa59a10566caacc6ffc85b910ed61f515ad462"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -1103,7 +1103,7 @@
     },
     {
       "file": "client/src/App.tsx",
-      "sha256": "e983db24f4ead299e354563c00a6636c9d12c0bbc99c2b9ec1f52996f32690d9"
+      "sha256": "250990d45842f1353cf4565a0556b6e24dd2a592f0a64f81a713619c7f452183"
     },
     {
       "file": "client/src/components/QuickAccessBar.tsx",

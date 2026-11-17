@@ -56,6 +56,7 @@ const PublicFormPage = lazy(() => import("@/pages/public-form-page"));
 const PrivacyPolicyPage = lazy(() => import("@/pages/privacy-policy-page"));
 const TermsOfServicePage = lazy(() => import("@/pages/terms-of-service-page"));
 const CookiePolicyPage = lazy(() => import("@/pages/cookie-policy-page"));
+const CrawlerPage = lazy(() => import("@/pages/crawler-page"));
 const VerifyEmailPage = lazy(() => import("@/pages/verify-email-page"));
 const ResetPasswordPage = lazy(() => import("@/pages/reset-password-page"));
 const ProfileSettingsPage = lazy(() => import("@/pages/profile-settings-page"));
@@ -108,6 +109,7 @@ function Router() {
       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
       <Route path="/terms-of-service" component={TermsOfServicePage} />
       <Route path="/cookie-policy" component={CookiePolicyPage} />
+      <Route path="/crawler" component={CrawlerPage} />
       <Route path="/verify-email/:token" component={VerifyEmailPage} />
       <Route path="/reset-password/:token" component={ResetPasswordPage} />
       <Route path="/register-hiring-manager/:token" component={RegisterHiringManager} />

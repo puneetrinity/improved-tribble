@@ -230,6 +230,11 @@ export async function setupVite(app: Express, server: Server) {
       description: 'Terms and conditions for using the ealana recruiting platform. Covers account usage, data ownership, and service agreements.',
       canonical: 'https://ealana.com/terms-of-service',
     },
+    '/crawler': {
+      title: 'EalanaJobsBot | ealana',
+      description: 'What the EalanaJobsBot crawler reads, how it behaves, and how site owners can slow it down or stop it.',
+      canonical: 'https://ealana.com/crawler',
+    },
     '/cookie-policy': {
       title: 'Cookie Policy | ealana',
       description: 'How ealana uses cookies and similar technologies. Learn about the cookies we use and how to manage your preferences.',
@@ -520,6 +525,11 @@ export async function serveStatic(app: Express) {
       title: 'Terms of Service | ealana',
       description: 'Terms and conditions for using the ealana recruiting platform. Covers account usage, data ownership, and service agreements.',
       canonical: 'https://ealana.com/terms-of-service',
+    },
+    '/crawler': {
+      title: 'EalanaJobsBot | ealana',
+      description: 'What the EalanaJobsBot crawler reads, how it behaves, and how site owners can slow it down or stop it.',
+      canonical: 'https://ealana.com/crawler',
     },
     '/cookie-policy': {
       title: 'Cookie Policy | ealana',
