@@ -24,6 +24,7 @@ import RecruiterProfilePage from './pages/recruiter-profile-page';
 import PrivacyPolicyPage from './pages/privacy-policy-page';
 import TermsOfServicePage from './pages/terms-of-service-page';
 import CookiePolicyPage from './pages/cookie-policy-page';
+import CrawlerPage from './pages/crawler-page';
 
 // Null auth context for SSR — public pages always render unauthenticated view
 const nullAuthContext = {
@@ -94,6 +95,7 @@ export function render(
                       <Route path="/privacy-policy" component={PrivacyPolicyPage} />
                       <Route path="/terms-of-service" component={TermsOfServicePage} />
                       <Route path="/cookie-policy" component={CookiePolicyPage} />
+                      <Route path="/crawler" component={CrawlerPage} />
                     </Switch>
                   </Router>
                 </Suspense>
