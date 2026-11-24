@@ -1,4 +1,7 @@
 import type { Express, NextFunction, Request, Response } from 'express';
+import {registerJobsAccessRoutes} from '../jobs-access/routes';
+import {registerJobsInteraction} from '../jobs-access/interaction';
+import {storage as jobsAccountStorage} from '../storage';
 import { requireVerifiedCandidate } from '../auth';
 import { pool } from '../db';
 import { recentConsentAuth } from '../candidate-consent/repository';
@@ -138,6 +141,11 @@ export function registerCandidateResumeRoutes(app: Express, csrfProtection: Midd
   });
 }
 export function registerCandidateProfileRoutes(app: Express, csrfProtection: Middleware): void {
+  registerJobsInteraction(app,requireVerifiedCandidate,csrfProtection,{owner:a=>profiles.owner(a),read:readSparkProfile},
+    ()=>process.env.JOBS_MCP_ACCESS_ENABLED==='true'&&profileEnabled()&&sparkEnabled(),id=>jobsAccountStorage.getUser(id));
+  registerJobsAccessRoutes(app,requireVerifiedCandidate,{owner:a=>profiles.owner(a),read:readSparkProfile},
+    ()=>process.env.JOBS_MCP_ACCESS_ENABLED==='true'&&profileEnabled()&&sparkEnabled(),
+    ()=>process.env.JOBS_MCP_RESOURCE_URL);
   const interpretationAvailable:Middleware=(_req,res,next)=>{
     res.setHeader('Cache-Control','no-store');
     if(!interpretationEnabled()){res.status(404).json({code:'not_found'});return;}next();
