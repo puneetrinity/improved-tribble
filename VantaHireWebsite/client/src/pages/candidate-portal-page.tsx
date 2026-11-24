@@ -11,27 +11,29 @@ import { CareerProfilePanel, PROFILE_QUERY_KEY, publicationPoll } from "@/compon
 import { loadProfile, type ProfileLoad } from "@/lib/candidate-profile-api";
 import { SessionEnded } from "@/components/candidate-profile/SparkStates";
 import {fetchWithCsrf} from '@/lib/csrf';
+import {Button} from '@/components/ui/button';
 
 function JobsAssistantAccess({userId}:{userId:number}){
   const [message,setMessage]=useState('');
+  const [disconnecting,setDisconnecting]=useState<string|null>(null);
   const access=useQuery<{eligible:boolean;resource?:string;instructions?:string}|null>({queryKey:['jobs-mcp-access',userId],retry:false,staleTime:0,
     queryFn:async()=>{const r=await fetch('/api/candidate/jobs-access',{cache:'no-store'});if(r.status===404)return null;if(!r.ok)throw Error('unavailable');return r.json();}});
-  const connections=useQuery<{grant_id:string;client_id:string;expires_at:string}[]>({queryKey:['jobs-mcp-connections',userId],retry:false,staleTime:0,enabled:!access.isPending&&access.data!==null,
+  const connections=useQuery<{grant_id:string;client_name?:string;expires_at:string}[]>({queryKey:['jobs-mcp-connections',userId],retry:false,staleTime:0,enabled:!access.isPending&&access.data!==null,
     queryFn:async()=>{const r=await fetchWithCsrf('/api/candidate/jobs-connect/connections',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'},{retryOn403:false});if(!r.ok)throw Error('unavailable');const b=await r.json();if(!Array.isArray(b.connections))throw Error('invalid');return b.connections;}});
-  async function disconnect(id:string){setMessage('Disconnecting…');try{
+  async function disconnect(id:string){if(disconnecting)return;setDisconnecting(id);setMessage('Disconnecting…');try{
     const r=await fetchWithCsrf('/api/candidate/jobs-connect/disconnect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({grant_id:id})},{retryOn403:false});
     if(!r.ok)throw Error();setMessage('Disconnected. Existing assistant conversation history is not deleted.');await connections.refetch();
-  }catch{setMessage('Disconnect could not be confirmed. Please retry.');}}
+  }catch{setMessage('Disconnect could not be confirmed. Please retry.');}finally{setDisconnecting(null);}}
   if(access.isPending||access.data===null)return null;
-  return <section className="mx-auto max-w-5xl rounded-xl border p-4 my-4" aria-label="Jobs in your assistant">
-    <h2 className="font-semibold">Use Ealana jobs in your assistant</h2>
-    {access.isError?<p>Connection information is temporarily unavailable. <button onClick={()=>void access.refetch()}>Retry</button></p>:
-      access.data?.eligible?<><p>{access.data.instructions}</p><p><code>{access.data.resource}</code></p><p>Choose a remote MCP connection in your assistant, enter this URL and sign in. Your candidate profile is not shared.</p></>:
-      <p><a href="/candidate-setup">Complete your onboarding</a> to connect. No additional recruiter consent is required.</p>}
-    <h3 className="mt-3 font-semibold">Connected assistants</h3>
-    {connections.isError?<p>Could not load connections. <button onClick={()=>void connections.refetch()}>Retry</button></p>:
-      connections.isPending?<p>Loading…</p>:connections.data?.length?connections.data.map(c=><p key={c.grant_id}>{c.client_id} <button onClick={()=>void disconnect(c.grant_id)}>Disconnect</button></p>):<p>No connected assistants.</p>}
-    <p role="status">{message}</p>
+  return <section className="mb-6 space-y-3 rounded-xl border border-border bg-background p-4 text-sm text-foreground md:p-6" aria-label="Jobs in your assistant">
+    <h2 className="text-lg font-semibold">Use Ealana jobs in your assistant</h2>
+    {access.isError?<p>Connection information is temporarily unavailable. <Button variant="outline" className="ml-2 min-h-11" onClick={()=>void access.refetch()}>Retry</Button></p>:
+      access.data?.eligible?<><p>{access.data.instructions}</p><p className="break-all rounded-md bg-muted p-3"><code>{access.data.resource}</code></p><p className="text-muted-foreground">Choose a remote MCP connection in your assistant, enter this URL and sign in. Your candidate profile is not shared.</p></>:
+      <p><a className="underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href="/candidate-setup">Complete your onboarding</a> to connect.</p>}
+    <h3 className="pt-2 font-semibold">Connected assistants</h3>
+    {connections.isError?<p>Could not load connections. <Button variant="outline" className="ml-2 min-h-11" onClick={()=>void connections.refetch()}>Retry</Button></p>:
+      connections.isPending?<p aria-live="polite">Loading connections…</p>:connections.data?.length?connections.data.map(c=><div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3" key={c.grant_id}><span>{c.client_name||'Assistant connection'}</span><Button variant="outline" className="min-h-11" disabled={disconnecting!==null} onClick={()=>void disconnect(c.grant_id)}>{disconnecting===c.grant_id?'Disconnecting…':'Disconnect'}</Button></div>):<p className="text-muted-foreground">No connected assistants.</p>}
+    <p role="status" aria-live="polite">{message}</p>
   </section>;
 }
 
@@ -108,8 +110,8 @@ export default function CandidatePortalPage() {
   if (!user || user.role !== "candidate" || !user.emailVerified) return <Redirect to="/candidate-auth#signin" />;
   return (
     <>
-    <JobsAssistantAccess key={user.id} userId={user.id}/>
     <CandidatePortal firstName={greetingName} section={section} onNavigate={go}
+      assistantAccess={<JobsAssistantAccess key={user.id} userId={user.id}/>}
       discovery={discovery} matching={matching} justFinishedOnboarding={welcome}
       sparkConsent={profile.data?.kind === "ready" && !!profile.data.profile.spark}
       resumeRouting={resumeRouting} onRetryResumeRouting={() => void profile.refetch()}

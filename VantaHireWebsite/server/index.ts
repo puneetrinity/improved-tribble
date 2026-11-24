@@ -57,7 +57,7 @@ app.use(express.json({
   verify: (req: any, _res, buf) => {
     // Store raw body for webhook signature verification
     const pathname = req.url?.split('?')[0];
-    if (req.url?.startsWith('/api/webhooks/') || pathname === '/api/candidate/product'
+    if (req.url?.startsWith('/api/webhooks/') || pathname === '/api/internal/jobs-readiness' || pathname === '/api/candidate/product'
         || pathname?.startsWith('/api/candidate/product/')) {
       req.rawBody = buf.toString('utf-8');
     }

@@ -26,12 +26,12 @@ const MANIFEST = "server/object-authorization/surfaces.json";
 const scratch: string[] = [];
 
 describe("4C route census amendment", () => {
-  it("refuses the pre-consent route census without relaxing prior authorization contracts", () => {
+  it.each([316,357])("refuses historical route census %s without relaxing prior authorization contracts", (historical) => {
     const root = fixture();
     const path = join(root, MANIFEST);
     const manifest = JSON.parse(readFileSync(path, "utf8"));
-    expect(manifest.route_registration_census).toBe(357);
-    manifest.route_registration_census = 316;
+    expect(manifest.route_registration_census).toBe(361);
+    manifest.route_registration_census = historical;
     writeFileSync(path, JSON.stringify(manifest));
     expect(checkObjectAuthorization(root)).toContain("object authorization route census contract is invalid.");
   });

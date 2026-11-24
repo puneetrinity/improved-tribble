@@ -1,7 +1,7 @@
 {
   "format_version": 1,
   "source_commit": "ae84dcf9af22ac15cca0fe1eaf546ee338fff779",
-  "route_registration_census": 357,
+  "route_registration_census": 361,
   "contract": "Application object reads, workflow mutations, AI candidate context, similarity, email context and provider handoff plus current membership/seat-scoped job, roster, hiring-manager, financial-document, organization-activity, routine-admin, talent-pool, organization privilege and versioned invitation commands are fail-closed; protected authorization and mutations share statement-bound grants; organization member privilege changes and password changes advance the affected account authorization version atomically; organization invitation bearers are strict, hashed at rest and ordinary registration never treats possession as mailbox proof; hiring-manager directory eligibility binds the stored organization to the exact accepted user; legacy numeric sessions are version-1 compatible and new sessions carry only id plus authVersion; provider/file work follows exact authorization; resume locator proxies, client-side download tracking, the routine admin application collection, consultant product and unsafe current-membership organization-attribution repair surfaces are retired. Historical ownership remains unknown and no replacement attribution is inferred. Seat-capacity serialization, password-reset token clearing, organization provisioning after the owner grant, accepted-history re-entry, invitation delivery truth and talent-pool conversion/suggestions remain outside this closure.",
   "routes": [
     {"method":"post","path":"/api/candidate/product/consent/signup-intent/activate","command":"flow_consent_v2_signup_activate","authority":"Verified candidate session and CSRF, capture/delivery gates, exact stored signup wording, linked owner/current privacy; newer grant or withdrawal supersedes intent."},
@@ -835,11 +835,11 @@
     },
     {
       "file": "../.github/workflows/ci.yml",
-      "sha256": "a6f7158a1d5746b97c768862bddeed1fa016e10ce3c677f359e15ca173e20048"
+      "sha256": "42b01e560b7cb756685aff0562c582e8eb8756855081925042feecfa8e487f3a"
     },
     {
       "file": "package.json",
-      "sha256": "a3bad82c5f1f95e791dfdd65b9f148c5a9101893e61ae09f5a8b024ee99f896a"
+      "sha256": "1cb303ab0598913c46db59d19498545bb9e3f876594b32448458c8ae1822b48e"
     },
     {
       "file": "vitest.server.config.ts",
@@ -895,7 +895,7 @@
     },
     {
       "file": "server/candidate-privacy/surfaces.json",
-      "sha256": "998bb457fd1f773395be42633f6dba6462faf5073465dc8aff9ba1406b051e9a"
+      "sha256": "8b8de9ef91af1e308ad4332587bf44e0d8ea732c1000eedf0f7dc5e1e74d22f5"
     },
     {
       "file": "server/lib/__tests__/applicationReadAuthorization.test.ts",
@@ -903,7 +903,7 @@
     },
     {
       "file": "server/lib/__tests__/objectAuthorizationSurfaceGuard.test.ts",
-      "sha256": "d078e9df6081f724c5c050daba57af5cf014182f7445c0cc3f7ee7337965ce7b"
+      "sha256": "4da4e11e2627863875f6383b45a44d9a75924119aebb2184058d7e9fc852e6bf"
     },
     {
       "file": "server/lib/__tests__/membershipScopedReadAuthorization.test.ts",
@@ -1007,7 +1007,7 @@
     },
     {
       "file": "scripts/check-object-authorization.mjs",
-      "sha256": "9b743cfc2ca25d626f52bc5f8b99e513b65a8e5e488215892bfe720c2fade17f"
+      "sha256": "a1b45d5f143350bcd0bd1ae7de7227a372a65899a8b810fd8ecf9cfe5edae7e6"
     },
     {
       "file": "client/src/pages/candidates-page.tsx",
@@ -1326,7 +1326,7 @@
     },
     {
       "file": "server/index.ts",
-      "sha256": "f66b31cfd8640af124aeea7de4067a1fff040f3943f7d7cda41f6e8346cb788c"
+      "sha256": "b530c2dd0f3265a8015c16483602833c096f20d2d596274b4ab13206c80919ae"
     },
     {
       "file": "server/aiWorker.ts",

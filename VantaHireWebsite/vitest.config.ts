@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => ({
     env: loadEnv(mode, process.cwd(), ''),
     css: true,
     exclude: [
+      'server/jobs-access/**/*.test.ts', // node:test; CI runs test:jobs-access separately
       'node_modules/**',
       '**/node_modules/**',    // Exclude all nested node_modules
       'provisioning-portal/**', // Exclude provisioning portal

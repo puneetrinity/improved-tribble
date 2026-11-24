@@ -64,6 +64,7 @@ type Props = {
   loadMoreFailed?: boolean | undefined;
   /** The profile page (CareerProfilePanel) and, once matching is live, recommendations. */
   profile: ReactNode;
+  assistantAccess?: ReactNode;
   recommendations?: ReactNode;
   onSignOut: () => void;
 };
@@ -105,7 +106,7 @@ export function CandidatePortal(p: Props) {
             </div>
           </div>
         )}
-        {p.section === "find" && <FindJobs {...p} />}
+        {p.section === "find" && <>{p.assistantAccess}<FindJobs {...p} /></>}
         {p.section === "jobs" && <MyJobs onBrowse={() => p.onNavigate("find")} />}
         {p.section === "profile" && <MyProfile {...p} openUpload={openUpload} />}
         {p.section === "privacy" && (

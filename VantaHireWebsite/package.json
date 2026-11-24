@@ -7,6 +7,7 @@
     "node": ">=20 <21"
   },
   "scripts": {
+    "test:jobs-access": "tsx --test server/jobs-access/*.test.ts",
     "dev": "cross-env NODE_ENV=development tsx --env-file=.env server/index.ts",
     "build": "vite build && npm run build:ssr && npm run build:server",
     "build:ssr": "vite build --ssr src/entry-server.tsx --outDir ../dist/server",

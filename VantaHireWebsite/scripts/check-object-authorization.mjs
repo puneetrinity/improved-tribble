@@ -2253,7 +2253,11 @@ export function checkObjectAuthorization(root = DEFAULT_ROOT, manifestRelative =
   // This lexical census includes that witness; no extra public route was added.
   // Spark release fixes (2026-11-07) add one owner-only candidate route:
   // PATCH /api/ai/resume/:id/default (verified candidate, CSRF, own résumé only).
-  if (manifest.route_registration_census !== 357) {
+  // Jobs access adds four lexical registrations (seven concrete routes):
+  // readiness (signed raw bytes), start (bounded, no candidate read), access
+  // (verified candidate), and the four-action loop (verified candidate + CSRF).
+  // Existing seventy object-authorization routes/frozen blocks are unchanged.
+  if (manifest.route_registration_census !== 361) {
     problems.push("object authorization route census contract is invalid.");
   }
   if (!Array.isArray(manifest.frozen_route_blocks) || manifest.frozen_route_blocks.length !== 7) {
